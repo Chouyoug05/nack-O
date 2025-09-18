@@ -32,7 +32,7 @@ const EventPublicPage = () => {
         const snap = await getDocs(q);
         if (!snap.empty) {
           const d = snap.docs[0];
-          const data = d.data() as any;
+          const data = d.data();
           const e: Event = {
             id: d.id,
             title: data.title,

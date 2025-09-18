@@ -31,7 +31,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { lossesColRef, productsColRef } from "@/lib/collections";
-import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
+import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction } from "firebase/firestore";
 import type { ProductDoc, LossDoc } from "@/types/inventory";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
@@ -58,9 +58,8 @@ const StockPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
@@ -222,41 +221,6 @@ const StockPage = () => {
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Suppression Ã©chouÃ©e", variant: "destructive" });
     }
   };
-
-  const handleEditProduct = (product: Product) => {
-    setEditingProduct(product);
-    setIsEditModalOpen(true);
-  };
-
-
-  const handleUpdateProduct = async () => {
-    if (!user || !editingProduct) return;
-    
-    if (!editingProduct.name || !editingProduct.category || !editingProduct.price || !editingProduct.quantity) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez remplir tous les champs obligatoires",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const productRef = fsDoc(productsColRef(db, user.uid), editingProduct.id);
-      await updateDoc(productRef, {
-        ...editingProduct,
-        updatedAt: Date.now()
-      });
-      
-      setIsEditModalOpen(false);
-      setEditingProduct(null);
-      toast({ title: "Produit modifié", description: `${editingProduct.name} a été modifié avec succès` });
-    } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Erreur inconnue";
-      toast({ title: "Erreur", description: message, variant: "destructive" });
-    }
-  };
-
 
   const handleRecordLoss = async () => {
     if (!user) return;
@@ -663,196 +627,16 @@ const StockPage = () => {
                        variant="destructive"
                        className="h-11 px-6 text-base font-medium"
                      >
-                     </Button>
-
                        Enregistrer la perte
-
-              <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-                  <DialogHeader className="pb-4">
-                    <DialogTitle className="text-xl font-bold">Modifier le produit</DialogTitle>
-                    <DialogDescription className="text-base">
-                      Modifiez les informations du produit sélectionné.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-6 py-4">
-                    {/* Informations de base */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold border-b pb-2">Informations de base</h3>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="edit-name" className="text-sm font-medium mb-2 block">Nom du produit *</Label>
-                          <Input
-                            id="edit-name"
-                            value={editingProduct?.name || ""}
-                            onChange={(e) => setEditingProduct({...editingProduct!, name: e.target.value})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: Bière Castel"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-category" className="text-sm font-medium mb-2 block">Catégorie *</Label>
-                          <Select
-                            value={editingProduct?.category || ""}
-                            onValueChange={(value) => setEditingProduct({...editingProduct!, category: value})}
-                          >
-                            <SelectTrigger className="w-full h-11 text-base bg-background">
-                              <SelectValue placeholder="Sélectionner une catégorie" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50">
-                              {categories.map(cat => (
-                                <SelectItem key={cat} value={cat} className="text-base py-2 cursor-pointer hover:bg-muted">
-                                  {cat}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-icon" className="text-sm font-medium mb-2 block">Icône</Label>
-                          <Select
-                            value={editingProduct?.icon || ""}
-                            onValueChange={(value) => setEditingProduct({...editingProduct!, icon: value})}
-                          >
-                            <SelectTrigger className="w-full h-11 text-base bg-background">
-                              <SelectValue placeholder="Sélectionner une icône" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
-                              {availableIcons.map(iconItem => (
-                                <SelectItem key={iconItem.name} value={iconItem.name} className="text-base py-3 cursor-pointer hover:bg-muted">
-                                  <div className="flex items-center gap-3">
-                                    <iconItem.icon size={20} />
-                                    <span>{iconItem.label}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-imageUrl" className="text-sm font-medium mb-2 block">Image (URL)</Label>
-                          <Input 
-                            id="edit-imageUrl" 
-                            value={editingProduct?.imageUrl || ""} 
-                            onChange={(e) => setEditingProduct({...editingProduct!, imageUrl: e.target.value})} 
-                            placeholder="https://.../image.png" 
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-description" className="text-sm font-medium mb-2 block">Description</Label>
-                          <Textarea
-                            id="edit-description"
-                            value={editingProduct?.description || ""}
-                            onChange={(e) => setEditingProduct({...editingProduct!, description: e.target.value})}
-                            className="w-full text-base min-h-[80px]"
-                            placeholder="Description du produit (optionnel)"
-                            rows={3}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Prix et stock */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold border-b pb-2">Prix et stock</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edit-price" className="text-sm font-medium mb-2 block">Prix de vente (XAF) *</Label>
-                          <Input
-                            id="edit-price"
-                            type="number"
-                            value={editingProduct?.price || ""}
-                            onChange={(e) => setEditingProduct({...editingProduct!, price: Number(e.target.value)})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 1500"
-                            min="0"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-cost" className="text-sm font-medium mb-2 block">Coût d'achat (XAF)</Label>
-                          <Input
-                            id="edit-cost"
-                            type="number"
-                            value={editingProduct?.cost || ""}
-                            onChange={(e) => setEditingProduct({...editingProduct!, cost: Number(e.target.value)})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 1000"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label htmlFor="edit-quantity" className="text-sm font-medium mb-2 block">Quantité *</Label>
-                        <Input
-                          id="edit-quantity"
-                          type="number"
-                          value={editingProduct?.quantity || ""}
-                          onChange={(e) => setEditingProduct({...editingProduct!, quantity: Number(e.target.value)})}
-                          className="w-full h-11 text-base"
-                          placeholder="Ex: 50"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Formule optionnelle */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold border-b pb-2">Formule (optionnel)</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="edit-formulaUnits" className="text-sm font-medium mb-2 block">Nombre d'unités</Label>
-                          <Input
-                            id="edit-formulaUnits"
-                            type="number"
-                            value={editingProduct?.formula?.units || ""}
-                            onChange={(e) => setEditingProduct({
-                              ...editingProduct!, 
-                              formula: {...editingProduct!.formula!, units: Number(e.target.value)}
-                            })}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 2"
-                            min="1"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="edit-formulaPrice" className="text-sm font-medium mb-2 block">Prix de la formule (XAF)</Label>
-                          <Input
-                            id="edit-formulaPrice"
-                            type="number"
-                            value={editingProduct?.formula?.price || ""}
-                            onChange={(e) => setEditingProduct({
-                              ...editingProduct!, 
-                              formula: {...editingProduct!.formula!, price: Number(e.target.value)}
-                            })}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 4500"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        setIsEditModalOpen(false);
-                        setEditingProduct(null);
-                      }}
-                      className="h-11 px-6 text-base"
-                    >
-                      Annuler
-                    </Button>
-                    <Button 
-                      onClick={handleUpdateProduct} 
-                      className="bg-gradient-primary text-white h-11 px-6 text-base font-medium"
-                    >
-                      Modifier le produit
-                    </Button>
-                  </div>
-                </DialogContent>
+                     </Button>
+                   </div>
+                 </DialogContent>
               </Dialog>
-
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
               <Input
@@ -938,9 +722,29 @@ const StockPage = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                          <Button variant="ghost" size="sm">
                             <Edit size={16} />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(product.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleDeleteProduct(product.id)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
                             <Trash2 size={16} />
                           </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default StockPage;

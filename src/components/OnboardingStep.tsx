@@ -8,7 +8,7 @@ interface OnboardingStepProps {
   title: string;
   description: string;
   image?: string;
-  animation?: any;
+  animation?: object;
   type?: "image" | "lottie" | "icon";
   iconType?: "restaurant" | "inventory" | "analytics";
   currentStep: number;

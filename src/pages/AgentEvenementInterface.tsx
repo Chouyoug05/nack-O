@@ -58,7 +58,7 @@ const AgentEvenementInterface = () => {
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(eventsColRef(db, user.uid), (snap) => {
-      const list = snap.docs.map(d => ({ id: d.id, title: (d.data() as any).title as string }));
+      const list = snap.docs.map(d => ({ id: d.id, title: d.data().title as string }));
       setEvents(list);
       if (!selectedEventId && list.length > 0) setSelectedEventId(list[0].id);
     });
@@ -81,7 +81,7 @@ const AgentEvenementInterface = () => {
       await updateDoc(fsDoc(eventTicketsColRef(db, user.uid, selectedEventId), ticketId), {
         validated,
         validatedAt: validated ? Date.now() : null,
-      } as any);
+      });
     } catch {
       toast({ title: 'Erreur', description: "Impossible de mettre à jour le ticket", variant: 'destructive' });
       }

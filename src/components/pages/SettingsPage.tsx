@@ -255,7 +255,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                                 phone: establishmentInfo.phone,
                                 logoUrl: url,
                                 logoDeleteToken: deleteToken,
-                              } as any);
+                              });
                               toast({ title: "Logo mis à jour", description: "Votre logo a été téléchargé." });
                             } catch {
                               toast({ title: "Échec de l'upload", description: "Veuillez réessayer avec une image différente.", variant: "destructive" });
