@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { useEffect, useRef } from "react";
 import Lottie, { LottieRef } from "lottie-react";
 import { cn } from "@/lib/utils";
 
