@@ -1,0 +1,82 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { OrderProvider } from "@/contexts/OrderContext";
+import { EventProvider } from "@/contexts/EventContext";
+import PWAInstallButton from "@/components/PWAInstallButton";
+import Index from "./pages/Index";
+import Onboarding from "./pages/Onboarding";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import Dashboard from "./pages/Dashboard";
+import ServeurInterface from "./pages/ServeurInterface";
+import CaisseInterface from "./pages/CaisseInterface";
+import EventPublicPage from "./pages/EventPublicPage";
+import AgentEvenementInterface from "./pages/AgentEvenementInterface";
+import NotFound from "./pages/NotFound";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import CompleteProfile from "./pages/CompleteProfile";
+
+const queryClient = new QueryClient();
+
+const RequireAuth = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return user ? <>{children}</> : <Navigate to="/login" replace />;
+};
+
+const RequireProfile = ({ children }: { children: React.ReactNode }) => {
+  const { user, profile, profileLoading } = useAuth();
+  if (profileLoading) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!profile) return <Navigate to="/complete-profile" replace />;
+  return <>{children}</>;
+};
+
+const AppContent = () => {
+  const location = useLocation();
+  
+  return (
+    <>
+      <Routes>
+        <Route path="/" element={<Onboarding />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/complete-profile" element={<RequireAuth><CompleteProfile /></RequireAuth>} />
+        <Route path="/dashboard" element={<RequireAuth><RequireProfile><Dashboard /></RequireProfile></RequireAuth>} />
+        <Route path="/serveur/:agentCode" element={<ServeurInterface />} />
+        <Route path="/caisse/:agentCode" element={<CaisseInterface />} />
+        <Route path="/agent-evenement/:agentCode" element={<AgentEvenementInterface />} />
+        <Route path="/event/:eventId" element={<EventPublicPage />} />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      {!location.pathname.startsWith('/event/') && <PWAInstallButton />}
+    </>
+  );
+};
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <AuthProvider>
+      <EventProvider>
+        <OrderProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </OrderProvider>
+      </EventProvider>
+      </AuthProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;

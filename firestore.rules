@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public mapping for resolving agents by token/code
+    match /agentTokens/{id} {
+      allow read: if true;
+      allow write: if request.auth != null; // only authenticated app users write
+    }
+
+    // Public read for events and tickets
+    match /profiles/{userId}/events/{eventId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+      match /tickets/{ticketId} {
+        allow read: if true;
+        allow write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // Products: public read, owner write
+    match /profiles/{userId}/products/{productId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Orders: public read; writes allowed for owner or valid agent token mapping
+    match /profiles/{userId}/orders/{orderId} {
+      allow read: if true;
+      allow write: if (
+        request.auth != null && request.auth.uid == userId
+      ) || (
+        // Validate that the request carries an agentToken that maps to this owner
+        // and that mapping exists in top-level agentTokens
+        exists(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)) &&
+        get(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)).data.ownerUid == userId
+      );
+    }
+
+    // Team subcollection: owner only
+    match /profiles/{userId}/team/{memberId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Owner-only access for other profile docs and subcollections
+    match /profiles/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+} 

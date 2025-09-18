@@ -1,0 +1,946 @@
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  Package, 
+  Plus, 
+  Search, 
+  Edit, 
+  Trash2, 
+  AlertTriangle,
+  TrendingDown,
+  DollarSign,
+  Coffee,
+  Wine,
+  Pizza,
+  Sandwich,
+  IceCream,
+  Beer,
+  GlassWater,
+  Cookie,
+  Cherry,
+  Apple
+} from "lucide-react";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
+import { lossesColRef, productsColRef } from "@/lib/collections";
+import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
+import type { ProductDoc, LossDoc } from "@/types/inventory";
+import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
+import { deleteImageByToken } from "@/lib/cloudinary";
+
+interface Product {
+  id: string;
+  name: string;
+  category: string;
+  price: number;
+  quantity: number;
+  cost: number;
+  description?: string;
+  icon?: string;
+  imageUrl?: string;
+  formula?: {
+    units: number;
+    price: number;
+  };
+}
+
+const StockPage = () => {
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isLossModalOpen, setIsLossModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(productsColRef(db, user.uid), (snap) => {
+      const list: Product[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Product, 'id'>) }));
+      setProducts(list);
+    });
+    return () => unsub();
+  }, [user]);
+
+  const [newProduct, setNewProduct] = useState({
+    name: "",
+    category: "",
+    price: "",
+    quantity: "",
+    cost: "",
+    description: "",
+    icon: "",
+    imageUrl: "",
+    formulaUnits: "",
+    formulaPrice: ""
+  });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isSavingProduct, setIsSavingProduct] = useState(false);
+
+  const [lossData, setLossData] = useState({
+    productId: "",
+    quantity: "",
+    reason: "",
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  const categories = ["Boissons", "Plats", "Alcools", "Snacks", "Desserts"];
+  
+  const availableIcons = [
+    { name: "Beer", icon: Beer, label: "Bière" },
+    { name: "Wine", icon: Wine, label: "Vin/Alcool" },
+    { name: "Coffee", icon: Coffee, label: "Café" },
+    { name: "GlassWater", icon: GlassWater, label: "Boisson" },
+    { name: "Pizza", icon: Pizza, label: "Pizza" },
+    { name: "Sandwich", icon: Sandwich, label: "Sandwich" },
+    { name: "Cookie", icon: Cookie, label: "Snack" },
+    { name: "IceCream", icon: IceCream, label: "Dessert" },
+    { name: "Cherry", icon: Cherry, label: "Fruit" },
+    { name: "Apple", icon: Apple, label: "Pomme" }
+  ];
+
+  const getProductIcon = (iconName?: string) => {
+    if (!iconName) return Package;
+    const iconItem = availableIcons.find(item => item.name === iconName);
+    return iconItem ? iconItem.icon : Package;
+  };
+
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const lowStockProducts = products.filter(p => p.quantity <= 10);
+  const totalStockValue = products.reduce((total, product) => total + (product.price * product.quantity), 0);
+
+  const handleAddProduct = async () => {
+    if (!user) return;
+    if (!newProduct.name || !newProduct.category || !newProduct.price || !newProduct.quantity) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs obligatoires",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validate numbers
+    const priceNum = Number(newProduct.price);
+    const qtyNum = Number(newProduct.quantity);
+    const costNum = Number(newProduct.cost || 0);
+    if (Number.isNaN(priceNum) || Number.isNaN(qtyNum) || priceNum < 0 || qtyNum < 0 || costNum < 0) {
+      toast({ title: "Valeurs invalides", description: "Prix, quantité et coût doivent être des nombres positifs.", variant: "destructive" });
+      return;
+    }
+
+    setIsSavingProduct(true);
+    try {
+    let finalImageUrl: string | undefined = newProduct.imageUrl || undefined;
+    let finalDeleteToken: string | undefined;
+    if (imageFile) {
+      try {
+        const up = await uploadImageToCloudinaryDetailed(imageFile, "products");
+        finalImageUrl = up.url;
+        finalDeleteToken = up.deleteToken;
+      } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Échec de l'upload";
+          // Ne pas bloquer l'ajout du produit si Cloudinary n'est pas configuré ou si l'upload échoue
+          toast({ title: "Image non ajoutée", description: msg + ". Le produit sera ajouté sans image.", variant: "destructive" });
+      }
+    }
+
+    const payload: ProductDoc = {
+      name: newProduct.name,
+      category: newProduct.category,
+        price: priceNum,
+        quantity: qtyNum,
+        cost: costNum,
+        ...(newProduct.description ? { description: newProduct.description } : {}),
+        ...(newProduct.icon ? { icon: newProduct.icon } : {}),
+        ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
+        ...(finalDeleteToken ? { imageDeleteToken: finalDeleteToken } : {}),
+        ...(newProduct.formulaUnits && newProduct.formulaPrice ? {
+          formula: {
+        units: Number(newProduct.formulaUnits),
+        price: Number(newProduct.formulaPrice)
+          }
+        } : {}),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+      await addDoc(productsColRef(db, user.uid), payload as ProductDoc);
+
+    setNewProduct({ 
+      name: "", 
+      category: "", 
+      price: "", 
+      quantity: "", 
+      cost: "", 
+      description: "",
+      icon: "",
+      imageUrl: "",
+      formulaUnits: "",
+      formulaPrice: ""
+    });
+    setImageFile(null);
+    setIsAddModalOpen(false);
+      toast({ title: "Produit ajouté", description: `${payload.name} a été ajouté au stock avec succès` });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erreur inconnue";
+      toast({ title: "Échec de l'ajout", description: message, variant: "destructive" });
+    } finally {
+      setIsSavingProduct(false);
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    if (!user) return;
+    try {
+      const ref = fsDoc(productsColRef(db, user.uid), id);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const data = snap.data() as ProductDoc;
+        if (data.imageDeleteToken) {
+          try { await deleteImageByToken(data.imageDeleteToken); } catch { /* ignore */ }
+        }
+      }
+      await deleteDoc(ref);
+      toast({ title: "Produit supprimé", description: "Le produit a été retiré du stock" });
+    } catch (e: unknown) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Suppression échouée", variant: "destructive" });
+    }
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setIsEditModalOpen(true);
+  };
+
+
+  const handleUpdateProduct = async () => {
+    if (!user || !editingProduct) return;
+    
+    if (!editingProduct.name || !editingProduct.category || !editingProduct.price || !editingProduct.quantity) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs obligatoires",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const productRef = fsDoc(productsColRef(db, user.uid), editingProduct.id);
+      await updateDoc(productRef, {
+        ...editingProduct,
+        updatedAt: Date.now()
+      });
+      
+      setIsEditModalOpen(false);
+      setEditingProduct(null);
+      toast({ title: "Produit modifi�", description: `${editingProduct.name} a �t� modifi� avec succ�s` });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erreur inconnue";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
+    }
+  };
+
+
+  const handleRecordLoss = async () => {
+    if (!user) return;
+    if (!lossData.productId || !lossData.quantity || !lossData.reason) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs obligatoires",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const lossQuantity = Number(lossData.quantity);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const productRef = fsDoc(productsColRef(db, user.uid), lossData.productId);
+        const productSnap = await transaction.get(productRef);
+        if (!productSnap.exists()) throw new Error("Produit introuvable");
+        const product = productSnap.data() as Product;
+        if (lossQuantity > product.quantity) throw new Error("La quantité de perte dépasse le stock");
+        transaction.update(productRef, { quantity: product.quantity - lossQuantity, updatedAt: Date.now() });
+        const lossRefParent = lossesColRef(db, user.uid);
+        await transaction.set(fsDoc(lossRefParent), {
+          productId: lossData.productId,
+          productName: product.name,
+          quantity: lossQuantity,
+          reason: lossData.reason,
+          date: lossData.date,
+          cost: product.cost * lossQuantity,
+          createdAt: Date.now(),
+        } as LossDoc);
+      });
+
+      setLossData({
+        productId: "",
+        quantity: "",
+        reason: "",
+        date: new Date().toISOString().split('T')[0]
+      });
+      setIsLossModalOpen(false);
+
+      toast({
+        title: "Perte enregistrée",
+        description: `${lossQuantity} unité(s) enregistrée(s) en perte`,
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erreur lors de l'enregistrement";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="shadow-card border-0">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Produits</p>
+                <p className="text-2xl font-bold">{products.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
+                <Package size={24} className="text-nack-red" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card border-0">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Valeur du Stock</p>
+                <p className="text-2xl font-bold">{totalStockValue.toLocaleString()} XAF</p>
+              </div>
+              <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
+                <DollarSign size={24} className="text-nack-red" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card border-0">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Stock Faible</p>
+                <p className="text-2xl font-bold text-red-600">{lowStockProducts.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                <AlertTriangle size={24} className="text-red-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Controls */}
+      <Card className="shadow-card border-0">
+        <CardHeader>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <CardTitle>Gestion du Stock</CardTitle>
+              <CardDescription>Gérez vos produits et surveillez les stocks</CardDescription>
+            </div>
+             <div className="flex gap-2">
+               <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                 <DialogTrigger asChild>
+                   <Button 
+                     className="bg-gradient-primary text-white shadow-button hover:shadow-elegant"
+                     onClick={() => {
+                       setIsAddModalOpen(true);
+                     }}
+                   >
+                     <Plus className="mr-2" size={18} />
+                     Ajouter un produit
+                   </Button>
+                 </DialogTrigger>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader className="pb-4">
+                    <DialogTitle className="text-xl font-bold">Ajouter un nouveau produit</DialogTitle>
+                    <DialogDescription className="text-base">
+                      Remplissez les informations du produit à ajouter au stock.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-6 py-4">
+                    {/* Informations de base */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold border-b pb-2">Informations de base</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="name" className="text-sm font-medium mb-2 block">Nom du produit *</Label>
+                          <Input
+                            id="name"
+                            value={newProduct.name}
+                            onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: Bière Castel"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="category" className="text-sm font-medium mb-2 block">Catégorie *</Label>
+                          <Select
+                            value={newProduct.category}
+                            onValueChange={(value) => setNewProduct({...newProduct, category: value})}
+                          >
+                            <SelectTrigger className="w-full h-11 text-base bg-background">
+                              <SelectValue placeholder="Sélectionner une catégorie" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50">
+                              {categories.map(cat => (
+                                <SelectItem key={cat} value={cat} className="text-base py-2 cursor-pointer hover:bg-muted">
+                                  {cat}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="icon" className="text-sm font-medium mb-2 block">Icône</Label>
+                          <Select
+                            value={newProduct.icon}
+                            onValueChange={(value) => setNewProduct({...newProduct, icon: value})}
+                          >
+                            <SelectTrigger className="w-full h-11 text-base bg-background">
+                              <SelectValue placeholder="Sélectionner une icône" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
+                              {availableIcons.map(iconItem => (
+                                <SelectItem key={iconItem.name} value={iconItem.name} className="text-base py-3 cursor-pointer hover:bg-muted">
+                                  <div className="flex items-center gap-3">
+                                    <iconItem.icon size={20} />
+                                    <span>{iconItem.label}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="productImage" className="text-sm font-medium mb-2 block">Image produit (fichier)</Label>
+                          <Input id="productImage" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
+                          <Label htmlFor="imageUrl" className="text-sm font-medium mb-2 block mt-2">ou Image (URL)</Label>
+                          <Input id="imageUrl" value={newProduct.imageUrl} onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})} placeholder="https://.../image.png" />
+                        </div>
+                        <div>
+                          <Label htmlFor="description" className="text-sm font-medium mb-2 block">Description</Label>
+                          <Textarea
+                            id="description"
+                            value={newProduct.description}
+                            onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                            className="w-full text-base min-h-[80px]"
+                            placeholder="Description du produit (optionnel)"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Prix et stock */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold border-b pb-2">Prix et stock</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="price" className="text-sm font-medium mb-2 block">Prix de vente (XAF) *</Label>
+                          <Input
+                            id="price"
+                            type="number"
+                            value={newProduct.price}
+                            onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 1500"
+                            min="0"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="cost" className="text-sm font-medium mb-2 block">Coût d'achat (XAF)</Label>
+                          <Input
+                            id="cost"
+                            type="number"
+                            value={newProduct.cost}
+                            onChange={(e) => setNewProduct({...newProduct, cost: e.target.value})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 1000"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="quantity" className="text-sm font-medium mb-2 block">Quantité initiale *</Label>
+                        <Input
+                          id="quantity"
+                          type="number"
+                          value={newProduct.quantity}
+                          onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})}
+                          className="w-full h-11 text-base"
+                          placeholder="Ex: 50"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Formule optionnelle */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold border-b pb-2">Formule (optionnel)</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="formulaUnits" className="text-sm font-medium mb-2 block">Nombre d'unités</Label>
+                          <Input
+                            id="formulaUnits"
+                            type="number"
+                            value={newProduct.formulaUnits}
+                            onChange={(e) => setNewProduct({...newProduct, formulaUnits: e.target.value})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 2"
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="formulaPrice" className="text-sm font-medium mb-2 block">Prix de la formule (XAF)</Label>
+                          <Input
+                            id="formulaPrice"
+                            type="number"
+                            value={newProduct.formulaPrice}
+                            onChange={(e) => setNewProduct({...newProduct, formulaPrice: e.target.value})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 4500"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        La formule permet de proposer un prix spécial pour plusieurs unités
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setIsAddModalOpen(false)}
+                      className="h-11 px-6 text-base"
+                    >
+                      Annuler
+                    </Button>
+                    <Button 
+                      onClick={handleAddProduct} 
+                      disabled={isSavingProduct}
+                      className="bg-gradient-primary text-white h-11 px-6 text-base font-medium"
+                    >
+                      {isSavingProduct ? 'Ajout...' : 'Ajouter le produit'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+               <Dialog open={isLossModalOpen} onOpenChange={setIsLossModalOpen}>
+                 <DialogTrigger asChild>
+                   <Button 
+                     variant="outline" 
+                     className="border-red-200 text-red-600 hover:bg-red-50"
+                     onClick={() => {
+                       setIsLossModalOpen(true);
+                     }}
+                   >
+                     <TrendingDown className="mr-2" size={18} />
+                     Perte
+                   </Button>
+                 </DialogTrigger>
+                 <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+                   <DialogHeader className="pb-4">
+                     <DialogTitle className="text-xl font-bold">Enregistrer une perte</DialogTitle>
+                     <DialogDescription className="text-base">
+                       Sélectionnez le produit et la quantité perdue pour mettre à jour le stock.
+                     </DialogDescription>
+                   </DialogHeader>
+                   <div className="space-y-6 py-4">
+                     <div>
+                       <Label htmlFor="product" className="text-sm font-medium mb-2 block">Produit concerné *</Label>
+                       <Select
+                         value={lossData.productId}
+                         onValueChange={(value) => setLossData({...lossData, productId: value})}
+                       >
+                         <SelectTrigger className="w-full h-11 text-base bg-background">
+                           <SelectValue placeholder="Sélectionner un produit" />
+                         </SelectTrigger>
+                         <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
+                           {products.map(product => (
+                             <SelectItem key={product.id} value={product.id} className="text-base py-3 cursor-pointer hover:bg-muted">
+                               <div className="flex flex-col items-start">
+                                 <span className="font-medium">{product.name}</span>
+                                 <span className="text-sm text-muted-foreground">Stock disponible: {product.quantity}</span>
+                               </div>
+                             </SelectItem>
+                           ))}
+                         </SelectContent>
+                       </Select>
+                     </div>
+
+                     <div>
+                       <Label htmlFor="lossQuantity" className="text-sm font-medium mb-2 block">Quantité perdue *</Label>
+                       <Input
+                         id="lossQuantity"
+                         type="number"
+                         value={lossData.quantity}
+                         onChange={(e) => setLossData({...lossData, quantity: e.target.value})}
+                         className="w-full h-11 text-base"
+                         placeholder="Nombre d'unités perdues"
+                         min="1"
+                       />
+                     </div>
+
+                     <div>
+                       <Label htmlFor="reason" className="text-sm font-medium mb-2 block">Raison de la perte *</Label>
+                       <Select
+                         value={lossData.reason}
+                         onValueChange={(value) => setLossData({...lossData, reason: value})}
+                       >
+                         <SelectTrigger className="w-full h-11 text-base bg-background">
+                           <SelectValue placeholder="Sélectionner une raison" />
+                         </SelectTrigger>
+                         <SelectContent className="bg-background border shadow-lg z-50">
+                           <SelectItem value="expired" className="text-base py-2 cursor-pointer hover:bg-muted">
+                             Produit expiré
+                           </SelectItem>
+                           <SelectItem value="damaged" className="text-base py-2 cursor-pointer hover:bg-muted">
+                             Produit endommagé
+                           </SelectItem>
+                           <SelectItem value="theft" className="text-base py-2 cursor-pointer hover:bg-muted">
+                             Vol
+                           </SelectItem>
+                           <SelectItem value="error" className="text-base py-2 cursor-pointer hover:bg-muted">
+                             Erreur d'inventaire
+                           </SelectItem>
+                           <SelectItem value="other" className="text-base py-2 cursor-pointer hover:bg-muted">
+                             Autre
+                           </SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
+
+                     <div>
+                       <Label htmlFor="date" className="text-sm font-medium mb-2 block">Date de la perte</Label>
+                       <Input
+                         id="date"
+                         type="date"
+                         value={lossData.date}
+                         onChange={(e) => setLossData({...lossData, date: e.target.value})}
+                         className="w-full h-11 text-base"
+                       />
+                     </div>
+                   </div>
+                   <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+                     <Button 
+                       variant="outline" 
+                       onClick={() => setIsLossModalOpen(false)}
+                       className="h-11 px-6 text-base"
+                     >
+                       Annuler
+                     </Button>
+                     <Button 
+                       onClick={handleRecordLoss} 
+                       variant="destructive"
+                       className="h-11 px-6 text-base font-medium"
+                     >
+                     </Button>
+
+                       Enregistrer la perte
+
+              <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader className="pb-4">
+                    <DialogTitle className="text-xl font-bold">Modifier le produit</DialogTitle>
+                    <DialogDescription className="text-base">
+                      Modifiez les informations du produit s�lectionn�.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-6 py-4">
+                    {/* Informations de base */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold border-b pb-2">Informations de base</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="edit-name" className="text-sm font-medium mb-2 block">Nom du produit *</Label>
+                          <Input
+                            id="edit-name"
+                            value={editingProduct?.name || ""}
+                            onChange={(e) => setEditingProduct({...editingProduct!, name: e.target.value})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: Bi�re Castel"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-category" className="text-sm font-medium mb-2 block">Cat�gorie *</Label>
+                          <Select
+                            value={editingProduct?.category || ""}
+                            onValueChange={(value) => setEditingProduct({...editingProduct!, category: value})}
+                          >
+                            <SelectTrigger className="w-full h-11 text-base bg-background">
+                              <SelectValue placeholder="S�lectionner une cat�gorie" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50">
+                              {categories.map(cat => (
+                                <SelectItem key={cat} value={cat} className="text-base py-2 cursor-pointer hover:bg-muted">
+                                  {cat}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-icon" className="text-sm font-medium mb-2 block">Ic�ne</Label>
+                          <Select
+                            value={editingProduct?.icon || ""}
+                            onValueChange={(value) => setEditingProduct({...editingProduct!, icon: value})}
+                          >
+                            <SelectTrigger className="w-full h-11 text-base bg-background">
+                              <SelectValue placeholder="S�lectionner une ic�ne" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
+                              {availableIcons.map(iconItem => (
+                                <SelectItem key={iconItem.name} value={iconItem.name} className="text-base py-3 cursor-pointer hover:bg-muted">
+                                  <div className="flex items-center gap-3">
+                                    <iconItem.icon size={20} />
+                                    <span>{iconItem.label}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-imageUrl" className="text-sm font-medium mb-2 block">Image (URL)</Label>
+                          <Input 
+                            id="edit-imageUrl" 
+                            value={editingProduct?.imageUrl || ""} 
+                            onChange={(e) => setEditingProduct({...editingProduct!, imageUrl: e.target.value})} 
+                            placeholder="https://.../image.png" 
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-description" className="text-sm font-medium mb-2 block">Description</Label>
+                          <Textarea
+                            id="edit-description"
+                            value={editingProduct?.description || ""}
+                            onChange={(e) => setEditingProduct({...editingProduct!, description: e.target.value})}
+                            className="w-full text-base min-h-[80px]"
+                            placeholder="Description du produit (optionnel)"
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Prix et stock */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold border-b pb-2">Prix et stock</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="edit-price" className="text-sm font-medium mb-2 block">Prix de vente (XAF) *</Label>
+                          <Input
+                            id="edit-price"
+                            type="number"
+                            value={editingProduct?.price || ""}
+                            onChange={(e) => setEditingProduct({...editingProduct!, price: Number(e.target.value)})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 1500"
+                            min="0"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-cost" className="text-sm font-medium mb-2 block">Co�t d'achat (XAF)</Label>
+                          <Input
+                            id="edit-cost"
+                            type="number"
+                            value={editingProduct?.cost || ""}
+                            onChange={(e) => setEditingProduct({...editingProduct!, cost: Number(e.target.value)})}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 1000"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-quantity" className="text-sm font-medium mb-2 block">Quantit� *</Label>
+                        <Input
+                          id="edit-quantity"
+                          type="number"
+                          value={editingProduct?.quantity || ""}
+                          onChange={(e) => setEditingProduct({...editingProduct!, quantity: Number(e.target.value)})}
+                          className="w-full h-11 text-base"
+                          placeholder="Ex: 50"
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Formule optionnelle */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold border-b pb-2">Formule (optionnel)</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="edit-formulaUnits" className="text-sm font-medium mb-2 block">Nombre d'unit�s</Label>
+                          <Input
+                            id="edit-formulaUnits"
+                            type="number"
+                            value={editingProduct?.formula?.units || ""}
+                            onChange={(e) => setEditingProduct({
+                              ...editingProduct!, 
+                              formula: {...editingProduct!.formula!, units: Number(e.target.value)}
+                            })}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 2"
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="edit-formulaPrice" className="text-sm font-medium mb-2 block">Prix de la formule (XAF)</Label>
+                          <Input
+                            id="edit-formulaPrice"
+                            type="number"
+                            value={editingProduct?.formula?.price || ""}
+                            onChange={(e) => setEditingProduct({
+                              ...editingProduct!, 
+                              formula: {...editingProduct!.formula!, price: Number(e.target.value)}
+                            })}
+                            className="w-full h-11 text-base"
+                            placeholder="Ex: 4500"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsEditModalOpen(false);
+                        setEditingProduct(null);
+                      }}
+                      className="h-11 px-6 text-base"
+                    >
+                      Annuler
+                    </Button>
+                    <Button 
+                      onClick={handleUpdateProduct} 
+                      className="bg-gradient-primary text-white h-11 px-6 text-base font-medium"
+                    >
+                      Modifier le produit
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
+              <Input
+                placeholder="Rechercher un produit..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full md:w-[200px]">
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les catégories</SelectItem>
+                {categories.map(cat => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Products Table */}
+          <div className="rounded-lg border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="text-left p-4 font-semibold">Produit</th>
+                    <th className="text-left p-4 font-semibold">Catégorie</th>
+                    <th className="text-left p-4 font-semibold">Prix</th>
+                    <th className="text-left p-4 font-semibold">Stock</th>
+                    <th className="text-left p-4 font-semibold">Statut</th>
+                    <th className="text-left p-4 font-semibold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map((product) => (
+                    <tr key={product.id} className="border-t border-border hover:bg-muted/50">
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} alt={product.name} className="w-6 h-6 rounded object-cover" />
+                          ) : (
+                            (() => {
+                              const IconComponent = getProductIcon(product.icon);
+                              return <IconComponent size={20} className="text-nack-red" />;
+                            })()
+                          )}
+                          <div>
+                            <p className="font-medium">{product.name}</p>
+                            {product.description && (
+                              <p className="text-sm text-muted-foreground">{product.description}</p>
+                            )}
+                            {product.formula && (
+                              <Badge variant="outline" className="mt-1 text-xs">
+                                Formule: {product.formula.units} unités à {product.formula.price.toLocaleString()} XAF
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        <Badge variant="secondary">{product.category}</Badge>
+                      </td>
+                      <td className="p-4 font-semibold">{product.price.toLocaleString()} XAF</td>
+                      <td className="p-4">
+                        <span className={`font-medium ${product.quantity <= 10 ? 'text-red-600' : 'text-foreground'}`}>
+                          {product.quantity}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {product.quantity <= 10 ? (
+                          <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                            <TrendingDown size={12} />
+                            Stock faible
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                            En stock
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                            <Edit size={16} />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteProduct(product.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                            <Trash2 size={16} />
+                          </Button>
