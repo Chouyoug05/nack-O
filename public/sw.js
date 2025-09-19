@@ -1,46 +1,24 @@
-const CACHE_NAME = 'nack-v1';
-const urlsToCache = [
-  '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json'
-];
+const CACHE_NAME = 'nack-cleanup-v2';
 
-// Install event
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(function(cache) {
-        console.log('Service Worker: Cache opened');
-        return cache.addAll(urlsToCache);
-      })
-  );
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
 });
 
-// Fetch event
-self.addEventListener('fetch', function(event) {
-  event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        // Return cached version or fetch from network
-        return response || fetch(event.request);
-      }
-    )
-  );
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const names = await caches.keys();
+      await Promise.all(names.map((n) => caches.delete(n)));
+    } catch {}
+    try {
+      await self.clients.claim();
+    } catch {}
+    try {
+      await self.registration.unregister();
+    } catch {}
+  })());
 });
 
-// Activate event
-self.addEventListener('activate', function(event) {
-  event.waitUntil(
-    caches.keys().then(function(cacheNames) {
-      return Promise.all(
-        cacheNames.map(function(cacheName) {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Service Worker: Clearing old cache');
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
-  );
+self.addEventListener('fetch', (event) => {
+  // Ne pas intercepter: laisser le réseau gérer
 });
