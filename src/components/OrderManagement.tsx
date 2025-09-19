@@ -211,7 +211,7 @@ const OrderManagement = ({
   const handleProcessOrder = async (order: Order) => {
     if (processingIds.has(order.id)) return;
     setProcessingIds(prev => new Set(prev).add(order.id));
-    toast({ title: "Validation en cours...", description: `Commande #${order.orderNumber}` });
+    // validation silencieuse: pas de toast
     if (uidToUse && (typeof navigator === 'undefined' || navigator.onLine)) {
       try {
         let redirected = false;
@@ -223,7 +223,7 @@ const OrderManagement = ({
             localStorage.setItem('nack_prefill_order_meta', JSON.stringify({ orderId: order.id, ownerUid: uidToUse }));
           } catch { /* ignore */ }
           onGoToSales();
-          toast({ title: "Panier pré-rempli", description: "Rendez-vous dans Point de Vente pour encaisser." });
+          // pas de toast ici: redirection directe vers Ventes
           redirected = true;
         }
         if (redirected) {

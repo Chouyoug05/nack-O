@@ -245,7 +245,17 @@ const SalesPage = () => {
       }
 
       setIsSaving(true);
-      // 1) Batch atomique: décrémenter le stock + créer la vente
+      // 1) Déterminer le propriétaire pour l'écriture (meta > user)
+      let ownerUidForWrites: string | undefined = user?.uid;
+      try {
+        const metaRaw = localStorage.getItem('nack_prefill_order_meta');
+        if (metaRaw) {
+          const meta = JSON.parse(metaRaw) as { ownerUid?: string };
+          if (meta.ownerUid) ownerUidForWrites = meta.ownerUid;
+        }
+      } catch { /* ignore */ }
+      if (!ownerUidForWrites) throw new Error("Propriétaire introuvable pour l'écriture");
+      // 2) Batch atomique: décrémenter le stock + créer la vente
       const batch = writeBatch(db);
         for (const item of cart) {
           const productRef = fsDoc(productsColRef(db, user.uid), item.id);
@@ -259,9 +269,9 @@ const SalesPage = () => {
         batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
         }
         const saleItems: SaleItem[] = cart.map(ci => ({ id: ci.id, name: ci.name, price: ci.price, quantity: ci.quantity, isFormula: ci.isFormula }));
-      const saleCol = salesColRef(db, user.uid);
-      // @ts-expect-error Firestore modular typing for new doc id
-      const saleRef = fsDoc(saleCol);
+              const saleCol = salesColRef(db, ownerUidForWrites);
+        // create new sale doc id
+        const saleRef = fsDoc(saleCol as any);
       const saleDoc: SaleDoc = { items: saleItems, total: cartTotal, paymentMethod: selectedPayment, createdAt: Date.now() };
       batch.set(saleRef, saleDoc);
       await batch.commit();
