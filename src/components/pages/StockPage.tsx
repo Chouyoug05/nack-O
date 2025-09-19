@@ -31,7 +31,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { lossesColRef, productsColRef } from "@/lib/collections";
-import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction } from "firebase/firestore";
+import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
 import type { ProductDoc, LossDoc } from "@/types/inventory";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
@@ -59,6 +59,7 @@ const StockPage = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -204,6 +205,23 @@ const StockPage = () => {
     }
   };
 
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setNewProduct({
+      name: product.name,
+      category: product.category,
+      price: String(product.price),
+      quantity: String(product.quantity),
+      cost: String(product.cost),
+      description: product.description || "",
+      icon: product.icon || "",
+      imageUrl: product.imageUrl || "",
+      formulaUnits: product.formula?.units ? String(product.formula.units) : "",
+      formulaPrice: product.formula?.price ? String(product.formula.price) : "",
+    });
+    setIsAddModalOpen(true);
+  };
+
   const handleDeleteProduct = async (id: string) => {
     if (!user) return;
     try {
@@ -219,6 +237,42 @@ const StockPage = () => {
       toast({ title: "Produit supprimé", description: "Le produit a été retiré du stock" });
     } catch (e: unknown) {
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Suppression échouée", variant: "destructive" });
+    }
+  };
+
+  const handleUpdateProduct = async () => {
+    if (!user || !editingProduct) return;
+
+    if (!editingProduct.name || !editingProduct.category || !editingProduct.price || !editingProduct.quantity) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs obligatoires",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const productRef = fsDoc(productsColRef(db, user.uid), editingProduct.id);
+      await updateDoc(productRef, {
+        name: editingProduct.name,
+        category: editingProduct.category,
+        price: Number(editingProduct.price),
+        quantity: Number(editingProduct.quantity),
+        cost: Number(editingProduct.cost || 0),
+        description: editingProduct.description || undefined,
+        icon: editingProduct.icon || undefined,
+        imageUrl: editingProduct.imageUrl || undefined,
+        formula: editingProduct.formula?.units && editingProduct.formula?.price ? { units: Number(editingProduct.formula.units), price: Number(editingProduct.formula.price) } : undefined,
+        updatedAt: Date.now()
+      } as Partial<ProductDoc>);
+
+      setIsAddModalOpen(false);
+      setEditingProduct(null);
+      toast({ title: "Produit modifié", description: "Le produit a été mis à jour" });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erreur inconnue";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
     }
   };
 
@@ -343,7 +397,7 @@ const StockPage = () => {
                  </DialogTrigger>
                 <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader className="pb-4">
-                    <DialogTitle className="text-xl font-bold">Ajouter un nouveau produit</DialogTitle>
+                    <DialogTitle className="text-xl font-bold">{editingProduct ? "Modifier le produit" : "Ajouter un nouveau produit"}</DialogTitle>
                     <DialogDescription className="text-base">
                       Remplissez les informations du produit à ajouter au stock.
                     </DialogDescription>
@@ -508,11 +562,11 @@ const StockPage = () => {
                       Annuler
                     </Button>
                     <Button 
-                      onClick={handleAddProduct} 
+                      onClick={editingProduct ? handleUpdateProduct : handleAddProduct} 
                       disabled={isSavingProduct}
                       className="bg-gradient-primary text-white h-11 px-6 text-base font-medium"
                     >
-                      {isSavingProduct ? 'Ajout...' : 'Ajouter le produit'}
+                      {isSavingProduct ? 'Sauvegarde...' : (editingProduct ? 'Modifier le produit' : 'Ajouter le produit')}
                     </Button>
                   </div>
                 </DialogContent>
@@ -722,7 +776,7 @@ const StockPage = () => {
                       </td>
                       <td className="p-4">
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
                             <Edit size={16} />
                           </Button>
                           <Button 
