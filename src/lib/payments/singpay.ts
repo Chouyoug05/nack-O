@@ -31,10 +31,10 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     isTransfer: params.isTransfer ?? false,
   };
 
-  // Si un proxy backend est disponible (Netlify/Vercel), l'utiliser pour ne pas exposer les secrets
-  const isNetlify = typeof window !== 'undefined' && Boolean((window as unknown as { __NETLIFY__?: unknown }).__NETLIFY__);
+  // Proxy backend si disponible (Netlify/Vercel)
+  const isNetlifyHost = typeof window !== 'undefined' && /\.netlify\.app$/i.test(window.location.hostname);
   const proxyUrl = (
-    isNetlify ? '/.netlify/functions/create-payment-link' : undefined
+    isNetlifyHost ? '/.netlify/functions/create-payment-link' : undefined
   ) || import.meta.env.VITE_PAYMENT_PROXY_URL;
 
   if (proxyUrl) {
