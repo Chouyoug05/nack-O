@@ -39,6 +39,8 @@ jobs:
         env:
           VITE_BASE: ${{ env.VITE_BASE }}
           VITE_PUBLIC_BASE_URL: ${{ env.VITE_PUBLIC_BASE_URL }}
+          # GitHub Pages n’a pas de fonctions: utilisez un proxy externe si disponible (ex: Cloudflare Worker)
+          VITE_PAYMENT_PROXY_URL: ${{ secrets.VITE_PAYMENT_PROXY_URL }}
           VITE_SINGPAY_CLIENT_ID: ${{ secrets.VITE_SINGPAY_CLIENT_ID }}
           VITE_SINGPAY_CLIENT_SECRET: ${{ secrets.VITE_SINGPAY_CLIENT_SECRET }}
           VITE_SINGPAY_WALLET: ${{ secrets.VITE_SINGPAY_WALLET }}

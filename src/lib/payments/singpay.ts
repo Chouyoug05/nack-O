@@ -14,34 +14,39 @@ interface CreatePaymentLinkResponse {
 
 const SINGPAY_ENDPOINT = "https://gateway.singpay.ga/v1/ext";
 
-const SINGPAY_CLIENT_ID = import.meta.env.VITE_SINGPAY_CLIENT_ID || "";
-const SINGPAY_CLIENT_SECRET = import.meta.env.VITE_SINGPAY_CLIENT_SECRET || "";
-const SINGPAY_WALLET = import.meta.env.VITE_SINGPAY_WALLET || "";
-const SINGPAY_DISBURSEMENT = import.meta.env.VITE_SINGPAY_DISBURSEMENT || "";
-
 export async function createSubscriptionPaymentLink(params: CreatePaymentLinkParams): Promise<string> {
   const body = {
-    portefeuille: SINGPAY_WALLET,
+    portefeuille: undefined as unknown as string, // set later if needed
     reference: params.reference,
     redirect_success: params.redirectSuccess,
     redirect_error: params.redirectError,
     amount: params.amount,
-    disbursement: SINGPAY_DISBURSEMENT,
+    disbursement: undefined as unknown as string, // set later if needed
     logoURL: params.logoURL,
     isTransfer: params.isTransfer ?? false,
-  };
+  } as Record<string, unknown>;
 
-  // Proxy backend si disponible (Netlify/Vercel)
-  const isNetlifyHost = typeof window !== 'undefined' && /\.netlify\.app$/i.test(window.location.hostname);
-  const proxyUrl = (
-    isNetlifyHost ? '/.netlify/functions/create-payment-link' : undefined
-  ) || import.meta.env.VITE_PAYMENT_PROXY_URL;
+  // 1) Toujours préférer un proxy backend (Netlify/Vercel) – aucune exposition de secrets
+  const proxyUrl = import.meta.env.VITE_PAYMENT_PROXY_URL
+    || (typeof window !== 'undefined' && /\.netlify\.app$/i.test(window.location.hostname)
+      ? '/.netlify/functions/create-payment-link' : undefined);
 
   if (proxyUrl) {
     const res = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        portefeuille: undefined,
+        reference: params.reference,
+        redirect_success: params.redirectSuccess,
+        redirect_error: params.redirectError,
+        amount: params.amount,
+        disbursement: undefined,
+        logoURL: params.logoURL,
+        isTransfer: params.isTransfer ?? false,
+      }),
+      credentials: 'omit',
+      mode: 'cors',
     });
     if (!res.ok) {
       const text = await res.text().catch(() => "");
@@ -52,23 +57,44 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     return data.link;
   }
 
-  const res = await fetch(SINGPAY_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Accept: "*/*",
-      "Content-Type": "application/json",
-      "x-client-id": SINGPAY_CLIENT_ID,
-      "x-client-secret": SINGPAY_CLIENT_SECRET,
-      "x-wallet": SINGPAY_WALLET,
-    },
-    body: JSON.stringify(body),
-  });
+  // 2) En développement uniquement (import.meta.env.DEV), autoriser l’appel direct (facilité locale)
+  if (import.meta.env.DEV) {
+    const SINGPAY_CLIENT_ID = import.meta.env.VITE_SINGPAY_CLIENT_ID || "";
+    const SINGPAY_CLIENT_SECRET = import.meta.env.VITE_SINGPAY_CLIENT_SECRET || "";
+    const SINGPAY_WALLET = import.meta.env.VITE_SINGPAY_WALLET || "";
+    const SINGPAY_DISBURSEMENT = import.meta.env.VITE_SINGPAY_DISBURSEMENT || "";
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`SingPay error ${res.status}: ${text}`);
+    const devBody = {
+      portefeuille: SINGPAY_WALLET,
+      reference: params.reference,
+      redirect_success: params.redirectSuccess,
+      redirect_error: params.redirectError,
+      amount: params.amount,
+      disbursement: SINGPAY_DISBURSEMENT,
+      logoURL: params.logoURL,
+      isTransfer: params.isTransfer ?? false,
+    };
+
+    const res = await fetch(SINGPAY_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Accept: "*/*",
+        "Content-Type": "application/json",
+        "x-client-id": SINGPAY_CLIENT_ID,
+        "x-client-secret": SINGPAY_CLIENT_SECRET,
+        "x-wallet": SINGPAY_WALLET,
+      },
+      body: JSON.stringify(devBody),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`SingPay error ${res.status}: ${text}`);
+    }
+    const data = (await res.json()) as CreatePaymentLinkResponse;
+    if (!data.link) throw new Error("Lien de paiement introuvable");
+    return data.link;
   }
-  const data = (await res.json()) as CreatePaymentLinkResponse;
-  if (!data.link) throw new Error("Lien de paiement introuvable");
-  return data.link;
+
+  throw new Error("Paiement indisponible: configurez VITE_PAYMENT_PROXY_URL (Netlify/Vercel Function)");
 } 
