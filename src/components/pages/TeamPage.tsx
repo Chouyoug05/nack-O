@@ -243,6 +243,13 @@ const TeamPage = () => {
   const activeMembers = teamMembers.filter(member => member.status === 'active');
 
   const openAddModal = (role: 'serveur' | 'caissier' | 'agent-evenement') => {
+    if (role === 'serveur' || role === 'caissier') {
+      toast({
+        title: "Bientôt disponible",
+        description: "Les fonctionnalités d’agent serveur et d’agent caisse seront disponibles en novembre.",
+      });
+      return;
+    }
     setSelectedRole(role);
     setIsAddModalOpen(true);
   };
@@ -304,14 +311,16 @@ const TeamPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Button
               onClick={() => openAddModal('serveur')}
-              className="flex-1 bg-blue-500 hover:bg-blue-600 text-white h-12"
+              className="flex-1 bg-blue-500/50 hover:bg-blue-500/50 cursor-not-allowed text-white h-12"
+              disabled
             >
               <Plus size={16} className="mr-2" />
               Ajouter un Serveur
             </Button>
             <Button
               onClick={() => openAddModal('caissier')}
-              className="flex-1 bg-green-500 hover:bg-green-600 text-white h-12"
+              className="flex-1 bg-green-500/50 hover:bg-green-500/50 cursor-not-allowed text-white h-12"
+              disabled
             >
               <Plus size={16} className="mr-2" />
               Ajouter un Caissier
@@ -338,6 +347,8 @@ const TeamPage = () => {
                 variant="outline" 
                 size="sm"
                 onClick={() => openAddModal('serveur')}
+                disabled
+                className="opacity-60 cursor-not-allowed"
               >
                 <Plus size={16} className="mr-2" />
                 Ajouter
@@ -448,6 +459,8 @@ const TeamPage = () => {
                 variant="outline" 
                 size="sm"
                 onClick={() => openAddModal('caissier')}
+                disabled
+                className="opacity-60 cursor-not-allowed"
               >
                 <Plus size={16} className="mr-2" />
                 Ajouter
