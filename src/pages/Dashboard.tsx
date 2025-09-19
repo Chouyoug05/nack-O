@@ -251,14 +251,7 @@ const Dashboard = () => {
       <div className="md:hidden bg-card border-b px-4 py-3 flex items-center justify-center relative flex-shrink-0">
         <NackLogo size="sm" />
         <div className="absolute right-4 flex items-center gap-2">
-          <div className="flex items-center gap-2 text-xs">
-            <span className={isOnline ? "text-green-600" : "text-red-600"}>{isOnline ? "En ligne" : "Hors ligne"}</span>
-            {queueCount > 0 && (
-              <Button variant="outline" size="sm" className="h-6 text-xs" onClick={() => window.dispatchEvent(new Event('online'))}>
-                À sync: {queueCount}
-              </Button>
-            )}
-          </div>
+
           <Button
             variant="ghost"
             size="sm"
@@ -268,17 +261,21 @@ const Dashboard = () => {
             <Calendar className="h-5 w-5" />
           </Button>
           <NotificationPanel size="sm" onNavigateToOrders={() => handleTabChange("sales")} />
-          <button
-            onClick={() => handleTabChange("settings")}
-            className="rounded-full overflow-hidden w-8 h-8 flex items-center justify-center bg-gradient-primary text-white font-bold"
-            aria-label="Profil"
-          >
-            {logoUrl ? (
-              <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-xs">{initials}</span>
-            )}
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => handleTabChange("settings")}
+              className="rounded-full overflow-hidden w-8 h-8 flex items-center justify-center bg-gradient-primary text-white font-bold"
+              aria-label="Profil"
+            >
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs">{initials}</span>
+              )}
+            </button>
+            {/* Dot statut sur avatar: vert si OK, rouge si offline ou sync en attente */}
+            <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-card ${(!isOnline || queueCount > 0) ? 'bg-red-600' : 'bg-green-600'}`}></span>
+          </div>
         </div>
       </div>
 
