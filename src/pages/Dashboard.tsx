@@ -240,6 +240,10 @@ const Dashboard = () => {
   };
 
   const handleTabChange = (tab: string) => {
+    if (tab === 'evenements') {
+      alert('La fonctionnalité Événements sera disponible en décembre.');
+      return;
+    }
     setActiveTab(tab);
     setSidebarOpen(false); // Close mobile sidebar when changing tabs
   };
