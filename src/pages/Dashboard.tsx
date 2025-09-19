@@ -512,13 +512,7 @@ const Dashboard = () => {
                     </CardContent>
                   </Card>
 
-                  {/* Order Management for Manager */}
-                  <OrderManagement 
-                    title="Commandes reçues"
-                    description="Commandes envoyées par les serveurs"
-                    showActions={true}
-                    onGoToSales={() => handleTabChange("sales")}
-                  />
+                  {/* Section Commandes reçues masquée temporairement */}
                 </>
               ) : (
                 <>

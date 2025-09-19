@@ -258,7 +258,7 @@ const SalesPage = () => {
       // 2) Batch atomique: décrémenter le stock + créer la vente
       const batch = writeBatch(db);
         for (const item of cart) {
-          const productRef = fsDoc(productsColRef(db, user.uid), item.id);
+          const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
         const snap = await getDoc(productRef);
           if (!snap.exists()) throw new Error(`Produit introuvable: ${item.name}`);
           const data = snap.data() as ProductDoc;
@@ -271,7 +271,9 @@ const SalesPage = () => {
         const saleItems: SaleItem[] = cart.map(ci => ({ id: ci.id, name: ci.name, price: ci.price, quantity: ci.quantity, isFormula: ci.isFormula }));
               const saleCol = salesColRef(db, ownerUidForWrites);
         // create new sale doc id
-        const saleRef = fsDoc(saleCol as any);
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error Firestore modular typing for new doc id
+        const saleRef = fsDoc(saleCol);
       const saleDoc: SaleDoc = { items: saleItems, total: cartTotal, paymentMethod: selectedPayment, createdAt: Date.now() };
       batch.set(saleRef, saleDoc);
       await batch.commit();
@@ -339,39 +341,7 @@ const SalesPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Orders Button */}
-      <div className="mb-6">
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-primary text-white shadow-button">
-              <ClipboardList className="mr-2" size={18} />
-              Commandes reçues
-              <Badge variant="secondary" className="ml-2 bg-white text-nack-red">
-                {pendingCount > 99 ? '99+' : pendingCount}
-              </Badge>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Commandes reçues</DialogTitle>
-              <DialogDescription>
-                Commandes envoyées par les serveurs - Encaissez les paiements
-              </DialogDescription>
-            </DialogHeader>
-            <div className="py-4">
-              <OrderManagement 
-                showActions={true}
-                onGoToSales={() => {
-                  const ok = applyPrefillFromStorage();
-                  if (!ok) {
-                    toast({ title: 'Pré-remplissage indisponible', description: 'Réessayez de valider la commande.', variant: 'destructive' });
-                  }
-                }}
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Products Grid */}
         <div className="lg:col-span-2">
