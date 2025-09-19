@@ -241,7 +241,7 @@ const Dashboard = () => {
 
   const handleTabChange = (tab: string) => {
     if (tab === 'evenements') {
-      alert('La fonctionnalité Événements sera disponible en décembre.');
+      alert('La fonctionnalité Événements sera disponible en décembre.\n\nPréparez vos événements (produits, tarifs, affiches).\nBilletterie en ligne et validation QR seront disponibles à cette date.');
       return;
     }
     setActiveTab(tab);
