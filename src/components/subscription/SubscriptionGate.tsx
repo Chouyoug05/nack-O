@@ -13,6 +13,7 @@ interface Props {
 }
 
 const msInDay = 24 * 60 * 60 * 1000;
+const sevenDays = 7 * msInDay;
 
 function formatCountdown(ms: number): string {
   if (ms <= 0) return "00j 00h 00m";
@@ -26,16 +27,53 @@ const SubscriptionGate = ({ children }: Props) => {
   const { user, profile } = useAuth();
   const [now, setNow] = useState<number>(() => Date.now());
   const [creatingLink, setCreatingLink] = useState(false);
+  const [trialOpen, setTrialOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('nack_trial_popup_dismissed') !== '1'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { if (!trialOpen) localStorage.setItem('nack_trial_popup_dismissed','1'); } catch (e) { void e; }
+  }, [trialOpen]); // persist dismissal
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 30_000); // update toutes les 30s
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(id);
   }, []);
 
+  // Fermer automatiquement le popup d’essai si l’utilisateur l’a déjà masqué
+  useEffect(() => {
+    const dismissed = (() => { try { return localStorage.getItem('nack_trial_popup_dismissed') === '1'; } catch { return false; } })();
+    if (dismissed) setTrialOpen(false);
+  }, []);
+
+  // Normaliser les anciens profils sans plan: les placer en essai 7j à partir de createdAt
+  useEffect(() => {
+    const normalize = async () => {
+      if (!user || !profile) return;
+      const needsPlan = profile.plan === undefined;
+      const needsTrial = profile.trialEndsAt === undefined;
+      if (!needsPlan && !needsTrial) return;
+      const createdAt = profile.createdAt || Date.now();
+      const trialEndsAt = (profile.trialEndsAt ?? (createdAt + sevenDays));
+      const plan = trialEndsAt > Date.now() ? 'trial' : 'expired';
+      try {
+        await updateDoc(doc(db, 'profiles', user.uid), {
+          plan,
+          trialEndsAt,
+          updatedAt: Date.now(),
+        });
+      } catch {
+        // ignore
+      }
+    };
+    normalize();
+  }, [user, profile]);
+
   const state = useMemo(() => {
     if (!profile) return { status: 'loading' as const };
-    const plan = profile.plan ?? 'active';
-    const trialEndsAt = profile.trialEndsAt ?? 0;
+    // Fallback: si plan manquant, reconstituer essai basé sur createdAt
+    const plan = profile.plan ?? 'trial';
+    const trialEndsAtFallback = (profile.trialEndsAt ?? ((profile.createdAt || 0) + sevenDays));
+    const trialEndsAt = trialEndsAtFallback;
     const subEndsAt = profile.subscriptionEndsAt ?? 0;
 
     if (plan === 'trial') {
@@ -48,7 +86,6 @@ const SubscriptionGate = ({ children }: Props) => {
         const remaining = subEndsAt - now;
         return { status: 'active' as const, remaining };
       }
-      // plan marqué actif mais expiré
       return { status: 'expired' as const };
     }
     return { status: 'expired' as const };
@@ -58,7 +95,7 @@ const SubscriptionGate = ({ children }: Props) => {
     if (!user) return;
     try {
       setCreatingLink(true);
-      const origin = window.location.origin;
+      const origin = (import.meta.env.VITE_PUBLIC_BASE_URL as string) || window.location.origin;
       const link = await createSubscriptionPaymentLink({
         amount: 1500,
         reference: 'abonnement',
@@ -76,11 +113,6 @@ const SubscriptionGate = ({ children }: Props) => {
     }
   };
 
-  // Affichage:
-  // - trial: popup non bloquant (guide + compte à rebours) + accès autorisé
-  // - active: rien (accès)
-  // - expired: popup bloquant (paiement)
-
   if (state.status === 'loading') return null;
 
   const isExpired = state.status === 'expired';
@@ -90,13 +122,15 @@ const SubscriptionGate = ({ children }: Props) => {
 
   return (
     <>
-      {/* Contenu de l'app */}
-      <div aria-hidden={isExpired} className={isExpired ? 'pointer-events-none select-none opacity-60' : ''}>
-        {children}
-      </div>
+      {/* Contenu de l'app (non rendu si expiré) */}
+      {!isExpired && (
+        <>
+          {children}
+        </>
+      )}
 
       {/* Popup essai: non bloquant */}
-      <Dialog open={showTrial} onOpenChange={() => {}}>
+      <Dialog open={trialOpen && showTrial} onOpenChange={setTrialOpen}>
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>Essai gratuit de 7 jours</DialogTitle>

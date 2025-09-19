@@ -14,11 +14,10 @@ interface CreatePaymentLinkResponse {
 
 const SINGPAY_ENDPOINT = "https://gateway.singpay.ga/v1/ext";
 
-// ATTENTION: pour un vrai déploiement, placez ces secrets côté serveur / variables d'environnement
-const SINGPAY_CLIENT_ID = "beae8d8d-377a-48f5-be50-20a2d2578e9f";
-const SINGPAY_CLIENT_SECRET = "11b90375aa987292c2e2abe0f19b482b45a4d4d2810813c3c9a10c3655cb3535";
-const SINGPAY_WALLET = "682211c3ac445b0a4e899383";
-const SINGPAY_DISBURSEMENT = "686119e88718fef8d176f4fa";
+const SINGPAY_CLIENT_ID = import.meta.env.VITE_SINGPAY_CLIENT_ID || "";
+const SINGPAY_CLIENT_SECRET = import.meta.env.VITE_SINGPAY_CLIENT_SECRET || "";
+const SINGPAY_WALLET = import.meta.env.VITE_SINGPAY_WALLET || "";
+const SINGPAY_DISBURSEMENT = import.meta.env.VITE_SINGPAY_DISBURSEMENT || "";
 
 export async function createSubscriptionPaymentLink(params: CreatePaymentLinkParams): Promise<string> {
   const body = {

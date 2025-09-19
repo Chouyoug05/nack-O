@@ -9,6 +9,7 @@ import {
   sendPasswordResetEmail,
   signOut,
   type User,
+  signInWithRedirect
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
@@ -60,15 +61,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
-    const cred = await signInWithPopup(auth, provider);
-    const ref = doc(db, "profiles", cred.user.uid);
-    const snap = await getDoc(ref);
-    if (snap.exists()) {
-      setProfile(snap.data() as UserProfile);
+    try {
+      const cred = await signInWithPopup(auth, provider);
+      const ref = doc(db, "profiles", cred.user.uid);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        setProfile(snap.data() as UserProfile);
+        return true;
+      }
+      setProfile(null);
       return true;
+    } catch (e) {
+      // Fallback Netlify/Popup blocked: redirect flow
+      try {
+        await signInWithRedirect(auth, provider);
+        return false; // navigation away
+      } catch {
+        return false;
+      }
     }
-    setProfile(null);
-    return false;
   };
 
   const signInWithEmail = async (email: string, password: string) => {

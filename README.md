@@ -1,73 +1,42 @@
-# Welcome to your Lovable project
+# Nack Gabonese Drinks Hub
 
-## Project info
+## Déploiement (Vite)
 
-**URL**: https://lovable.dev/projects/7f568380-b008-4918-86fa-8679f5c03c46
+1) Variables d’environnement (Vercel/Netlify/Firebase Hosting) – créer un fichier `.env` local à partir de `env.example` et configurer ces clés dans votre hébergeur:
 
-## How can I edit this code?
+```
+VITE_PUBLIC_BASE_URL=https://app.votre-domaine.com
+VITE_SINGPAY_CLIENT_ID=... (ne pas committer)
+VITE_SINGPAY_CLIENT_SECRET=... (ne pas committer)
+VITE_SINGPAY_WALLET=682211c3ac445b0a4e899383
+VITE_SINGPAY_DISBURSEMENT=686119e88718fef8d176f4fa
+```
 
-There are several ways of editing your application.
+2) Build & output
+- Build: `npm run build`
+- Output: `dist`
 
-**Use Lovable**
+3) Redirections paiement
+- Success: `${VITE_PUBLIC_BASE_URL}/payment/success`
+- Error: `${VITE_PUBLIC_BASE_URL}/payment/error`
+- Déclarez ces URLs dans le back-office SingPay.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/7f568380-b008-4918-86fa-8679f5c03c46) and start prompting.
+4) Notes de sécurité
+- Les identifiants SingPay sont utilisés côté front pour ce lancement test. Avant la prod, déporter l’appel vers une fonction serverless/proxy pour ne pas exposer les secrets.
 
-Changes made via Lovable will be committed automatically to this repo.
+## Abonnement & Essai
+- Nouveaux comptes: essai gratuit 7 jours (popup guide + compte à rebours).
+- Après 7 jours: blocage avec bouton de paiement SingPay.
+- Paiement réussi: abonnement actif 30 jours (compte à rebours affiché).
 
-**Use your preferred IDE**
+## Fonctionnalités en cours
+- Équipe: disponible en novembre (boutons désactivés + message).
+- Événements: disponible en décembre (popup d’information à l’ouverture de l’onglet).
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
+## Développement local
+```
 npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/7f568380-b008-4918-86fa-8679f5c03c46) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Technos: Vite + React + TypeScript + Tailwind + shadcn-ui.

@@ -26,6 +26,15 @@ import { uploadLogo } from "@/lib/upload";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
+import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
+
+function formatCountdown(ms: number) {
+  if (!ms || ms <= 0) return "—";
+  const d = Math.floor(ms / (24*60*60*1000));
+  const h = Math.floor((ms % (24*60*60*1000)) / (60*60*1000));
+  const m = Math.floor((ms % (60*60*1000)) / (60*1000));
+  return `${d}j ${h}h ${m}m`;
+}
 
 const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) => {
   const { toast } = useToast();
@@ -75,16 +84,25 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     });
   };
 
-  const currentPlan = {
-    name: "Plan Professionnel",
-    price: "15,000 XAF/mois",
-    features: [
-      "Gestion illimitée des produits",
-      "Équipe jusqu'à 10 membres",
-      "Rapports avancés",
-      "Support prioritaire"
-    ],
-    nextBilling: "15 février 2024"
+  const planLabel = profile?.plan === 'trial' ? 'Essai (7 jours)' : profile?.plan === 'active' ? 'Actif' : 'Expiré';
+  const now = Date.now();
+  const remaining = profile?.plan === 'trial' && profile.trialEndsAt ? (profile.trialEndsAt - now) : (profile?.plan === 'active' && profile.subscriptionEndsAt ? (profile.subscriptionEndsAt - now) : 0);
+
+  const payNow = async () => {
+    try {
+      const origin = (import.meta.env.VITE_PUBLIC_BASE_URL as string) || window.location.origin;
+      const link = await createSubscriptionPaymentLink({
+        amount: 1500,
+        reference: 'abonnement',
+        redirectSuccess: `${origin}/payment/success`,
+        redirectError: `${origin}/payment/error`,
+        logoURL: `${origin}/favicon.png`,
+        isTransfer: false,
+      });
+      window.location.href = link;
+    } catch {
+      toast({ title: "Paiement indisponible", description: "Réessayez dans quelques instants.", variant: "destructive" });
+    }
   };
 
   return (
@@ -123,30 +141,24 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold">{currentPlan.name}</h3>
-                      <p className="text-2xl font-bold text-nack-red">{currentPlan.price}</p>
+                      <h3 className="font-semibold">{planLabel}</h3>
+                      <p className="text-2xl font-bold text-nack-red">{profile?.plan === 'trial' ? '0 XAF' : '1,500 XAF / 30 jours'}</p>
                     </div>
-                    <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                      Actif
+                    <Badge className={profile?.plan === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'}>
+                      {planLabel}
                     </Badge>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <p className="font-medium">Fonctionnalités incluses:</p>
-                    <ul className="space-y-1">
-                      {currentPlan.features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2 text-sm">
-                          <Check size={16} className="text-green-600" />
-                          {feature}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  
+
                   <div className="bg-nack-beige-light p-3 rounded-lg">
                     <p className="text-sm">
-                      <strong>Prochaine facturation:</strong> {currentPlan.nextBilling}
+                      <strong>Temps restant:</strong> {formatCountdown(remaining)}
                     </p>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button onClick={payNow} className="w-full bg-gradient-primary text-white">
+                      {profile?.plan === 'trial' || profile?.plan === 'expired' ? 'Activer mon abonnement (1500 XAF)' : 'Renouveler (1500 XAF)'}
+                    </Button>
                   </div>
                 </div>
               </CardContent>
@@ -164,33 +176,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="bg-nack-beige-light p-4 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <span className="font-medium">Méthode de paiement</span>
-                      <Button variant="outline" size="sm">Modifier</Button>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      •••• •••• •••• 1234 (Visa)
+                      À définir après le premier paiement.
                     </p>
                   </div>
-                  
-                  <div className="space-y-2">
-                    <p className="font-medium">Historique des paiements:</p>
-                    <div className="space-y-2">
-                      {[
-                        { date: "15/01/2024", amount: "15,000 XAF", status: "Payé" },
-                        { date: "15/12/2023", amount: "15,000 XAF", status: "Payé" },
-                        { date: "15/11/2023", amount: "15,000 XAF", status: "Payé" }
-                      ].map((payment, index) => (
-                        <div key={index} className="flex items-center justify-between text-sm p-2 bg-background rounded">
-                          <span>{payment.date}</span>
-                          <span>{payment.amount}</span>
-                          <Badge variant="secondary">{payment.status}</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <Button className="w-full bg-gradient-primary text-white">
-                    Passer au Plan Premium
-                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -380,40 +370,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                 Gestion de l'équipe
               </CardTitle>
               <CardDescription>
-                Gérez votre équipe de serveurs et caissiers
+                Fonction disponible en novembre. Les compteurs et statistiques seront affichés ici.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-nack-beige-light rounded-lg">
-                  <div>
-                    <p className="font-medium">Équipe active</p>
-                    <p className="text-sm text-muted-foreground">8 membres • 5 serveurs, 3 caissiers</p>
-                  </div>
-                  <Button 
-                    onClick={() => onTabChange("equipe")} 
-                    variant="nack-outline"
-                    className="gap-2"
-                  >
-                    <Users size={16} />
-                    Gérer l'équipe
-                  </Button>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="text-center p-3 bg-background rounded-lg border">
-                    <p className="text-2xl font-bold text-nack-red">8</p>
-                    <p className="text-sm text-muted-foreground">Membres actifs</p>
-                  </div>
-                  <div className="text-center p-3 bg-background rounded-lg border">
-                    <p className="text-2xl font-bold text-green-600">5</p>
-                    <p className="text-sm text-muted-foreground">En service</p>
-                  </div>
-                  <div className="text-center p-3 bg-background rounded-lg border">
-                    <p className="text-2xl font-bold text-orange-600">3</p>
-                    <p className="text-sm text-muted-foreground">Hors service</p>
-                  </div>
-                </div>
+              <div className="p-4 bg-nack-beige-light rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  En attendant, vous pouvez préparer votre inventaire et vos ventes.
+                </p>
               </div>
             </CardContent>
           </Card>
