@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install
+        run: npm ci
+
+      - name: Compute VITE_BASE and PUBLIC URL
+        run: |
+          echo "VITE_BASE=/${GITHUB_REPOSITORY#*/}/" >> $GITHUB_ENV
+          echo "VITE_PUBLIC_BASE_URL=https://${GITHUB_REPOSITORY_OWNER}.github.io/${GITHUB_REPOSITORY#*/}" >> $GITHUB_ENV
+
+      - name: Build
+        env:
+          VITE_BASE: ${{ env.VITE_BASE }}
+          VITE_PUBLIC_BASE_URL: ${{ env.VITE_PUBLIC_BASE_URL }}
+          VITE_SINGPAY_CLIENT_ID: ${{ secrets.VITE_SINGPAY_CLIENT_ID }}
+          VITE_SINGPAY_CLIENT_SECRET: ${{ secrets.VITE_SINGPAY_CLIENT_SECRET }}
+          VITE_SINGPAY_WALLET: ${{ secrets.VITE_SINGPAY_WALLET }}
+          VITE_SINGPAY_DISBURSEMENT: ${{ secrets.VITE_SINGPAY_DISBURSEMENT }}
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+        run: npm run build
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4 

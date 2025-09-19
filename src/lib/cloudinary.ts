@@ -1,6 +1,10 @@
 const CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined;
 const UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string | undefined;
 
+export function isCloudinaryConfigured(): boolean {
+  return Boolean(CLOUD_NAME && UPLOAD_PRESET);
+}
+
 export async function uploadImageToCloudinaryDetailed(file: File, folder: string = "uploads"): Promise<{ url: string; publicId?: string; deleteToken?: string; }> {
   if (!CLOUD_NAME || !UPLOAD_PRESET) {
     throw new Error("Cloudinary non configuré: définissez VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET");

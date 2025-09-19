@@ -74,7 +74,7 @@ const App = () => (
         <OrderProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
             <AppContent />
           </BrowserRouter>
         </OrderProvider>

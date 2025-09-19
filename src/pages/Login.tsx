@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,14 @@ const Login = () => {
   
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signInWithEmail, signInWithGoogle } = useAuth();
+  const { signInWithEmail, signInWithGoogle, user, profile, profileLoading } = useAuth();
+
+  useEffect(() => {
+    if (!profileLoading && user) {
+      if (profile) navigate('/dashboard', { replace: true });
+      else navigate('/complete-profile', { replace: true });
+    }
+  }, [user, profile, profileLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

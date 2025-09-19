@@ -95,13 +95,19 @@ const SubscriptionGate = ({ children }: Props) => {
     if (!user) return;
     try {
       setCreatingLink(true);
-      const origin = (import.meta.env.VITE_PUBLIC_BASE_URL as string) || window.location.origin;
+      const base = (
+        (import.meta.env.VITE_PUBLIC_BASE_URL as string)
+        || (window.location.origin + import.meta.env.BASE_URL)
+      ).replace(/\/+$/, '/');
+      const redirectSuccess = new URL('payment/success', base).toString();
+      const redirectError = new URL('payment/error', base).toString();
+      const logoURL = new URL('favicon.png', base).toString();
       const link = await createSubscriptionPaymentLink({
         amount: 1500,
         reference: 'abonnement',
-        redirectSuccess: `${origin}/payment/success`,
-        redirectError: `${origin}/payment/error`,
-        logoURL: `${origin}/favicon.png`,
+        redirectSuccess,
+        redirectError,
+        logoURL,
         isTransfer: false,
       });
       window.location.href = link;

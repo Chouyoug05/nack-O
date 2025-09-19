@@ -1,0 +1,12 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  # Base path pour Netlify (généralement "/")
+  VITE_BASE = "/"
+  # Optionnel: URL publique (peut être définie dans le dashboard Netlify)
+  # VITE_PUBLIC_BASE_URL = "https://<votre-site>.netlify.app"
+
+# Les secrets sensibles (SingPay, Cloudinary) doivent être définis dans le dashboard Netlify
+# Site settings > Build & deploy > Environment > Environment variables 

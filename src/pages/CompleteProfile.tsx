@@ -8,7 +8,7 @@ import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { uploadImageToCloudinary } from "@/lib/cloudinary";
+import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 
 const establishmentTypes = [
   { value: "bar", label: "Bar" },
@@ -43,7 +43,20 @@ const CompleteProfile = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const finalLogoUrl = logoFile ? await uploadImageToCloudinary(logoFile, "logos") : formData.logoUrl || undefined;
+      let finalLogoUrl: string | undefined = formData.logoUrl || undefined;
+      if (logoFile) {
+        if (!isCloudinaryConfigured()) {
+          toast({ title: "Cloudinary non configuré", description: "Ajoutez VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET", variant: "destructive" });
+          return;
+        }
+        try {
+          finalLogoUrl = await uploadImageToCloudinary(logoFile, "logos");
+        } catch (uploadErr: unknown) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+          toast({ title: "Échec de l'upload du logo", description: msg, variant: "destructive" });
+          return;
+        }
+      }
       await saveProfile({
         establishmentName: formData.establishmentName,
         establishmentType: formData.establishmentType,

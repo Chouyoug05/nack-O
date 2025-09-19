@@ -67,15 +67,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const snap = await getDoc(ref);
       if (snap.exists()) {
         setProfile(snap.data() as UserProfile);
-        return true;
+        return true; // profil présent -> dashboard
       }
       setProfile(null);
-      return true;
+      return false; // pas de profil -> compléter profil
     } catch (e) {
       // Fallback Netlify/Popup blocked: redirect flow
       try {
         await signInWithRedirect(auth, provider);
-        return false; // navigation away
+        return false; // navigation away ou complétion ultérieure
       } catch {
         return false;
       }
@@ -106,7 +106,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       createdAt: now,
       updatedAt: now,
     };
-    await setDoc(ref, data);
+    await setDoc(ref, data, { merge: true });
     setProfile(data);
   };
 
@@ -117,14 +117,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const saveProfile = async (data: Omit<UserProfile, "uid" | "createdAt" | "updatedAt">) => {
     if (!user) throw new Error("Not authenticated");
     const ref = doc(db, "profiles", user.uid);
-    const payload: UserProfile = {
+    const now = Date.now();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    const shouldSetTrialDefaults = !profile?.plan;
+    const payload: Partial<UserProfile> = {
       uid: user.uid,
       ...data,
-      createdAt: profile?.createdAt ?? Date.now(),
-      updatedAt: Date.now(),
+      createdAt: profile?.createdAt ?? now,
+      updatedAt: now,
+      ...(shouldSetTrialDefaults ? { plan: 'trial', trialEndsAt: now + sevenDays } : {}),
     };
-    await setDoc(ref, payload);
-    setProfile(payload);
+    await setDoc(ref, payload, { merge: true });
+    setProfile({ ...(profile || { uid: user.uid, createdAt: now }), ...(payload as UserProfile) });
   };
 
   const logout = async () => {

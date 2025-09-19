@@ -9,7 +9,7 @@ import { Eye, EyeOff, Building2 } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { uploadImageToCloudinary } from "@/lib/cloudinary";
+import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -55,9 +55,19 @@ const Register = () => {
     
     try {
       await signUpWithEmail(formData.email, formData.password);
-      let finalLogoUrl = formData.logoUrl;
+      let finalLogoUrl = formData.logoUrl || undefined;
       if (logoFile) {
-        finalLogoUrl = await uploadImageToCloudinary(logoFile, "logos");
+        if (!isCloudinaryConfigured()) {
+          toast({ title: "Cloudinary non configuré", description: "Ajoutez VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET", variant: "destructive" });
+          return;
+        }
+        try {
+          finalLogoUrl = await uploadImageToCloudinary(logoFile, "logos");
+        } catch (uploadErr: unknown) {
+          const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
+          toast({ title: "Échec de l'upload du logo", description: msg, variant: "destructive" });
+          return;
+        }
       }
       await saveProfile({
         establishmentName: formData.establishmentName,
@@ -65,7 +75,7 @@ const Register = () => {
         ownerName: formData.ownerName,
         email: formData.email,
         phone: formData.phone,
-        logoUrl: finalLogoUrl || undefined,
+        logoUrl: finalLogoUrl,
       });
       toast({ title: "Inscription réussie !", description: "Bienvenue sur NACK!" });
       navigate("/dashboard");
