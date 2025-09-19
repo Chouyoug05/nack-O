@@ -215,7 +215,7 @@ const OrderManagement = ({
     if (uidToUse && (typeof navigator === 'undefined' || navigator.onLine)) {
       try {
         let redirected = false;
-        if (isOwnerAuthed && onGoToSales) {
+        if (onGoToSales) {
           // Pré-remplir le panier de la page Ventes et y naviguer
           try {
             const prefill = order.items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity }));
