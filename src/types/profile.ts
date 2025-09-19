@@ -7,6 +7,11 @@ export interface UserProfile {
   phone: string;
   logoUrl?: string;
   logoDeleteToken?: string;
+  // Abonnement
+  plan?: 'trial' | 'active' | 'expired';
+  trialEndsAt?: number; // epoch ms
+  subscriptionEndsAt?: number; // epoch ms
+  lastPaymentAt?: number; // epoch ms
   createdAt: number;
   updatedAt: number;
 } 

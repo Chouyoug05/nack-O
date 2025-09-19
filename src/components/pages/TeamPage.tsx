@@ -256,6 +256,10 @@ const TeamPage = () => {
 
   return (
     <div className="space-y-6">
+      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+        <p className="text-sm text-yellow-800 font-medium">Fonctionnalités Équipe</p>
+        <p className="text-xs text-yellow-700">La gestion complète de l’équipe (création/édition/suppression) sera disponible en novembre. Merci pour votre patience.</p>
+      </div>
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-card border-0">
@@ -327,7 +331,8 @@ const TeamPage = () => {
             </Button>
             <Button
               onClick={() => openAddModal('agent-evenement')}
-              className="flex-1 bg-purple-500 hover:bg-purple-600 text-white h-12"
+              className="flex-1 bg-purple-500/50 hover:bg-purple-500/50 cursor-not-allowed text-white h-12"
+              disabled
             >
               <Plus size={16} className="mr-2" />
               Agent Événement
@@ -571,6 +576,8 @@ const TeamPage = () => {
                 variant="outline" 
                 size="sm"
                 onClick={() => openAddModal('agent-evenement')}
+                disabled
+                className="opacity-60 cursor-not-allowed"
               >
                 <Plus size={16} className="mr-2" />
                 Ajouter

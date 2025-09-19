@@ -19,6 +19,9 @@ import AgentEvenementInterface from "./pages/AgentEvenementInterface";
 import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import CompleteProfile from "./pages/CompleteProfile";
+import SubscriptionGate from "@/components/subscription/SubscriptionGate";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentError from "./pages/PaymentError";
 
 const queryClient = new QueryClient();
 
@@ -48,11 +51,13 @@ const AppContent = () => {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/complete-profile" element={<RequireAuth><CompleteProfile /></RequireAuth>} />
-        <Route path="/dashboard" element={<RequireAuth><RequireProfile><Dashboard /></RequireProfile></RequireAuth>} />
+        <Route path="/dashboard" element={<RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth>} />
         <Route path="/serveur/:agentCode" element={<ServeurInterface />} />
         <Route path="/caisse/:agentCode" element={<CaisseInterface />} />
         <Route path="/agent-evenement/:agentCode" element={<AgentEvenementInterface />} />
         <Route path="/event/:eventId" element={<EventPublicPage />} />
+        <Route path="/payment/success" element={<RequireAuth><PaymentSuccess /></RequireAuth>} />
+        <Route path="/payment/error" element={<RequireAuth><PaymentError /></RequireAuth>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

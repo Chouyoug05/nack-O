@@ -78,6 +78,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signUpWithEmail = async (email: string, password: string) => {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     const ref = doc(db, "profiles", cred.user.uid);
+    const now = Date.now();
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const data: UserProfile = {
       uid: cred.user.uid,
       establishmentName: "",
@@ -86,8 +88,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       email,
       phone: "",
       logoUrl: undefined,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      plan: 'trial',
+      trialEndsAt: now + sevenDays,
+      subscriptionEndsAt: undefined,
+      lastPaymentAt: undefined,
+      createdAt: now,
+      updatedAt: now,
     };
     await setDoc(ref, data);
     setProfile(data);
