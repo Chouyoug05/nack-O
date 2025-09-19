@@ -31,6 +31,27 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     isTransfer: params.isTransfer ?? false,
   };
 
+  // Si un proxy backend est disponible (Netlify/Vercel), l'utiliser pour ne pas exposer les secrets
+  const isNetlify = typeof window !== 'undefined' && Boolean((window as unknown as { __NETLIFY__?: unknown }).__NETLIFY__);
+  const proxyUrl = (
+    isNetlify ? '/.netlify/functions/create-payment-link' : undefined
+  ) || import.meta.env.VITE_PAYMENT_PROXY_URL;
+
+  if (proxyUrl) {
+    const res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Proxy error ${res.status}: ${text}`);
+    }
+    const data = (await res.json()) as CreatePaymentLinkResponse;
+    if (!data.link) throw new Error("Lien de paiement introuvable");
+    return data.link;
+  }
+
   const res = await fetch(SINGPAY_ENDPOINT, {
     method: "POST",
     headers: {

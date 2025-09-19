@@ -50,22 +50,5 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
-          var base = document.baseURI || window.location.origin;
-          var swUrl = (document.querySelector('link[rel="manifest"]')?.getAttribute('href') || '').replace('manifest.json','sw.js');
-          if (!swUrl) { swUrl = '%BASE_URL%sw.js'; }
-          navigator.serviceWorker.register(swUrl, { scope: '%BASE_URL%' })
-            .then(function(registration) {
-              console.log('ServiceWorker registration successful with scope: ', registration.scope);
-            }, function(err) {
-              console.log('ServiceWorker registration failed: ', err);
-            });
-        });
-      }
-    </script>
   </body>
 </html>
