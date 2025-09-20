@@ -87,27 +87,51 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signUpWithEmail = async (email: string, password: string) => {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    const ref = doc(db, "profiles", cred.user.uid);
-    const now = Date.now();
-    const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    const data: UserProfile = {
-      uid: cred.user.uid,
-      establishmentName: "",
-      establishmentType: "",
-      ownerName: "",
-      email,
-      phone: "",
-      logoUrl: undefined,
-      plan: 'trial',
-      trialEndsAt: now + sevenDays,
-      subscriptionEndsAt: undefined,
-      lastPaymentAt: undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await setDoc(ref, data, { merge: true });
-    setProfile(data);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const ref = doc(db, "profiles", cred.user.uid);
+      const now = Date.now();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      const data: UserProfile = {
+        uid: cred.user.uid,
+        establishmentName: "",
+        establishmentType: "",
+        ownerName: "",
+        email,
+        phone: "",
+        logoUrl: undefined,
+        plan: 'trial',
+        trialEndsAt: now + sevenDays,
+        subscriptionEndsAt: undefined,
+        lastPaymentAt: undefined,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await setDoc(ref, data, { merge: true });
+      setProfile(data);
+    } catch (err: unknown) {
+      let message = "Inscription impossible. Réessayez.";
+      if (typeof err === 'object' && err && 'code' in err) {
+        const code = (err as { code?: string }).code || '';
+        switch (code) {
+          case 'auth/email-already-in-use':
+            message = "Cet email est déjà utilisé.";
+            break;
+          case 'auth/invalid-email':
+            message = "Email invalide.";
+            break;
+          case 'auth/operation-not-allowed':
+            message = "Inscription par email/mot de passe désactivée dans Firebase.";
+            break;
+          case 'auth/weak-password':
+            message = "Mot de passe trop faible (>= 6 caractères).";
+            break;
+          default:
+            message = "Une erreur est survenue lors de l'inscription. Réessayez.";
+        }
+      }
+      throw new Error(message);
+    }
   };
 
   const resetPassword = async (email: string) => {
@@ -115,20 +139,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const saveProfile = async (data: Omit<UserProfile, "uid" | "createdAt" | "updatedAt">) => {
-    if (!user) throw new Error("Not authenticated");
-    const ref = doc(db, "profiles", user.uid);
+    let currentUser = user ?? auth.currentUser;
+    if (!currentUser) {
+      currentUser = await new Promise<User | null>((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+          unsubscribe();
+          resolve(u);
+        });
+        setTimeout(() => {
+          unsubscribe();
+          resolve(null);
+        }, 5000);
+      });
+    }
+    if (!currentUser) throw new Error("Authentification en cours. Veuillez réessayer dans un instant.");
+    const ref = doc(db, "profiles", currentUser.uid);
     const now = Date.now();
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
     const shouldSetTrialDefaults = !profile?.plan;
     const payload: Partial<UserProfile> = {
-      uid: user.uid,
+      uid: currentUser.uid,
       ...data,
       createdAt: profile?.createdAt ?? now,
       updatedAt: now,
       ...(shouldSetTrialDefaults ? { plan: 'trial', trialEndsAt: now + sevenDays } : {}),
     };
     await setDoc(ref, payload, { merge: true });
-    setProfile({ ...(profile || { uid: user.uid, createdAt: now }), ...(payload as UserProfile) });
+    setProfile({ ...(profile || { uid: currentUser.uid, createdAt: now }), ...(payload as UserProfile) });
   };
 
   const logout = async () => {

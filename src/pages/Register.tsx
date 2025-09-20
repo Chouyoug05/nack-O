@@ -50,11 +50,22 @@ const Register = () => {
       });
       return;
     }
+
+    const email = formData.email.trim();
+    const password = formData.password.trim();
+    if (password.length < 6) {
+      toast({
+        title: "Mot de passe trop court",
+        description: "Le mot de passe doit contenir au moins 6 caractères.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsLoading(true);
     
     try {
-      await signUpWithEmail(formData.email, formData.password);
+      await signUpWithEmail(email, password);
       let finalLogoUrl = formData.logoUrl || undefined;
       if (logoFile) {
         if (!isCloudinaryConfigured()) {
@@ -80,8 +91,7 @@ const Register = () => {
       toast({ title: "Inscription réussie !", description: "Bienvenue sur NACK!" });
       navigate("/dashboard");
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Réessayez.";
-      toast({ title: "Inscription échouée", description: message, variant: "destructive" });
+      toast({ title: "Inscription échouée", description: "Une erreur est survenue. Réessayez.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
