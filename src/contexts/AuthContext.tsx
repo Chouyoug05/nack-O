@@ -111,24 +111,61 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setProfile(data);
     } catch (err: unknown) {
       let message = "Inscription impossible. Réessayez.";
+      let code = '';
       if (typeof err === 'object' && err && 'code' in err) {
-        const code = (err as { code?: string }).code || '';
-        switch (code) {
-          case 'auth/email-already-in-use':
-            message = "Cet email est déjà utilisé.";
-            break;
-          case 'auth/invalid-email':
-            message = "Email invalide.";
-            break;
-          case 'auth/operation-not-allowed':
-            message = "Inscription par email/mot de passe désactivée dans Firebase.";
-            break;
-          case 'auth/weak-password':
-            message = "Mot de passe trop faible (>= 6 caractères).";
-            break;
-          default:
-            message = "Une erreur est survenue lors de l'inscription. Réessayez.";
+        code = (err as { code?: string }).code || '';
+      }
+      if (code === 'auth/email-already-in-use') {
+        // Tentative de connexion automatique si le compte existe déjà
+        try {
+          const login = await signInWithEmailAndPassword(auth, email, password);
+          const userUid = login.user.uid;
+          const ref = doc(db, "profiles", userUid);
+          const snap = await getDoc(ref);
+          if (!snap.exists()) {
+            const now = Date.now();
+            const sevenDays = 7 * 24 * 60 * 60 * 1000;
+            const data: UserProfile = {
+              uid: userUid,
+              establishmentName: "",
+              establishmentType: "",
+              ownerName: "",
+              email,
+              phone: "",
+              logoUrl: undefined,
+              plan: 'trial',
+              trialEndsAt: now + sevenDays,
+              subscriptionEndsAt: undefined,
+              lastPaymentAt: undefined,
+              createdAt: now,
+              updatedAt: now,
+            };
+            await setDoc(ref, data, { merge: true });
+            setProfile(data);
+          } else {
+            setProfile(snap.data() as UserProfile);
+          }
+          return; // Succès: on est connecté et profil prêt/créé
+        } catch (loginErr: unknown) {
+          // Connexion impossible (ex: mauvais mot de passe): on renvoie un message simple
+          throw new Error("Cet email est déjà utilisé. Veuillez vous connecter.");
         }
+      }
+      switch (code) {
+        case 'auth/invalid-email':
+          message = "Email invalide.";
+          break;
+        case 'auth/operation-not-allowed':
+          message = "Inscription par email/mot de passe indisponible. Contactez le support.";
+          break;
+        case 'auth/weak-password':
+          message = "Mot de passe trop faible (>= 6 caractères).";
+          break;
+        case 'auth/network-request-failed':
+          message = "Problème de réseau. Vérifiez votre connexion et réessayez.";
+          break;
+        default:
+          message = "Une erreur est survenue lors de l'inscription. Réessayez.";
       }
       throw new Error(message);
     }
