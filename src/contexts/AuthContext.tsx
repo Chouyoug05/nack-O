@@ -73,6 +73,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
+      // Détecter les environnements où les popups échouent souvent (PWA, iOS Safari, certains navigateurs mobiles)
+      const isStandalone = (() => {
+        try {
+          const nav = typeof navigator !== 'undefined' ? (navigator as unknown as { standalone?: boolean }) : undefined;
+          if (nav?.standalone === true) return true; // iOS Safari PWA
+          if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+            if (window.matchMedia('(display-mode: standalone)').matches) return true; // PWA
+          }
+        } catch { /* ignore */ }
+        return false;
+      })();
+      const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+      if (isStandalone || isMobile) {
+        await signInWithRedirect(auth, provider);
+        return false; // la redirection va recharger l'app et onAuthStateChanged fera le reste
+      }
+
       const cred = await signInWithPopup(auth, provider);
       const ref = doc(db, "profiles", cred.user.uid);
       const snap = await getDoc(ref);
@@ -82,8 +100,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       setProfile(null);
       return false; // pas de profil -> compléter profil
-    } catch (e) {
-      // Fallback Netlify/Popup blocked: redirect flow
+    } catch (e: unknown) {
+      // Fallback Netlify/Popup blocked: redirection
       try {
         await signInWithRedirect(auth, provider);
         return false; // navigation away ou complétion ultérieure
