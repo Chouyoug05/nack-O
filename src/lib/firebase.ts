@@ -1,6 +1,6 @@
 import { initializeApp, getApps, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
-import { getAuth, setPersistence, browserLocalPersistence, type Auth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence, type Auth, browserSessionPersistence, inMemoryPersistence } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 
@@ -35,9 +35,13 @@ export { analyticsInstance as analytics };
 export const auth: Auth = getAuth(app);
 
 if (typeof window !== "undefined") {
-  setPersistence(auth, browserLocalPersistence).catch(() => {
-    // ignore persistence failures (e.g., in private mode)
-  });
+  // Fallback de persistance: local -> session -> mémoire
+  setPersistence(auth, browserLocalPersistence)
+    .catch(() => setPersistence(auth, browserSessionPersistence))
+    .catch(() => setPersistence(auth, inMemoryPersistence))
+    .catch(() => {
+      // ignore persistence failures (ex: navigation privée stricte)
+    });
 }
 
 export const db: Firestore = getFirestore(app);

@@ -9,7 +9,8 @@ import {
   sendPasswordResetEmail,
   signOut,
   type User,
-  signInWithRedirect
+  signInWithRedirect,
+  getRedirectResult,
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
@@ -67,48 +68,44 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setProfile(null);
       }
     });
+
+    // Tenter de compléter le flux de redirection Google si présent
+    (async () => {
+      try {
+        const res = await getRedirectResult(auth);
+        if (res?.user) {
+          setUser(res.user);
+          // Le onAuthStateChanged ci-dessus chargera le profil
+        }
+      } catch {
+        // ignorer les erreurs de retour redirect
+      }
+    })();
+
     return () => unsub();
   }, []);
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     try {
-      // Détecter les environnements où les popups échouent souvent (PWA, iOS Safari, certains navigateurs mobiles)
-      const isStandalone = (() => {
-        try {
-          const nav = typeof navigator !== 'undefined' ? (navigator as unknown as { standalone?: boolean }) : undefined;
-          if (nav?.standalone === true) return true; // iOS Safari PWA
-          if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
-            if (window.matchMedia('(display-mode: standalone)').matches) return true; // PWA
-          }
-        } catch { /* ignore */ }
-        return false;
-      })();
-      const isMobile = typeof navigator !== 'undefined' && /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-      if (isStandalone || isMobile) {
-        await signInWithRedirect(auth, provider);
-        return false; // la redirection va recharger l'app et onAuthStateChanged fera le reste
-      }
-
-      const cred = await signInWithPopup(auth, provider);
-      // Assure la dispo immédiate du user pour les routes protégées
-      setUser(cred.user);
-      const ref = doc(db, "profiles", cred.user.uid);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        setProfile(snap.data() as UserProfile);
-        return true; // profil présent -> dashboard
-      }
-      setProfile(null);
-      return false; // pas de profil -> compléter profil
+      // Utiliser la redirection pour tous les environnements pour fiabilité maximale
+      await signInWithRedirect(auth, provider);
+      return false;
     } catch (e: unknown) {
-      // Fallback Netlify/Popup blocked: redirection
+      // Si la redirection échoue (cas rare), tenter le popup en dernier recours
       try {
-        await signInWithRedirect(auth, provider);
-        return false; // navigation away ou complétion ultérieure
-      } catch {
+        const cred = await signInWithPopup(auth, provider);
+        setUser(cred.user);
+        const ref = doc(db, "profiles", cred.user.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          setProfile(snap.data() as UserProfile);
+          return true;
+        }
+        setProfile(null);
         return false;
+      } catch {
+        throw new Error("Connexion Google indisponible pour le moment. Réessayez.");
       }
     }
   };
