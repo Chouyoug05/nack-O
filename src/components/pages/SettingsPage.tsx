@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,10 @@ import {
   Check,
   Users,
   Image as ImageIcon,
+  ExternalLink,
+  Heart,
+  Code,
+  Palette
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadLogo } from "@/lib/upload";
@@ -29,7 +33,7 @@ import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 
 function formatCountdown(ms: number) {
-  if (!ms || ms <= 0) return "—";
+  if (!ms || ms <= 0) return "";
   const d = Math.floor(ms / (24*60*60*1000));
   const h = Math.floor((ms % (24*60*60*1000)) / (60*60*1000));
   const m = Math.floor((ms % (60*60*1000)) / (60*1000));
@@ -55,12 +59,6 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     dailyReport: true,
     newSales: false,
     teamUpdates: true
-  });
-
-  const [securitySettings, setSecuritySettings] = useState({
-    twoFactor: false,
-    autoLogout: true,
-    sessionTimeout: "30"
   });
 
   const handleSaveEstablishment = () => {
@@ -123,7 +121,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         <TabsList className="grid w-full grid-cols-4 h-auto">
           <TabsTrigger value="subscription" className="text-xs sm:text-sm px-2 py-3 h-auto">Abonnement</TabsTrigger>
           <TabsTrigger value="establishment" className="text-xs sm:text-sm px-2 py-3 h-auto">Établissement</TabsTrigger>
-          <TabsTrigger value="security" className="text-xs sm:text-sm px-2 py-3 h-auto">Sécurité</TabsTrigger>
+          <TabsTrigger value="security" className="text-xs sm:text-sm px-2 py-3 h-auto">À propos</TabsTrigger>
           <TabsTrigger value="data" className="text-xs sm:text-sm px-2 py-3 h-auto">Données</TabsTrigger>
         </TabsList>
 
@@ -383,81 +381,124 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
           </Card>
         </TabsContent>
 
-        {/* Security Tab */}
+        {/* About Tab (formerly Security) */}
         <TabsContent value="security">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="shadow-card border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Shield size={20} />
-                  Sécurité du compte
+                  <Heart className="text-nack-red" size={20} />
+                  À propos de Nack!
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Authentification à deux facteurs</p>
-                      <p className="text-sm text-muted-foreground">Sécurité renforcée pour votre compte</p>
+                  <div className="bg-gradient-to-r from-nack-red/10 to-nack-beige-light p-4 rounded-lg">
+                    <h3 className="font-semibold text-lg mb-2">Notre histoire</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Nack! est née d'une demande suite aux lourdes commandes d'un bar. 
+                      Face aux défis de gestion des stocks, des ventes et de l'équipe, 
+                      nous avons créé une solution complète et intuitive pour tous les 
+                      établissements du Gabon.
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Aujourd'hui, Nack! accompagne des dizaines d'établissements dans 
+                      leur gestion quotidienne, leur permettant de se concentrer sur 
+                      l'essentiel : servir leurs clients.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 p-3 bg-nack-beige-light rounded-lg">
+                      <div className="w-10 h-10 bg-nack-red rounded-full flex items-center justify-center">
+                        <Code className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Développé par l'équipe Bwitix</p>
+                        <p className="text-sm text-muted-foreground">Solutions technologiques innovantes</p>
+                      </div>
                     </div>
-                    <Switch
-                      checked={securitySettings.twoFactor}
-                      onCheckedChange={(checked) => setSecuritySettings({...securitySettings, twoFactor: checked})}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium">Déconnexion automatique</p>
-                      <p className="text-sm text-muted-foreground">Se déconnecter après une période d'inactivité</p>
+
+                    <div className="flex items-center gap-3 p-3 bg-nack-beige-light rounded-lg">
+                      <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                        <Palette className="h-5 w-5 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium">Design par Chouyoug</p>
+                        <p className="text-sm text-muted-foreground">Interface utilisateur moderne et intuitive</p>
+                      </div>
                     </div>
-                    <Switch
-                      checked={securitySettings.autoLogout}
-                      onCheckedChange={(checked) => setSecuritySettings({...securitySettings, autoLogout: checked})}
-                    />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="session-timeout">Délai de déconnexion (minutes)</Label>
-                    <Input
-                      id="session-timeout"
-                      type="number"
-                      value={securitySettings.sessionTimeout}
-                      onChange={(e) => setSecuritySettings({...securitySettings, sessionTimeout: e.target.value})}
-                    />
+
+                  <div className="pt-2">
+                    <Button 
+                      onClick={() => window.open("http://wa.me/24104746847", "_blank")}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Nous contacter sur WhatsApp
+                    </Button>
                   </div>
-                  <Button variant="outline" className="w-full">
-                    Changer le mot de passe
-                  </Button>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="shadow-card border-0">
               <CardHeader>
-                <CardTitle>Sessions actives</CardTitle>
-                <CardDescription>Gérez vos connexions actives</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield size={20} />
+                  Informations techniques
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {[
-                    { device: "Chrome sur Windows", location: "Dakar, Sénégal", current: true, lastActive: "Maintenant" },
-                    { device: "Safari sur iPhone", location: "Dakar, Sénégal", current: false, lastActive: "Il y a 2h" },
-                    { device: "Firefox sur Mac", location: "Thiès, Sénégal", current: false, lastActive: "Hier" }
-                  ].map((session, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">Version actuelle</h4>
+                    <p className="text-sm text-blue-700">Nack! v1.0.0 - Version stable</p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                       <div>
-                        <p className="font-medium text-sm">{session.device}</p>
-                        <p className="text-xs text-muted-foreground">{session.location}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {session.current ? "Session actuelle" : session.lastActive}
-                        </p>
+                        <p className="font-medium">Sécurité des données</p>
+                        <p className="text-sm text-muted-foreground">Chiffrement end-to-end</p>
                       </div>
-                      {!session.current && (
-                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                          Déconnecter
-                        </Button>
-                      )}
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        Sécurisé
+                      </Badge>
                     </div>
-                  ))}
+                    
+                    <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
+                      <div>
+                        <p className="font-medium">Sauvegarde automatique</p>
+                        <p className="text-sm text-muted-foreground">Données protégées 24/7</p>
+                      </div>
+                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                        Actif
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
+                      <div>
+                        <p className="font-medium">Support technique</p>
+                        <p className="text-sm text-muted-foreground">Disponible via WhatsApp</p>
+                      </div>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">
+                        Disponible
+                      </Badge>
+                    </div>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button 
+                      onClick={() => window.open("https://chouyoug.netlify.app/", "_blank")}
+                      variant="outline" 
+                      className="w-full"
+                    >
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Visiter Chouyoug Design
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -503,10 +544,10 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
                     <p className="text-sm font-medium text-yellow-800">Configuration système</p>
                     <div className="mt-2 space-y-1 text-sm text-yellow-700">
-                      <p>• Devise: XAF (Franc CFA)</p>
-                      <p>• Fuseau horaire: GMT+0 (Dakar)</p>
-                      <p>• Format de date: DD/MM/YYYY</p>
-                      <p>• Langue: Français</p>
+                      <p> Devise: XAF (Franc CFA)</p>
+                      <p> Fuseau horaire: GMT+0 (Dakar)</p>
+                      <p> Format de date: DD/MM/YYYY</p>
+                      <p> Langue: Français</p>
                     </div>
                   </div>
                 </div>

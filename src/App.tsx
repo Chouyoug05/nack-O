@@ -1,4 +1,4 @@
-import { Toaster } from "@/components/ui/toaster";
+﻿import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-route
 import { OrderProvider } from "@/contexts/OrderContext";
 import { EventProvider } from "@/contexts/EventContext";
 import PWAInstallButton from "@/components/PWAInstallButton";
+import WhatsAppCommunityPopup from "@/components/WhatsAppCommunityPopup";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
@@ -62,6 +63,7 @@ const AppContent = () => {
         <Route path="*" element={<NotFound />} />
       </Routes>
       {!location.pathname.startsWith('/event/') && <PWAInstallButton />}
+      <WhatsAppCommunityPopup />
     </>
   );
 };
