@@ -92,6 +92,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       const cred = await signInWithPopup(auth, provider);
+      // Assure la dispo immédiate du user pour les routes protégées
+      setUser(cred.user);
       const ref = doc(db, "profiles", cred.user.uid);
       const snap = await getDoc(ref);
       if (snap.exists()) {
