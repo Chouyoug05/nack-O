@@ -40,13 +40,32 @@ const RequireProfile = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Composant pour rediriger automatiquement selon l'état de connexion
+const HomeRedirect = () => {
+  const { user, profile, loading, profileLoading } = useAuth();
+  
+  if (loading || profileLoading) {
+    return null; // ou un spinner
+  }
+  
+  if (user && profile) {
+    return <Navigate to="/dashboard" replace />;
+  }
+  
+  if (user && !profile) {
+    return <Navigate to="/complete-profile" replace />;
+  }
+  
+  return <Onboarding />;
+};
+
 const AppContent = () => {
   const location = useLocation();
   
   return (
     <>
       <Routes>
-        <Route path="/" element={<Onboarding />} />
+        <Route path="/" element={<HomeRedirect />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />

@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageCircle, ExternalLink, X } from "lucide-react";
+import { MessageCircle, ExternalLink } from "lucide-react";
 
 const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029VbBeYoYDJ6GtVge5A409";
 const POPUP_INTERVAL = 3 * 60 * 60 * 1000; // 3 heures en millisecondes
@@ -50,20 +50,10 @@ const WhatsAppCommunityPopup = () => {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-green-600" />
-              Rejoignez la communauté Nack!
-            </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDismiss}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5 text-green-600" />
+            Rejoignez la communauté Nack!
+          </DialogTitle>
           <DialogDescription>
             Restez informé des dernières nouveautés et actualités de votre plateforme
           </DialogDescription>
