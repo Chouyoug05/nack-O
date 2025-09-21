@@ -46,7 +46,12 @@ const Login = () => {
   const handleGoogle = async () => {
     setIsLoading(true);
     try {
-      const hasProfile = await signInWithGoogle();
+      const result = await signInWithGoogle();
+      if (result === 'redirect') {
+        // Le flux continue après retour Google via getRedirectResult/onAuthStateChanged
+        return;
+      }
+      const hasProfile = result === true;
       toast({ title: "Connexion Google réussie", description: "Bienvenue sur NACK!" });
       navigate(hasProfile ? "/dashboard" : "/complete-profile");
     } catch (error: unknown) {

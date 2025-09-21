@@ -20,7 +20,7 @@ interface AuthContextValue {
   loading: boolean;
   profile: UserProfile | null;
   profileLoading: boolean;
-  signInWithGoogle: () => Promise<boolean>;
+  signInWithGoogle: () => Promise<'redirect' | boolean>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -85,12 +85,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsub();
   }, []);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (): Promise<'redirect' | boolean> => {
     const provider = new GoogleAuthProvider();
     try {
       // Utiliser la redirection pour tous les environnements pour fiabilité maximale
       await signInWithRedirect(auth, provider);
-      return false;
+      return 'redirect';
     } catch (e: unknown) {
       // Si la redirection échoue (cas rare), tenter le popup en dernier recours
       try {
@@ -104,7 +104,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
         setProfile(null);
         return false;
-      } catch {
+      } catch (popupErr) {
+        console.error('Google sign-in error:', popupErr);
         throw new Error("Connexion Google indisponible pour le moment. Réessayez.");
       }
     }
