@@ -3,9 +3,12 @@ import App from "./App.tsx";
 import { OrderProvider } from "@/contexts/OrderContext";
 import "./index.css";
 import "./lib/firebase";
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 createRoot(document.getElementById("root")!).render(
-  <OrderProvider>
-    <App />
-  </OrderProvider>
+  <ErrorBoundary>
+    <OrderProvider>
+      <App />
+    </OrderProvider>
+  </ErrorBoundary>
 );

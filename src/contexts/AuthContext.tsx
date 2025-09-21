@@ -29,6 +29,17 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function removeUndefinedFields<T extends object>(obj: T): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key of Object.keys(obj) as Array<keyof T>) {
+    const value = obj[key];
+    if (value !== undefined) {
+      result[key] = value as T[typeof key];
+    }
+  }
+  return result;
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -99,15 +110,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         ownerName: "",
         email,
         phone: "",
-        logoUrl: undefined,
+        // logoUrl omis si non défini
         plan: 'trial',
         trialEndsAt: now + sevenDays,
-        subscriptionEndsAt: undefined,
-        lastPaymentAt: undefined,
+        // subscriptionEndsAt omis si non défini
+        // lastPaymentAt omis si non défini
         createdAt: now,
         updatedAt: now,
-      };
-      await setDoc(ref, data, { merge: true });
+      } as unknown as UserProfile; // champs optionnels non requis
+      await setDoc(ref, removeUndefinedFields(data), { merge: true });
       setProfile(data);
     } catch (err: unknown) {
       let message = "Inscription impossible. Réessayez.";
@@ -132,15 +143,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               ownerName: "",
               email,
               phone: "",
-              logoUrl: undefined,
               plan: 'trial',
               trialEndsAt: now + sevenDays,
-              subscriptionEndsAt: undefined,
-              lastPaymentAt: undefined,
               createdAt: now,
               updatedAt: now,
-            };
-            await setDoc(ref, data, { merge: true });
+            } as unknown as UserProfile;
+            await setDoc(ref, removeUndefinedFields(data), { merge: true });
             setProfile(data);
           } else {
             setProfile(snap.data() as UserProfile);
@@ -201,8 +209,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       updatedAt: now,
       ...(shouldSetTrialDefaults ? { plan: 'trial', trialEndsAt: now + sevenDays } : {}),
     };
-    await setDoc(ref, payload, { merge: true });
-    setProfile({ ...(profile || { uid: currentUser.uid, createdAt: now }), ...(payload as UserProfile) });
+    const clean = removeUndefinedFields(payload);
+    await setDoc(ref, clean, { merge: true });
+    setProfile({ ...(profile || { uid: currentUser.uid, createdAt: now }), ...(clean as UserProfile) });
   };
 
   const logout = async () => {
