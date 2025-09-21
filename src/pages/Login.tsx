@@ -46,14 +46,8 @@ const Login = () => {
   const handleGoogle = async () => {
     setIsLoading(true);
     try {
-      const result = await signInWithGoogle();
-      if (result === 'redirect') {
-        // Le flux continue après retour Google via getRedirectResult/onAuthStateChanged
-        return;
-      }
-      const hasProfile = result === true;
-      toast({ title: "Connexion Google réussie", description: "Bienvenue sur NACK!" });
-      navigate(hasProfile ? "/dashboard" : "/complete-profile");
+      await signInWithGoogle();
+      // Redirection lancée — le flux continuera au retour
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Réessayez.";
       toast({ title: "Connexion Google échouée", description: message, variant: "destructive" });

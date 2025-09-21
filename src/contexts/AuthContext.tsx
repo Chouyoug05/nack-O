@@ -20,7 +20,7 @@ interface AuthContextValue {
   loading: boolean;
   profile: UserProfile | null;
   profileLoading: boolean;
-  signInWithGoogle: () => Promise<'redirect' | boolean>;
+  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -77,7 +77,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(res.user);
           // Le onAuthStateChanged ci-dessus chargera le profil
         }
-      } catch {
+      } catch (err) {
+        console.error('Google redirect result error:', err);
         // ignorer les erreurs de retour redirect
       }
     })();
@@ -85,29 +86,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsub();
   }, []);
 
-  const signInWithGoogle = async (): Promise<'redirect' | boolean> => {
+  const signInWithGoogle = async (): Promise<void> => {
     const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
     try {
-      // Utiliser la redirection pour tous les environnements pour fiabilité maximale
       await signInWithRedirect(auth, provider);
-      return 'redirect';
-    } catch (e: unknown) {
-      // Si la redirection échoue (cas rare), tenter le popup en dernier recours
-      try {
-        const cred = await signInWithPopup(auth, provider);
-        setUser(cred.user);
-        const ref = doc(db, "profiles", cred.user.uid);
-        const snap = await getDoc(ref);
-        if (snap.exists()) {
-          setProfile(snap.data() as UserProfile);
-          return true;
-        }
-        setProfile(null);
-        return false;
-      } catch (popupErr) {
-        console.error('Google sign-in error:', popupErr);
-        throw new Error("Connexion Google indisponible pour le moment. Réessayez.");
-      }
+    } catch (e) {
+      console.error('Google redirect error:', e);
+      throw new Error("Connexion Google indisponible pour le moment. Réessayez.");
     }
   };
 
