@@ -21,9 +21,9 @@ import {
   Users,
   Image as ImageIcon,
   ExternalLink,
-  Heart,
-  Code,
-  Palette
+  Info,
+  Wrench,
+  Paintbrush
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadLogo } from "@/lib/upload";
@@ -387,7 +387,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
             <Card className="shadow-card border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Heart className="text-nack-red" size={20} />
+                  <Info className="text-nack-red" size={20} />
                   À propos de Nack!
                 </CardTitle>
               </CardHeader>
@@ -411,7 +411,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="space-y-3">
                     <div className="flex items-center gap-3 p-3 bg-nack-beige-light rounded-lg">
                       <div className="w-10 h-10 bg-nack-red rounded-full flex items-center justify-center">
-                        <Code className="h-5 w-5 text-white" />
+                        <Wrench className="h-5 w-5 text-white" />
                       </div>
                       <div>
                         <p className="font-medium">Développé par l'équipe Bwitix</p>
@@ -421,7 +421,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
                     <div className="flex items-center gap-3 p-3 bg-nack-beige-light rounded-lg">
                       <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                        <Palette className="h-5 w-5 text-white" />
+                        <Paintbrush className="h-5 w-5 text-white" />
                       </div>
                       <div>
                         <p className="font-medium">Design par Chouyoug</p>
