@@ -153,6 +153,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </p>
                   </div>
 
+                  <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      Avertissement: le paiement est disponible uniquement via <strong>Airtel Money</strong>.
+                      Moov Money est momentanément indisponible.
+                    </p>
+                  </div>
+
                   <div className="pt-2">
                     <Button onClick={payNow} className="w-full bg-gradient-primary text-white">
                       {profile?.plan === 'trial' || profile?.plan === 'expired' ? 'Activer mon abonnement (1500 XAF)' : 'Renouveler (1500 XAF)'}

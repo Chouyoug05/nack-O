@@ -23,13 +23,23 @@ const PaymentSuccess = () => {
       } catch (e) {
         console.error(e);
       } finally {
-        navigate('/dashboard', { replace: true });
+        setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
       }
     };
     run();
   }, [user, navigate]);
 
-  return null;
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6">
+      <div className="max-w-md w-full text-center space-y-4">
+        <h1 className="text-2xl font-bold">Paiement confirmé</h1>
+        <p className="text-sm text-muted-foreground">Votre abonnement a été activé. Redirection…</p>
+        <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-sm text-yellow-800">
+          Avertissement: le paiement est disponible uniquement via <strong>Airtel Money</strong>. Moov Money est momentanément indisponible.
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default PaymentSuccess; 
