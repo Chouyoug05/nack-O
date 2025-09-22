@@ -44,6 +44,20 @@ const Login = () => {
   };
 
   const handleGoogle = async () => {
+    // Forcer le domaine canonique (www -> apex) avant de démarrer l’OAuth
+    try {
+      if (typeof window !== 'undefined') {
+        const host = window.location.hostname;
+        if (host.toLowerCase().startsWith('www.')) {
+          const target = window.location.href.replace(/^https?:\/\/www\./i, (m) => m.replace('www.', ''));
+          window.location.replace(target);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     setIsLoading(true);
     try {
       await signInWithGoogle();
@@ -140,19 +154,7 @@ const Login = () => {
               </Button>
             </form>
 
-            <div className="my-4 text-center text-sm text-muted-foreground">ou</div>
-
-            <Button
-              type="button"
-              variant="nack-ghost"
-              size="lg"
-              className="w-full h-12"
-              onClick={handleGoogle}
-              disabled={isLoading}
-            >
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Connexion avec Google
-            </Button>
+            {/* Bouton Google temporairement désactivé */}
 
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">
