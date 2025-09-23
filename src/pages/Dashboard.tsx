@@ -32,6 +32,7 @@ import { productsColRef, salesColRef, teamColRef } from "@/lib/collections";
 import { onSnapshot, orderBy, query } from "firebase/firestore";
 import { setDoc, doc } from "firebase/firestore";
 import { agentTokensTopColRef } from "@/lib/collections";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const getManagerOutboxKey = (uid: string) => `nack_m_outbox_${uid}`;
 const getAgentOutboxPrefix = (uid: string) => `nack_order_outbox_${uid}_`;
@@ -266,17 +267,29 @@ const Dashboard = () => {
           </Button>
           <NotificationPanel size="sm" onNavigateToOrders={() => handleTabChange("sales")} />
           <div className="relative">
-            <button
-              onClick={() => handleTabChange("settings")}
-              className="rounded-full overflow-hidden w-8 h-8 flex items-center justify-center bg-gradient-primary text-white font-bold"
-              aria-label="Profil"
-            >
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-xs">{initials}</span>
-              )}
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="rounded-full overflow-hidden w-8 h-8 flex items-center justify-center bg-gradient-primary text-white font-bold"
+                  aria-label="Profil"
+                >
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-xs">{initials}</span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={() => handleTabChange("settings")}>
+                  <Settings className="mr-2 h-4 w-4" /> Paramètres
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" /> Déconnexion
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {/* Dot statut sur avatar: vert si OK, rouge si offline ou sync en attente */}
             <span className={`absolute -top-1 -right-1 w-3 h-3 rounded-full border-2 border-card ${(!isOnline || queueCount > 0) ? 'bg-red-600' : 'bg-green-600'}`}></span>
           </div>
