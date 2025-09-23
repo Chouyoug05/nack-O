@@ -53,7 +53,8 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
     const unsub = onSnapshot(q, (snap) => {
       const list: Notification[] = snap.docs.map((d) => {
         const n = d.data() as NotificationDoc;
-        const time = new Date(n.createdAt).toLocaleString();
+        const ts = Number((n.createdAt as unknown as number) || 0);
+        const time = new Date(ts).toLocaleString();
         return {
           id: d.id,
           title: n.title,

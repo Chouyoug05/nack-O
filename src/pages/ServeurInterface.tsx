@@ -437,7 +437,7 @@ const ServeurInterface = () => {
                       <div key={item.id} className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                         <div className="flex-1">
                           <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">{item.price.toLocaleString()} XAF</p>
+                          <p className="text-sm text-muted-foreground">{Number(item.price || 0).toLocaleString()} XAF</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
@@ -463,7 +463,7 @@ const ServeurInterface = () => {
                     <div className="border-t pt-3 space-y-3">
                       <div className="flex justify-between items-center font-bold text-lg">
                         <span>Total:</span>
-                        <span className="text-nack-red">{cartTotal.toLocaleString()} XAF</span>
+                        <span className="text-nack-red">{Number(cartTotal || 0).toLocaleString()} XAF</span>
                       </div>
                       
                       <div className="flex flex-col gap-2">

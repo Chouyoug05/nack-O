@@ -88,7 +88,7 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
                   </Badge>
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  {order.createdAt.toLocaleTimeString()}
+                  {new Date(order.createdAt).toLocaleTimeString()}
                 </div>
               </div>
 
@@ -97,12 +97,12 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
                 {order.items.map((item, index) => (
                   <div key={index} className="flex justify-between text-sm bg-muted p-2 rounded">
                     <span>{item.name} x{item.quantity}</span>
-                    <span className="font-medium">{(item.price * item.quantity).toLocaleString()} XAF</span>
+                    <span className="font-medium">{Number(item.price * item.quantity).toLocaleString()} XAF</span>
                   </div>
                 ))}
                 <div className="flex justify-between font-bold text-lg pt-2 border-t">
                   <span>Total:</span>
-                  <span className="text-nack-red">{order.total.toLocaleString()} XAF</span>
+                  <span className="text-nack-red">{Number(order.total || 0).toLocaleString()} XAF</span>
                 </div>
               </div>
 
