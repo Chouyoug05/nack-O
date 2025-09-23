@@ -26,10 +26,9 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     isTransfer: params.isTransfer ?? false,
   } as Record<string, unknown>;
 
-  // 1) Toujours préférer un proxy backend (Netlify/Vercel) – aucune exposition de secrets
-  const proxyUrl = import.meta.env.VITE_PAYMENT_PROXY_URL
-    || (typeof window !== 'undefined' && /\.netlify\.app$/i.test(window.location.hostname)
-      ? '/.netlify/functions/create-payment-link' : undefined);
+  // Préférer un proxy backend (Netlify/Vercel). Si VITE_PAYMENT_PROXY_URL est fourni, l'utiliser.
+  // Sinon, tenter le chemin Netlify par défaut (/.netlify/functions/create-payment-link) pour tout domaine web.
+  const proxyUrl = import.meta.env.VITE_PAYMENT_PROXY_URL || '/.netlify/functions/create-payment-link';
 
   if (proxyUrl) {
     const res = await fetch(proxyUrl, {
@@ -57,7 +56,7 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     return data.link;
   }
 
-  // 2) En développement uniquement (import.meta.env.DEV), autoriser l’appel direct (facilité locale)
+  // Fallback dev uniquement (appel direct)
   if (import.meta.env.DEV) {
     const SINGPAY_CLIENT_ID = import.meta.env.VITE_SINGPAY_CLIENT_ID || "";
     const SINGPAY_CLIENT_SECRET = import.meta.env.VITE_SINGPAY_CLIENT_SECRET || "";
@@ -96,5 +95,5 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     return data.link;
   }
 
-  throw new Error("Paiement indisponible: configurez VITE_PAYMENT_PROXY_URL (Netlify/Vercel Function)");
+  throw new Error("Paiement indisponible: configurez VITE_PAYMENT_PROXY_URL ou Netlify Functions");
 } 

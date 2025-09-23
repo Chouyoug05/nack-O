@@ -94,17 +94,19 @@ const SalesPage = () => {
     if (!user) return;
     const unsub = onSnapshot(productsColRef(db, user.uid), (snap) => {
       const list: Product[] = snap.docs.map((d) => {
-        const data = d.data() as ProductDoc;
+        const data = d.data() as Partial<ProductDoc>;
         return {
           id: d.id,
-          name: data.name,
-          price: data.price,
-          category: data.category,
-          stock: data.quantity,
+          name: data.name || "",
+          price: Number((data.price as number | string | undefined) ?? 0) || 0,
+          category: data.category || "",
+          stock: Number((data.quantity as number | string | undefined) ?? 0) || 0,
           imageUrl: data.imageUrl,
           icon: data.icon,
-          formula: data.formula,
-        };
+          formula: data.formula && typeof data.formula.units !== 'undefined' && typeof data.formula.price !== 'undefined'
+            ? { units: Number(data.formula.units) || 0, price: Number(data.formula.price) || 0 }
+            : undefined,
+        } as Product;
       });
       setProducts(list);
     });
@@ -157,8 +159,8 @@ const SalesPage = () => {
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantityToAdd;
       const maxStock = isFormula && product.formula 
-        ? Math.floor(product.stock / product.formula.units)
-        : product.stock;
+        ? Math.floor((product.stock || 0) / ((product.formula.units || 1)))
+        : (product.stock || 0);
         
       if (newQuantity <= maxStock) {
         setCart(cart.map(item =>
@@ -271,8 +273,6 @@ const SalesPage = () => {
         const saleItems: SaleItem[] = cart.map(ci => ({ id: ci.id, name: ci.name, price: ci.price, quantity: ci.quantity, isFormula: ci.isFormula }));
               const saleCol = salesColRef(db, ownerUidForWrites);
         // create new sale doc id
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error Firestore modular typing for new doc id
         const saleRef = fsDoc(saleCol);
       const saleDoc: SaleDoc = { items: saleItems, total: cartTotal, paymentMethod: selectedPayment, createdAt: Date.now() };
       batch.set(saleRef, saleDoc);
@@ -374,12 +374,12 @@ const SalesPage = () => {
                     <CardContent className="p-3 text-center">
                       {renderProductVisual(product)}
                       <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
-                      <p className="text-lg font-bold text-nack-red mb-1">{product.price.toLocaleString()} XAF</p>
-                      <p className="text-xs text-muted-foreground mb-2">Stock: {product.stock}</p>
+                      <p className="text-lg font-bold text-nack-red mb-1">{Number(product.price || 0).toLocaleString()} XAF</p>
+                      <p className="text-xs text-muted-foreground mb-2">Stock: {Number(product.stock || 0)}</p>
                       <div className="flex gap-1">
                         <Button 
                           className="flex-1 bg-gradient-primary text-white shadow-button text-xs h-8"
-                          disabled={product.stock === 0}
+                          disabled={(product.stock || 0) === 0}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleAddToCartClick(product);
@@ -559,7 +559,7 @@ const SalesPage = () => {
               >
                 <span className="font-semibold">Produit unitaire</span>
                 <span className="text-sm text-muted-foreground">
-                  {selectedProduct?.price.toLocaleString()} XAF l'unité
+                  {Number(selectedProduct?.price || 0).toLocaleString()} XAF l'unité
                 </span>
               </Button>
               {selectedProduct?.formula && (
@@ -573,7 +573,7 @@ const SalesPage = () => {
                 >
                   <span className="font-semibold">Formule</span>
                   <span className="text-sm text-muted-foreground">
-                    {selectedProduct.formula.units} unités à {selectedProduct.formula.price.toLocaleString()} XAF
+                    {(selectedProduct.formula.units || 0)} unités à {Number(selectedProduct.formula.price || 0).toLocaleString()} XAF
                   </span>
                 </Button>
               )}
