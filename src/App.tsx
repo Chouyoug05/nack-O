@@ -26,15 +26,21 @@ import PaymentError from "./pages/PaymentError";
 
 const queryClient = new QueryClient();
 
+const FullscreenLoader = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-pulse text-sm text-muted-foreground">Chargement…</div>
+  </div>
+);
+
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return null;
+  if (loading) return <FullscreenLoader/>;
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
 const RequireProfile = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, profileLoading } = useAuth();
-  if (profileLoading) return null;
+  if (profileLoading) return <FullscreenLoader/>;
   if (!user) return <Navigate to="/login" replace />;
   if (!profile) return <Navigate to="/complete-profile" replace />;
   return <>{children}</>;
@@ -45,7 +51,7 @@ const HomeRedirect = () => {
   const { user, profile, loading, profileLoading } = useAuth();
   
   if (loading || profileLoading) {
-    return null; // ou un spinner
+    return <FullscreenLoader/>;
   }
   
   if (user && profile) {

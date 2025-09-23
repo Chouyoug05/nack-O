@@ -48,9 +48,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profileLoading, setProfileLoading] = useState(false);
 
   useEffect(() => {
+    let redirectChecked = false;
+
     const unsub = onAuthStateChanged(auth, async (current) => {
       setUser(current);
-      setLoading(false);
       if (current) {
         setProfileLoading(true);
         try {
@@ -67,19 +68,42 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       } else {
         setProfile(null);
       }
+      if (redirectChecked) {
+        setLoading(false);
+      }
     });
 
-    // Tenter de compléter le flux de redirection Google si présent
     (async () => {
       try {
         const res = await getRedirectResult(auth);
         if (res?.user) {
           setUser(res.user);
-          // Le onAuthStateChanged ci-dessus chargera le profil
+          try {
+            const rref = doc(db, "profiles", res.user.uid);
+            const rsnap = await getDoc(rref);
+            const base = import.meta.env.BASE_URL || '/';
+            const join = (p: string) => {
+              const baseTrim = base.endsWith('/') ? base.slice(0, -1) : base;
+              const path = p.startsWith('/') ? p : `/${p}`;
+              return `${baseTrim}${path}`;
+            };
+            if (rsnap.exists()) {
+              window.location.replace(join('/dashboard'));
+              return;
+            } else {
+              window.location.replace(join('/complete-profile'));
+              return;
+            }
+          } catch (redirErr) {
+            console.error('Post-redirect profile load error:', redirErr);
+          }
         }
       } catch (err) {
         console.error('Google redirect result error:', err);
-        // ignorer les erreurs de retour redirect
+      } finally {
+        try { sessionStorage.removeItem('nack_oauth_redirect'); } catch { /* ignore */ }
+        redirectChecked = true;
+        setLoading(false);
       }
     })();
 
@@ -90,6 +114,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
     try {
+      try { sessionStorage.setItem('nack_oauth_redirect', '1'); } catch { /* ignore */ }
       await signInWithRedirect(auth, provider);
     } catch (e) {
       console.error('Google redirect error:', e);

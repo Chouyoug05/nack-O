@@ -50,7 +50,7 @@ const Register = () => {
       });
       return;
     }
-
+    
     const email = formData.email.trim();
     const password = formData.password.trim();
     if (password.length < 6) {

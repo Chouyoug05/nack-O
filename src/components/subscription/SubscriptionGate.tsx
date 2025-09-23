@@ -113,7 +113,8 @@ const SubscriptionGate = ({ children }: Props) => {
       window.location.href = link;
     } catch (e) {
       console.error(e);
-      alert("Impossible de créer le lien de paiement. Réessayez.");
+      const msg = e instanceof Error ? e.message : String(e);
+      alert(`Impossible de créer le lien de paiement: ${msg}`);
     } finally {
       setCreatingLink(false);
     }
