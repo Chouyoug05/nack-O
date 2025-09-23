@@ -103,7 +103,7 @@ const SubscriptionGate = ({ children }: Props) => {
       const redirectError = new URL('payment/error', base).toString();
       const logoURL = new URL('favicon.png', base).toString();
       const link = await createSubscriptionPaymentLink({
-        amount: 1500,
+        amount: 2500,
         reference: 'abonnement',
         redirectSuccess,
         redirectError,
@@ -161,7 +161,7 @@ const SubscriptionGate = ({ children }: Props) => {
               </div>
               <div className="pt-2">
                 <Button onClick={startPayment} disabled={creatingLink} className="bg-gradient-primary text-white">
-                  {creatingLink ? 'Ouverture du paiement…' : 'Passer à l’abonnement (1500 XAF)'}
+                  {creatingLink ? 'Ouverture du paiement…' : 'Passer à l’abonnement (2500 XAF)'}
                 </Button>
               </div>
             </CardContent>
@@ -184,7 +184,7 @@ const SubscriptionGate = ({ children }: Props) => {
               <span>Accès restreint jusqu’au paiement.</span>
             </div>
             <Button onClick={startPayment} disabled={creatingLink} className="bg-gradient-primary text-white w-full">
-              {creatingLink ? 'Ouverture du paiement…' : 'Payer 1500 XAF'}
+              {creatingLink ? 'Ouverture du paiement…' : 'Payer 2500 XAF'}
             </Button>
           </div>
         </DialogContent>

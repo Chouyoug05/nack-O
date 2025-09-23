@@ -90,7 +90,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     try {
       const origin = (import.meta.env.VITE_PUBLIC_BASE_URL as string) || window.location.origin;
       const link = await createSubscriptionPaymentLink({
-        amount: 1500,
+        amount: 2500,
         reference: 'abonnement',
         redirectSuccess: `${origin}/payment/success`,
         redirectError: `${origin}/payment/error`,
@@ -140,7 +140,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold">{planLabel}</h3>
-                      <p className="text-2xl font-bold text-nack-red">{profile?.plan === 'trial' ? '0 XAF' : '1,500 XAF / 30 jours'}</p>
+                      <p className="text-2xl font-bold text-nack-red">{profile?.plan === 'trial' ? '0 XAF' : '2,500 XAF / 30 jours'}</p>
                     </div>
                     <Badge className={profile?.plan === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'}>
                       {planLabel}
@@ -162,7 +162,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
                   <div className="pt-2">
                     <Button onClick={payNow} className="w-full bg-gradient-primary text-white">
-                      {profile?.plan === 'trial' || profile?.plan === 'expired' ? 'Activer mon abonnement (1500 XAF)' : 'Renouveler (1500 XAF)'}
+                      {profile?.plan === 'trial' || profile?.plan === 'expired' ? 'Activer mon abonnement (2500 XAF)' : 'Renouveler (2500 XAF)'}
                     </Button>
                   </div>
                 </div>
