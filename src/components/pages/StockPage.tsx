@@ -66,7 +66,26 @@ const StockPage = () => {
   useEffect(() => {
     if (!user) return;
     const unsub = onSnapshot(productsColRef(db, user.uid), (snap) => {
-      const list: Product[] = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Product, 'id'>) }));
+      const list: Product[] = snap.docs.map((d) => {
+        const raw = d.data() as Partial<ProductDoc> & Record<string, unknown>;
+        const price = Number((raw.price as number | string | undefined) ?? 0) || 0;
+        const quantity = Number((raw.quantity as number | string | undefined) ?? 0) || 0;
+        const cost = Number((raw.cost as number | string | undefined) ?? 0) || 0;
+        const formulaUnits = raw.formula && typeof raw.formula.units !== 'undefined' ? Number(raw.formula.units) || 0 : undefined;
+        const formulaPrice = raw.formula && typeof raw.formula.price !== 'undefined' ? Number(raw.formula.price) || 0 : undefined;
+        return {
+          id: d.id,
+          name: (raw.name as string) || "",
+          category: (raw.category as string) || "",
+          price,
+          quantity,
+          cost,
+          description: (raw.description as string) || undefined,
+          icon: (raw.icon as string) || undefined,
+          imageUrl: (raw.imageUrl as string) || undefined,
+          formula: formulaUnits !== undefined && formulaPrice !== undefined ? { units: formulaUnits, price: formulaPrice } : undefined,
+        } as Product;
+      });
       setProducts(list);
     });
     return () => unsub();
@@ -116,13 +135,14 @@ const StockPage = () => {
   };
 
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const name = (product.name || "").toLowerCase();
+    const matchesSearch = name.includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const lowStockProducts = products.filter(p => p.quantity <= 10);
-  const totalStockValue = products.reduce((total, product) => total + (product.price * product.quantity), 0);
+  const lowStockProducts = products.filter(p => (p.quantity ?? 0) <= 10);
+  const totalStockValue = products.reduce((total, product) => total + (Number(product.price || 0) * Number(product.quantity || 0)), 0);
 
   const handleAddProduct = async () => {
     if (!user) return;
@@ -756,10 +776,10 @@ const StockPage = () => {
                       <td className="p-4">
                         <Badge variant="secondary">{product.category}</Badge>
                       </td>
-                      <td className="p-4 font-semibold">{product.price.toLocaleString()} XAF</td>
+                      <td className="p-4 font-semibold">{Number(product.price || 0).toLocaleString()} XAF</td>
                       <td className="p-4">
                         <span className={`font-medium ${product.quantity <= 10 ? 'text-red-600' : 'text-foreground'}`}>
-                          {product.quantity}
+                          {Number(product.quantity || 0)}
                         </span>
                       </td>
                       <td className="p-4">
