@@ -12,8 +12,4 @@
 # Les secrets sensibles (SingPay, Cloudinary) doivent être définis dans le dashboard Netlify
 # Site settings > Build & deploy > Environment > Environment variables
 
-# SPA fallback: toutes les routes pointent vers index.html
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200 
+# SPA fallback défini via public/_redirects (copié vers dist/_redirects au build) 
