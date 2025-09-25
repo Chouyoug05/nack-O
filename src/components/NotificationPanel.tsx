@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -46,6 +46,21 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
   const [pendingOrders, setPendingOrders] = useState<number>(0);
   const [open, setOpen] = useState(false);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    // Preload a short sound for notifications
+    try {
+      const audio = new Audio('/favicon.png'); // placeholder to warm cache
+      audioRef.current = new Audio('data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA...');
+    } catch { /* ignore */ }
+    // Request permission for Web Notifications
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => undefined);
+      }
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     if (!user) { setNotifications([]); return; }
@@ -65,6 +80,19 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
         };
       });
       setNotifications(list);
+      // Play sound and show Web Notification for the latest item if unread
+      try {
+        const newest = list[0];
+        if (newest && !newest.read) {
+          if (audioRef.current) {
+            audioRef.current.currentTime = 0;
+            audioRef.current.play().catch(() => undefined);
+          }
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(newest.title, { body: newest.message, icon: '/icons/icon-192x192.png' });
+          }
+        }
+      } catch { /* ignore */ }
     });
     return () => unsub();
   }, [user]);

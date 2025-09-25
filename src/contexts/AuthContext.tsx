@@ -12,8 +12,9 @@ import {
   signInWithRedirect,
   getRedirectResult,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, addDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
+import { notificationsColRef } from "@/lib/collections";
 
 interface AuthContextValue {
   user: User | null;
@@ -109,6 +110,49 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    const pushSystemNotifications = async () => {
+      if (!user || !profile) return;
+      const uid = user.uid;
+      try {
+        const now = Date.now();
+        const baseKey = (k: string) => `nack_sys_notif_${k}_${uid}`;
+        if (!localStorage.getItem(baseKey('welcome'))) {
+          try {
+            await addDoc(notificationsColRef(db, uid), {
+              title: "Bienvenue sur Nack!",
+              message: "Merci de nous faire confiance",
+              type: "success",
+              createdAt: now,
+              read: false,
+            });
+            localStorage.setItem(baseKey('welcome'), '1');
+          } catch { /* ignore welcome notif failure */ }
+        }
+        if (profile.plan === 'trial' && profile.trialEndsAt) {
+          const msLeft = profile.trialEndsAt - now;
+          const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
+          if (daysLeft > 0 && daysLeft <= 3) {
+            const dayKey = baseKey(`trial_${daysLeft}`);
+            if (!localStorage.getItem(dayKey)) {
+              try {
+                await addDoc(notificationsColRef(db, uid), {
+                  title: "Essai bientôt terminé",
+                  message: `Il vous reste ${daysLeft} jour${daysLeft > 1 ? 's' : ''} pour utiliser la plateforme. Passez à l'abonnement.`,
+                  type: "warning",
+                  createdAt: now,
+                  read: false,
+                });
+                localStorage.setItem(dayKey, '1');
+              } catch { /* ignore trial notif failure */ }
+            }
+          }
+        }
+      } catch { /* ignore sys notif orchestration errors */ }
+    };
+    pushSystemNotifications();
+  }, [user, profile]);
 
   const signInWithGoogle = async (): Promise<void> => {
     const provider = new GoogleAuthProvider();
