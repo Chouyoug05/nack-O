@@ -101,7 +101,7 @@ const EventPublicPage = () => {
   // Lien WhatsApp direct vers l'organisateur
   const organizerPhone = (event.organizerWhatsapp || '').replace(/\D/g, '');
   const shortDesc = (event.description || '').trim().slice(0, 200);
-  const wText = `Bonjour, je souhaite réserver des billets pour:\n• ${event.title}\n• Quand: ${new Date(event.date).toLocaleDateString('fr-FR')} ${event.time}\n• Où: ${event.location}\n${shortDesc ? '• Infos: ' + shortDesc + '\n' : ''}• Quantité souhaitée: 1\n• Tarif: ${event.ticketPrice.toLocaleString()} ${event.currency} / billet`;
+  const wText = `Bonjour, je souhaite réserver des billets pour:\n• ${event.title}\n• Quand: ${new Date(event.date).toLocaleDateString('fr-FR')} ${event.time}\n• Où: ${event.location}\n${shortDesc ? '• Infos: ' + shortDesc + '\n' : ''}• Quantité souhaitée: 1\n• Tarif: ${Number(event.ticketPrice || 0).toLocaleString()} ${event.currency} / billet`;
   const whatsappHref = organizerPhone ? `https://wa.me/${encodeURIComponent(organizerPhone)}?text=${encodeURIComponent(wText)}` : undefined;
 
   return (

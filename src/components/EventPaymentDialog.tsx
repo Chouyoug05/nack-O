@@ -238,7 +238,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
             <div className="bg-nack-beige-light rounded-lg p-4">
               <div className="flex justify-between items-center">
                 <span className="font-medium">Total à payer</span>
-                <span className="text-xl font-bold text-nack-red">{totalAmount.toLocaleString()} {event.currency}</span>
+                <span className="text-xl font-bold text-nack-red">{Number(totalAmount || 0).toLocaleString()} {event.currency}</span>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -258,7 +258,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
               <div className="flex justify-between"><span>WhatsApp:</span><span className="font-medium">{formData.phone}</span></div>
               <div className="flex justify-between"><span>Billets:</span><span className="font-medium">{formData.quantity}</span></div>
               <Separator className="my-2" />
-              <div className="flex justify-between font-bold text-nack-red"><span>Total:</span><span>{totalAmount.toLocaleString()} {event.currency}</span></div>
+              <div className="flex justify-between font-bold text-nack-red"><span>Total:</span><span>{Number(totalAmount || 0).toLocaleString()} {event.currency}</span></div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Button onClick={simulatePayment} disabled={isProcessing} className="w-full bg-gradient-primary text-white shadow-button">

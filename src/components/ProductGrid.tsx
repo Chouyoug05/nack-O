@@ -124,7 +124,7 @@ const ProductGrid = ({ cart, onAddToCart, onUpdateQuantity, productsOverride }: 
                   {renderProductVisual(product)}
                   <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
                   <div className="text-xs text-muted-foreground mb-1">{product.category}</div>
-                  <p className="text-lg font-bold text-nack-red mb-1">{product.price.toLocaleString()} XAF</p>
+                  <p className="text-lg font-bold text-nack-red mb-1">{Number(product.price || 0).toLocaleString()} XAF</p>
                 <p className="text-xs text-muted-foreground mb-2">Stock: {product.stock}</p>
                 <Button 
                   className="w-full bg-gradient-primary text-white shadow-button text-xs h-8"

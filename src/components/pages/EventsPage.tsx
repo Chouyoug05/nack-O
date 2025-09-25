@@ -255,7 +255,7 @@ const EventsPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Revenus</p>
-                <p className="text-2xl font-bold">{totalRevenue.toLocaleString()} XAF</p>
+                <p className="text-2xl font-bold">{Number(totalRevenue || 0).toLocaleString()} XAF</p>
               </div>
               <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
                 <Users size={24} className="text-nack-red" />
@@ -463,7 +463,7 @@ const EventsPage = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           <Users size={16} className="text-nack-red" />
-                          <span>{event.ticketPrice.toLocaleString()} {event.currency}</span>
+                          <span>{Number(event.ticketPrice || 0).toLocaleString()} {event.currency}</span>
                         </div>
                       </div>
                     </div>
