@@ -269,16 +269,16 @@ const Dashboard = () => {
           <div className="relative">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button
-                  className="rounded-full overflow-hidden w-8 h-8 flex items-center justify-center bg-gradient-primary text-white font-bold"
-                  aria-label="Profil"
-                >
-                  {logoUrl ? (
-                    <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-xs">{initials}</span>
-                  )}
-                </button>
+            <button
+              className="rounded-full overflow-hidden w-8 h-8 flex items-center justify-center bg-gradient-primary text-white font-bold"
+              aria-label="Profil"
+            >
+              {logoUrl ? (
+                <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xs">{initials}</span>
+              )}
+            </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={() => handleTabChange("settings")}>
