@@ -13,3 +13,15 @@
 # Site settings > Build & deploy > Environment > Environment variables
 
 # SPA fallback défini via public/_redirects (copié vers dist/_redirects au build) 
+
+# Redirections explicites (Netlify)
+[[redirects]]
+  from = "https://www.nack.pro/*"
+  to = "https://nack.pro/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
