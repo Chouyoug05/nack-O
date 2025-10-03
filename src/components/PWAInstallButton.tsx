@@ -73,7 +73,15 @@ const PWAInstallButton = () => {
   };
 
   // Don't show if already installed or user dismissed
-  if (isInstalled || !showInstallBanner || localStorage.getItem('pwa-install-dismissed')) {
+  const dismissed = typeof window !== 'undefined' ? (() => {
+    try {
+      return localStorage.getItem('pwa-install-dismissed');
+    } catch {
+      return null;
+    }
+  })() : null;
+
+  if (isInstalled || !showInstallBanner || dismissed) {
     return null;
   }
 
