@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { OrderProvider } from "@/contexts/OrderContext";
 import OrderManagement from "@/components/OrderManagement";
 import { 
   LogOut,
@@ -220,9 +219,7 @@ const CaisseInterfaceContent = () => {
 
 const CaisseInterface = () => {
   return (
-    <OrderProvider>
-      <CaisseInterfaceContent />
-    </OrderProvider>
+    <CaisseInterfaceContent />
   );
 };
 

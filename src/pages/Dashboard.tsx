@@ -25,7 +25,6 @@ import EventsPage from "@/components/pages/EventsPage";
 import SettingsPage from "@/components/pages/SettingsPage";
 import ReportsPage from "@/components/pages/ReportsPage";
 import TeamPage from "@/components/pages/TeamPage";
-import { OrderProvider } from "@/contexts/OrderContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { productsColRef, salesColRef, teamColRef } from "@/lib/collections";
@@ -259,8 +258,7 @@ const Dashboard = () => {
   }, [activeTab]);
 
   return (
-    <OrderProvider>
-      <div className="h-screen bg-background flex flex-col overflow-hidden">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       {/* Mobile Header - Simple header for mobile without burger menu */}
       <div className="md:hidden bg-card border-b px-4 py-3 flex items-center justify-center relative flex-shrink-0">
         <NackLogo size="sm" />
@@ -580,7 +578,6 @@ const Dashboard = () => {
         onTabChange={handleTabChange}
       />
       </div>
-    </OrderProvider>
   );
 };
 
