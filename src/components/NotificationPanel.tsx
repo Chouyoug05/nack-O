@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -45,6 +46,7 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [pendingOrders, setPendingOrders] = useState<number>(0);
   const [open, setOpen] = useState(false);
+  const location = useLocation();
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator === 'undefined' ? true : navigator.onLine);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -61,6 +63,11 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
       }
     } catch { /* ignore */ }
   }, []);
+
+  // Fermer le popover lors des changements de route (évite des erreurs DOM sur Chrome)
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!user) { setNotifications([]); return; }

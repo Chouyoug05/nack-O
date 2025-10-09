@@ -19,11 +19,19 @@ const PWAInstallButton = () => {
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
-      // Prevent Chrome 67 and earlier from automatically showing the prompt
-      e.preventDefault();
-      // Stash the event so it can be triggered later
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setShowInstallBanner(true);
+      try {
+        const alreadyInstalled = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as { standalone?: boolean }).standalone;
+        const dismissed = localStorage.getItem('pwa-install-dismissed') === 'true';
+        // Ne bloquer l'infobar que si on veut réellement afficher notre bannière custom
+        if (!alreadyInstalled && !dismissed) {
+          e.preventDefault();
+          setDeferredPrompt(e as BeforeInstallPromptEvent);
+          setShowInstallBanner(true);
+        }
+        // Sinon: laisser Chrome gérer (pas de preventDefault) pour éviter l’avertissement
+      } catch {
+        // En cas d'erreur d'accès storage, fallback au comportement par défaut (ne rien faire)
+      }
     };
 
     const handleAppInstalled = () => {
