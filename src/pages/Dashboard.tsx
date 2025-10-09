@@ -33,6 +33,7 @@ import { onSnapshot, orderBy, query } from "firebase/firestore";
 import { setDoc, doc } from "firebase/firestore";
 import { agentTokensTopColRef } from "@/lib/collections";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Shield } from "lucide-react";
 
 const getManagerOutboxKey = (uid: string) => `nack_m_outbox_${uid}`;
 const getAgentOutboxPrefix = (uid: string) => `nack_order_outbox_${uid}_`;

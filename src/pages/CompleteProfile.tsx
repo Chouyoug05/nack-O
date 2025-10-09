@@ -20,7 +20,7 @@ const establishmentTypes = [
 ];
 
 const CompleteProfile = () => {
-  const { user, profile, profileLoading, saveProfile } = useAuth();
+  const { user, profile, profileLoading, saveProfile, isAdmin, isAdminLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -33,6 +33,13 @@ const CompleteProfile = () => {
     logoUrl: "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    // Si admin, rediriger vers /admin même sans profil
+    if (user && !isAdminLoading && isAdmin) {
+      navigate("/admin", { replace: true });
+    }
+  }, [user, isAdmin, isAdminLoading, navigate]);
 
   useEffect(() => {
     if (!profileLoading && profile) {

@@ -23,6 +23,7 @@ import CompleteProfile from "./pages/CompleteProfile";
 import SubscriptionGate from "@/components/subscription/SubscriptionGate";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentError from "./pages/PaymentError";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -46,19 +47,27 @@ const RequireProfile = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const RequireAdmin = ({ children }: { children: React.ReactNode }) => {
+  const { user, isAdmin, isAdminLoading } = useAuth();
+  if (isAdminLoading) return <FullscreenLoader/>;
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+};
+
 // Composant pour rediriger automatiquement selon l'état de connexion
 const HomeRedirect = () => {
-  const { user, profile, loading, profileLoading } = useAuth();
+  const { user, profile, loading, profileLoading, isAdmin, isAdminLoading } = useAuth();
   
-  if (loading || profileLoading) {
+  if (loading || profileLoading || isAdminLoading) {
     return <FullscreenLoader/>;
   }
   
-  if (user && profile) {
-    return <Navigate to="/dashboard" replace />;
+  if (user && (isAdmin || profile)) {
+    return <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />;
   }
   
-  if (user && !profile) {
+  if (user && !profile && !isAdmin) {
     return <Navigate to="/complete-profile" replace />;
   }
   
@@ -78,6 +87,7 @@ const AppContent = () => {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/complete-profile" element={<RequireAuth><CompleteProfile /></RequireAuth>} />
         <Route path="/dashboard" element={<RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth>} />
+        <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth>} />
         <Route path="/serveur/:agentCode" element={<ServeurInterface />} />
         <Route path="/caisse/:agentCode" element={<CaisseInterface />} />
         <Route path="/agent-evenement/:agentCode" element={<AgentEvenementInterface />} />

@@ -19,14 +19,15 @@ const Login = () => {
   
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signInWithEmail, signInWithGoogle, user, profile, profileLoading } = useAuth();
+  const { signInWithEmail, signInWithGoogle, user, profile, profileLoading, isAdmin, isAdminLoading } = useAuth();
 
   useEffect(() => {
-    if (!profileLoading && user) {
-      if (profile) navigate('/dashboard', { replace: true });
+    if (user && !profileLoading && !isAdminLoading) {
+      if (isAdmin) navigate('/admin', { replace: true });
+      else if (profile) navigate('/dashboard', { replace: true });
       else navigate('/complete-profile', { replace: true });
     }
-  }, [user, profile, profileLoading, navigate]);
+  }, [user, profile, profileLoading, isAdmin, isAdminLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,7 +35,7 @@ const Login = () => {
     try {
       await signInWithEmail(formData.email, formData.password);
       toast({ title: "Connexion réussie !", description: "Bienvenue sur NACK!" });
-      navigate("/dashboard");
+      // La redirection est gérée par l'effet en fonction de isAdmin/profile
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Vérifiez vos identifiants.";
       toast({ title: "Erreur de connexion", description: message, variant: "destructive" });

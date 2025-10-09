@@ -15,12 +15,15 @@ import {
 import { doc, getDoc, setDoc, addDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import { notificationsColRef } from "@/lib/collections";
+import { adminDocRef } from "@/lib/collections";
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
   profile: UserProfile | null;
   profileLoading: boolean;
+  isAdmin: boolean;
+  isAdminLoading: boolean;
   signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
@@ -47,14 +50,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminLoading, setIsAdminLoading] = useState(true);
 
   useEffect(() => {
-    let redirectChecked = false;
+    // Si aucun redirect OAuth n'est attendu, ne pas bloquer le chargement sur Chrome
+    let expectRedirect = false;
+    try {
+      expectRedirect = sessionStorage.getItem('nack_oauth_redirect') === '1';
+    } catch { /* ignore */ }
+    let redirectChecked = !expectRedirect;
 
     const unsub = onAuthStateChanged(auth, async (current) => {
       setUser(current);
       if (current) {
         setProfileLoading(true);
+        setIsAdminLoading(true);
         try {
           const ref = doc(db, "profiles", current.uid);
           const snap = await getDoc(ref);
@@ -63,50 +74,69 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           } else {
             setProfile(null);
           }
+          try {
+            const aSnap = await getDoc(adminDocRef(db, current.uid));
+            setIsAdmin(!!aSnap.exists());
+          } catch {
+            setIsAdmin(false);
+          }
         } finally {
           setProfileLoading(false);
+          setIsAdminLoading(false);
         }
       } else {
         setProfile(null);
+        setIsAdmin(false);
+        setIsAdminLoading(false);
       }
       if (redirectChecked) {
         setLoading(false);
       }
     });
 
-    (async () => {
-      try {
-        const res = await getRedirectResult(auth);
-        if (res?.user) {
-          setUser(res.user);
-          try {
-            const rref = doc(db, "profiles", res.user.uid);
-            const rsnap = await getDoc(rref);
-            const base = import.meta.env.BASE_URL || '/';
-            const join = (p: string) => {
-              const baseTrim = base.endsWith('/') ? base.slice(0, -1) : base;
-              const path = p.startsWith('/') ? p : `/${p}`;
-              return `${baseTrim}${path}`;
-            };
-            if (rsnap.exists()) {
-              window.location.replace(join('/dashboard'));
-              return;
-            } else {
-              window.location.replace(join('/complete-profile'));
-              return;
+    if (expectRedirect) {
+      (async () => {
+        try {
+          const res = await getRedirectResult(auth);
+          if (res?.user) {
+            setUser(res.user);
+            try {
+              const rref = doc(db, "profiles", res.user.uid);
+              const rsnap = await getDoc(rref);
+              const base = import.meta.env.BASE_URL || '/';
+              const join = (p: string) => {
+                const baseTrim = base.endsWith('/') ? base.slice(0, -1) : base;
+                const path = p.startsWith('/') ? p : `/${p}`;
+                return `${baseTrim}${path}`;
+              };
+              // Priorité: si admin, aller sur /admin même sans profil
+              try {
+                const aSnap = await getDoc(adminDocRef(db, res.user.uid));
+                if (aSnap.exists()) {
+                  window.location.replace(join('/admin'));
+                  return;
+                }
+              } catch { /* ignore */ }
+              if (rsnap.exists()) {
+                window.location.replace(join('/dashboard'));
+                return;
+              } else {
+                window.location.replace(join('/complete-profile'));
+                return;
+              }
+            } catch (redirErr) {
+              console.error('Post-redirect profile load error:', redirErr);
             }
-          } catch (redirErr) {
-            console.error('Post-redirect profile load error:', redirErr);
           }
+        } catch (err) {
+          console.error('Google redirect result error:', err);
+        } finally {
+          try { sessionStorage.removeItem('nack_oauth_redirect'); } catch { /* ignore */ }
+          redirectChecked = true;
+          setLoading(false);
         }
-      } catch (err) {
-        console.error('Google redirect result error:', err);
-      } finally {
-        try { sessionStorage.removeItem('nack_oauth_redirect'); } catch { /* ignore */ }
-        redirectChecked = true;
-        setLoading(false);
-      }
-    })();
+      })();
+    }
 
     return () => unsub();
   }, []);
@@ -296,13 +326,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     loading,
     profile,
     profileLoading,
+    isAdmin,
+    isAdminLoading,
     signInWithGoogle,
     signInWithEmail,
     signUpWithEmail,
     resetPassword,
     saveProfile,
     logout,
-  }), [user, loading, profile, profileLoading]);
+  }), [user, loading, profile, profileLoading, isAdmin, isAdminLoading]);
 
   return (
     <AuthContext.Provider value={value}>

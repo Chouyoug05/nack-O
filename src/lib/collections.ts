@@ -2,6 +2,9 @@ import { collection, doc, type CollectionReference, type Firestore } from "fireb
 
 export const profileDocRef = (db: Firestore, uid: string) => doc(db, "profiles", uid);
 
+export const profilesColRef = (db: Firestore): CollectionReference =>
+  collection(db, "profiles") as CollectionReference;
+
 export const productsColRef = (db: Firestore, uid: string): CollectionReference =>
   collection(db, "profiles", uid, "products") as CollectionReference;
 
@@ -27,4 +30,6 @@ export const agentTokensTopColRef = (db: Firestore): CollectionReference =>
   collection(db, "agentTokens") as CollectionReference;
 
 export const notificationsColRef = (db: Firestore, uid: string): CollectionReference =>
-  collection(db, "profiles", uid, "notifications") as CollectionReference; 
+  collection(db, "profiles", uid, "notifications") as CollectionReference;
+
+export const adminDocRef = (db: Firestore, uid: string) => doc(db, "admins", uid); 
