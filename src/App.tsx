@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { OrderProvider } from "@/contexts/OrderContext";
 import { EventProvider } from "@/contexts/EventContext";
 import PWAInstallButton from "@/components/PWAInstallButton";
@@ -77,6 +78,13 @@ const HomeRedirect = () => {
 const AppContent = () => {
   const location = useLocation();
   
+  // Fermer proprement tout overlay/portal (Radix Popover/Dropdown/Dialog) sur changement de route
+  // pour éviter des incohérences DOM sur certains Chrome
+  useEffect(() => {
+    try { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); } catch { /* ignore */ }
+    try { window.dispatchEvent(new Event('nack_route_change')); } catch { /* ignore */ }
+  }, [location.pathname]);
+
   return (
     <>
       <Routes>
