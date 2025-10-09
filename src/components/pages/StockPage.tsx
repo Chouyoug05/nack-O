@@ -263,7 +263,8 @@ const StockPage = () => {
   const handleUpdateProduct = async () => {
     if (!user || !editingProduct) return;
 
-    if (!editingProduct.name || !editingProduct.category || !editingProduct.price || !editingProduct.quantity) {
+    // Utiliser les valeurs du formulaire (newProduct) et non l'instantané initial (editingProduct)
+    if (!newProduct.name || !newProduct.category || newProduct.price === "" || newProduct.quantity === "") {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs obligatoires",
@@ -272,23 +273,49 @@ const StockPage = () => {
       return;
     }
 
+    const priceNum = Number(newProduct.price);
+    const qtyNum = Number(newProduct.quantity);
+    const costNum = Number(newProduct.cost || 0);
+    if (Number.isNaN(priceNum) || Number.isNaN(qtyNum) || priceNum < 0 || qtyNum < 0 || costNum < 0) {
+      toast({ title: "Valeurs invalides", description: "Prix, quantité et coût doivent être des nombres positifs.", variant: "destructive" });
+      return;
+    }
+
     try {
       const productRef = fsDoc(productsColRef(db, user.uid), editingProduct.id);
-      await updateDoc(productRef, {
-        name: editingProduct.name,
-        category: editingProduct.category,
-        price: Number(editingProduct.price),
-        quantity: Number(editingProduct.quantity),
-        cost: Number(editingProduct.cost || 0),
-        description: editingProduct.description || undefined,
-        icon: editingProduct.icon || undefined,
-        imageUrl: editingProduct.imageUrl || undefined,
-        formula: editingProduct.formula?.units && editingProduct.formula?.price ? { units: Number(editingProduct.formula.units), price: Number(editingProduct.formula.price) } : undefined,
-        updatedAt: Date.now()
-      } as Partial<ProductDoc>);
+      const payload: Partial<ProductDoc> = {
+        name: newProduct.name,
+        category: newProduct.category,
+        price: priceNum,
+        quantity: qtyNum,
+        ...(newProduct.cost !== "" ? { cost: costNum } : {}),
+        ...(newProduct.description ? { description: newProduct.description } : {}),
+        ...(newProduct.icon ? { icon: newProduct.icon } : {}),
+        ...(newProduct.imageUrl ? { imageUrl: newProduct.imageUrl } : {}),
+        ...(newProduct.formulaUnits && newProduct.formulaPrice ? {
+          formula: {
+            units: Number(newProduct.formulaUnits),
+            price: Number(newProduct.formulaPrice)
+          }
+        } : {}),
+        updatedAt: Date.now(),
+      };
+      await updateDoc(productRef, payload);
 
       setIsAddModalOpen(false);
       setEditingProduct(null);
+      setNewProduct({
+        name: "",
+        category: "",
+        price: "",
+        quantity: "",
+        cost: "",
+        description: "",
+        icon: "",
+        imageUrl: "",
+        formulaUnits: "",
+        formulaPrice: ""
+      });
       toast({ title: "Produit modifié", description: "Le produit a été mis à jour" });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Erreur inconnue";
