@@ -80,10 +80,7 @@ const AppContent = () => {
   
   // Fermer proprement tout overlay/portal (Radix Popover/Dropdown/Dialog) sur changement de route
   // pour éviter des incohérences DOM sur certains Chrome
-  useEffect(() => {
-    try { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); } catch { /* ignore */ }
-    try { window.dispatchEvent(new Event('nack_route_change')); } catch { /* ignore */ }
-  }, [location.pathname]);
+  // Retiré: les dispatch global Escape peuvent provoquer des suppressions doubles côté Radix
 
   return (
     <>

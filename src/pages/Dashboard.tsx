@@ -247,15 +247,8 @@ const Dashboard = () => {
     }
     setActiveTab(tab);
     setSidebarOpen(false); // Close mobile sidebar when changing tabs
-    // Fermer tous les overlays Radix (Popover/Dropdown/Dialog) ouverts
-    try { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); } catch { /* ignore */ }
-    try { window.dispatchEvent(new Event('nack_tab_change')); } catch { /* ignore */ }
   };
 
-  useEffect(() => {
-    // Double sécurité: à chaque changement d'onglet, fermer overlays
-    try { window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); } catch { /* ignore */ }
-  }, [activeTab]);
 
   return (
     <div className="h-screen bg-background flex flex-col overflow-hidden">
