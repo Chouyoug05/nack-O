@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+// Remplacement: utiliser un select natif pour éviter les issues de portail/overlay sur certains Chrome
 import { Eye, EyeOff, Building2 } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
@@ -138,21 +138,19 @@ const Register = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="establishmentType">Type d'établissement</Label>
-                <Select
+                <select
+                  id="establishmentType"
+                  name="establishmentType"
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                   value={formData.establishmentType}
-                  onValueChange={(value) => setFormData({...formData, establishmentType: value})}
+                  onChange={(e) => setFormData({ ...formData, establishmentType: e.target.value })}
+                  required
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez le type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {establishmentTypes.map((type) => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="" disabled>Choisir…</option>
+                  {establishmentTypes.map((type) => (
+                    <option key={type.value} value={type.value}>{type.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">
