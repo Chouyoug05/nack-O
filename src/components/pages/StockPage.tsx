@@ -543,11 +543,11 @@ const StockPage = () => {
               <CardTitle>Gestion du Stock</CardTitle>
               <CardDescription>Gérez vos produits et surveillez les stocks</CardDescription>
             </div>
-             <div className="flex gap-2">
+             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
                <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                  <DialogTrigger asChild>
                    <Button 
-                     className="bg-gradient-primary text-white shadow-button hover:shadow-elegant"
+                     className="w-full sm:w-auto bg-gradient-primary text-white shadow-button hover:shadow-elegant"
                      onClick={() => {
                        requireManagerAuth(() => {
                          setEditingProduct(null);
@@ -567,7 +567,7 @@ const StockPage = () => {
                  <Button 
                    variant="outline"
                    onClick={() => setIsSecurityDialogOpen(true)}
-                   className="ml-2"
+                   className="w-full sm:w-auto"
                  >
                    Sécurité
                  </Button>
@@ -752,7 +752,7 @@ const StockPage = () => {
                  <DialogTrigger asChild>
                    <Button 
                      variant="outline" 
-                     className="border-red-200 text-red-600 hover:bg-red-50"
+                     className="w-full sm:w-auto border-red-200 text-red-600 hover:bg-red-50"
                      onClick={() => {
                        setIsLossModalOpen(true);
                      }}
