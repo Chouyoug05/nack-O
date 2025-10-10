@@ -33,6 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { lossesColRef, productsColRef } from "@/lib/collections";
 import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
 import type { ProductDoc, LossDoc } from "@/types/inventory";
+import type { UserProfile } from "@/types/profile";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
 
@@ -54,7 +55,7 @@ interface Product {
 
 const StockPage = () => {
   const { toast } = useToast();
-  const { user, profile } = useAuth();
+  const { user, profile, saveProfile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -170,6 +171,55 @@ const StockPage = () => {
       toast({ title: "Code incorrect", description: "Le code gérant ne correspond pas.", variant: "destructive" });
     } finally {
       setIsAuthChecking(false);
+    }
+  };
+
+  // --- Security code management UI ---
+  const [isSecurityDialogOpen, setIsSecurityDialogOpen] = useState(false);
+  const [currentCode, setCurrentCode] = useState("");
+  const [newCode, setNewCode] = useState("");
+  const [confirmCode, setConfirmCode] = useState("");
+  const [isSavingCode, setIsSavingCode] = useState(false);
+  const digestSha256HexLocal = async (text: string): Promise<string> => {
+    const data = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    const bytes = Array.from(new Uint8Array(buf));
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+  const handleSaveSecurityCode = async () => {
+    try {
+      if (!newCode || !confirmCode) {
+        toast({ title: "Champs requis", description: "Saisissez et confirmez le code.", variant: "destructive" });
+        return;
+      }
+      if (newCode !== confirmCode) {
+        toast({ title: "Codes différents", description: "Le nouveau code et sa confirmation ne correspondent pas.", variant: "destructive" });
+        return;
+      }
+      if (profile?.managerPinHash) {
+        if (!currentCode) {
+          toast({ title: "Code actuel requis", description: "Saisissez le code actuel pour le modifier.", variant: "destructive" });
+          return;
+        }
+        const curHash = await digestSha256HexLocal(currentCode);
+        if (curHash !== profile.managerPinHash) {
+          toast({ title: "Code actuel incorrect", description: "Le code actuel ne correspond pas.", variant: "destructive" });
+          return;
+        }
+      }
+      setIsSavingCode(true);
+      const newHash = await digestSha256HexLocal(newCode);
+      await saveProfile({
+        // On ne modifie que le code; saveProfile fait un merge partiel
+        managerPinHash: newHash,
+      } as Omit<UserProfile, "uid" | "createdAt" | "updatedAt">);
+      setIsSecurityDialogOpen(false);
+      setCurrentCode(""); setNewCode(""); setConfirmCode("");
+      toast({ title: "Sécurité mise à jour", description: "Le code gérant a été enregistré." });
+    } catch {
+      toast({ title: "Erreur", description: "Impossible d'enregistrer le code pour le moment.", variant: "destructive" });
+    } finally {
+      setIsSavingCode(false);
     }
   };
 
@@ -513,7 +563,15 @@ const StockPage = () => {
                      Ajouter un produit
                    </Button>
                  </DialogTrigger>
-                <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                 {/* Bouton Sécurité */}
+                 <Button 
+                   variant="outline"
+                   onClick={() => setIsSecurityDialogOpen(true)}
+                   className="ml-2"
+                 >
+                   Sécurité
+                 </Button>
+                 <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                   <DialogHeader className="pb-4">
                     <DialogTitle className="text-xl font-bold">{editingProduct ? "Modifier le produit" : "Ajouter un nouveau produit"}</DialogTitle>
                     <DialogDescription className="text-base">
@@ -933,6 +991,37 @@ const StockPage = () => {
             <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)}>Annuler</Button>
             <Button onClick={submitManagerAuth} disabled={isAuthChecking} className="bg-gradient-primary text-white">
               {isAuthChecking ? 'Vérification…' : 'Vérifier'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Security Code Dialog */}
+      <Dialog open={isSecurityDialogOpen} onOpenChange={setIsSecurityDialogOpen}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle>Sécuriser le stock (code gérant)</DialogTitle>
+            <DialogDescription>
+              Créez un code gérant pour protéger l'ajout et la modification du stock.
+              Ce code n’est pas votre mot de passe de compte. Il est optionnel, destiné aux comptes partagés.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {profile?.managerPinHash && (
+              <>
+                <Label htmlFor="cur-code">Code actuel</Label>
+                <Input id="cur-code" type="password" value={currentCode} onChange={(e) => setCurrentCode(e.target.value)} />
+              </>
+            )}
+            <Label htmlFor="new-code">Nouveau code</Label>
+            <Input id="new-code" type="password" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
+            <Label htmlFor="conf-code">Confirmer le code</Label>
+            <Input id="conf-code" type="password" value={confirmCode} onChange={(e) => setConfirmCode(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsSecurityDialogOpen(false)}>Annuler</Button>
+            <Button onClick={handleSaveSecurityCode} disabled={isSavingCode} className="bg-gradient-primary text-white">
+              {isSavingCode ? 'Enregistrement…' : 'Enregistrer le code'}
             </Button>
           </div>
         </DialogContent>
