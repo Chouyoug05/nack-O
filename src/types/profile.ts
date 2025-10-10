@@ -7,6 +7,8 @@ export interface UserProfile {
   phone: string;
   logoUrl?: string;
   logoDeleteToken?: string;
+  // Sécurité gérant
+  managerPinHash?: string; // SHA-256 hex of optional manager code (not account password)
   // Abonnement
   plan?: 'trial' | 'active' | 'expired';
   trialEndsAt?: number; // epoch ms

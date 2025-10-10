@@ -28,8 +28,7 @@ import {
   Cherry,
   Apple
 } from "lucide-react";
-import { auth, db } from "@/lib/firebase";
-import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { lossesColRef, productsColRef } from "@/lib/collections";
 import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
@@ -55,7 +54,7 @@ interface Product {
 
 const StockPage = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -116,7 +115,7 @@ const StockPage = () => {
 
   // --- Manager authentication (password prompt) ---
   const [isManagerAuthOpen, setIsManagerAuthOpen] = useState(false);
-  const [managerPassword, setManagerPassword] = useState("");
+  const [managerCode, setManagerCode] = useState("");
   const [isAuthChecking, setIsAuthChecking] = useState(false);
   const [postAuthActionRefState] = useState<null | (() => void)>(null);
   const postAuthActionRef = { current: postAuthActionRefState as undefined | (() => void) } as { current: undefined | (() => void) };
@@ -134,37 +133,41 @@ const StockPage = () => {
   };
 
   const requireManagerAuth = (action: () => void) => {
+    // Si aucun code gérant n'est configuré, pas de vérification requise
+    if (!profile?.managerPinHash) { action(); return; }
     if (Date.now() < authValidUntil) { action(); return; }
     postAuthActionRef.current = action;
-    setManagerPassword("");
+    setManagerCode("");
     setIsManagerAuthOpen(true);
   };
 
+  const digestSha256Hex = async (text: string): Promise<string> => {
+    const data = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    const bytes = Array.from(new Uint8Array(buf));
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
   const submitManagerAuth = async () => {
-    if (!user?.email) {
-      toast({ title: "Action protégée", description: "Impossible de vérifier (email manquant).", variant: "destructive" });
+    if (!profile?.managerPinHash) {
+      setIsManagerAuthOpen(false);
+      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
       return;
     }
-    if (!managerPassword) {
-      toast({ title: "Mot de passe requis", description: "Veuillez saisir votre mot de passe.", variant: "destructive" });
+    if (!managerCode) {
+      toast({ title: "Code requis", description: "Veuillez saisir votre code gérant.", variant: "destructive" });
       return;
     }
     setIsAuthChecking(true);
     try {
-      const cred = EmailAuthProvider.credential(user.email, managerPassword);
-      if (!auth.currentUser) throw new Error("Session invalide");
-      await reauthenticateWithCredential(auth.currentUser, cred);
+      const hash = await digestSha256Hex(managerCode);
+      if (hash !== profile.managerPinHash) throw new Error('bad');
       rememberAuthWindow(10 * 60 * 1000); // 10 minutes
       setIsManagerAuthOpen(false);
-      const fn = postAuthActionRef.current;
-      postAuthActionRef.current = undefined;
-      if (fn) fn();
+      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
       toast({ title: "Vérification réussie", description: "Vous pouvez modifier le stock pendant 10 minutes." });
-    } catch (e: unknown) {
-      const msg = (e as { code?: string; message?: string })?.code === 'auth/wrong-password'
-        ? 'Mot de passe incorrect.'
-        : 'Impossible de vérifier. Utilisez un compte email/mot de passe.';
-      toast({ title: "Échec de la vérification", description: msg, variant: "destructive" });
+    } catch {
+      toast({ title: "Code incorrect", description: "Le code gérant ne correspond pas.", variant: "destructive" });
     } finally {
       setIsAuthChecking(false);
     }
@@ -912,18 +915,19 @@ const StockPage = () => {
           </div>
         </CardContent>
       </Card>
-      {/* Manager Auth Dialog */}
+      {/* Manager Auth Dialog (Optionnel) */}
       <Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen}>
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>Vérification du gérant</DialogTitle>
             <DialogDescription>
-              Saisissez votre mot de passe pour autoriser l'ajout/la modification du stock.
+              Saisissez votre <strong>code gérant</strong> pour autoriser l'ajout/la modification du stock.<br/>
+              Ce code n’est <strong>pas</strong> votre mot de passe de compte. Il est <strong>optionnel</strong> et utile si vous partagez le compte gérant.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <Label htmlFor="mgr-pass">Mot de passe</Label>
-            <Input id="mgr-pass" type="password" value={managerPassword} onChange={(e) => setManagerPassword(e.target.value)} />
+            <Label htmlFor="mgr-code">Code gérant</Label>
+            <Input id="mgr-code" type="password" value={managerCode} onChange={(e) => setManagerCode(e.target.value)} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)}>Annuler</Button>
