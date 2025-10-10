@@ -28,7 +28,8 @@ import {
   Cherry,
   Apple
 } from "lucide-react";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
 import { useAuth } from "@/contexts/AuthContext";
 import { lossesColRef, productsColRef } from "@/lib/collections";
 import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
@@ -112,6 +113,62 @@ const StockPage = () => {
     reason: "",
     date: new Date().toISOString().split('T')[0]
   });
+
+  // --- Manager authentication (password prompt) ---
+  const [isManagerAuthOpen, setIsManagerAuthOpen] = useState(false);
+  const [managerPassword, setManagerPassword] = useState("");
+  const [isAuthChecking, setIsAuthChecking] = useState(false);
+  const [postAuthActionRefState] = useState<null | (() => void)>(null);
+  const postAuthActionRef = { current: postAuthActionRefState as undefined | (() => void) } as { current: undefined | (() => void) };
+  const [authValidUntil, setAuthValidUntil] = useState<number>(() => {
+    try {
+      const raw = sessionStorage.getItem('nack_manager_auth_until');
+      return raw ? Number(raw) : 0;
+    } catch { return 0; }
+  });
+
+  const rememberAuthWindow = (ms: number) => {
+    const until = Date.now() + ms;
+    setAuthValidUntil(until);
+    try { sessionStorage.setItem('nack_manager_auth_until', String(until)); } catch { /* ignore */ }
+  };
+
+  const requireManagerAuth = (action: () => void) => {
+    if (Date.now() < authValidUntil) { action(); return; }
+    postAuthActionRef.current = action;
+    setManagerPassword("");
+    setIsManagerAuthOpen(true);
+  };
+
+  const submitManagerAuth = async () => {
+    if (!user?.email) {
+      toast({ title: "Action protégée", description: "Impossible de vérifier (email manquant).", variant: "destructive" });
+      return;
+    }
+    if (!managerPassword) {
+      toast({ title: "Mot de passe requis", description: "Veuillez saisir votre mot de passe.", variant: "destructive" });
+      return;
+    }
+    setIsAuthChecking(true);
+    try {
+      const cred = EmailAuthProvider.credential(user.email, managerPassword);
+      if (!auth.currentUser) throw new Error("Session invalide");
+      await reauthenticateWithCredential(auth.currentUser, cred);
+      rememberAuthWindow(10 * 60 * 1000); // 10 minutes
+      setIsManagerAuthOpen(false);
+      const fn = postAuthActionRef.current;
+      postAuthActionRef.current = undefined;
+      if (fn) fn();
+      toast({ title: "Vérification réussie", description: "Vous pouvez modifier le stock pendant 10 minutes." });
+    } catch (e: unknown) {
+      const msg = (e as { code?: string; message?: string })?.code === 'auth/wrong-password'
+        ? 'Mot de passe incorrect.'
+        : 'Impossible de vérifier. Utilisez un compte email/mot de passe.';
+      toast({ title: "Échec de la vérification", description: msg, variant: "destructive" });
+    } finally {
+      setIsAuthChecking(false);
+    }
+  };
 
   const categories = ["Boissons", "Plats", "Alcools", "Snacks", "Desserts"];
   
@@ -225,7 +282,7 @@ const StockPage = () => {
     }
   };
 
-  const handleEditProduct = (product: Product) => {
+  const openEditProductUnsafe = (product: Product) => {
     setEditingProduct(product);
     setNewProduct({
       name: product.name,
@@ -240,6 +297,10 @@ const StockPage = () => {
       formulaPrice: product.formula?.price ? String(product.formula.price) : "",
     });
     setIsAddModalOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    requireManagerAuth(() => openEditProductUnsafe(product));
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -435,7 +496,14 @@ const StockPage = () => {
                    <Button 
                      className="bg-gradient-primary text-white shadow-button hover:shadow-elegant"
                      onClick={() => {
-                       setIsAddModalOpen(true);
+                       requireManagerAuth(() => {
+                         setEditingProduct(null);
+                         setNewProduct({
+                           name: "", category: "", price: "", quantity: "", cost: "",
+                           description: "", icon: "", imageUrl: "", formulaUnits: "", formulaPrice: ""
+                         });
+                         setIsAddModalOpen(true);
+                       });
                      }}
                    >
                      <Plus className="mr-2" size={18} />
@@ -844,6 +912,27 @@ const StockPage = () => {
           </div>
         </CardContent>
       </Card>
+      {/* Manager Auth Dialog */}
+      <Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Vérification du gérant</DialogTitle>
+            <DialogDescription>
+              Saisissez votre mot de passe pour autoriser l'ajout/la modification du stock.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="mgr-pass">Mot de passe</Label>
+            <Input id="mgr-pass" type="password" value={managerPassword} onChange={(e) => setManagerPassword(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)}>Annuler</Button>
+            <Button onClick={submitManagerAuth} disabled={isAuthChecking} className="bg-gradient-primary text-white">
+              {isAuthChecking ? 'Vérification…' : 'Vérifier'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
