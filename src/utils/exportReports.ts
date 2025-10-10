@@ -43,8 +43,18 @@ export const exportSalesCsv = (opts: { sales: SaleDoc[]; losses: LossDoc[]; orde
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName || `rapport-${periodLabel}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  a.style.display = "none";
+  try {
+    document.body.appendChild(a);
+    a.click();
+  } finally {
+    try {
+      if (a && a.parentNode) {
+        a.parentNode.removeChild(a);
+      }
+    } catch { /* ignore */ }
+    try { URL.revokeObjectURL(url); } catch { /* ignore */ }
+  }
 };
 
 async function loadImageAsDataURL(url: string): Promise<string> {
