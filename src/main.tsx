@@ -27,6 +27,24 @@ try {
   }
 } catch { /* ignore */ }
 
+// Garde globale: éviter NotFoundError sur removeChild pour des portails démontés
+try {
+  if (typeof window !== 'undefined' && typeof Node !== 'undefined') {
+    const originalRemoveChild: typeof Node.prototype.removeChild = Node.prototype.removeChild;
+    Node.prototype.removeChild = function<T extends Node>(child: T): T {
+      try {
+        // Supprimer seulement si le parent correspond encore
+        if (child && child.parentNode === this) {
+          return originalRemoveChild.call(this, child);
+        }
+      } catch {
+        // ignore et retomber sur retour neutre
+      }
+      return child;
+    };
+  }
+} catch { /* ignore */ }
+
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
     <App />
