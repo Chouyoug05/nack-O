@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCircle, X } from "lucide-react";
+import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 
 interface Props {
   open: boolean;
@@ -30,6 +31,15 @@ const WhatsAppPopup = ({ open, onOpenChange }: Props) => {
       toast({
         title: "Numéro WhatsApp requis",
         description: "Veuillez saisir votre numéro WhatsApp",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!validateWhatsApp(whatsapp)) {
+      toast({
+        title: "Format WhatsApp invalide",
+        description: getWhatsAppErrorMessage(whatsapp),
         variant: "destructive"
       });
       return;
@@ -93,7 +103,14 @@ const WhatsAppPopup = ({ open, onOpenChange }: Props) => {
               value={whatsapp}
               onChange={(e) => setWhatsapp(e.target.value)}
               required
+              className={whatsapp && !validateWhatsApp(whatsapp) ? "border-red-500" : ""}
             />
+            {whatsapp && !validateWhatsApp(whatsapp) && (
+              <p className="text-xs text-red-500">{getWhatsAppErrorMessage(whatsapp)}</p>
+            )}
+            {whatsapp && validateWhatsApp(whatsapp) && (
+              <p className="text-xs text-green-600">✓ Format WhatsApp valide</p>
+            )}
             <p className="text-xs text-muted-foreground">
               Format: +241 suivi de votre numéro (ex: +241 01 23 45 67)
             </p>

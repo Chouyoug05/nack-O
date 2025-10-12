@@ -32,6 +32,7 @@ import { deleteImageByToken } from "@/lib/cloudinary";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
+import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "";
@@ -50,6 +51,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     address: "",
     phone: profile?.phone || "",
     email: profile?.email || "",
+    whatsapp: profile?.whatsapp || "",
     logoUrl: profile?.logoUrl || "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -283,6 +285,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                                 ownerName: profile?.ownerName || "",
                                 email: establishmentInfo.email,
                                 phone: establishmentInfo.phone,
+                                whatsapp: establishmentInfo.whatsapp,
                                 logoUrl: url,
                                 logoDeleteToken: deleteToken,
                               });
@@ -316,6 +319,23 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="establishment-whatsapp">WhatsApp <span className="text-red-500">*</span></Label>
+                    <Input
+                      id="establishment-whatsapp"
+                      type="tel"
+                      value={establishmentInfo.whatsapp}
+                      onChange={(e) => setEstablishmentInfo({...establishmentInfo, whatsapp: e.target.value})}
+                      placeholder="+241 XX XX XX XX"
+                      className={establishmentInfo.whatsapp && !validateWhatsApp(establishmentInfo.whatsapp) ? "border-red-500" : ""}
+                    />
+                    {establishmentInfo.whatsapp && !validateWhatsApp(establishmentInfo.whatsapp) && (
+                      <p className="text-xs text-red-500">{getWhatsAppErrorMessage(establishmentInfo.whatsapp)}</p>
+                    )}
+                    {establishmentInfo.whatsapp && validateWhatsApp(establishmentInfo.whatsapp) && (
+                      <p className="text-xs text-green-600">✓ Format WhatsApp valide</p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="establishment-email">Email</Label>
                     <Input
                       id="establishment-email"
@@ -327,12 +347,22 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <Button onClick={async () => {
                     try {
                       setIsSaving(true);
+                      // Validation WhatsApp avant sauvegarde
+                      if (establishmentInfo.whatsapp && !validateWhatsApp(establishmentInfo.whatsapp)) {
+                        toast({
+                          title: "Format WhatsApp invalide",
+                          description: getWhatsAppErrorMessage(establishmentInfo.whatsapp),
+                          variant: "destructive"
+                        });
+                        return;
+                      }
                       await saveProfile({
                         establishmentName: establishmentInfo.name,
                         establishmentType: profile?.establishmentType || "",
                         ownerName: profile?.ownerName || "",
                         email: establishmentInfo.email,
                         phone: establishmentInfo.phone,
+                        whatsapp: establishmentInfo.whatsapp,
                         logoUrl: establishmentInfo.logoUrl || undefined,
                       });
                       toast({ title: "Informations sauvegardées", description: "Profil mis à jour" });

@@ -10,6 +10,7 @@ import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
+import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -58,6 +59,25 @@ const Register = () => {
       toast({
         title: "Mot de passe trop court",
         description: "Le mot de passe doit contenir au moins 6 caractères.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Validation WhatsApp
+    if (!formData.whatsapp.trim()) {
+      toast({
+        title: "Numéro WhatsApp requis",
+        description: "Le numéro WhatsApp est obligatoire pour le support.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!validateWhatsApp(formData.whatsapp)) {
+      toast({
+        title: "Format WhatsApp invalide",
+        description: getWhatsAppErrorMessage(formData.whatsapp),
         variant: "destructive"
       });
       return;
@@ -203,7 +223,14 @@ const Register = () => {
                   value={formData.whatsapp}
                   onChange={handleInputChange}
                   required
+                  className={formData.whatsapp && !validateWhatsApp(formData.whatsapp) ? "border-red-500" : ""}
                 />
+                {formData.whatsapp && !validateWhatsApp(formData.whatsapp) && (
+                  <p className="text-xs text-red-500">{getWhatsAppErrorMessage(formData.whatsapp)}</p>
+                )}
+                {formData.whatsapp && validateWhatsApp(formData.whatsapp) && (
+                  <p className="text-xs text-green-600">✓ Format WhatsApp valide</p>
+                )}
                 <p className="text-xs text-muted-foreground">Numéro WhatsApp obligatoire pour le support</p>
               </div>
               

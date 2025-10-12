@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
+import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 
 const establishmentTypes = [
   { value: "bar", label: "Bar" },
@@ -50,6 +51,26 @@ const CompleteProfile = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation WhatsApp
+    if (!formData.whatsapp.trim()) {
+      toast({
+        title: "Numéro WhatsApp requis",
+        description: "Le numéro WhatsApp est obligatoire pour le support.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    if (!validateWhatsApp(formData.whatsapp)) {
+      toast({
+        title: "Format WhatsApp invalide",
+        description: getWhatsAppErrorMessage(formData.whatsapp),
+        variant: "destructive"
+      });
+      return;
+    }
+    
     try {
       let finalLogoUrl: string | undefined = formData.logoUrl || undefined;
       if (logoFile) {
@@ -139,7 +160,22 @@ const CompleteProfile = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="whatsapp">WhatsApp <span className="text-red-500">*</span></Label>
-                <Input id="whatsapp" name="whatsapp" type="tel" value={formData.whatsapp} onChange={handleInputChange} required />
+                <Input 
+                  id="whatsapp" 
+                  name="whatsapp" 
+                  type="tel" 
+                  value={formData.whatsapp} 
+                  onChange={handleInputChange} 
+                  required 
+                  placeholder="+241 XX XX XX XX"
+                  className={formData.whatsapp && !validateWhatsApp(formData.whatsapp) ? "border-red-500" : ""}
+                />
+                {formData.whatsapp && !validateWhatsApp(formData.whatsapp) && (
+                  <p className="text-xs text-red-500">{getWhatsAppErrorMessage(formData.whatsapp)}</p>
+                )}
+                {formData.whatsapp && validateWhatsApp(formData.whatsapp) && (
+                  <p className="text-xs text-green-600">✓ Format WhatsApp valide</p>
+                )}
                 <p className="text-xs text-muted-foreground">Numéro WhatsApp obligatoire pour le support</p>
               </div>
 
