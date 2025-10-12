@@ -5,6 +5,7 @@ export interface UserProfile {
   ownerName: string;
   email: string;
   phone: string;
+  whatsapp?: string; // Numéro WhatsApp obligatoire
   logoUrl?: string;
   logoDeleteToken?: string;
   // Sécurité gérant

@@ -10,7 +10,8 @@ import {
   Settings,
   Menu,
   Calendar,
-  LogOut
+  LogOut,
+  Shield
 } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -32,7 +33,7 @@ import { onSnapshot, orderBy, query } from "firebase/firestore";
 import { setDoc, doc } from "firebase/firestore";
 import { agentTokensTopColRef } from "@/lib/collections";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Shield } from "lucide-react";
+import WhatsAppPopup from "@/components/WhatsAppPopup";
 
 const getManagerOutboxKey = (uid: string) => `nack_m_outbox_${uid}`;
 const getAgentOutboxPrefix = (uid: string) => `nack_order_outbox_${uid}_`;
@@ -57,6 +58,13 @@ const Dashboard = () => {
   const [recentSales, setRecentSales] = useState<Array<{ id: string; items: { name: string; quantity: number; }[]; total: number; createdAt: number }>>([]);
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [queueCount, setQueueCount] = useState<number>(0);
+  const [showWhatsAppPopup, setShowWhatsAppPopup] = useState(false);
+
+  useEffect(() => {
+    if (profile && !profile.whatsapp) {
+      setShowWhatsAppPopup(true);
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (!user) return;
@@ -569,6 +577,12 @@ const Dashboard = () => {
       <MobileBottomNav 
         activeTab={activeTab}
         onTabChange={handleTabChange}
+      />
+
+      {/* WhatsApp Popup */}
+      <WhatsAppPopup 
+        open={showWhatsAppPopup}
+        onOpenChange={setShowWhatsAppPopup}
       />
       </div>
   );

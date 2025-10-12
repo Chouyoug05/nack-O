@@ -167,22 +167,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const now = Date.now();
         const baseKey = (k: string) => `nack_sys_notif_${k}_${uid}`;
-        if (!localStorage.getItem(baseKey('welcome'))) {
-          try {
-            await addDoc(notificationsColRef(db, uid), {
-              title: "Bienvenue sur Nack!",
-              message: "Merci de nous faire confiance",
-              type: "success",
-              createdAt: now,
-              read: false,
-            });
-            localStorage.setItem(baseKey('welcome'), '1');
-          } catch { /* ignore welcome notif failure */ }
-        }
+        
+        // Seulement les notifications importantes - suppression de la notification de bienvenue
         if (profile.plan === 'trial' && profile.trialEndsAt) {
           const msLeft = profile.trialEndsAt - now;
           const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
-          if (daysLeft > 0 && daysLeft <= 3) {
+          // Seulement les 2 derniers jours d'essai
+          if (daysLeft > 0 && daysLeft <= 2) {
             const dayKey = baseKey(`trial_${daysLeft}`);
             if (!localStorage.getItem(dayKey)) {
               try {

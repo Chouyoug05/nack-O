@@ -30,6 +30,7 @@ const CompleteProfile = () => {
     ownerName: "",
     email: user?.email ?? "",
     phone: "",
+    whatsapp: "",
     logoUrl: "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -70,6 +71,7 @@ const CompleteProfile = () => {
         ownerName: formData.ownerName,
         email: formData.email,
         phone: formData.phone,
+        whatsapp: formData.whatsapp,
         logoUrl: finalLogoUrl,
       });
       toast({ title: "Profil enregistré", description: "Bienvenue sur NACK!" });
@@ -133,6 +135,12 @@ const CompleteProfile = () => {
               <div className="space-y-2">
                 <Label htmlFor="phone">Téléphone</Label>
                 <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp">WhatsApp <span className="text-red-500">*</span></Label>
+                <Input id="whatsapp" name="whatsapp" type="tel" value={formData.whatsapp} onChange={handleInputChange} required />
+                <p className="text-xs text-muted-foreground">Numéro WhatsApp obligatoire pour le support</p>
               </div>
 
               <div className="space-y-2">

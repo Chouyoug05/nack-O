@@ -1,0 +1,130 @@
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { MessageCircle, X } from "lucide-react";
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+const WhatsAppPopup = ({ open, onOpenChange }: Props) => {
+  const { user, profile, saveProfile } = useAuth();
+  const { toast } = useToast();
+  const [whatsapp, setWhatsapp] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (profile?.whatsapp) {
+      setWhatsapp(profile.whatsapp);
+    }
+  }, [profile]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!whatsapp.trim()) {
+      toast({
+        title: "Numéro WhatsApp requis",
+        description: "Veuillez saisir votre numéro WhatsApp",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await saveProfile({
+        establishmentName: profile?.establishmentName || "",
+        establishmentType: profile?.establishmentType || "",
+        ownerName: profile?.ownerName || "",
+        email: profile?.email || "",
+        phone: profile?.phone || "",
+        whatsapp: whatsapp.trim(),
+        logoUrl: profile?.logoUrl,
+      });
+      
+      toast({
+        title: "WhatsApp enregistré",
+        description: "Votre numéro WhatsApp a été sauvegardé",
+      });
+      
+      onOpenChange(false);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder le numéro WhatsApp",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleContactWhatsApp = () => {
+    const message = `Bonjour, je suis ${profile?.ownerName || "un utilisateur"} de ${profile?.establishmentName || "mon établissement"}. Je souhaite ajouter mon numéro WhatsApp à mon profil NACK. Mon numéro est: ${whatsapp || "à définir"}`;
+    const whatsappUrl = `https://wa.me/24104746847?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, "_blank");
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <MessageCircle className="text-green-600" size={20} />
+            Numéro WhatsApp requis
+          </DialogTitle>
+          <DialogDescription>
+            Votre numéro WhatsApp est nécessaire pour le support technique et les notifications importantes.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="whatsapp">Numéro WhatsApp</Label>
+            <Input
+              id="whatsapp"
+              type="tel"
+              placeholder="+241 XX XX XX XX"
+              value={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Format: +241 suivi de votre numéro (ex: +241 01 23 45 67)
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleContactWhatsApp}
+              className="flex-1"
+            >
+              <MessageCircle className="mr-2" size={16} />
+              Nous contacter
+            </Button>
+            <Button
+              type="submit"
+              disabled={isLoading}
+              className="flex-1"
+            >
+              {isLoading ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </div>
+        </form>
+
+        <div className="text-xs text-muted-foreground text-center">
+          Vous pouvez aussi nous contacter directement sur WhatsApp pour obtenir de l'aide
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default WhatsAppPopup;

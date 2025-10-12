@@ -20,6 +20,7 @@ const Register = () => {
     ownerName: "",
     email: "",
     phone: "",
+    whatsapp: "",
     password: "",
     confirmPassword: "",
     logoUrl: "",
@@ -86,6 +87,7 @@ const Register = () => {
         ownerName: formData.ownerName,
         email: formData.email,
         phone: formData.phone,
+        whatsapp: formData.whatsapp,
         logoUrl: finalLogoUrl,
       });
       toast({ title: "Inscription réussie !", description: "Bienvenue sur NACK!" });
@@ -189,6 +191,20 @@ const Register = () => {
                   onChange={handleInputChange}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp">WhatsApp <span className="text-red-500">*</span></Label>
+                <Input
+                  id="whatsapp"
+                  name="whatsapp"
+                  type="tel"
+                  placeholder="+241 XX XX XX XX"
+                  value={formData.whatsapp}
+                  onChange={handleInputChange}
+                  required
+                />
+                <p className="text-xs text-muted-foreground">Numéro WhatsApp obligatoire pour le support</p>
               </div>
               
               <div className="space-y-2">
