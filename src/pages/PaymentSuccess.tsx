@@ -2,10 +2,12 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, addDoc } from "firebase/firestore";
+import { notificationsColRef } from "@/lib/collections";
+import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 
 const PaymentSuccess = () => {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,6 +22,35 @@ const PaymentSuccess = () => {
           lastPaymentAt: now,
           updatedAt: now,
         });
+
+        // Notification de paiement réussi
+        try {
+          await addDoc(notificationsColRef(db, user.uid), {
+            title: "Paiement réussi",
+            message: "Votre abonnement (2 500 XAF) est activé pour 30 jours.",
+            type: "success",
+            createdAt: now,
+            read: false,
+          });
+        } catch {/* ignore */}
+
+        // Générer le reçu si le profil est disponible
+        try {
+          if (profile) {
+            await generateSubscriptionReceiptPDF({
+              establishmentName: profile.establishmentName,
+              email: profile.email,
+              phone: profile.phone,
+              logoUrl: profile.logoUrl,
+              uid: user.uid,
+            }, {
+              amountXaf: 2500,
+              paidAt: now,
+              paymentMethod: "Airtel Money",
+              reference: "abonnement",
+            });
+          }
+        } catch {/* ignore receipt generation errors */}
       } catch (e) {
         console.error(e);
       } finally {
@@ -27,7 +58,7 @@ const PaymentSuccess = () => {
       }
     };
     run();
-  }, [user, navigate]);
+  }, [user, profile, navigate]);
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6">

@@ -12,7 +12,7 @@ import {
   signInWithRedirect,
   getRedirectResult,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, addDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, addDoc, onSnapshot } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import { notificationsColRef } from "@/lib/collections";
 import { adminDocRef } from "@/lib/collections";
@@ -140,6 +140,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => unsub();
   }, []);
+
+  // Realtime profile and admin updates
+  useEffect(() => {
+    if (!user) return;
+    setProfileLoading(true);
+    setIsAdminLoading(true);
+    const unsubProfile = onSnapshot(doc(db, "profiles", user.uid), (snap) => {
+      setProfile(snap.exists() ? (snap.data() as UserProfile) : null);
+      setProfileLoading(false);
+    }, () => setProfileLoading(false));
+    const unsubAdmin = onSnapshot(adminDocRef(db, user.uid), (snap) => {
+      setIsAdmin(!!snap.exists());
+      setIsAdminLoading(false);
+    }, () => setIsAdminLoading(false));
+    return () => {
+      try { unsubProfile(); } catch { /* ignore */ }
+      try { unsubAdmin(); } catch { /* ignore */ }
+    };
+  }, [user]);
 
   useEffect(() => {
     const pushSystemNotifications = async () => {

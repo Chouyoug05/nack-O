@@ -31,6 +31,7 @@ import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
+import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "";
@@ -101,6 +102,22 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     } catch {
       toast({ title: "Paiement indisponible", description: "Réessayez dans quelques instants.", variant: "destructive" });
     }
+  };
+
+  const downloadReceipt = async () => {
+    if (!profile || !user || !profile.lastPaymentAt) return;
+    await generateSubscriptionReceiptPDF({
+      establishmentName: profile.establishmentName,
+      email: profile.email,
+      phone: profile.phone,
+      logoUrl: profile.logoUrl,
+      uid: user.uid,
+    }, {
+      amountXaf: 2500,
+      paidAt: profile.lastPaymentAt,
+      paymentMethod: "Airtel Money",
+      reference: "abonnement",
+    });
   };
 
   return (
@@ -178,13 +195,31 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="bg-nack-beige-light p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium">Méthode de paiement</span>
+                  <div className="bg-nack-beige-light p-4 rounded-lg space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Montant</span>
+                      <span className="text-sm">2,500 XAF / 30 jours</span>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      À définir après le premier paiement.
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Dernier paiement</span>
+                      <span className="text-sm">{profile?.lastPaymentAt ? new Date(profile.lastPaymentAt).toLocaleString() : "—"}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Méthode</span>
+                      <span className="text-sm">{profile?.lastPaymentAt ? "Airtel Money" : "—"}</span>
+                    </div>
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full"
+                        onClick={downloadReceipt}
+                        disabled={!profile?.lastPaymentAt}
+                      >
+                        <Download className="mr-2" size={16} />
+                        Télécharger le reçu
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>
