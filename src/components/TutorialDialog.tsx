@@ -28,6 +28,8 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed'>('stock');
 
+  console.log('TutorialDialog render - open:', open, 'profile:', profile?.uid);
+
   useEffect(() => {
     if (profile?.tutorialStep) {
       setCurrentStep(profile.tutorialStep);
@@ -180,6 +182,10 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
 
   const currentStepData = steps.find(step => step.id === currentStep);
   const currentIndex = steps.findIndex(step => step.id === currentStep);
+
+  console.log('TutorialDialog - currentStep:', currentStep);
+  console.log('TutorialDialog - currentStepData:', currentStepData);
+  console.log('TutorialDialog - steps:', steps.map(s => s.id));
 
   const handleNext = async () => {
     if (currentIndex < steps.length - 1) {

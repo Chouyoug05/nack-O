@@ -70,7 +70,10 @@ const Dashboard = () => {
   useTutorialProgress();
 
   const handleStartTutorial = () => {
+    console.log('handleStartTutorial called');
+    console.log('Current showTutorial state:', showTutorial);
     setShowTutorial(true);
+    console.log('setShowTutorial(true) called');
   };
 
   useEffect(() => {
