@@ -28,6 +28,11 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed'>('stock');
 
+  console.log('=== TUTORIAL DIALOG RENDER ===');
+  console.log('open prop:', open);
+  console.log('profile:', profile?.uid);
+  console.log('currentStep state:', currentStep);
+
   useEffect(() => {
     if (profile?.tutorialStep) {
       setCurrentStep(profile.tutorialStep);
@@ -243,9 +248,17 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
     }
   };
 
-  if (!currentStepData) return null;
+  if (!currentStepData) {
+    console.log('=== TUTORIAL DIALOG: currentStepData is null ===');
+    console.log('currentStep:', currentStep);
+    console.log('steps:', steps.map(s => s.id));
+    return null;
+  }
 
   const IconComponent = currentStepData.icon;
+
+  console.log('=== TUTORIAL DIALOG: RENDERING ===');
+  console.log('currentStepData:', currentStepData.title);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
