@@ -70,15 +70,7 @@ const Dashboard = () => {
   useTutorialProgress();
 
   const handleStartTutorial = () => {
-    console.log('=== DEBUG TUTORIAL ===');
-    console.log('handleStartTutorial called');
-    console.log('Current showTutorial state:', showTutorial);
-    console.log('Profile:', profile?.uid);
-    console.log('Profile tutorialStep:', profile?.tutorialStep);
-    console.log('Profile tutorialCompleted:', profile?.tutorialCompleted);
     setShowTutorial(true);
-    console.log('setShowTutorial(true) called');
-    console.log('=== END DEBUG ===');
   };
 
   useEffect(() => {
@@ -655,7 +647,6 @@ const Dashboard = () => {
         onOpenChange={setShowTutorial}
         onStepComplete={handleTutorialStepComplete}
       />
-      {console.log('Dashboard render - showTutorial:', showTutorial)}
 
       {/* WhatsApp Community Popup */}
       <WhatsAppCommunityPopup />
