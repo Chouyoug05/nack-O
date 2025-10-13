@@ -70,9 +70,7 @@ const Dashboard = () => {
   useTutorialProgress();
 
   const handleStartTutorial = () => {
-    console.log('handleStartTutorial called, showTutorial:', showTutorial);
     setShowTutorial(true);
-    console.log('setShowTutorial(true) called');
   };
 
   useEffect(() => {
@@ -80,17 +78,6 @@ const Dashboard = () => {
       setShowWhatsAppPopup(true);
     }
   }, [profile]);
-
-  // Afficher le tutoriel pour les nouveaux utilisateurs
-  useEffect(() => {
-    if (profile && !profile.tutorialCompleted && !showTutorial) {
-      // Attendre un peu pour que l'interface se charge
-      const timer = setTimeout(() => {
-        setShowTutorial(true);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [profile]); // Retirer showTutorial des dépendances pour éviter les conflits
 
   useEffect(() => {
     if (!user) return;

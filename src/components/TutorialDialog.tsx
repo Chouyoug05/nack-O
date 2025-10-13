@@ -28,8 +28,6 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed'>('stock');
 
-  console.log('TutorialDialog render - open:', open);
-
   useEffect(() => {
     if (profile?.tutorialStep) {
       setCurrentStep(profile.tutorialStep);
@@ -220,22 +218,11 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
   };
 
   const handleSkip = async () => {
-    await saveProfile({
-      establishmentName: profile?.establishmentName || "",
-      establishmentType: profile?.establishmentType || "",
-      ownerName: profile?.ownerName || "",
-      email: profile?.email || "",
-      phone: profile?.phone || "",
-      whatsapp: profile?.whatsapp,
-      logoUrl: profile?.logoUrl,
-      tutorialCompleted: true,
-      tutorialStep: 'completed',
-    });
-    onStepComplete('completed');
+    // Ne pas marquer comme terminé, juste fermer temporairement
     onOpenChange(false);
     toast({
-      title: "Tutoriel ignoré",
-      description: "Vous pouvez toujours consulter l'aide dans les paramètres.",
+      title: "Tutoriel fermé",
+      description: "Vous pouvez le relancer depuis le menu avatar à tout moment.",
     });
   };
 
