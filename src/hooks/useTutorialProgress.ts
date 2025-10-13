@@ -52,12 +52,6 @@ export const useTutorialProgress = () => {
             logoUrl: profile.logoUrl,
             tutorialStep: 'sales',
           });
-          // Déclencher le popup communauté après l'étape stock
-          setTimeout(() => {
-            try {
-              window.dispatchEvent(new CustomEvent('nack:community:open'));
-            } catch {}
-          }, 1000);
         } catch (error) {
           console.error('Erreur progression ventes:', error);
         }

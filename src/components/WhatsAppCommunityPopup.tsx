@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageCircle, ExternalLink } from "lucide-react";
 
 const WHATSAPP_CHANNEL_URL = "https://whatsapp.com/channel/0029VbBeYoYDJ6GtVge5A409";
-const POPUP_INTERVAL = 3 * 60 * 60 * 1000; // 3 heures en millisecondes
+const POPUP_INTERVAL = 5 * 60 * 60 * 1000; // 5 heures en millisecondes
 const STORAGE_KEY = "nack_whatsapp_popup_last_shown";
 
 const WhatsAppCommunityPopup = () => {
@@ -19,8 +19,12 @@ const WhatsAppCommunityPopup = () => {
         const now = Date.now();
         
         if (!lastShown || (now - parseInt(lastShown)) >= POPUP_INTERVAL) {
-          setIsOpen(true);
-          localStorage.setItem(STORAGE_KEY, now.toString());
+          // Vérifier si le tutoriel est ouvert pour éviter les conflits
+          const tutorialDialog = document.querySelector('[role="dialog"]');
+          if (!tutorialDialog) {
+            setIsOpen(true);
+            localStorage.setItem(STORAGE_KEY, now.toString());
+          }
         }
       } catch (error) {
         // Ignore localStorage errors

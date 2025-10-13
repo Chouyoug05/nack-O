@@ -37,17 +37,6 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
     }
   }, [profile]);
 
-  // Déclencher le popup communauté quand on arrive à l'étape stock
-  useEffect(() => {
-    if (open && currentStep === 'stock') {
-      setTimeout(() => {
-        try {
-          window.dispatchEvent(new CustomEvent('nack:community:open'));
-        } catch {}
-      }, 2000); // Attendre 2 secondes pour que l'utilisateur voie l'étape stock
-    }
-  }, [open, currentStep]);
-
   const steps = [
     {
       id: 'stock' as const,
