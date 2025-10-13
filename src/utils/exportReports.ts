@@ -148,4 +148,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   }
 
   doc.save(fileName || `rapport-${periodLabel}.pdf`);
+  try {
+    window.dispatchEvent(new CustomEvent('nack:report:downloaded', { detail: { periodLabel, at: Date.now() } }));
+  } catch { /* ignore */ }
 }; 

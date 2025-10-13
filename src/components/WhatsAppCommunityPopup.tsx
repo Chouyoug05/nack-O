@@ -46,9 +46,15 @@ const WhatsAppCommunityPopup = () => {
     setIsOpen(false);
   };
 
+  useEffect(() => {
+    const onOpenEvt = () => setIsOpen(true);
+    window.addEventListener('nack:community:open', onOpenEvt as EventListener);
+    return () => window.removeEventListener('nack:community:open', onOpenEvt as EventListener);
+  }, []);
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="w-[95vw] max-w-[520px] sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5 text-green-600" />

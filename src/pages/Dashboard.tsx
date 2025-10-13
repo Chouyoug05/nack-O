@@ -11,7 +11,8 @@ import {
   Menu,
   Calendar,
   LogOut,
-  Shield
+  Shield,
+  Target
 } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -36,6 +37,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import WhatsAppPopup from "@/components/WhatsAppPopup";
 import TutorialDialog from "@/components/TutorialDialog";
 import TutorialBlocker from "@/components/TutorialBlocker";
+import WhatsAppCommunityPopup from "@/components/WhatsAppCommunityPopup";
 import { useTutorialProgress } from "@/hooks/useTutorialProgress";
 
 const getManagerOutboxKey = (uid: string) => `nack_m_outbox_${uid}`;
@@ -66,6 +68,10 @@ const Dashboard = () => {
 
   // Hook pour suivre le progrès du tutoriel
   useTutorialProgress();
+
+  const handleStartTutorial = () => {
+    setShowTutorial(true);
+  };
 
   useEffect(() => {
     if (profile && !profile.whatsapp) {
@@ -271,6 +277,24 @@ const Dashboard = () => {
       alert('La fonctionnalité Événements sera disponible en décembre.\n\nPréparez vos événements (produits, tarifs, affiches).\nBilletterie en ligne et validation QR seront disponibles à cette date.');
       return;
     }
+    // Avancer automatiquement le tutoriel lorsqu'on ouvre Ventes / Rapports
+    try {
+      if (tab === 'sales') {
+        // Ouvre la page ventes et laisse le hook détecter la première vente
+        // Rien à faire ici, juste ouvrir
+      } else if (tab === 'reports') {
+        // Encourage l'utilisateur à exporter un rapport
+        setTimeout(() => {
+          try {
+            window.dispatchEvent(new CustomEvent('nack:tutorial:hint', { detail: { page: 'reports' } }));
+          } catch {
+            // Ignore dispatch errors
+          }
+        }, 500);
+      }
+    } catch {
+      // Ignore tutorial navigation errors
+    }
     setActiveTab(tab);
     setSidebarOpen(false); // Close mobile sidebar when changing tabs
   };
@@ -313,6 +337,9 @@ const Dashboard = () => {
             </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={handleStartTutorial}>
+                  <Target className="mr-2 h-4 w-4" /> Tutoriel
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleTabChange("settings")}>
                   <Settings className="mr-2 h-4 w-4" /> Paramètres
                 </DropdownMenuItem>
@@ -631,6 +658,9 @@ const Dashboard = () => {
         onOpenChange={setShowTutorial}
         onStepComplete={handleTutorialStepComplete}
       />
+
+      {/* WhatsApp Community Popup */}
+      <WhatsAppCommunityPopup />
       </div>
   );
 };

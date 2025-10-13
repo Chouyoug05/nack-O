@@ -17,7 +17,7 @@ export interface UserProfile {
   lastPaymentAt?: number; // epoch ms
   // Tutoriel
   tutorialCompleted?: boolean;
-  tutorialStep?: 'stock' | 'first-product' | 'security' | 'completed';
+  tutorialStep?: 'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed';
   createdAt: number;
   updatedAt: number;
 } 

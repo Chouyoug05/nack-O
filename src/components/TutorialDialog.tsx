@@ -12,8 +12,9 @@ import {
   ArrowRight, 
   ArrowLeft,
   X,
-  Lightbulb,
-  Target
+  Target,
+  ShoppingCart,
+  FileDown
 } from "lucide-react";
 
 interface Props {
@@ -25,7 +26,7 @@ interface Props {
 const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
   const { profile, saveProfile } = useAuth();
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState<'stock' | 'first-product' | 'security' | 'completed'>('stock');
+  const [currentStep, setCurrentStep] = useState<'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed'>('stock');
 
   useEffect(() => {
     if (profile?.tutorialStep) {
@@ -53,6 +54,9 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
           <div className="text-center">
             <p className="text-sm text-muted-foreground mb-3">
               Cliquez sur l'onglet <strong>"Stock"</strong> dans le menu pour commencer
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Remplissez tous les champs requis lors de l'ajout d'un produit (nom, prix, quantité). Les champs non obligatoires peuvent être laissés vides.
             </p>
             <Badge variant="outline" className="text-blue-600 border-blue-600">
               <Target className="w-3 h-3 mr-1" />
@@ -83,6 +87,60 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
               Ajoutez au moins <strong>un produit</strong> pour continuer
             </p>
             <Badge variant="outline" className="text-green-600 border-green-600">
+              <Target className="w-3 h-3 mr-1" />
+              Action requise
+            </Badge>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'sales' as const,
+      title: "Étape 3: Découvrir la vente",
+      description: "Effectuez une vente test pour vous familiariser",
+      icon: ShoppingCart,
+      content: (
+        <div className="space-y-4">
+          <div className="bg-purple-50 border border-purple-200 p-4 rounded-lg">
+            <h4 className="font-semibold text-purple-800 mb-2">Première vente</h4>
+            <ol className="text-sm text-purple-700 space-y-1">
+              <li>1. Ouvrez l'onglet "Point de Vente"</li>
+              <li>2. Ajoutez un produit au panier</li>
+              <li>3. Finalisez la vente</li>
+            </ol>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground mb-3">
+              Réalisez une <strong>vente test</strong> pour débloquer la suite
+            </p>
+            <Badge variant="outline" className="text-purple-600 border-purple-600">
+              <Target className="w-3 h-3 mr-1" />
+              Action requise
+            </Badge>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'report' as const,
+      title: "Étape 4: Exporter un rapport",
+      description: "Téléchargez votre premier rapport PDF/CSV",
+      icon: FileDown,
+      content: (
+        <div className="space-y-4">
+          <div className="bg-indigo-50 border border-indigo-200 p-4 rounded-lg">
+            <h4 className="font-semibold text-indigo-800 mb-2">Télécharger un rapport</h4>
+            <ol className="text-sm text-indigo-700 space-y-1">
+              <li>1. Ouvrez l'onglet "Rapports"</li>
+              <li>2. Choisissez une période</li>
+              <li>3. Cliquez sur Export CSV ou PDF</li>
+            </ol>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground mb-3">
+              Téléchargez au moins <strong>un rapport</strong> pour terminer
+            </p>
+            <Badge variant="outline" className="text-indigo-600 border-indigo-600">
               <Target className="w-3 h-3 mr-1" />
               Action requise
             </Badge>
