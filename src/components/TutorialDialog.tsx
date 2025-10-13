@@ -152,7 +152,7 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
     },
     {
       id: 'security' as const,
-      title: "Étape 3: Sécuriser votre compte",
+      title: "Étape 5: Sécuriser votre compte",
       description: "Configurez un code PIN pour protéger votre compte",
       icon: Shield,
       content: (
@@ -179,6 +179,9 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
       )
     }
   ];
+
+  console.log('TutorialDialog - steps length:', steps.length);
+  console.log('TutorialDialog - steps IDs:', steps.map(s => s.id));
 
   const currentStepData = steps.find(step => step.id === currentStep);
   const currentIndex = steps.findIndex(step => step.id === currentStep);
