@@ -249,23 +249,23 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[500px] sm:max-w-[500px] mx-auto">
+      <DialogContent className="w-[90vw] max-w-[500px] sm:max-w-[500px] mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <IconComponent className="w-5 h-5 text-blue-600" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
               </div>
-              <div>
-                <DialogTitle className="text-lg">{currentStepData.title}</DialogTitle>
-                <DialogDescription>{currentStepData.description}</DialogDescription>
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-base sm:text-lg leading-tight">{currentStepData.title}</DialogTitle>
+                <DialogDescription className="text-sm leading-tight">{currentStepData.description}</DialogDescription>
               </div>
             </div>
             <Button
               variant="ghost"
               size="icon"
               onClick={handleSkip}
-              className="text-muted-foreground hover:text-foreground"
+              className="text-muted-foreground hover:text-foreground flex-shrink-0 ml-2"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -291,28 +291,28 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
             </div>
 
             {/* Navigation buttons */}
-            <div className="flex justify-between pt-4">
+            <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4">
               <Button
                 variant="outline"
                 onClick={handlePrevious}
                 disabled={currentIndex === 0}
-                className="flex items-center gap-2"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto"
               >
                 <ArrowLeft className="w-4 h-4" />
                 Précédent
               </Button>
               
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   variant="ghost"
                   onClick={handleSkip}
-                  className="text-muted-foreground"
+                  className="text-muted-foreground w-full sm:w-auto"
                 >
                   Ignorer le tutoriel
                 </Button>
                 <Button
                   onClick={handleNext}
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   {currentIndex === steps.length - 1 ? (
                     <>

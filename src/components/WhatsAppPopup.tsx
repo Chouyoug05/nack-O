@@ -82,13 +82,13 @@ const WhatsAppPopup = ({ open, onOpenChange }: Props) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-[425px] sm:max-w-[425px] mx-auto">
+      <DialogContent className="w-[90vw] max-w-[425px] sm:max-w-[425px] mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <MessageCircle className="text-green-600" size={20} />
-            Numéro WhatsApp requis
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <MessageCircle className="text-green-600 h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+            <span className="leading-tight">Numéro WhatsApp requis</span>
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm leading-tight">
             Votre numéro WhatsApp est nécessaire pour le support technique et les notifications importantes.
           </DialogDescription>
         </DialogHeader>
@@ -116,20 +116,20 @@ const WhatsAppPopup = ({ open, onOpenChange }: Props) => {
             </p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Button
               type="button"
               variant="outline"
               onClick={handleContactWhatsApp}
-              className="flex-1"
+              className="flex-1 flex items-center justify-center gap-2"
             >
-              <MessageCircle className="mr-2" size={16} />
+              <MessageCircle className="h-4 w-4" />
               Nous contacter
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="flex-1"
+              className="flex-1 flex items-center justify-center gap-2"
             >
               {isLoading ? "Enregistrement..." : "Enregistrer"}
             </Button>

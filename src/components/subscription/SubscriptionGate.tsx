@@ -138,10 +138,10 @@ const SubscriptionGate = ({ children }: Props) => {
 
       {/* Popup essai: non bloquant */}
       <Dialog open={trialOpen && showTrial} onOpenChange={setTrialOpen}>
-        <DialogContent className="w-[95vw] max-w-[520px] sm:max-w-[520px] mx-auto">
+        <DialogContent className="w-[90vw] max-w-[500px] sm:max-w-[520px] mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Essai gratuit de 7 jours</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-base sm:text-lg leading-tight">Essai gratuit de 7 jours</DialogTitle>
+            <DialogDescription className="text-sm leading-tight">
               Bienvenue sur Nack. Profitez de 7 jours gratuits pour découvrir la plateforme.
             </DialogDescription>
           </DialogHeader>
@@ -171,7 +171,7 @@ const SubscriptionGate = ({ children }: Props) => {
 
       {/* Popup expiré: bloquant */}
       <Dialog open={isExpired} onOpenChange={() => {}}>
-        <DialogContent className="w-[95vw] max-w-[520px] sm:max-w-[520px] mx-auto">
+        <DialogContent className="w-[90vw] max-w-[500px] sm:max-w-[520px] mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Abonnement requis</DialogTitle>
             <DialogDescription>
