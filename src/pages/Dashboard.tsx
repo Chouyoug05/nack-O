@@ -34,6 +34,9 @@ import { setDoc, doc } from "firebase/firestore";
 import { agentTokensTopColRef } from "@/lib/collections";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import WhatsAppPopup from "@/components/WhatsAppPopup";
+import TutorialDialog from "@/components/TutorialDialog";
+import TutorialBlocker from "@/components/TutorialBlocker";
+import { useTutorialProgress } from "@/hooks/useTutorialProgress";
 
 const getManagerOutboxKey = (uid: string) => `nack_m_outbox_${uid}`;
 const getAgentOutboxPrefix = (uid: string) => `nack_order_outbox_${uid}_`;
@@ -59,12 +62,27 @@ const Dashboard = () => {
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator === 'undefined' ? true : navigator.onLine);
   const [queueCount, setQueueCount] = useState<number>(0);
   const [showWhatsAppPopup, setShowWhatsAppPopup] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  // Hook pour suivre le progrès du tutoriel
+  useTutorialProgress();
 
   useEffect(() => {
     if (profile && !profile.whatsapp) {
       setShowWhatsAppPopup(true);
     }
   }, [profile]);
+
+  // Afficher le tutoriel pour les nouveaux utilisateurs
+  useEffect(() => {
+    if (profile && !profile.tutorialCompleted && !showTutorial) {
+      // Attendre un peu pour que l'interface se charge
+      const timer = setTimeout(() => {
+        setShowTutorial(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [profile, showTutorial]);
 
   useEffect(() => {
     if (!user) return;
@@ -255,6 +273,12 @@ const Dashboard = () => {
     }
     setActiveTab(tab);
     setSidebarOpen(false); // Close mobile sidebar when changing tabs
+  };
+
+  const handleTutorialStepComplete = (step: string) => {
+    if (step === 'completed') {
+      setShowTutorial(false);
+    }
   };
 
 
@@ -561,11 +585,27 @@ const Dashboard = () => {
 
                   {/* Render Page Components */}
                   {activeTab === "stock" && <StockPage />}
-                  {activeTab === "sales" && <SalesPage />}
-                  {activeTab === "equipe" && <TeamPage />}
+                  {activeTab === "sales" && (
+                    <TutorialBlocker feature="sales">
+                      <SalesPage />
+                    </TutorialBlocker>
+                  )}
+                  {activeTab === "equipe" && (
+                    <TutorialBlocker feature="team">
+                      <TeamPage />
+                    </TutorialBlocker>
+                  )}
                   {activeTab === "evenements" && <EventsPage />}
-                  {activeTab === "reports" && <ReportsPage />}
-                  {activeTab === "settings" && <SettingsPage onTabChange={handleTabChange} />}
+                  {activeTab === "reports" && (
+                    <TutorialBlocker feature="reports">
+                      <ReportsPage />
+                    </TutorialBlocker>
+                  )}
+                  {activeTab === "settings" && (
+                    <TutorialBlocker feature="settings">
+                      <SettingsPage onTabChange={handleTabChange} />
+                    </TutorialBlocker>
+                  )}
                 </>
               )}
             </div>
@@ -583,6 +623,13 @@ const Dashboard = () => {
       <WhatsAppPopup 
         open={showWhatsAppPopup}
         onOpenChange={setShowWhatsAppPopup}
+      />
+
+      {/* Tutorial Dialog */}
+      <TutorialDialog 
+        open={showTutorial}
+        onOpenChange={setShowTutorial}
+        onStepComplete={handleTutorialStepComplete}
       />
       </div>
   );

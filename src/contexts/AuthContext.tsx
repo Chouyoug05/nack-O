@@ -228,6 +228,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         trialEndsAt: now + sevenDays,
         // subscriptionEndsAt omis si non défini
         // lastPaymentAt omis si non défini
+        tutorialCompleted: false,
+        tutorialStep: 'stock',
         createdAt: now,
         updatedAt: now,
       } as unknown as UserProfile; // champs optionnels non requis
@@ -258,6 +260,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               phone: "",
               plan: 'trial',
               trialEndsAt: now + sevenDays,
+              tutorialCompleted: false,
+              tutorialStep: 'stock',
               createdAt: now,
               updatedAt: now,
             } as unknown as UserProfile;

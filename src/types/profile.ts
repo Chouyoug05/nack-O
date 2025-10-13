@@ -15,6 +15,9 @@ export interface UserProfile {
   trialEndsAt?: number; // epoch ms
   subscriptionEndsAt?: number; // epoch ms
   lastPaymentAt?: number; // epoch ms
+  // Tutoriel
+  tutorialCompleted?: boolean;
+  tutorialStep?: 'stock' | 'first-product' | 'security' | 'completed';
   createdAt: number;
   updatedAt: number;
 } 
