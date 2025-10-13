@@ -70,8 +70,9 @@ const Dashboard = () => {
   useTutorialProgress();
 
   const handleStartTutorial = () => {
-    console.log('Starting tutorial manually');
+    console.log('handleStartTutorial called, showTutorial:', showTutorial);
     setShowTutorial(true);
+    console.log('setShowTutorial(true) called');
   };
 
   useEffect(() => {
@@ -89,7 +90,7 @@ const Dashboard = () => {
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [profile, showTutorial]);
+  }, [profile]); // Retirer showTutorial des dépendances pour éviter les conflits
 
   useEffect(() => {
     if (!user) return;

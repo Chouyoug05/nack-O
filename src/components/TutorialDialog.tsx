@@ -28,6 +28,8 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState<'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed'>('stock');
 
+  console.log('TutorialDialog render - open:', open);
+
   useEffect(() => {
     if (profile?.tutorialStep) {
       setCurrentStep(profile.tutorialStep);
