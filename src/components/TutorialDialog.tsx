@@ -37,6 +37,17 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
     }
   }, [profile]);
 
+  // Déclencher le popup communauté quand on arrive à l'étape stock
+  useEffect(() => {
+    if (open && currentStep === 'stock') {
+      setTimeout(() => {
+        try {
+          window.dispatchEvent(new CustomEvent('nack:community:open'));
+        } catch {}
+      }, 2000); // Attendre 2 secondes pour que l'utilisateur voie l'étape stock
+    }
+  }, [open, currentStep]);
+
   const steps = [
     {
       id: 'stock' as const,
@@ -254,24 +265,14 @@ const TutorialDialog = ({ open, onOpenChange, onStepComplete }: Props) => {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[90vw] max-w-[500px] sm:max-w-[500px] mx-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <DialogTitle className="text-base sm:text-lg leading-tight">{currentStepData.title}</DialogTitle>
-                <DialogDescription className="text-sm leading-tight">{currentStepData.description}</DialogDescription>
-              </div>
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <IconComponent className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleSkip}
-              className="text-muted-foreground hover:text-foreground flex-shrink-0 ml-2"
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base sm:text-lg leading-tight">{currentStepData.title}</DialogTitle>
+              <DialogDescription className="text-sm leading-tight">{currentStepData.description}</DialogDescription>
+            </div>
           </div>
         </DialogHeader>
         
