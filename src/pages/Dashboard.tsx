@@ -70,6 +70,7 @@ const Dashboard = () => {
   useTutorialProgress();
 
   const handleStartTutorial = () => {
+    console.log('Starting tutorial manually');
     setShowTutorial(true);
   };
 

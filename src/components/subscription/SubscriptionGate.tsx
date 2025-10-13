@@ -138,7 +138,7 @@ const SubscriptionGate = ({ children }: Props) => {
 
       {/* Popup essai: non bloquant */}
       <Dialog open={trialOpen && showTrial} onOpenChange={setTrialOpen}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="w-[95vw] max-w-[520px] sm:max-w-[520px] mx-auto">
           <DialogHeader>
             <DialogTitle>Essai gratuit de 7 jours</DialogTitle>
             <DialogDescription>
@@ -171,7 +171,7 @@ const SubscriptionGate = ({ children }: Props) => {
 
       {/* Popup expiré: bloquant */}
       <Dialog open={isExpired} onOpenChange={() => {}}>
-        <DialogContent className="sm:max-w-[520px]">
+        <DialogContent className="w-[95vw] max-w-[520px] sm:max-w-[520px] mx-auto">
           <DialogHeader>
             <DialogTitle>Abonnement requis</DialogTitle>
             <DialogDescription>

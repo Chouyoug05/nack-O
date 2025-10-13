@@ -94,7 +94,7 @@ const TutorialBlocker = ({ children, feature }: Props) => {
 
   return (
     <Dialog open={true}>
-      <DialogContent className="sm:max-w-[400px]">
+      <DialogContent className="w-[95vw] max-w-[400px] sm:max-w-[400px] mx-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
