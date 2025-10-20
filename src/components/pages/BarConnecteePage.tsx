@@ -415,19 +415,54 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     }
   };
 
-  // Marquer comme servie
+  // Marquer comme servie (avec paiement et intégration ventes)
   const markAsServed = async (orderId: string) => {
-    if (!user) return;
+    if (!user || !profile) return;
     
     try {
+      // Trouver la commande
+      const order = orders.find(o => o.id === orderId);
+      if (!order) {
+        toast({
+          title: "Erreur",
+          description: "Commande introuvable.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Marquer comme servie
       await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
         status: 'served',
-        servedAt: Date.now()
+        servedAt: Date.now(),
+        paidAt: Date.now(),
+        paymentMethod: 'cash' // Par défaut, paiement en espèces
       }, { merge: true });
+
+      // Créer une vente dans la collection sales
+      const saleData = {
+        type: 'bar-connectee',
+        orderNumber: order.orderNumber,
+        establishmentName: profile.establishmentName,
+        tableZone: order.tableZone,
+        items: order.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity
+        })),
+        total: order.total,
+        paymentMethod: 'cash',
+        createdAt: Date.now(),
+        servedAt: Date.now(),
+        source: 'Bar Connectée'
+      };
+
+      await addDoc(collection(db, `profiles/${user.uid}/sales`), saleData);
       
       toast({
-        title: "Commande servie !",
-        description: "La commande a été marquée comme servie."
+        title: "Commande servie et payée !",
+        description: `Commande #${order.orderNumber} ajoutée aux ventes (${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF)`
       });
     } catch (error) {
       console.error('Erreur marquage servie:', error);
@@ -446,7 +481,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       case 'confirmed':
         return <Badge variant="outline" className="text-blue-600 border-blue-600"><CheckCircle className="w-3 h-3 mr-1" />Confirmée</Badge>;
       case 'served':
-        return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" />Servie</Badge>;
+        return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" />Servie & Payée</Badge>;
       default:
         return <Badge variant="outline"><AlertCircle className="w-3 h-3 mr-1" />Inconnu</Badge>;
     }
@@ -746,7 +781,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                         {order.status === 'confirmed' && (
                           <Button size="sm" onClick={() => markAsServed(order.id)}>
                             <CheckCircle className="w-4 h-4 mr-2" />
-                            Marquer servie
+                            Servir & Payer
                           </Button>
                         )}
                         <Button variant="outline" size="sm">

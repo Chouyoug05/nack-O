@@ -542,7 +542,18 @@ const SalesPage = () => {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(sale.createdAt).toLocaleTimeString()} • {sale.paymentMethod === 'card' ? 'Carte' : 'Cash'}
+                        {sale.type === 'bar-connectee' && (
+                          <span className="ml-2 inline-flex items-center gap-1">
+                            <QrCode className="w-3 h-3" />
+                            Bar Connectée
+                          </span>
+                        )}
                       </p>
+                      {sale.type === 'bar-connectee' && sale.establishmentName && (
+                        <p className="text-xs text-blue-600 font-medium">
+                          📍 {sale.establishmentName} • {sale.tableZone}
+                        </p>
+                      )}
                     </div>
                     <span className="font-semibold text-green-600">
                       +{sale.total.toLocaleString()} XAF
