@@ -187,17 +187,26 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
         console.error('Erreur snapshot commandes:', error);
       });
 
-      // Charger les produits du stock (avec gestion d'erreur de permissions)
+      // Charger tous les produits d'abord pour diagnostic
       const productsRef = collection(db, `profiles/${user.uid}/products`);
-      const productsQuery = query(productsRef, where('stock', '>', 0));
-      const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
+      const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
         try {
-          const productsData = snapshot.docs.map(doc => ({
+          const allProducts = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
-          console.log('Produits en stock chargés:', productsData.length);
-          setProducts(productsData);
+          console.log('Tous les produits chargés:', allProducts.length);
+          console.log('Détails des produits:', allProducts);
+          
+          // Filtrer les produits en stock côté client
+          const productsInStock = allProducts.filter(product => {
+            const stock = product.stock || 0;
+            console.log(`Produit ${product.name}: stock = ${stock}`);
+            return stock > 0;
+          });
+          
+          console.log('Produits en stock après filtrage:', productsInStock.length);
+          setProducts(productsInStock);
         } catch (error) {
           console.error('Erreur traitement produits:', error);
         }
@@ -554,6 +563,18 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                   <p className="text-muted-foreground mb-4">
                     Ajoutez des produits dans la section Stock pour qu'ils apparaissent ici.
                   </p>
+                  <div className="mt-4 p-4 bg-muted rounded-lg text-left">
+                    <p className="text-sm font-medium mb-2">Debug Info:</p>
+                    <p className="text-xs text-muted-foreground">
+                      Collection: profiles/{user?.uid}/products
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Filtre: stock > 0
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Vérifiez la console pour plus de détails
+                    </p>
+                  </div>
                 </div>
               )}
             </CardContent>
