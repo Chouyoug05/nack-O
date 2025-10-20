@@ -63,6 +63,22 @@ const PublicOrderingPage = () => {
   const [receiptQR, setReceiptQR] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Fallback pour Safari: extraire l'ID depuis les paramètres de recherche
+  const getEstablishmentIdFromSearch = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const routeParam = urlParams.get('route');
+    const idParam = urlParams.get('id');
+    
+    if (routeParam === 'commande' && idParam) {
+      console.log('ID trouvé dans les paramètres de recherche:', idParam);
+      return idParam;
+    }
+    return null;
+  };
+
+  // Utiliser l'ID depuis les paramètres si pas d'ID dans l'URL
+  const effectiveEstablishmentId = establishmentId || getEstablishmentIdFromSearch();
+
   // Debug: Vérifier l'extraction de l'ID depuis l'URL
   console.log('=== EXTRACTION URL ===');
   console.log('URL complète:', window.location.href);
@@ -70,12 +86,19 @@ const PublicOrderingPage = () => {
   console.log('Search:', window.location.search);
   console.log('Hash:', window.location.hash);
   console.log('establishmentId extrait:', establishmentId);
+  console.log('effectiveEstablishmentId:', effectiveEstablishmentId);
   console.log('Type establishmentId:', typeof establishmentId);
+  
+  // Détection Safari spécifique
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  const isMobileSafari = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  console.log('Is Safari:', isSafari);
+  console.log('Is Mobile Safari:', isMobileSafari);
 
   // Vérifier si on a une erreur 404 ou problème de route
   useEffect(() => {
-    if (!establishmentId) {
-      console.log('❌ Pas d\'establishmentId - Possible erreur 404');
+    if (!effectiveEstablishmentId) {
+      console.log('❌ Pas d\'effectiveEstablishmentId - Possible erreur 404');
       console.log('Vérification des segments d\'URL...');
       
       // Essayer d'extraire manuellement l'ID depuis l'URL
@@ -87,17 +110,56 @@ const PublicOrderingPage = () => {
       if (commandeIndex !== -1 && pathSegments[commandeIndex + 1]) {
         const manualId = pathSegments[commandeIndex + 1];
         console.log('ID trouvé manuellement:', manualId);
-        // Forcer le rechargement avec le bon ID
-        window.history.replaceState(null, '', `/commande/${manualId}`);
-        window.location.reload();
+        
+        // Solutions spécifiques pour Safari mobile
+        if (isMobileSafari) {
+          console.log('🔧 Correction spécifique Safari mobile...');
+          
+          // Méthode 1: Utiliser hash routing temporairement
+          const hashUrl = `#/commande/${manualId}`;
+          console.log('Tentative avec hash routing:', hashUrl);
+          window.location.hash = hashUrl;
+          
+          // Méthode 2: Si hash ne fonctionne pas, utiliser search params
+          setTimeout(() => {
+            if (!effectiveEstablishmentId) {
+              console.log('Hash routing échoué, tentative avec search params...');
+              const searchUrl = `/?route=commande&id=${manualId}`;
+              window.location.href = searchUrl;
+            }
+          }, 1000);
+        } else {
+          // Pour les autres navigateurs, méthode standard
+          window.history.replaceState(null, '', `/commande/${manualId}`);
+          window.location.reload();
+        }
+      } else if (isMobileSafari) {
+        // Fallback spécifique Safari: essayer de récupérer depuis l'URL complète
+        console.log('🔍 Recherche dans URL complète pour Safari...');
+        const urlMatch = window.location.href.match(/\/commande\/([^\/\?#]+)/);
+        if (urlMatch && urlMatch[1]) {
+          const extractedId = urlMatch[1];
+          console.log('ID extrait depuis URL complète:', extractedId);
+          
+          // Essayer de naviguer avec hash
+          window.location.hash = `#/commande/${extractedId}`;
+          
+          // Si ça ne marche pas, utiliser une approche différente
+          setTimeout(() => {
+            if (!effectiveEstablishmentId) {
+              console.log('Tentative de navigation directe...');
+              window.location.href = `${window.location.origin}/#/commande/${extractedId}`;
+            }
+          }, 500);
+        }
       }
     }
-  }, [establishmentId]);
+  }, [effectiveEstablishmentId, isMobileSafari]);
 
   // Charger les données de l'établissement
   useEffect(() => {
-    if (!establishmentId) {
-      console.log('Pas d\'establishmentId fourni');
+    if (!effectiveEstablishmentId) {
+      console.log('Pas d\'effectiveEstablishmentId fourni');
       return;
     }
 
@@ -105,13 +167,13 @@ const PublicOrderingPage = () => {
     console.log('User Agent:', navigator.userAgent);
     console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
     console.log('Window location:', window.location.href);
-    console.log('Chargement des données pour l\'établissement:', establishmentId);
+    console.log('Chargement des données pour l\'établissement:', effectiveEstablishmentId);
 
     const loadEstablishmentData = async () => {
       try {
         // Charger les infos de l'établissement
-        console.log('Tentative de récupération du profil:', `profiles/${establishmentId}`);
-        const profileDoc = await getDoc(doc(db, 'profiles', establishmentId));
+        console.log('Tentative de récupération du profil:', `profiles/${effectiveEstablishmentId}`);
+        const profileDoc = await getDoc(doc(db, 'profiles', effectiveEstablishmentId));
         
         if (profileDoc.exists()) {
           const profileData = profileDoc.data();
@@ -119,14 +181,14 @@ const PublicOrderingPage = () => {
           console.log('Nom établissement:', profileData.establishmentName);
           setEstablishment(profileData as Establishment);
         } else {
-          console.log('❌ Profil non trouvé pour l\'ID:', establishmentId);
+          console.log('❌ Profil non trouvé pour l\'ID:', effectiveEstablishmentId);
           console.log('Vérification Firestore - Collection profiles existe-t-elle ?');
           setEstablishment(null);
         }
 
         // Charger les produits
-        console.log('Chargement des produits depuis:', `profiles/${establishmentId}/products`);
-        const productsRef = collection(db, `profiles/${establishmentId}/products`);
+        console.log('Chargement des produits depuis:', `profiles/${effectiveEstablishmentId}/products`);
+        const productsRef = collection(db, `profiles/${effectiveEstablishmentId}/products`);
         const productsQuery = query(productsRef, orderBy('name'));
         const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
           console.log('Snapshot produits reçu:', snapshot.size, 'documents');
@@ -151,8 +213,8 @@ const PublicOrderingPage = () => {
         });
 
         // Charger les tables/zones
-        console.log('Chargement des tables depuis:', `profiles/${establishmentId}/tables`);
-        const tablesRef = collection(db, `profiles/${establishmentId}/tables`);
+        console.log('Chargement des tables depuis:', `profiles/${effectiveEstablishmentId}/tables`);
+        const tablesRef = collection(db, `profiles/${effectiveEstablishmentId}/tables`);
         const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
           console.log('Snapshot tables reçu:', snapshot.size, 'documents');
           const tablesData = snapshot.docs.map(doc => ({
@@ -175,7 +237,7 @@ const PublicOrderingPage = () => {
       } catch (error) {
         console.error('❌ Erreur chargement données:', error);
         console.error('Détails de l\'erreur:', {
-          establishmentId,
+          effectiveEstablishmentId,
           errorMessage: error instanceof Error ? error.message : 'Erreur inconnue',
           errorCode: error instanceof Error ? (error as any).code : 'N/A',
           userAgent: navigator.userAgent,
@@ -183,10 +245,10 @@ const PublicOrderingPage = () => {
         });
         
         // En cas d'erreur, essayer de récupérer au moins le profil
-        if (establishmentId) {
+        if (effectiveEstablishmentId) {
           try {
             console.log('Tentative de récupération directe du profil...');
-            const profileDoc = await getDoc(doc(db, 'profiles', establishmentId));
+            const profileDoc = await getDoc(doc(db, 'profiles', effectiveEstablishmentId));
             if (profileDoc.exists()) {
               console.log('✅ Profil récupéré en fallback');
               setEstablishment(profileDoc.data() as Establishment);
@@ -201,7 +263,7 @@ const PublicOrderingPage = () => {
     };
 
     loadEstablishmentData();
-  }, [establishmentId]);
+  }, [effectiveEstablishmentId]);
 
   // Ajouter un produit au panier
   const addToCart = (product: Product) => {
@@ -342,12 +404,12 @@ Merci pour votre commande !
           {/* Informations de debug pour mobile */}
           <div className="text-xs text-muted-foreground bg-gray-50 p-3 rounded border text-left">
             <p><strong>Debug Info:</strong></p>
-            <p>ID: {establishmentId || 'Non fourni'}</p>
+            <p>ID: {effectiveEstablishmentId || 'Non fourni'}</p>
             <p>URL: {window.location.href}</p>
             <p>Pathname: {window.location.pathname}</p>
             <p>Mobile: {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Oui' : 'Non'}</p>
             <p className="mt-2 text-xs">
-              {!establishmentId ? 
+              {!effectiveEstablishmentId ? 
                 '❌ Erreur 404: Route non trouvée. Vérifiez la configuration du serveur.' : 
                 'Vérifiez la console pour plus de détails'
               }
@@ -355,7 +417,7 @@ Merci pour votre commande !
           </div>
           
           {/* Instructions pour corriger l'erreur 404 */}
-          {!establishmentId && (
+          {!effectiveEstablishmentId && (
             <div className="mt-4 text-xs text-muted-foreground bg-blue-50 p-3 rounded border">
               <p><strong>Solution erreur 404:</strong></p>
               <p>1. Vérifiez que le serveur redirige toutes les routes vers index.html</p>
