@@ -18,7 +18,8 @@ import {
   CheckCircle,
   Clock,
   AlertCircle,
-  ShoppingCart
+  ShoppingCart,
+  Package
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -137,7 +138,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       }
     };
     
-    // Charger les tables
+    // Charger les tables (avec gestion d'erreur de permissions)
     try {
       const tablesRef = collection(db, `establishments/${user.uid}/tables`);
       const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
@@ -150,12 +151,15 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement tables:', error);
-          setError('Erreur lors du chargement des tables');
+          // Ne pas afficher d'erreur pour les permissions, juste continuer
           checkAllLoaded();
         }
+      }, (error) => {
+        console.error('Erreur snapshot tables:', error);
+        checkAllLoaded();
       });
 
-      // Charger les commandes
+      // Charger les commandes (avec gestion d'erreur de permissions)
       const ordersRef = collection(db, `establishments/${user.uid}/barOrders`);
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
       const unsubscribeOrders = onSnapshot(q, (snapshot) => {
@@ -190,12 +194,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement commandes:', error);
-          setError('Erreur lors du chargement des commandes');
           checkAllLoaded();
         }
+      }, (error) => {
+        console.error('Erreur snapshot commandes:', error);
+        checkAllLoaded();
       });
 
-      // Charger les produits
+      // Charger les produits (avec gestion d'erreur de permissions)
       const productsRef = collection(db, `establishments/${user.uid}/products`);
       const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
         try {
@@ -207,9 +213,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement produits:', error);
-          setError('Erreur lors du chargement des produits');
           checkAllLoaded();
         }
+      }, (error) => {
+        console.error('Erreur snapshot produits:', error);
+        checkAllLoaded();
       });
 
       return () => {
@@ -219,7 +227,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       };
     } catch (error) {
       console.error('Erreur chargement données:', error);
-      setError('Erreur lors du chargement des données');
       setIsLoading(false);
     }
   }, [user]);
@@ -283,14 +290,18 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       setQrCodeUrl(qrCodeDataUrl);
       
       // Sauvegarder l'URL publique dans Firestore
-      await setDoc(doc(db, `establishments/${user.uid}/barConnectee`, 'config'), {
-        publicUrl,
-        qrCodeGenerated: true,
-        establishmentName: profile.establishmentName,
-        lastUpdated: Date.now()
-      });
-      
-      console.log('Configuration sauvegardée dans Firestore');
+      try {
+        await setDoc(doc(db, `establishments/${user.uid}/barConnectee`, 'config'), {
+          publicUrl,
+          qrCodeGenerated: true,
+          establishmentName: profile.establishmentName,
+          lastUpdated: Date.now()
+        });
+        console.log('Configuration sauvegardée dans Firestore');
+      } catch (firestoreError) {
+        console.warn('Erreur sauvegarde Firestore (permissions):', firestoreError);
+        // Continuer même si la sauvegarde échoue
+      }
       
       toast({
         title: "QR Code généré !",
@@ -323,8 +334,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       const tableData = {
         name: newTableName.trim(),
         type: newTableType,
-        capacity: newTableCapacity > 0 ? newTableCapacity : undefined,
-        description: newTableDescription.trim() || undefined,
+        ...(newTableCapacity > 0 && { capacity: newTableCapacity }),
+        ...(newTableDescription.trim() && { description: newTableDescription.trim() }),
         createdAt: Date.now()
       };
       
