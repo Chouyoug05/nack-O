@@ -205,8 +205,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
             return stock > 0;
           });
           
+          // TEMPORAIRE: Afficher tous les produits pour debug
           console.log('Produits en stock après filtrage:', productsInStock.length);
-          setProducts(productsInStock);
+          console.log('AFFICHAGE TEMPORAIRE: Tous les produits (même sans stock)');
+          setProducts(allProducts); // Afficher tous les produits temporairement
         } catch (error) {
           console.error('Erreur traitement produits:', error);
         }
@@ -536,6 +538,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
               </CardTitle>
               <CardDescription>
                 Ces produits seront visibles par vos clients lorsqu'ils scannent le QR Code
+                <br />
+                <span className="text-orange-600 font-medium">
+                  ⚠️ Mode debug: Tous les produits sont affichés (même ceux sans stock)
+                </span>
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -550,8 +556,9 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                       <p className="text-sm text-muted-foreground">
                         Prix: {product.price?.toLocaleString('fr-FR', { useGrouping: false })} XAF
                       </p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className={`text-sm ${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
                         Stock: {product.stock || 0} unités
+                        {(product.stock || 0) === 0 && ' (HORS STOCK)'}
                       </p>
                     </div>
                   ))}
