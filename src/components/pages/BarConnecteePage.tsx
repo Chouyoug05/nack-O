@@ -123,52 +123,42 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     );
   }
 
-  // Charger les tables/zones
+  // Charger toutes les données
   useEffect(() => {
     if (!user) return;
     
-    // Désactiver l'écran de chargement après un délai
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    let loadedCount = 0;
+    const totalLoads = 3; // tables, orders, products
     
+    const checkAllLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= totalLoads) {
+        setIsLoading(false);
+      }
+    };
+    
+    // Charger les tables
     try {
       const tablesRef = collection(db, `establishments/${user.uid}/tables`);
-      const unsubscribe = onSnapshot(tablesRef, (snapshot) => {
+      const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
         try {
           const tablesData = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })) as TableZone[];
           setTables(tablesData);
-          setIsLoading(false);
+          checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement tables:', error);
           setError('Erreur lors du chargement des tables');
-          setIsLoading(false);
+          checkAllLoaded();
         }
       });
 
-      return () => {
-        unsubscribe();
-        clearTimeout(timer);
-      };
-    } catch (error) {
-      console.error('Erreur chargement tables:', error);
-      setError('Erreur lors du chargement des tables');
-      setIsLoading(false);
-      clearTimeout(timer);
-    }
-  }, [user]);
-
-  // Charger les commandes
-  useEffect(() => {
-    if (!user) return;
-    
-    try {
+      // Charger les commandes
       const ordersRef = collection(db, `establishments/${user.uid}/barOrders`);
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
-      const unsubscribe = onSnapshot(q, (snapshot) => {
+      const unsubscribeOrders = onSnapshot(q, (snapshot) => {
         try {
           const ordersData = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -178,7 +168,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           // Vérifier s'il y a de nouvelles commandes
           const newOrders = ordersData.filter(order => 
             order.status === 'pending' && 
-            order.createdAt > (Date.now() - 60000) // Commandes des dernières 60 secondes
+            order.createdAt > (Date.now() - 60000)
           );
           
           // Créer des notifications pour les nouvelles commandes
@@ -197,16 +187,40 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           });
           
           setOrders(ordersData);
+          checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement commandes:', error);
           setError('Erreur lors du chargement des commandes');
+          checkAllLoaded();
         }
       });
 
-      return () => unsubscribe();
+      // Charger les produits
+      const productsRef = collection(db, `establishments/${user.uid}/products`);
+      const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
+        try {
+          const productsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setProducts(productsData);
+          checkAllLoaded();
+        } catch (error) {
+          console.error('Erreur traitement produits:', error);
+          setError('Erreur lors du chargement des produits');
+          checkAllLoaded();
+        }
+      });
+
+      return () => {
+        unsubscribeTables();
+        unsubscribeOrders();
+        unsubscribeProducts();
+      };
     } catch (error) {
-      console.error('Erreur chargement commandes:', error);
-      setError('Erreur lors du chargement des commandes');
+      console.error('Erreur chargement données:', error);
+      setError('Erreur lors du chargement des données');
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -238,32 +252,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     };
 
     loadExistingQRCode();
-  }, [user]);
-
-  // Charger les produits disponibles
-  useEffect(() => {
-    if (!user) return;
-    
-    try {
-      const productsRef = collection(db, `establishments/${user.uid}/products`);
-      const unsubscribe = onSnapshot(productsRef, (snapshot) => {
-        try {
-          const productsData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          setProducts(productsData);
-        } catch (error) {
-          console.error('Erreur traitement produits:', error);
-          setError('Erreur lors du chargement des produits');
-        }
-      });
-
-      return () => unsubscribe();
-    } catch (error) {
-      console.error('Erreur chargement produits:', error);
-      setError('Erreur lors du chargement des produits');
-    }
   }, [user]);
 
   // Générer le QR Code
