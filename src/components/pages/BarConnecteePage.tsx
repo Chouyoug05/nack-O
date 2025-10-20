@@ -200,15 +200,13 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           
           // Filtrer les produits en stock côté client
           const productsInStock = allProducts.filter(product => {
-            const stock = product.stock || 0;
-            console.log(`Produit ${product.name}: stock = ${stock}`);
+            const stock = product.quantity || product.stock || 0; // Utiliser quantity comme dans StockPage
+            console.log(`Produit ${product.name}: quantity = ${product.quantity}, stock = ${product.stock}`);
             return stock > 0;
           });
           
-          // TEMPORAIRE: Afficher tous les produits pour debug
           console.log('Produits en stock après filtrage:', productsInStock.length);
-          console.log('AFFICHAGE TEMPORAIRE: Tous les produits (même sans stock)');
-          setProducts(allProducts); // Afficher tous les produits temporairement
+          setProducts(productsInStock);
         } catch (error) {
           console.error('Erreur traitement produits:', error);
         }
@@ -538,10 +536,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
               </CardTitle>
               <CardDescription>
                 Ces produits seront visibles par vos clients lorsqu'ils scannent le QR Code
-                <br />
-                <span className="text-orange-600 font-medium">
-                  ⚠️ Mode debug: Tous les produits sont affichés (même ceux sans stock)
-                </span>
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -556,9 +550,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                       <p className="text-sm text-muted-foreground">
                         Prix: {product.price?.toLocaleString('fr-FR', { useGrouping: false })} XAF
                       </p>
-                      <p className={`text-sm ${(product.stock || 0) > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                        Stock: {product.stock || 0} unités
-                        {(product.stock || 0) === 0 && ' (HORS STOCK)'}
+                      <p className="text-sm text-muted-foreground">
+                        Stock: {(product.quantity || product.stock || 0)} unités
                       </p>
                     </div>
                   ))}
