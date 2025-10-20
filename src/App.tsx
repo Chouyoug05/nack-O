@@ -25,6 +25,7 @@ import SubscriptionGate from "@/components/subscription/SubscriptionGate";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentError from "./pages/PaymentError";
 import AdminDashboard from "./pages/AdminDashboard";
+import PublicOrderingPage from "./pages/PublicOrderingPage";
 
 const queryClient = new QueryClient();
 
@@ -97,6 +98,7 @@ const AppContent = () => {
         <Route path="/caisse/:agentCode" element={<CaisseInterface />} />
         <Route path="/agent-evenement/:agentCode" element={<AgentEvenementInterface />} />
         <Route path="/event/:eventId" element={<EventPublicPage />} />
+        <Route path="/commande/:establishmentId" element={<PublicOrderingPage />} />
         <Route path="/payment/success" element={<RequireAuth><PaymentSuccess /></RequireAuth>} />
         <Route path="/payment/error" element={<RequireAuth><PaymentError /></RequireAuth>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

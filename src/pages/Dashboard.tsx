@@ -12,7 +12,8 @@ import {
   Calendar,
   LogOut,
   Shield,
-  Target
+  Target,
+  QrCode
 } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import MobileBottomNav from "@/components/MobileBottomNav";
@@ -27,6 +28,7 @@ import EventsPage from "@/components/pages/EventsPage";
 import SettingsPage from "@/components/pages/SettingsPage";
 import ReportsPage from "@/components/pages/ReportsPage";
 import TeamPage from "@/components/pages/TeamPage";
+import BarConnecteePage from "@/components/pages/BarConnecteePage";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { productsColRef, salesColRef, teamColRef } from "@/lib/collections";
@@ -329,6 +331,9 @@ const Dashboard = () => {
                 <DropdownMenuItem onClick={handleStartTutorial}>
                   <Target className="mr-2 h-4 w-4" /> Tutoriel
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleTabChange("bar-connectee")}>
+                  <QrCode className="mr-2 h-4 w-4" /> Bar Connectée
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleTabChange("settings")}>
                   <Settings className="mr-2 h-4 w-4" /> Paramètres
                 </DropdownMenuItem>
@@ -616,6 +621,9 @@ const Dashboard = () => {
                     <TutorialBlocker feature="reports">
                       <ReportsPage />
                     </TutorialBlocker>
+                  )}
+                  {activeTab === "bar-connectee" && (
+                    <BarConnecteePage />
                   )}
                   {activeTab === "settings" && (
                     <TutorialBlocker feature="settings">
