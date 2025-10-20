@@ -109,34 +109,27 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     );
   }
 
-  // Écran de chargement
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="text-center py-8">
-          <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <h3 className="text-lg font-semibold mb-2">Chargement...</h3>
-          <p className="text-muted-foreground">
-            Chargement de la page Bar Connectée
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Écran de chargement - désactivé pour éviter les blocages
+  // if (isLoading) {
+  //   return (
+  //     <div className="space-y-6">
+  //       <div className="text-center py-8">
+  //         <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+  //         <h3 className="text-lg font-semibold mb-2">Chargement...</h3>
+  //         <p className="text-muted-foreground">
+  //           Chargement de la page Bar Connectée
+  //         </p>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   // Charger toutes les données
   useEffect(() => {
     if (!user) return;
     
-    let loadedCount = 0;
-    const totalLoads = 3; // tables, orders, products
-    
-    const checkAllLoaded = () => {
-      loadedCount++;
-      if (loadedCount >= totalLoads) {
-        setIsLoading(false);
-      }
-    };
+    // Désactiver le chargement immédiatement
+    setIsLoading(false);
     
     // Charger les tables (avec gestion d'erreur de permissions)
     try {
@@ -148,15 +141,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
             ...doc.data()
           })) as TableZone[];
           setTables(tablesData);
-          checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement tables:', error);
-          // Ne pas afficher d'erreur pour les permissions, juste continuer
-          checkAllLoaded();
         }
       }, (error) => {
         console.error('Erreur snapshot tables:', error);
-        checkAllLoaded();
       });
 
       // Charger les commandes (avec gestion d'erreur de permissions)
@@ -191,14 +180,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           });
           
           setOrders(ordersData);
-          checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement commandes:', error);
-          checkAllLoaded();
         }
       }, (error) => {
         console.error('Erreur snapshot commandes:', error);
-        checkAllLoaded();
       });
 
       // Charger les produits (avec gestion d'erreur de permissions)
@@ -210,14 +196,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
             ...doc.data()
           }));
           setProducts(productsData);
-          checkAllLoaded();
         } catch (error) {
           console.error('Erreur traitement produits:', error);
-          checkAllLoaded();
         }
       }, (error) => {
         console.error('Erreur snapshot produits:', error);
-        checkAllLoaded();
       });
 
       return () => {
@@ -227,7 +210,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       };
     } catch (error) {
       console.error('Erreur chargement données:', error);
-      setIsLoading(false);
     }
   }, [user]);
 
