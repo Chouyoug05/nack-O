@@ -81,6 +81,21 @@ const Dashboard = () => {
     }
   }, [profile]);
 
+  // Écouter les événements de changement d'onglet depuis les pages
+  useEffect(() => {
+    const handleTabChange = (event: CustomEvent) => {
+      const tab = event.detail;
+      if (tab === 'bar-connectee') {
+        setActiveTab('bar-connectee');
+      }
+    };
+
+    window.addEventListener('nack:tab:change', handleTabChange as EventListener);
+    return () => {
+      window.removeEventListener('nack:tab:change', handleTabChange as EventListener);
+    };
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     const unsubs: Array<() => void> = [];

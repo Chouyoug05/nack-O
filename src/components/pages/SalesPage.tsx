@@ -25,6 +25,7 @@ import {
   IceCream,
   Cherry,
   Apple,
+  QrCode
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -352,14 +353,29 @@ const SalesPage = () => {
                   <CardTitle>Produits disponibles</CardTitle>
                   <CardDescription>Sélectionnez les produits à vendre</CardDescription>
                 </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
-                  <Input
-                    placeholder="Rechercher un produit..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 w-full md:w-[300px]"
-                  />
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      // Déclencher le changement d'onglet vers Bar Connectée
+                      const event = new CustomEvent('nack:tab:change', { detail: 'bar-connectee' });
+                      window.dispatchEvent(event);
+                    }}
+                    className="gap-2"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    Bar Connectée
+                  </Button>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
+                    <Input
+                      placeholder="Rechercher un produit..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10 w-full md:w-[300px]"
+                    />
+                  </div>
                 </div>
               </div>
             </CardHeader>

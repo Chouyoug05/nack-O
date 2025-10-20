@@ -25,6 +25,7 @@ import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, where } from "firebase/firestore";
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
+import { notificationsColRef } from "@/lib/collections";
 
 interface TableZone {
   id: string;
@@ -109,6 +110,28 @@ const BarConnecteePage = () => {
           id: doc.id,
           ...doc.data()
         })) as BarOrder[];
+        
+        // Vérifier s'il y a de nouvelles commandes
+        const newOrders = ordersData.filter(order => 
+          order.status === 'pending' && 
+          order.createdAt > (Date.now() - 60000) // Commandes des dernières 60 secondes
+        );
+        
+        // Créer des notifications pour les nouvelles commandes
+        newOrders.forEach(async (order) => {
+          try {
+            await addDoc(notificationsColRef(db, user.uid), {
+              title: "Nouvelle commande Bar Connectée",
+              message: `Commande #${order.orderNumber} - ${order.tableZone} - ${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`,
+              type: "info",
+              createdAt: Date.now(),
+              read: false,
+            });
+          } catch (error) {
+            console.error('Erreur création notification:', error);
+          }
+        });
+        
         setOrders(ordersData);
       });
 
@@ -116,6 +139,36 @@ const BarConnecteePage = () => {
     } catch (error) {
       console.error('Erreur chargement commandes:', error);
     }
+  }, [user]);
+
+  // Charger le QR Code existant
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadExistingQRCode = async () => {
+      try {
+        const configDoc = await getDoc(doc(db, `establishments/${user.uid}/barConnectee`, 'config'));
+        if (configDoc.exists()) {
+          const config = configDoc.data();
+          if (config.qrCodeGenerated) {
+            const publicUrl = `${window.location.origin}/commande/${user.uid}`;
+            const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+              width: 300,
+              margin: 2,
+              color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+              }
+            });
+            setQrCodeUrl(qrCodeDataUrl);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur chargement QR Code:', error);
+      }
+    };
+
+    loadExistingQRCode();
   }, [user]);
 
   // Générer le QR Code
@@ -167,7 +220,7 @@ const BarConnecteePage = () => {
       const tableData = {
         name: newTableName.trim(),
         type: newTableType,
-        capacity: newTableCapacity || undefined,
+        capacity: newTableCapacity > 0 ? newTableCapacity : undefined,
         description: newTableDescription.trim() || undefined,
         createdAt: Date.now()
       };
