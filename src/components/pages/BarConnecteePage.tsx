@@ -133,7 +133,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     
     // Charger les tables (avec gestion d'erreur de permissions)
     try {
-      const tablesRef = collection(db, `establishments/${user.uid}/tables`);
+      const tablesRef = collection(db, `profiles/${user.uid}/tables`);
       const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
         try {
           const tablesData = snapshot.docs.map(doc => ({
@@ -149,7 +149,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       });
 
       // Charger les commandes (avec gestion d'erreur de permissions)
-      const ordersRef = collection(db, `establishments/${user.uid}/barOrders`);
+      const ordersRef = collection(db, `profiles/${user.uid}/barOrders`);
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
       const unsubscribeOrders = onSnapshot(q, (snapshot) => {
         try {
@@ -188,7 +188,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       });
 
       // Charger les produits du stock (avec gestion d'erreur de permissions)
-      const productsRef = collection(db, `establishments/${user.uid}/products`);
+      const productsRef = collection(db, `profiles/${user.uid}/products`);
       const productsQuery = query(productsRef, where('stock', '>', 0));
       const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
         try {
@@ -221,7 +221,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     
     const loadExistingQRCode = async () => {
       try {
-        const configDoc = await getDoc(doc(db, `establishments/${user.uid}/barConnectee`, 'config'));
+        const configDoc = await getDoc(doc(db, `profiles/${user.uid}/barConnectee`, 'config'));
         if (configDoc.exists()) {
           const config = configDoc.data();
           if (config.qrCodeGenerated) {
@@ -275,7 +275,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       
       // Sauvegarder l'URL publique dans Firestore
       try {
-        await setDoc(doc(db, `establishments/${user.uid}/barConnectee`, 'config'), {
+        await setDoc(doc(db, `profiles/${user.uid}/barConnectee`, 'config'), {
           publicUrl,
           qrCodeGenerated: true,
           establishmentName: profile.establishmentName,
@@ -324,9 +324,9 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       };
       
       console.log('Ajout table:', tableData);
-      console.log('Collection path:', `establishments/${user.uid}/tables`);
+      console.log('Collection path:', `profiles/${user.uid}/tables`);
       
-      const docRef = await addDoc(collection(db, `establishments/${user.uid}/tables`), tableData);
+      const docRef = await addDoc(collection(db, `profiles/${user.uid}/tables`), tableData);
       console.log('Table ajoutée avec ID:', docRef.id);
       
       // Réinitialiser le formulaire
@@ -363,7 +363,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     if (!user) return;
     
     try {
-      await setDoc(doc(db, `establishments/${user.uid}/tables`, tableId), {
+      await setDoc(doc(db, `profiles/${user.uid}/tables`, tableId), {
         deleted: true,
         deletedAt: Date.now()
       });
@@ -387,7 +387,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     if (!user) return;
     
     try {
-      await setDoc(doc(db, `establishments/${user.uid}/barOrders`, orderId), {
+      await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
         status: 'confirmed',
         confirmedAt: Date.now()
       }, { merge: true });
@@ -411,7 +411,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     if (!user) return;
     
     try {
-      await setDoc(doc(db, `establishments/${user.uid}/barOrders`, orderId), {
+      await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
         status: 'served',
         servedAt: Date.now()
       }, { merge: true });
