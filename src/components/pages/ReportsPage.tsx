@@ -292,19 +292,19 @@ const ReportsPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-foreground mb-1">Rapports & Analyses</h2>
           <p className="text-sm text-muted-foreground">Suivez les performances de votre établissement</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="nack-outline" size="sm" className="gap-2" onClick={() => handleExport('csv')}>
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+          <Button variant="nack-outline" size="sm" className="gap-2 flex-1 sm:flex-none" onClick={() => handleExport('csv')}>
             <Download size={16} />
-            Exporter CSV
+            <span className="hidden xs:inline">Exporter </span>CSV
           </Button>
-          <Button variant="nack-outline" size="sm" className="gap-2" onClick={() => handleExport('pdf')}>
+          <Button variant="nack-outline" size="sm" className="gap-2 flex-1 sm:flex-none" onClick={() => handleExport('pdf')}>
             <Download size={16} />
-            Exporter PDF
+            <span className="hidden xs:inline">Exporter </span>PDF
           </Button>
         </div>
       </div>
