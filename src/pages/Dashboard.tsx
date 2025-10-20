@@ -67,6 +67,7 @@ const Dashboard = () => {
   const [queueCount, setQueueCount] = useState<number>(0);
   const [showWhatsAppPopup, setShowWhatsAppPopup] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
+  const [barConnecteeActiveTab, setBarConnecteeActiveTab] = useState<string>("qr-code");
 
   // Hook pour suivre le progrès du tutoriel
   useTutorialProgress();
@@ -84,9 +85,14 @@ const Dashboard = () => {
   // Écouter les événements de changement d'onglet depuis les pages
   useEffect(() => {
     const handleTabChange = (event: CustomEvent) => {
-      const tab = event.detail;
-      if (tab === 'bar-connectee') {
+      const data = event.detail;
+      if (typeof data === 'string' && data === 'bar-connectee') {
         setActiveTab('bar-connectee');
+      } else if (typeof data === 'object' && data.tab === 'bar-connectee') {
+        setActiveTab('bar-connectee');
+        if (data.subTab) {
+          setBarConnecteeActiveTab(data.subTab);
+        }
       }
     };
 
@@ -638,7 +644,10 @@ const Dashboard = () => {
                     </TutorialBlocker>
                   )}
                   {activeTab === "bar-connectee" && (
-                    <BarConnecteePage />
+                    <BarConnecteePage 
+                      activeTab={barConnecteeActiveTab} 
+                      onTabChange={(tab: string) => setBarConnecteeActiveTab(tab)} 
+                    />
                   )}
                   {activeTab === "settings" && (
                     <TutorialBlocker feature="settings">

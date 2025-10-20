@@ -358,8 +358,10 @@ const SalesPage = () => {
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
-                      // Déclencher le changement d'onglet vers Bar Connectée
-                      const event = new CustomEvent('nack:tab:change', { detail: 'bar-connectee' });
+                      // Déclencher le changement d'onglet vers Bar Connectée avec focus sur les commandes
+                      const event = new CustomEvent('nack:tab:change', { 
+                        detail: { tab: 'bar-connectee', subTab: 'orders' } 
+                      });
                       window.dispatchEvent(event);
                     }}
                     className="gap-2"

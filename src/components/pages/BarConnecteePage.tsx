@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,7 +52,12 @@ interface BarOrder {
   receiptNumber: string;
 }
 
-const BarConnecteePage = () => {
+interface BarConnecteePageProps {
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
+}
+
+const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-code", onTabChange }) => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
   const [tables, setTables] = useState<TableZone[]>([]);
@@ -214,7 +220,14 @@ const BarConnecteePage = () => {
 
   // Ajouter une table/zone
   const addTable = async () => {
-    if (!newTableName.trim() || !user) return;
+    if (!newTableName.trim() || !user) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez saisir un nom de table.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       const tableData = {
@@ -225,6 +238,7 @@ const BarConnecteePage = () => {
         createdAt: Date.now()
       };
       
+      console.log('Ajout table:', tableData);
       await addDoc(collection(db, `establishments/${user.uid}/tables`), tableData);
       
       setNewTableName("");
@@ -240,7 +254,7 @@ const BarConnecteePage = () => {
       console.error('Erreur ajout table:', error);
       toast({
         title: "Erreur",
-        description: "Impossible d'ajouter la table.",
+        description: "Impossible d'ajouter la table. Réessayez.",
         variant: "destructive"
       });
     }
@@ -341,7 +355,7 @@ const BarConnecteePage = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="qr-code" className="w-full">
+      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="qr-code">QR Code</TabsTrigger>
           <TabsTrigger value="tables">Tables & Zones</TabsTrigger>
