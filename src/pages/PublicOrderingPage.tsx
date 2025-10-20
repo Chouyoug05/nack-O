@@ -67,8 +67,32 @@ const PublicOrderingPage = () => {
   console.log('=== EXTRACTION URL ===');
   console.log('URL complète:', window.location.href);
   console.log('Pathname:', window.location.pathname);
+  console.log('Search:', window.location.search);
+  console.log('Hash:', window.location.hash);
   console.log('establishmentId extrait:', establishmentId);
   console.log('Type establishmentId:', typeof establishmentId);
+
+  // Vérifier si on a une erreur 404 ou problème de route
+  useEffect(() => {
+    if (!establishmentId) {
+      console.log('❌ Pas d\'establishmentId - Possible erreur 404');
+      console.log('Vérification des segments d\'URL...');
+      
+      // Essayer d'extraire manuellement l'ID depuis l'URL
+      const pathSegments = window.location.pathname.split('/').filter(segment => segment);
+      console.log('Segments d\'URL:', pathSegments);
+      
+      // Chercher le segment après 'commande'
+      const commandeIndex = pathSegments.indexOf('commande');
+      if (commandeIndex !== -1 && pathSegments[commandeIndex + 1]) {
+        const manualId = pathSegments[commandeIndex + 1];
+        console.log('ID trouvé manuellement:', manualId);
+        // Forcer le rechargement avec le bon ID
+        window.history.replaceState(null, '', `/commande/${manualId}`);
+        window.location.reload();
+      }
+    }
+  }, [establishmentId]);
 
   // Charger les données de l'établissement
   useEffect(() => {
@@ -320,9 +344,26 @@ Merci pour votre commande !
             <p><strong>Debug Info:</strong></p>
             <p>ID: {establishmentId || 'Non fourni'}</p>
             <p>URL: {window.location.href}</p>
+            <p>Pathname: {window.location.pathname}</p>
             <p>Mobile: {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Oui' : 'Non'}</p>
-            <p className="mt-2 text-xs">Vérifiez la console pour plus de détails</p>
+            <p className="mt-2 text-xs">
+              {!establishmentId ? 
+                '❌ Erreur 404: Route non trouvée. Vérifiez la configuration du serveur.' : 
+                'Vérifiez la console pour plus de détails'
+              }
+            </p>
           </div>
+          
+          {/* Instructions pour corriger l'erreur 404 */}
+          {!establishmentId && (
+            <div className="mt-4 text-xs text-muted-foreground bg-blue-50 p-3 rounded border">
+              <p><strong>Solution erreur 404:</strong></p>
+              <p>1. Vérifiez que le serveur redirige toutes les routes vers index.html</p>
+              <p>2. Pour Vercel: ajoutez vercel.json</p>
+              <p>3. Pour Netlify: ajoutez _redirects</p>
+              <p>4. Pour Apache: ajoutez .htaccess</p>
+            </div>
+          )}
         </div>
       </div>
     );
