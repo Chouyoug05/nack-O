@@ -98,10 +98,10 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
 
   // Tableau de résumé
   const tableData = [
-    { metric: "Ventes totales", value: `${summary.ventes.toLocaleString()} XAF`, status: "Positif" },
+    { metric: "Ventes totales", value: `${summary.ventes.toLocaleString('fr-FR')} XAF`, status: "Positif" },
     { metric: "Nombre de commandes", value: summary.commandes.toString(), status: "Actif" },
-    { metric: "Pertes enregistrées", value: `${summary.pertes.toLocaleString()} XAF`, status: "À surveiller" },
-    { metric: "Bénéfice net", value: `${summary.benefice.toLocaleString()} XAF`, status: "Excellent" }
+    { metric: "Pertes enregistrées", value: `${summary.pertes.toLocaleString('fr-FR')} XAF`, status: "À surveiller" },
+    { metric: "Bénéfice net", value: `${summary.benefice.toLocaleString('fr-FR')} XAF`, status: "Excellent" }
   ];
 
   // Dessiner le tableau
@@ -235,26 +235,113 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.text(date, 45, rowY + 13);
       doc.text(order.tableNumber || '-', 40 + ordersCol1Width + 5, rowY + 13);
       doc.text(agent || '-', 40 + ordersCol1Width + ordersCol2Width + 5, rowY + 13);
-      doc.text(`${order.total.toLocaleString()} XAF`, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + 5, rowY + 13);
+      doc.text(`${order.total.toLocaleString('fr-FR')} XAF`, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + 5, rowY + 13);
       doc.text(order.status || '-', 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width + 5, rowY + 13);
     });
 
     y = ordersTableStartY + ordersRowHeight + (orders.length * ordersRowHeight) + 20;
   }
 
-  // Ventes détaillées
-  doc.setFontSize(14); doc.text("Ventes", 40, y); y += 18; doc.setFontSize(11);
+  // Ventes détaillées (format reçu)
+  doc.setFontSize(14); doc.text("Détail des Ventes", 40, y); y += 18;
+  
   if (sales.length === 0) {
+    doc.setFontSize(11);
     doc.text("Aucune vente pour cette période", 40, y); y += 14;
   } else {
-    for (const s of sales) {
-      const d = new Date(s.createdAt).toLocaleString();
-      const items = s.items.map(i => `${i.name} x${i.quantity}`).join(", ");
-      const line = `${d} • ${s.paymentMethod} • ${s.total.toLocaleString()} XAF`;
-      doc.text(line, 40, y); y += 14;
-      doc.text(items, 60, y); y += 14;
-      if (y > 760) { doc.addPage(); y = 40; }
-    }
+    sales.forEach((sale, saleIndex) => {
+      // Vérifier si on dépasse la page
+      if (y > 700) {
+        doc.addPage();
+        y = 40;
+      }
+      
+      // En-tête du reçu
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Reçu #${saleIndex + 1}`, 40, y);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(10);
+      
+      const saleDate = new Date(sale.createdAt).toLocaleString('fr-FR');
+      doc.text(`Date: ${saleDate}`, 40, y + 12);
+      doc.text(`Méthode: ${sale.paymentMethod || 'Non spécifiée'}`, 40, y + 24);
+      y += 40;
+      
+      // Tableau des produits
+      const productsTableStartY = y;
+      const productsTableWidth = 515;
+      const productsRowHeight = 18;
+      const productsCol1Width = 250; // Produit
+      const productsCol2Width = 80;  // Quantité
+      const productsCol3Width = 100; // Prix unitaire
+      const productsCol4Width = 85; // Total
+
+      // En-têtes du tableau des produits
+      doc.setFontSize(9);
+      doc.setFont(undefined, 'bold');
+      doc.setFillColor(240, 240, 240);
+      doc.rect(40, productsTableStartY, productsTableWidth, productsRowHeight, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(40, productsTableStartY, productsTableWidth, productsRowHeight);
+      
+      // Lignes verticales
+      doc.line(40 + productsCol1Width, productsTableStartY, 40 + productsCol1Width, productsTableStartY + productsRowHeight);
+      doc.line(40 + productsCol1Width + productsCol2Width, productsTableStartY, 40 + productsCol1Width + productsCol2Width, productsTableStartY + productsRowHeight);
+      doc.line(40 + productsCol1Width + productsCol2Width + productsCol3Width, productsTableStartY, 40 + productsCol1Width + productsCol2Width + productsCol3Width, productsTableStartY + productsRowHeight);
+      
+      // Texte des en-têtes
+      doc.text("Produit", 45, productsTableStartY + 12);
+      doc.text("Qté", 40 + productsCol1Width + 5, productsTableStartY + 12);
+      doc.text("Prix unit.", 40 + productsCol1Width + productsCol2Width + 5, productsTableStartY + 12);
+      doc.text("Total", 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, productsTableStartY + 12);
+
+      // Données des produits
+      doc.setFont(undefined, 'normal');
+      sale.items.forEach((item, itemIndex) => {
+        const itemRowY = productsTableStartY + productsRowHeight + (itemIndex * productsRowHeight);
+        
+        // Fond alterné
+        if (itemIndex % 2 === 0) {
+          doc.setFillColor(250, 250, 250);
+          doc.rect(40, itemRowY, productsTableWidth, productsRowHeight, 'F');
+        } else {
+          doc.setFillColor(255, 255, 255);
+          doc.rect(40, itemRowY, productsTableWidth, productsRowHeight, 'F');
+        }
+        
+        // Bordures
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(40, itemRowY, productsTableWidth, productsRowHeight);
+        doc.line(40 + productsCol1Width, itemRowY, 40 + productsCol1Width, itemRowY + productsRowHeight);
+        doc.line(40 + productsCol1Width + productsCol2Width, itemRowY, 40 + productsCol1Width + productsCol2Width, itemRowY + productsRowHeight);
+        doc.line(40 + productsCol1Width + productsCol2Width + productsCol3Width, itemRowY, 40 + productsCol1Width + productsCol2Width + productsCol3Width, itemRowY + productsRowHeight);
+        
+        // Texte des données
+        doc.setFontSize(8);
+        const unitPrice = Number(item.price || 0);
+        const itemTotal = unitPrice * Number(item.quantity || 0);
+        
+        doc.text(item.name || 'Produit inconnu', 45, itemRowY + 11);
+        doc.text(`${item.quantity || 0}`, 40 + productsCol1Width + 5, itemRowY + 11);
+        doc.text(`${unitPrice.toLocaleString('fr-FR')} XAF`, 40 + productsCol1Width + productsCol2Width + 5, itemRowY + 11);
+        doc.text(`${itemTotal.toLocaleString('fr-FR')} XAF`, 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, itemRowY + 11);
+      });
+
+      // Total du reçu
+      const totalRowY = productsTableStartY + productsRowHeight + (sale.items.length * productsRowHeight);
+      doc.setFontSize(10);
+      doc.setFont(undefined, 'bold');
+      doc.setFillColor(240, 240, 240);
+      doc.rect(40, totalRowY, productsTableWidth, productsRowHeight, 'F');
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(40, totalRowY, productsTableWidth, productsRowHeight);
+      
+      doc.text("TOTAL", 40 + productsCol1Width + productsCol2Width + productsCol3Width - 50, totalRowY + 12);
+      doc.text(`${Number(sale.total).toLocaleString('fr-FR')} XAF`, 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, totalRowY + 12);
+      
+      y = totalRowY + productsRowHeight + 20;
+    });
   }
 
   // Pertes détaillées
@@ -264,7 +351,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   } else {
     for (const l of losses) {
       const d = new Date(l.createdAt).toLocaleString();
-      const line = `${d} • ${l.productName} x${l.quantity} • ${l.cost.toLocaleString()} XAF`;
+      const line = `${d} • ${l.productName} x${l.quantity} • ${l.cost.toLocaleString('fr-FR')} XAF`;
       doc.text(line, 40, y); y += 14;
       if (y > 760) { doc.addPage(); y = 40; }
     }

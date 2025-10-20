@@ -237,6 +237,19 @@ const ReportsPage = () => {
     const dayMs = 24 * 60 * 60 * 1000;
     const start = activeTab === 'daily' ? now - dayMs : activeTab === 'weekly' ? now - 7 * dayMs : now - 30 * dayMs;
 
+    // Calculer les vraies périodes pour les labels
+    const startDate = new Date(start);
+    const endDate = new Date(now);
+    
+    let periodLabel = '';
+    if (activeTab === 'daily') {
+      periodLabel = `Journalier - ${startDate.toLocaleDateString()}`;
+    } else if (activeTab === 'weekly') {
+      periodLabel = `Hebdomadaire - Du ${startDate.toLocaleDateString()} au ${endDate.toLocaleDateString()}`;
+    } else {
+      periodLabel = `Mensuel - ${startDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`;
+    }
+
     const qSales = query(salesColRef(db, uid), where('createdAt', '>=', start), orderBy('createdAt', 'desc'));
     const qLosses = query(lossesColRef(db, uid), where('createdAt', '>=', start), orderBy('createdAt', 'desc'));
     const qOrders = query(ordersColRef(db, uid), where('createdAt', '>=', start), orderBy('createdAt', 'desc'));
@@ -260,7 +273,7 @@ const ReportsPage = () => {
         sales,
         losses,
         orders,
-        periodLabel: activeTab,
+        periodLabel,
         summary: activeTab === 'daily' ? daily : activeTab === 'weekly' ? weekly : monthly,
         org: {
           establishmentName: profile?.establishmentName || 'Mon Établissement',
@@ -272,7 +285,7 @@ const ReportsPage = () => {
         },
       });
     } else {
-      exportSalesCsv({ sales, losses, orders, periodLabel: activeTab });
+      exportSalesCsv({ sales, losses, orders, periodLabel });
     }
   };
 
