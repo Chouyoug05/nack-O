@@ -58,6 +58,10 @@ interface Sale {
   total: number;
   paymentMethod: PaymentMethod;
   createdAt: number;
+  type?: 'bar-connectee' | 'normal';
+  establishmentName?: string;
+  tableZone?: string;
+  orderNumber?: string;
 }
 
 const SalesPage = () => {
@@ -74,6 +78,17 @@ const SalesPage = () => {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
+
+  // Fonction pour récupérer les détails d'un produit par ID
+  const getProductById = (productId: string): Product | undefined => {
+    return products.find(p => p.id === productId);
+  };
+
+  // Fonction pour obtenir l'image d'un produit
+  const getProductImage = (product: Product | undefined): string | null => {
+    if (!product) return null;
+    return product.imageUrl && product.imageUrl.trim() !== '' ? product.imageUrl : null;
+  };
 
   const applyPrefillFromStorage = () => {
     try {
@@ -535,9 +550,41 @@ const SalesPage = () => {
             <CardContent>
               <div className="space-y-3">
                 {sales.slice(0, 3).map((sale) => (
-                  <div key={sale.id} className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
-                    <div>
-                      <p className="font-medium text-sm">
+                  <div key={sale.id} className="flex items-start gap-3 p-3 bg-nack-beige-light rounded-lg">
+                    {/* Images des produits */}
+                    <div className="flex gap-1 flex-shrink-0">
+                      {sale.items.slice(0, 3).map((item, index) => {
+                        const product = getProductById(item.id);
+                        const imageUrl = getProductImage(product);
+                        return (
+                          <div key={`${sale.id}-${item.id}-${index}`} className="w-8 h-8 rounded-md overflow-hidden bg-gray-100">
+                            {imageUrl ? (
+                              <img 
+                                src={imageUrl} 
+                                alt={item.name} 
+                                className="w-full h-full object-cover" 
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                }}
+                              />
+                            ) : null}
+                            <div className={`w-full h-full flex items-center justify-center text-xs font-bold text-gray-600 ${imageUrl ? 'hidden' : ''}`}>
+                              {item.name.charAt(0).toUpperCase()}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {sale.items.length > 3 && (
+                        <div className="w-8 h-8 rounded-md bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
+                          +{sale.items.length - 3}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Détails de la vente */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
                         {sale.items.map(item => `${item.name} x${item.quantity}`).join(', ')}
                       </p>
                       <p className="text-xs text-muted-foreground">
@@ -555,9 +602,13 @@ const SalesPage = () => {
                         </p>
                       )}
                     </div>
-                    <span className="font-semibold text-green-600">
-                      +{sale.total.toLocaleString()} XAF
-                    </span>
+
+                    {/* Montant */}
+                    <div className="flex-shrink-0">
+                      <span className="font-semibold text-green-600">
+                        +{sale.total.toLocaleString()} XAF
+                      </span>
+                    </div>
                   </div>
                 ))}
                 {sales.length === 0 && <p className="text-sm text-muted-foreground">Aucune vente récente</p>}

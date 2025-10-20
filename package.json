@@ -53,6 +53,7 @@
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.2.1",
     "firebase-admin": "^12.7.0",
+    "html5-qrcode": "^2.3.8",
     "input-otp": "^1.4.2",
     "jspdf": "^3.0.2",
     "lottie-react": "^2.4.1",

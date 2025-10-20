@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,153 +14,245 @@ import {
   CreditCard,
   Banknote,
   MapPin,
-  Clock
+  Clock,
+  X
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, writeBatch, collection, addDoc } from 'firebase/firestore';
 
-interface ScannedOrder {
-  orderNumber: string;
-  receiptNumber: string;
+interface ReceiptData {
+  orderId: string;
   establishmentId: string;
-  total: number;
+  timestamp: number;
+}
+
+interface BarOrder {
+  id: string;
+  orderNumber: string;
   items: Array<{
+    id: string;
     name: string;
-    quantity: number;
     price: number;
+    quantity: number;
   }>;
+  total: number;
   tableZone: string;
+  status: 'pending' | 'confirmed' | 'served';
   createdAt: number;
+  establishmentName?: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  quantity?: number;
+  stock?: number;
 }
 
 const QRScanner: React.FC = () => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [scannedData, setScannedData] = useState<string | null>(null);
-  const [orderDetails, setOrderDetails] = useState<ScannedOrder | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [scannedOrder, setScannedOrder] = useState<BarOrder | null>(null);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
-  const [isOrderPaid, setIsOrderPaid] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string>('');
 
-  // Simuler le scan QR (en attendant l'implémentation réelle)
-  const simulateScan = () => {
+  // Vérifier que l'utilisateur est connecté
+  if (!user) {
+    return (
+      <Card>
+        <CardContent className="text-center py-8">
+          <AlertCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Accès non autorisé</h3>
+          <p className="text-muted-foreground">
+            Vous devez être connecté pour utiliser le scanner QR.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const startScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.clear();
+    }
+
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
+      supportedScanTypes: [Html5QrcodeSupportedFormats.QR_CODE]
+    };
+
+    scannerRef.current = new Html5QrcodeScanner(
+      "qr-scanner",
+      config,
+      false
+    );
+
+    scannerRef.current.render(
+      (decodedText) => {
+        console.log('QR Code scanné:', decodedText);
+        handleScannedCode(decodedText);
+      },
+      (error) => {
+        // Ignorer les erreurs de scan continu
+        if (error && !error.includes('No QR code found')) {
+          console.log('Erreur de scan:', error);
+        }
+      }
+    );
+
     setIsScanning(true);
-    setTimeout(() => {
-      // Simuler des données QR d'une commande
-      const mockOrderData = {
-        orderNumber: 'CMD123456',
-        receiptNumber: 'RCP123456',
-        establishmentId: user?.uid || 'test',
-        total: 2500,
-        items: [
-          { name: 'Regab', quantity: 2, price: 1000 },
-          { name: 'Brochette', quantity: 1, price: 500 }
-        ],
-        tableZone: 'Table 1',
-        createdAt: Date.now() - 300000 // 5 minutes ago
-      };
-      
-      setScannedData(JSON.stringify(mockOrderData));
-      setOrderDetails(mockOrderData);
-      setIsScanning(false);
-      setShowOrderDialog(true);
-    }, 2000);
   };
 
-  // Vérifier si la commande est déjà payée
-  const checkOrderStatus = async (orderNumber: string) => {
-    if (!user) return false;
-    
+  const stopScanner = () => {
+    if (scannerRef.current) {
+      scannerRef.current.clear();
+      scannerRef.current = null;
+    }
+    setIsScanning(false);
+  };
+
+  const handleScannedCode = async (decodedText: string) => {
     try {
-      const orderDoc = await getDoc(doc(db, `profiles/${user.uid}/barOrders`, orderNumber));
-      if (orderDoc.exists()) {
-        const orderData = orderDoc.data();
-        return orderData.status === 'served' && orderData.paidAt;
+      console.log('Traitement du QR Code:', decodedText);
+      
+      // Arrêter le scanner temporairement
+      stopScanner();
+      
+      // Parser les données du reçu
+      let receiptData: ReceiptData;
+      try {
+        receiptData = JSON.parse(decodedText);
+      } catch (parseError) {
+        console.error('Erreur parsing QR Code:', parseError);
+        toast({
+          title: "QR Code invalide",
+          description: "Le QR Code scanné ne contient pas de données valides.",
+          variant: "destructive"
+        });
+        return;
       }
-      return false;
+
+      console.log('Données du reçu:', receiptData);
+
+      // Vérifier que c'est bien un reçu de commande
+      if (!receiptData.orderId || !receiptData.establishmentId) {
+        toast({
+          title: "QR Code invalide",
+          description: "Ce QR Code ne semble pas être un reçu de commande.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Récupérer la commande depuis Firestore
+      const orderRef = doc(db, `profiles/${receiptData.establishmentId}/barOrders`, receiptData.orderId);
+      const orderSnap = await getDoc(orderRef);
+
+      if (!orderSnap.exists()) {
+        toast({
+          title: "Commande introuvable",
+          description: "Cette commande n'existe pas ou a été supprimée.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const orderData = orderSnap.data() as BarOrder;
+      console.log('Commande trouvée:', orderData);
+
+      setScannedOrder(orderData);
+      setShowOrderDialog(true);
+
     } catch (error) {
-      console.error('Erreur vérification commande:', error);
-      return false;
+      console.error('Erreur lors du traitement:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors du traitement du QR Code.",
+        variant: "destructive"
+      });
     }
   };
 
-  // Finaliser la vente (marquer comme payée et diminuer stock)
-  const finalizeSale = async () => {
-    if (!user || !orderDetails || !profile) return;
-    
+  const finalizeOrder = async () => {
+    if (!scannedOrder || !user) return;
+
     setIsProcessing(true);
+
     try {
-      // Trouver la commande dans barOrders
-      const orderDoc = await getDoc(doc(db, `profiles/${user.uid}/barOrders`, orderDetails.orderNumber));
-      
-      if (orderDoc.exists()) {
-        const orderData = orderDoc.data();
+      // Vérifier le stock avant de finaliser
+      const productsRef = collection(db, `profiles/${user.uid}/products`);
+      const batch = writeBatch(db);
+
+      // Vérifier et décrémenter le stock pour chaque produit
+      for (const item of scannedOrder.items) {
+        const productRef = doc(productsRef, item.id);
+        const productSnap = await getDoc(productRef);
         
-        // Vérifier si déjà payée
-        if (orderData.status === 'served' && orderData.paidAt) {
-          setIsOrderPaid(true);
-          toast({
-            title: "Commande déjà payée",
-            description: "Cette commande a déjà été finalisée.",
-            variant: "destructive"
-          });
-          return;
+        if (productSnap.exists()) {
+          const productData = productSnap.data() as Product;
+          const currentStock = productData.quantity || productData.stock || 0;
+          const newStock = currentStock - item.quantity;
+          
+          if (newStock < 0) {
+            toast({
+              title: "Stock insuffisant",
+              description: `Stock insuffisant pour ${item.name}. Stock actuel: ${currentStock}`,
+              variant: "destructive"
+            });
+            setIsProcessing(false);
+            return;
+          }
+          
+          batch.update(productRef, { quantity: newStock });
         }
-
-        // Diminuer le stock et finaliser la vente
-        const batch = writeBatch(db);
-        
-        // Mettre à jour la commande
-        batch.update(doc(db, `profiles/${user.uid}/barOrders`, orderDetails.orderNumber), {
-          status: 'served',
-          servedAt: Date.now(),
-          paidAt: Date.now(),
-          paymentMethod: 'cash'
-        });
-
-        // Créer une vente dans la collection sales
-        const saleData = {
-          type: 'bar-connectee',
-          orderNumber: orderDetails.orderNumber,
-          establishmentName: profile.establishmentName,
-          tableZone: orderDetails.tableZone,
-          items: orderDetails.items.map(item => ({
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            total: item.price * item.quantity
-          })),
-          total: orderDetails.total,
-          paymentMethod: 'cash',
-          createdAt: Date.now(),
-          servedAt: Date.now(),
-          source: 'Bar Connectée - Scanner QR'
-        };
-
-        const saleRef = doc(db, `profiles/${user.uid}/sales`);
-        batch.set(saleRef, saleData);
-
-        await batch.commit();
-        
-        toast({
-          title: "Vente finalisée !",
-          description: `Commande #${orderDetails.orderNumber} marquée comme payée (${orderDetails.total.toLocaleString('fr-FR', { useGrouping: false })} XAF)`
-        });
-        
-        setIsOrderPaid(true);
-      } else {
-        toast({
-          title: "Commande introuvable",
-          description: "Cette commande n'existe pas dans le système.",
-          variant: "destructive"
-        });
       }
+
+      // Mettre à jour le statut de la commande
+      const orderRef = doc(db, `profiles/${scannedOrder.id.split('/')[0]}/barOrders`, scannedOrder.id.split('/')[1] || scannedOrder.id);
+      batch.update(orderRef, {
+        status: 'served',
+        servedAt: Date.now(),
+        paidAt: Date.now(),
+        paymentMethod: 'cash'
+      });
+
+      // Créer une entrée de vente
+      const saleData = {
+        type: 'bar-connectee',
+        orderNumber: scannedOrder.orderNumber,
+        establishmentName: scannedOrder.establishmentName || 'Établissement',
+        tableZone: scannedOrder.tableZone,
+        items: scannedOrder.items,
+        total: scannedOrder.total,
+        paymentMethod: 'cash' as const,
+        createdAt: scannedOrder.createdAt,
+        servedAt: Date.now(),
+        source: 'Bar Connectée'
+      };
+
+      const salesRef = collection(db, `profiles/${user.uid}/sales`);
+      batch.set(doc(salesRef), saleData);
+
+      await batch.commit();
+
+      toast({
+        title: "Commande finalisée",
+        description: "La commande a été servie et payée avec succès.",
+      });
+
+      setShowOrderDialog(false);
+      setScannedOrder(null);
+
     } catch (error) {
-      console.error('Erreur finalisation:', error);
+      console.error('Erreur lors de la finalisation:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de finaliser la vente.",
+        description: "Une erreur est survenue lors de la finalisation de la commande.",
         variant: "destructive"
       });
     } finally {
@@ -167,28 +260,29 @@ const QRScanner: React.FC = () => {
     }
   };
 
-  const resetScanner = () => {
-    setScannedData(null);
-    setOrderDetails(null);
-    setShowOrderDialog(false);
-    setIsOrderPaid(false);
-    setIsScanning(false);
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Badge variant="outline" className="text-yellow-600"><Clock className="w-3 h-3 mr-1" />En attente</Badge>;
+      case 'confirmed':
+        return <Badge variant="outline" className="text-blue-600"><CheckCircle className="w-3 h-3 mr-1" />Confirmée</Badge>;
+      case 'served':
+        return <Badge variant="outline" className="text-green-600"><CheckCircle className="w-3 h-3 mr-1" />Servie & Payée</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
-  if (!user) {
-    return (
-      <div className="text-center py-8">
-        <AlertCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Accès non autorisé</h3>
-        <p className="text-muted-foreground">
-          Vous devez être connecté pour utiliser le scanner QR.
-        </p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+      }
+    };
+  }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -196,127 +290,118 @@ const QRScanner: React.FC = () => {
             Scanner QR Code
           </CardTitle>
           <CardDescription>
-            Scannez le QR Code du reçu client pour valider et finaliser la commande
+            Scannez les QR Code des reçus clients pour valider leurs commandes
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {!isScanning && !scannedData && (
+        <CardContent>
+          {!isScanning ? (
             <div className="text-center py-8">
-              <div className="w-24 h-24 mx-auto bg-primary/10 rounded-full flex items-center justify-center mb-4">
-                <QrCode className="w-12 h-12 text-primary" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Scanner un reçu</h3>
+              <QrCode className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">Prêt à scanner</h3>
               <p className="text-muted-foreground mb-4">
-                Placez le QR Code du reçu client dans le cadre pour scanner
+                Cliquez sur le bouton ci-dessous pour démarrer le scanner QR Code
               </p>
-              <Button onClick={simulateScan} className="w-full">
+              <Button onClick={startScanner} className="w-full sm:w-auto">
                 <QrCode className="w-4 h-4 mr-2" />
-                Démarrer le scan
+                Démarrer le scanner
               </Button>
             </div>
-          )}
-
-          {isScanning && (
-            <div className="text-center py-8">
-              <div className="w-24 h-24 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-              <h3 className="text-lg font-semibold mb-2">Scan en cours...</h3>
-              <p className="text-muted-foreground">
-                Positionnez le QR Code dans le cadre
-              </p>
+          ) : (
+            <div className="space-y-4">
+              <div id="qr-scanner" className="w-full"></div>
+              <Button onClick={stopScanner} variant="outline" className="w-full">
+                <X className="w-4 h-4 mr-2" />
+                Arrêter le scanner
+              </Button>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Dialog pour afficher les détails de la commande */}
+      {/* Dialog de détails de la commande */}
       <Dialog open={showOrderDialog} onOpenChange={setShowOrderDialog}>
         <DialogContent className="w-[90vw] max-w-[500px] sm:max-w-[500px] mx-auto max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {isOrderPaid ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-orange-600" />
-              )}
+              <QrCode className="w-5 h-5" />
               Détails de la commande
             </DialogTitle>
             <DialogDescription>
-              {isOrderPaid ? 'Cette commande a déjà été payée' : 'Commande en attente de paiement'}
+              Vérifiez les détails avant de finaliser la commande
             </DialogDescription>
           </DialogHeader>
 
-          {orderDetails && (
+          {scannedOrder && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Numéro de commande</p>
-                  <p className="font-semibold">#{orderDetails.orderNumber}</p>
+              {/* Informations générales */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">Commande #{scannedOrder.orderNumber}</span>
+                  {getStatusBadge(scannedOrder.status)}
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Reçu</p>
-                  <p className="font-semibold">#{orderDetails.receiptNumber}</p>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  Table/Zone: {scannedOrder.tableZone}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Heure: {new Date(scannedOrder.createdAt).toLocaleString()}
+                </p>
+                {scannedOrder.establishmentName && (
+                  <p className="text-sm text-blue-600 font-medium">
+                    📍 {scannedOrder.establishmentName}
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">{orderDetails.tableZone}</span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm">
-                  {new Date(orderDetails.createdAt).toLocaleString()}
-                </span>
-              </div>
-
-              <div>
-                <h4 className="font-semibold mb-2">Articles commandés</h4>
-                <div className="space-y-2">
-                  {orderDetails.items.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-2 bg-muted rounded">
-                      <div>
-                        <p className="font-medium">{item.name}</p>
-                        <p className="text-sm text-muted-foreground">x{item.quantity}</p>
-                      </div>
-                      <p className="font-semibold">
-                        {(item.price * item.quantity).toLocaleString('fr-FR', { useGrouping: false })} XAF
-                      </p>
+              {/* Articles */}
+              <div className="space-y-2">
+                <h4 className="font-medium">Articles commandés:</h4>
+                <div className="space-y-1">
+                  {scannedOrder.items.map((item, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span>{item.name} x{item.quantity}</span>
+                      <span>{item.price.toLocaleString('fr-FR', { useGrouping: false })} XAF</span>
                     </div>
                   ))}
                 </div>
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-lg font-bold">Total</span>
-                  <span className="text-lg font-bold text-primary">
-                    {orderDetails.total.toLocaleString('fr-FR', { useGrouping: false })} XAF
-                  </span>
+                <div className="border-t pt-2">
+                  <div className="flex justify-between font-semibold">
+                    <span>Total:</span>
+                    <span>{scannedOrder.total.toLocaleString('fr-FR', { useGrouping: false })} XAF</span>
+                  </div>
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                {!isOrderPaid ? (
+              {/* Actions */}
+              <div className="flex gap-2 pt-4">
+                {scannedOrder.status === 'served' ? (
+                  <div className="w-full text-center py-4">
+                    <CheckCircle className="w-8 h-8 mx-auto text-green-600 mb-2" />
+                    <p className="text-green-600 font-medium">Commande déjà servie et payée</p>
+                  </div>
+                ) : (
                   <Button 
-                    onClick={finalizeSale} 
+                    onClick={finalizeOrder} 
                     disabled={isProcessing}
                     className="flex-1"
                   >
-                    <Banknote className="w-4 h-4 mr-2" />
-                    {isProcessing ? 'Finalisation...' : 'Finaliser la vente'}
+                    {isProcessing ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Finalisation...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-4 h-4 mr-2" />
+                        Finaliser la vente
+                      </>
+                    )}
                   </Button>
-                ) : (
-                  <div className="flex-1">
-                    <Badge className="w-full justify-center bg-green-600">
-                      <CheckCircle className="w-4 h-4 mr-2" />
-                      Déjà payée
-                    </Badge>
-                  </div>
                 )}
-                
-                <Button variant="outline" onClick={resetScanner}>
-                  <XCircle className="w-4 h-4 mr-2" />
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowOrderDialog(false)}
+                  disabled={isProcessing}
+                >
                   Fermer
                 </Button>
               </div>
