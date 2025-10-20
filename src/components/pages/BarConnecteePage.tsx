@@ -64,6 +64,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
   const [orders, setOrders] = useState<BarOrder[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [products, setProducts] = useState<any[]>([]);
   const [newTableName, setNewTableName] = useState("");
   const [newTableType, setNewTableType] = useState<'table' | 'zone'>('table');
   const [newTableCapacity, setNewTableCapacity] = useState<number>(0);
@@ -177,13 +178,42 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     loadExistingQRCode();
   }, [user]);
 
+  // Charger les produits disponibles
+  useEffect(() => {
+    if (!user) return;
+    
+    try {
+      const productsRef = collection(db, `establishments/${user.uid}/products`);
+      const unsubscribe = onSnapshot(productsRef, (snapshot) => {
+        const productsData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setProducts(productsData);
+      });
+
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Erreur chargement produits:', error);
+    }
+  }, [user]);
+
   // Générer le QR Code
   const generateQRCode = async () => {
-    if (!user || !profile) return;
+    if (!user || !profile) {
+      toast({
+        title: "Erreur",
+        description: "Utilisateur non connecté ou profil manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsGeneratingQR(true);
     try {
       const publicUrl = `${window.location.origin}/commande/${user.uid}`;
+      console.log('Génération QR Code pour URL:', publicUrl);
+      
       const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
         width: 300,
         margin: 2,
@@ -192,6 +222,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           light: '#FFFFFF'
         }
       });
+      
+      console.log('QR Code généré avec succès');
       setQrCodeUrl(qrCodeDataUrl);
       
       // Sauvegarder l'URL publique dans Firestore
@@ -202,6 +234,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
         lastUpdated: Date.now()
       });
       
+      console.log('Configuration sauvegardée dans Firestore');
+      
       toast({
         title: "QR Code généré !",
         description: "Votre QR Code est prêt à être utilisé par vos clients."
@@ -210,7 +244,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       console.error('Erreur génération QR:', error);
       toast({
         title: "Erreur",
-        description: "Impossible de générer le QR Code.",
+        description: `Impossible de générer le QR Code: ${error.message}`,
         variant: "destructive"
       });
     } finally {
@@ -415,6 +449,47 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                   <Button onClick={generateQRCode} disabled={isGeneratingQR}>
                     {isGeneratingQR ? "Génération..." : "Générer QR Code"}
                   </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Produits disponibles */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Produits disponibles pour commande
+              </CardTitle>
+              <CardDescription>
+                Ces produits seront visibles par vos clients lorsqu'ils scannent le QR Code
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {products.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {products.map((product) => (
+                    <div key={product.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">{product.name}</h4>
+                        <Badge variant="outline">{product.category}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Prix: {product.price?.toLocaleString('fr-FR', { useGrouping: false })} XAF
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Stock: {product.stock || 0} unités
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">Aucun produit disponible</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Ajoutez des produits dans la section Stock pour qu'ils apparaissent ici.
+                  </p>
                 </div>
               )}
             </CardContent>
