@@ -96,28 +96,151 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   doc.setFontSize(16);
   doc.text(`Rapport ${periodLabel}`, 40, y); y += 24;
 
-  // Résumé
+  // Tableau de résumé
+  const tableData = [
+    { metric: "Ventes totales", value: `${summary.ventes.toLocaleString()} XAF`, status: "Positif" },
+    { metric: "Nombre de commandes", value: summary.commandes.toString(), status: "Actif" },
+    { metric: "Pertes enregistrées", value: `${summary.pertes.toLocaleString()} XAF`, status: "À surveiller" },
+    { metric: "Bénéfice net", value: `${summary.benefice.toLocaleString()} XAF`, status: "Excellent" }
+  ];
+
+  // Dessiner le tableau
+  const tableStartY = y;
+  const tableWidth = 515; // Largeur du tableau
+  const rowHeight = 25;
+  const col1Width = 200; // Métrique
+  const col2Width = 150; // Valeur
+  const col3Width = 165; // Statut
+
+  // En-têtes du tableau
   doc.setFontSize(12);
-  doc.text(`Ventes: ${summary.ventes.toLocaleString()} XAF`, 40, y); y += 16;
-  doc.text(`Commandes: ${summary.commandes}`, 40, y); y += 16;
-  doc.text(`Pertes: ${summary.pertes.toLocaleString()} XAF`, 40, y); y += 16;
-  doc.text(`Bénéfice net: ${summary.benefice.toLocaleString()} XAF`, 40, y); y += 24;
+  doc.setFont(undefined, 'bold');
+  doc.setFillColor(240, 240, 240);
+  doc.rect(40, tableStartY, tableWidth, rowHeight, 'F');
+  doc.setDrawColor(200, 200, 200);
+  doc.rect(40, tableStartY, tableWidth, rowHeight);
+  
+  // Lignes verticales pour les colonnes
+  doc.line(40 + col1Width, tableStartY, 40 + col1Width, tableStartY + rowHeight);
+  doc.line(40 + col1Width + col2Width, tableStartY, 40 + col1Width + col2Width, tableStartY + rowHeight);
+  
+  // Texte des en-têtes
+  doc.text("Métrique", 50, tableStartY + 16);
+  doc.text("Valeur", 40 + col1Width + 10, tableStartY + 16);
+  doc.text("Statut", 40 + col1Width + col2Width + 10, tableStartY + 16);
+
+  // Données du tableau
+  doc.setFont(undefined, 'normal');
+  doc.setFillColor(255, 255, 255);
+  
+  tableData.forEach((row, index) => {
+    const rowY = tableStartY + rowHeight + (index * rowHeight);
+    
+    // Fond alterné pour les lignes
+    if (index % 2 === 0) {
+      doc.setFillColor(250, 250, 250);
+      doc.rect(40, rowY, tableWidth, rowHeight, 'F');
+    } else {
+      doc.setFillColor(255, 255, 255);
+      doc.rect(40, rowY, tableWidth, rowHeight, 'F');
+    }
+    
+    // Bordures du tableau
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(40, rowY, tableWidth, rowHeight);
+    doc.line(40 + col1Width, rowY, 40 + col1Width, rowY + rowHeight);
+    doc.line(40 + col1Width + col2Width, rowY, 40 + col1Width + col2Width, rowY + rowHeight);
+    
+    // Texte des données
+    doc.setFontSize(11);
+    doc.text(row.metric, 50, rowY + 16);
+    doc.text(row.value, 40 + col1Width + 10, rowY + 16);
+    doc.text(row.status, 40 + col1Width + col2Width + 10, rowY + 16);
+  });
+
+  y = tableStartY + rowHeight + (tableData.length * rowHeight) + 30;
 
   // Commandes détaillées
-  doc.setFontSize(14); doc.text("Commandes", 40, y); y += 18; doc.setFontSize(11);
+  doc.setFontSize(14); doc.text("Détail des Commandes", 40, y); y += 18;
+  
   if (orders.length === 0) {
+    doc.setFontSize(11);
     doc.text("Aucune commande pour cette période", 40, y); y += 14;
   } else {
-    for (const o of orders) {
-      const d = new Date(o.createdAt).toLocaleString();
-      const agent = o.agentName ? `${o.agentName}${o.agentCode ? ` (${o.agentCode})` : ''}` : (o.agentCode || "");
-      const line = `${d} • Table ${o.tableNumber || ''} • ${o.total.toLocaleString()} XAF • ${o.status || ''}`;
-      doc.text(line, 40, y); y += 14;
-      if (agent) { doc.text(`Agent: ${agent}`, 60, y); y += 14; }
-      if (y > 760) { doc.addPage(); y = 40; }
-    }
+    // En-têtes du tableau des commandes
+    const ordersTableStartY = y;
+    const ordersTableWidth = 515;
+    const ordersRowHeight = 20;
+    const ordersCol1Width = 120; // Date
+    const ordersCol2Width = 80;  // Table
+    const ordersCol3Width = 100; // Agent
+    const ordersCol4Width = 100; // Total
+    const ordersCol5Width = 115; // Statut
+
+    // En-têtes
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.rect(40, ordersTableStartY, ordersTableWidth, ordersRowHeight, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(40, ordersTableStartY, ordersTableWidth, ordersRowHeight);
+    
+    // Lignes verticales
+    doc.line(40 + ordersCol1Width, ordersTableStartY, 40 + ordersCol1Width, ordersTableStartY + ordersRowHeight);
+    doc.line(40 + ordersCol1Width + ordersCol2Width, ordersTableStartY, 40 + ordersCol1Width + ordersCol2Width, ordersTableStartY + ordersRowHeight);
+    doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, ordersTableStartY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, ordersTableStartY + ordersRowHeight);
+    doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, ordersTableStartY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, ordersTableStartY + ordersRowHeight);
+    
+    // Texte des en-têtes
+    doc.text("Date", 45, ordersTableStartY + 13);
+    doc.text("Table", 40 + ordersCol1Width + 5, ordersTableStartY + 13);
+    doc.text("Agent", 40 + ordersCol1Width + ordersCol2Width + 5, ordersTableStartY + 13);
+    doc.text("Total", 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + 5, ordersTableStartY + 13);
+    doc.text("Statut", 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width + 5, ordersTableStartY + 13);
+
+    // Données des commandes
+    doc.setFont(undefined, 'normal');
+    orders.forEach((order, index) => {
+      const rowY = ordersTableStartY + ordersRowHeight + (index * ordersRowHeight);
+      
+      // Vérifier si on dépasse la page
+      if (rowY > 750) {
+        doc.addPage();
+        y = 40;
+        return;
+      }
+      
+      // Fond alterné
+      if (index % 2 === 0) {
+        doc.setFillColor(250, 250, 250);
+        doc.rect(40, rowY, ordersTableWidth, ordersRowHeight, 'F');
+      } else {
+        doc.setFillColor(255, 255, 255);
+        doc.rect(40, rowY, ordersTableWidth, ordersRowHeight, 'F');
+      }
+      
+      // Bordures
+      doc.setDrawColor(200, 200, 200);
+      doc.rect(40, rowY, ordersTableWidth, ordersRowHeight);
+      doc.line(40 + ordersCol1Width, rowY, 40 + ordersCol1Width, rowY + ordersRowHeight);
+      doc.line(40 + ordersCol1Width + ordersCol2Width, rowY, 40 + ordersCol1Width + ordersCol2Width, rowY + ordersRowHeight);
+      doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, rowY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, rowY + ordersRowHeight);
+      doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, rowY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, rowY + ordersRowHeight);
+      
+      // Texte des données
+      doc.setFontSize(9);
+      const date = new Date(order.createdAt).toLocaleDateString();
+      const agent = order.agentName ? `${order.agentName}${order.agentCode ? ` (${order.agentCode})` : ''}` : (order.agentCode || "");
+      
+      doc.text(date, 45, rowY + 13);
+      doc.text(order.tableNumber || '-', 40 + ordersCol1Width + 5, rowY + 13);
+      doc.text(agent || '-', 40 + ordersCol1Width + ordersCol2Width + 5, rowY + 13);
+      doc.text(`${order.total.toLocaleString()} XAF`, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + 5, rowY + 13);
+      doc.text(order.status || '-', 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width + 5, rowY + 13);
+    });
+
+    y = ordersTableStartY + ordersRowHeight + (orders.length * ordersRowHeight) + 20;
   }
-  y += 10;
 
   // Ventes détaillées
   doc.setFontSize(14); doc.text("Ventes", 40, y); y += 18; doc.setFontSize(11);
