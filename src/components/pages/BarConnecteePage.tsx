@@ -16,7 +16,8 @@ import {
   MapPin,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  ShoppingCart
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -61,37 +62,60 @@ const BarConnecteePage = () => {
   const [newTableCapacity, setNewTableCapacity] = useState<number>(0);
   const [newTableDescription, setNewTableDescription] = useState("");
 
+  // Vérifier que l'utilisateur est connecté
+  if (!user) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <AlertCircle className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+          <h3 className="text-lg font-semibold mb-2">Accès non autorisé</h3>
+          <p className="text-muted-foreground">
+            Vous devez être connecté pour accéder à cette fonctionnalité.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Charger les tables/zones
   useEffect(() => {
     if (!user) return;
     
-    const tablesRef = collection(db, `establishments/${user.uid}/tables`);
-    const unsubscribe = onSnapshot(tablesRef, (snapshot) => {
-      const tablesData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as TableZone[];
-      setTables(tablesData);
-    });
+    try {
+      const tablesRef = collection(db, `establishments/${user.uid}/tables`);
+      const unsubscribe = onSnapshot(tablesRef, (snapshot) => {
+        const tablesData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as TableZone[];
+        setTables(tablesData);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Erreur chargement tables:', error);
+    }
   }, [user]);
 
   // Charger les commandes
   useEffect(() => {
     if (!user) return;
     
-    const ordersRef = collection(db, `establishments/${user.uid}/barOrders`);
-    const q = query(ordersRef, orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const ordersData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as BarOrder[];
-      setOrders(ordersData);
-    });
+    try {
+      const ordersRef = collection(db, `establishments/${user.uid}/barOrders`);
+      const q = query(ordersRef, orderBy('createdAt', 'desc'));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const ordersData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as BarOrder[];
+        setOrders(ordersData);
+      });
 
-    return () => unsubscribe();
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('Erreur chargement commandes:', error);
+    }
   }, [user]);
 
   // Générer le QR Code
