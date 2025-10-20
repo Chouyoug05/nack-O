@@ -77,9 +77,34 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
   // Fonction utilitaire pour obtenir l'URL publique
   const getPublicUrl = () => {
     if (!user) return '';
-    const currentOrigin = window.location.origin;
+    
+    // Détecter l'environnement
+    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    // Utiliser l'URL appropriée selon l'environnement
+    const baseUrl = isDevelopment ? 'https://nack.pro' : window.location.origin;
     const basePath = import.meta.env.BASE_URL || '';
-    return `${currentOrigin}${basePath}/commande/${user.uid}`;
+    
+    // Nettoyer le basePath pour éviter les doubles barres obliques
+    const cleanBasePath = basePath.replace(/\/+$/, ''); // Supprimer les barres obliques en fin
+    
+    // Construire l'URL finale en évitant les doubles barres obliques
+    const finalUrl = `${baseUrl}${cleanBasePath}/commande/${user.uid}`;
+    
+    // Nettoyer les doubles barres obliques dans l'URL finale
+    const cleanUrl = finalUrl.replace(/\/+/g, '/').replace(':/', '://');
+    
+    console.log('🔗 Construction URL publique:', {
+      isDevelopment,
+      baseUrl,
+      basePath,
+      cleanBasePath,
+      finalUrl,
+      cleanUrl,
+      userId: user.uid
+    });
+    
+    return cleanUrl;
   };
 
   // Vérifier que l'utilisateur est connecté
