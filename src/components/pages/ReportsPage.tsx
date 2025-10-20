@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   Calendar,
   TrendingUp,
@@ -65,33 +66,93 @@ const usePeriodData = (uid: string | undefined, period: 'daily' | 'weekly' | 'mo
   return { ventes, commandes, pertes, benefice, sales };
 };
 
-interface ReportCardProps {
-  title: string;
-  value: string | number;
-  change: string;
-  icon: LucideIcon;
-  trend: 'up' | 'down' | 'flat';
+
+interface ReportData {
+  ventes: number;
+  commandes: number;
+  pertes: number;
+  benefice: number;
+  sales: SaleDoc[];
 }
 
-const ReportCard = ({ title, value, change, icon: Icon, trend }: ReportCardProps) => (
+const ReportTable = ({ data, periodLabel }: { data: ReportData; periodLabel: string }) => (
   <Card className="shadow-card border-0">
-    <CardContent className="p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">{title}</p>
-          <p className="text-2xl font-bold text-foreground">{value}</p>
-          <p className={`text-sm flex items-center gap-1 ${
-            trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-gray-600'
-          }`}>
-            {trend === 'up' && <TrendingUp size={16} />}
-            {trend === 'down' && <TrendingDown size={16} />}
-            {change}
-          </p>
-        </div>
-        <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
-          <Icon size={24} className="text-nack-red" />
-        </div>
-      </div>
+    <CardHeader>
+      <CardTitle className="text-lg font-semibold">Rapport {periodLabel}</CardTitle>
+      <CardDescription>Détails des performances de votre établissement</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="font-semibold">Métrique</TableHead>
+            <TableHead className="font-semibold text-right">Valeur</TableHead>
+            <TableHead className="font-semibold text-right">Statut</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          <TableRow>
+            <TableCell className="font-medium flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-green-600" />
+              Ventes totales
+            </TableCell>
+            <TableCell className="text-right font-semibold text-green-600">
+              {Number(data.ventes || 0).toLocaleString()} XAF
+            </TableCell>
+            <TableCell className="text-right">
+              <span className="inline-flex items-center gap-1 text-green-600">
+                <TrendingUp className="w-3 h-3" />
+                Positif
+              </span>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium flex items-center gap-2">
+              <ShoppingBag className="w-4 h-4 text-blue-600" />
+              Nombre de commandes
+            </TableCell>
+            <TableCell className="text-right font-semibold text-blue-600">
+              {Number(data.commandes || 0)}
+            </TableCell>
+            <TableCell className="text-right">
+              <span className="inline-flex items-center gap-1 text-blue-600">
+                <TrendingUp className="w-3 h-3" />
+                Actif
+              </span>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600" />
+              Pertes enregistrées
+            </TableCell>
+            <TableCell className="text-right font-semibold text-red-600">
+              {Number(data.pertes || 0).toLocaleString()} XAF
+            </TableCell>
+            <TableCell className="text-right">
+              <span className="inline-flex items-center gap-1 text-red-600">
+                <TrendingDown className="w-3 h-3" />
+                À surveiller
+              </span>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell className="font-medium flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
+              Bénéfice net
+            </TableCell>
+            <TableCell className="text-right font-semibold text-emerald-600">
+              {Number(data.benefice || 0).toLocaleString()} XAF
+            </TableCell>
+            <TableCell className="text-right">
+              <span className="inline-flex items-center gap-1 text-emerald-600">
+                <TrendingUp className="w-3 h-3" />
+                Excellent
+              </span>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
     </CardContent>
   </Card>
 );
@@ -254,36 +315,7 @@ const ReportsPage = () => {
 
         {/* Rapport Journalier */}
         <TabsContent value="daily" className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <ReportCard 
-              title="Ventes du jour"
-              value={`${Number(daily.ventes || 0).toLocaleString()} XAF`}
-              change=""
-              icon={DollarSign}
-              trend="up"
-            />
-            <ReportCard 
-              title="Commandes"
-              value={Number(daily.commandes || 0)}
-              change=""
-              icon={ShoppingBag}
-              trend="up"
-            />
-            <ReportCard 
-              title="Pertes"
-              value={`${Number(daily.pertes || 0).toLocaleString()} XAF`}
-              change=""
-              icon={AlertTriangle}
-              trend="down"
-            />
-            <ReportCard 
-              title="Bénéfice net"
-              value={`${Number(daily.benefice || 0).toLocaleString()} XAF`}
-              change=""
-              icon={TrendingUp}
-              trend="up"
-            />
-          </div>
+          <ReportTable data={daily} periodLabel="Journalier" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card className="shadow-card border-0">
               <CardHeader>
@@ -308,36 +340,7 @@ const ReportsPage = () => {
 
         {/* Rapport Hebdomadaire */}
         <TabsContent value="weekly" className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <ReportCard 
-              title="Ventes de la semaine"
-              value={`${Number(weekly.ventes || 0).toLocaleString()} XAF`}
-              change=""
-              icon={DollarSign}
-              trend="up"
-            />
-            <ReportCard 
-              title="Commandes"
-              value={Number(weekly.commandes || 0)}
-              change=""
-              icon={ShoppingBag}
-              trend="up"
-            />
-            <ReportCard 
-              title="Pertes"
-              value={`${Number(weekly.pertes || 0).toLocaleString()} XAF`}
-              change=""
-              icon={AlertTriangle}
-              trend="down"
-            />
-            <ReportCard 
-              title="Bénéfice net"
-              value={`${Number(weekly.benefice || 0).toLocaleString()} XAF`}
-              change=""
-              icon={TrendingUp}
-              trend="up"
-            />
-          </div>
+          <ReportTable data={weekly} periodLabel="Hebdomadaire" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card className="shadow-card border-0">
               <CardHeader>
@@ -362,36 +365,7 @@ const ReportsPage = () => {
 
         {/* Rapport Mensuel */}
         <TabsContent value="monthly" className="space-y-6">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <ReportCard 
-              title="Ventes du mois"
-              value={`${Number(monthly.ventes || 0).toLocaleString()} XAF`}
-              change=""
-              icon={DollarSign}
-              trend="up"
-            />
-            <ReportCard 
-              title="Commandes"
-              value={Number(monthly.commandes || 0)}
-              change=""
-              icon={ShoppingBag}
-              trend="up"
-            />
-            <ReportCard 
-              title="Pertes"
-              value={`${Number(monthly.pertes || 0).toLocaleString()} XAF`}
-              change=""
-              icon={AlertTriangle}
-              trend="down"
-            />
-            <ReportCard 
-              title="Bénéfice net"
-              value={`${Number(monthly.benefice || 0).toLocaleString()} XAF`}
-              change=""
-              icon={TrendingUp}
-              trend="up"
-            />
-          </div>
+          <ReportTable data={monthly} periodLabel="Mensuel" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <Card className="shadow-card border-0">
               <CardHeader>
