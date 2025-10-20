@@ -569,7 +569,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                       Collection: profiles/{user?.uid}/products
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Filtre: stock > 0
+                      Filtre: stock &gt; 0
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Vérifiez la console pour plus de détails
