@@ -63,6 +63,13 @@ const PublicOrderingPage = () => {
   const [receiptQR, setReceiptQR] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Debug: Vérifier l'extraction de l'ID depuis l'URL
+  console.log('=== EXTRACTION URL ===');
+  console.log('URL complète:', window.location.href);
+  console.log('Pathname:', window.location.pathname);
+  console.log('establishmentId extrait:', establishmentId);
+  console.log('Type establishmentId:', typeof establishmentId);
+
   // Charger les données de l'établissement
   useEffect(() => {
     if (!establishmentId) {
@@ -70,6 +77,10 @@ const PublicOrderingPage = () => {
       return;
     }
 
+    console.log('=== DIAGNOSTIC MOBILE ===');
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
+    console.log('Window location:', window.location.href);
     console.log('Chargement des données pour l\'établissement:', establishmentId);
 
     const loadEstablishmentData = async () => {
@@ -81,9 +92,11 @@ const PublicOrderingPage = () => {
         if (profileDoc.exists()) {
           const profileData = profileDoc.data();
           console.log('Profil trouvé:', profileData);
+          console.log('Nom établissement:', profileData.establishmentName);
           setEstablishment(profileData as Establishment);
         } else {
-          console.log('Profil non trouvé pour l\'ID:', establishmentId);
+          console.log('❌ Profil non trouvé pour l\'ID:', establishmentId);
+          console.log('Vérification Firestore - Collection profiles existe-t-elle ?');
           setEstablishment(null);
         }
 
@@ -136,12 +149,29 @@ const PublicOrderingPage = () => {
           unsubscribeTables();
         };
       } catch (error) {
-        console.error('Erreur chargement données:', error);
+        console.error('❌ Erreur chargement données:', error);
         console.error('Détails de l\'erreur:', {
           establishmentId,
           errorMessage: error instanceof Error ? error.message : 'Erreur inconnue',
-          errorCode: error instanceof Error ? (error as any).code : 'N/A'
+          errorCode: error instanceof Error ? (error as any).code : 'N/A',
+          userAgent: navigator.userAgent,
+          isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
         });
+        
+        // En cas d'erreur, essayer de récupérer au moins le profil
+        if (establishmentId) {
+          try {
+            console.log('Tentative de récupération directe du profil...');
+            const profileDoc = await getDoc(doc(db, 'profiles', establishmentId));
+            if (profileDoc.exists()) {
+              console.log('✅ Profil récupéré en fallback');
+              setEstablishment(profileDoc.data() as Establishment);
+            }
+          } catch (fallbackError) {
+            console.error('❌ Fallback échoué:', fallbackError);
+          }
+        }
+        
         setIsLoading(false);
       }
     };
@@ -280,10 +310,19 @@ Merci pour votre commande !
 
   if (!establishment) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center max-w-md">
           <h1 className="text-2xl font-bold text-destructive mb-2">Établissement introuvable</h1>
-          <p className="text-muted-foreground">Ce QR Code ne semble pas valide.</p>
+          <p className="text-muted-foreground mb-4">Ce QR Code ne semble pas valide.</p>
+          
+          {/* Informations de debug pour mobile */}
+          <div className="text-xs text-muted-foreground bg-gray-50 p-3 rounded border text-left">
+            <p><strong>Debug Info:</strong></p>
+            <p>ID: {establishmentId || 'Non fourni'}</p>
+            <p>URL: {window.location.href}</p>
+            <p>Mobile: {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Oui' : 'Non'}</p>
+            <p className="mt-2 text-xs">Vérifiez la console pour plus de détails</p>
+          </div>
         </div>
       </div>
     );
