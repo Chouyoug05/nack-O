@@ -28,6 +28,7 @@ import { doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, wh
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
 import { notificationsColRef } from "@/lib/collections";
+import { generateTicketPDF } from "@/utils/ticketPDF";
 
 interface TableZone {
   id: string;
@@ -544,6 +545,42 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     }
   };
 
+  // Télécharger le ticket d'une commande
+  const downloadOrderTicket = async (order: BarOrder) => {
+    if (!user || !profile) return;
+
+    try {
+      const ticketData = {
+        orderNumber: order.orderNumber,
+        establishmentName: profile.establishmentName || 'Établissement',
+        establishmentLogo: profile.logoUrl,
+        tableZone: order.tableZone,
+        items: order.items,
+        total: order.total,
+        createdAt: order.createdAt,
+        receiptData: {
+          orderId: order.id,
+          establishmentId: user.uid,
+          timestamp: order.createdAt
+        }
+      };
+
+      await generateTicketPDF(ticketData);
+      
+      toast({
+        title: "Ticket téléchargé",
+        description: `Ticket de la commande #${order.orderNumber} téléchargé avec succès.`
+      });
+    } catch (error) {
+      console.error('Erreur génération ticket:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de générer le ticket PDF.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -876,9 +913,9 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                             Servir & Payer
                           </Button>
                         )}
-                        <Button variant="outline" size="sm">
+                        <Button variant="outline" size="sm" onClick={() => downloadOrderTicket(order)}>
                           <Download className="w-4 h-4 mr-2" />
-                          Reçu
+                          Ticket PDF
                         </Button>
                       </div>
                     </div>

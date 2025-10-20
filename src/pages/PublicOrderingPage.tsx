@@ -17,6 +17,7 @@ import { useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy } from "firebase/firestore";
 import QRCode from "qrcode";
+import { generateTicketPDF } from "@/utils/ticketPDF";
 
 interface Product {
   id: string;
@@ -356,9 +357,40 @@ const PublicOrderingPage = () => {
     }
   };
 
-  // Télécharger le reçu
-  const downloadReceipt = () => {
-    const receiptContent = `
+  // Télécharger le ticket PDF
+  const downloadReceipt = async () => {
+    if (!establishment || !orderNumber) return;
+
+    try {
+      // Données du ticket
+      const ticketData = {
+        orderNumber,
+        establishmentName: establishment.establishmentName,
+        establishmentLogo: establishment.logoUrl,
+        tableZone: selectedTable,
+        items: cart.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total,
+        createdAt: Date.now(),
+        receiptData: {
+          orderId: orderNumber,
+          establishmentId: effectiveEstablishmentId || '',
+          timestamp: Date.now()
+        }
+      };
+
+      // Générer et télécharger le PDF
+      await generateTicketPDF(ticketData);
+      
+      console.log('Ticket PDF généré avec succès');
+    } catch (error) {
+      console.error('Erreur génération ticket PDF:', error);
+      
+      // Fallback vers l'ancienne méthode si erreur
+      const receiptContent = `
 RECU DE COMMANDE
 ${establishment?.establishmentName || 'Établissement'}
 
@@ -372,15 +404,16 @@ ${cart.map(item => `${item.name} x${item.quantity} = ${(item.price * item.quanti
 TOTAL: ${total.toLocaleString('fr-FR', { useGrouping: false })} XAF
 
 Merci pour votre commande !
-    `.trim();
+      `.trim();
 
-    const blob = new Blob([receiptContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `recu-${orderNumber}.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+      const blob = new Blob([receiptContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `recu-${orderNumber}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   if (isLoading) {
@@ -456,7 +489,7 @@ Merci pour votre commande !
               <div className="space-y-2">
                 <Button onClick={downloadReceipt} className="w-full">
                   <Download className="w-4 h-4 mr-2" />
-                  Télécharger le reçu
+                  Télécharger le ticket PDF
                 </Button>
                 <Button 
                   variant="outline" 
