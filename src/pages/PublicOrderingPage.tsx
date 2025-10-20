@@ -160,7 +160,7 @@ const PublicOrderingPage = () => {
   // Charger les données de l'établissement
   useEffect(() => {
     if (!effectiveEstablishmentId) {
-      console.log('Pas d\'effectiveEstablishmentId fourni');
+      console.log('❌ Pas d\'effectiveEstablishmentId fourni');
       return;
     }
 
@@ -168,22 +168,42 @@ const PublicOrderingPage = () => {
     console.log('User Agent:', navigator.userAgent);
     console.log('Is Mobile:', /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent));
     console.log('Window location:', window.location.href);
-    console.log('Chargement des données pour l\'établissement:', effectiveEstablishmentId);
+    console.log('✅ Chargement des données pour l\'établissement:', effectiveEstablishmentId);
+    console.log('Type effectiveEstablishmentId:', typeof effectiveEstablishmentId);
+    console.log('Longueur effectiveEstablishmentId:', effectiveEstablishmentId.length);
 
     const loadEstablishmentData = async () => {
       try {
+        console.log('🚀 Début chargement données établissement');
+        console.log('📋 ID établissement:', effectiveEstablishmentId);
+        console.log('🔗 URL Firestore:', `profiles/${effectiveEstablishmentId}`);
+        
         // Charger les infos de l'établissement
-        console.log('Tentative de récupération du profil:', `profiles/${effectiveEstablishmentId}`);
+        console.log('📡 Tentative de récupération du profil...');
         const profileDoc = await getDoc(doc(db, 'profiles', effectiveEstablishmentId));
+        
+        console.log('📄 Résultat getDoc:', {
+          exists: profileDoc.exists(),
+          id: profileDoc.id,
+          hasData: profileDoc.data() ? 'Oui' : 'Non'
+        });
         
         if (profileDoc.exists()) {
           const profileData = profileDoc.data();
-          console.log('Profil trouvé:', profileData);
-          console.log('Nom établissement:', profileData.establishmentName);
+          console.log('✅ Profil trouvé:', profileData);
+          console.log('🏪 Nom établissement:', profileData.establishmentName);
+          console.log('🖼️ Logo URL:', profileData.logoUrl);
           setEstablishment(profileData as Establishment);
         } else {
           console.log('❌ Profil non trouvé pour l\'ID:', effectiveEstablishmentId);
-          console.log('Vérification Firestore - Collection profiles existe-t-elle ?');
+          console.log('🔍 Vérification Firestore - Collection profiles existe-t-elle ?');
+          console.log('📊 Détails de debug:', {
+            establishmentId: effectiveEstablishmentId,
+            url: window.location.href,
+            pathname: window.location.pathname,
+            search: window.location.search,
+            hash: window.location.hash
+          });
           setEstablishment(null);
         }
 
@@ -242,17 +262,28 @@ const PublicOrderingPage = () => {
           errorMessage: error instanceof Error ? error.message : 'Erreur inconnue',
           errorCode: error instanceof Error ? (error as any).code : 'N/A',
           userAgent: navigator.userAgent,
-          isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+          isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+          url: window.location.href,
+          timestamp: new Date().toISOString()
         });
         
         // En cas d'erreur, essayer de récupérer au moins le profil
         if (effectiveEstablishmentId) {
           try {
-            console.log('Tentative de récupération directe du profil...');
+            console.log('🔄 Tentative de récupération directe du profil...');
             const profileDoc = await getDoc(doc(db, 'profiles', effectiveEstablishmentId));
             if (profileDoc.exists()) {
               console.log('✅ Profil récupéré en fallback');
-              setEstablishment(profileDoc.data() as Establishment);
+              const profileData = profileDoc.data();
+              console.log('📋 Données profil fallback:', {
+                establishmentName: profileData.establishmentName,
+                hasLogo: !!profileData.logoUrl,
+                plan: profileData.plan
+              });
+              setEstablishment(profileData as Establishment);
+            } else {
+              console.log('❌ Profil non trouvé même en fallback');
+              console.log('🔍 Vérifiez que l\'ID existe dans Firestore:', effectiveEstablishmentId);
             }
           } catch (fallbackError) {
             console.error('❌ Fallback échoué:', fallbackError);
