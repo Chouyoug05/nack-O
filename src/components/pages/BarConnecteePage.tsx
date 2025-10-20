@@ -187,14 +187,16 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
         console.error('Erreur snapshot commandes:', error);
       });
 
-      // Charger les produits (avec gestion d'erreur de permissions)
+      // Charger les produits du stock (avec gestion d'erreur de permissions)
       const productsRef = collection(db, `establishments/${user.uid}/products`);
-      const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
+      const productsQuery = query(productsRef, where('stock', '>', 0));
+      const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
         try {
           const productsData = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
+          console.log('Produits en stock chargés:', productsData.length);
           setProducts(productsData);
         } catch (error) {
           console.error('Erreur traitement produits:', error);
@@ -322,8 +324,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       };
       
       console.log('Ajout table:', tableData);
-      await addDoc(collection(db, `establishments/${user.uid}/tables`), tableData);
+      console.log('Collection path:', `establishments/${user.uid}/tables`);
       
+      const docRef = await addDoc(collection(db, `establishments/${user.uid}/tables`), tableData);
+      console.log('Table ajoutée avec ID:', docRef.id);
+      
+      // Réinitialiser le formulaire
       setNewTableName("");
       setNewTableType('table');
       setNewTableCapacity(0);
@@ -335,9 +341,18 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       });
     } catch (error) {
       console.error('Erreur ajout table:', error);
+      console.error('Détails erreur:', error.code, error.message);
+      
+      let errorMessage = "Impossible d'ajouter la table.";
+      if (error.code === 'permission-denied') {
+        errorMessage = "Permissions insuffisantes. Contactez le support.";
+      } else if (error.code === 'unavailable') {
+        errorMessage = "Service temporairement indisponible. Réessayez.";
+      }
+      
       toast({
         title: "Erreur",
-        description: "Impossible d'ajouter la table. Réessayez.",
+        description: errorMessage,
         variant: "destructive"
       });
     }
