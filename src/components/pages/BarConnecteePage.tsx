@@ -509,6 +509,8 @@ const BarConnecteePage = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
         {/* Scanner Tab */}
         <TabsContent value="scanner" className="space-y-6">
           <Card>
