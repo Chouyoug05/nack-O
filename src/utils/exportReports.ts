@@ -98,10 +98,10 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
 
   // Tableau de résumé
   const tableData = [
-    { metric: "Ventes totales", value: `${summary.ventes.toLocaleString('fr-FR')} XAF`, status: "Positif" },
+    { metric: "Ventes totales", value: `${summary.ventes.toLocaleString('fr-FR', { useGrouping: false })} XAF`, status: "Positif" },
     { metric: "Nombre de commandes", value: summary.commandes.toString(), status: "Actif" },
-    { metric: "Pertes enregistrées", value: `${summary.pertes.toLocaleString('fr-FR')} XAF`, status: "À surveiller" },
-    { metric: "Bénéfice net", value: `${summary.benefice.toLocaleString('fr-FR')} XAF`, status: "Excellent" }
+    { metric: "Pertes enregistrées", value: `${summary.pertes.toLocaleString('fr-FR', { useGrouping: false })} XAF`, status: "À surveiller" },
+    { metric: "Bénéfice net", value: `${summary.benefice.toLocaleString('fr-FR', { useGrouping: false })} XAF`, status: "Excellent" }
   ];
 
   // Dessiner le tableau
@@ -235,7 +235,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.text(date, 45, rowY + 13);
       doc.text(order.tableNumber || '-', 40 + ordersCol1Width + 5, rowY + 13);
       doc.text(agent || '-', 40 + ordersCol1Width + ordersCol2Width + 5, rowY + 13);
-      doc.text(`${order.total.toLocaleString('fr-FR')} XAF`, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + 5, rowY + 13);
+      doc.text(`${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + 5, rowY + 13);
       doc.text(order.status || '-', 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width + 5, rowY + 13);
     });
 
@@ -324,8 +324,8 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
         
         doc.text(item.name || 'Produit inconnu', 45, itemRowY + 11);
         doc.text(`${item.quantity || 0}`, 40 + productsCol1Width + 5, itemRowY + 11);
-        doc.text(`${unitPrice.toLocaleString('fr-FR')} XAF`, 40 + productsCol1Width + productsCol2Width + 5, itemRowY + 11);
-        doc.text(`${itemTotal.toLocaleString('fr-FR')} XAF`, 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, itemRowY + 11);
+        doc.text(`${unitPrice.toLocaleString('fr-FR', { useGrouping: false })} XAF`, 40 + productsCol1Width + productsCol2Width + 5, itemRowY + 11);
+        doc.text(`${itemTotal.toLocaleString('fr-FR', { useGrouping: false })} XAF`, 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, itemRowY + 11);
       });
 
       // Total du reçu
@@ -338,7 +338,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.rect(40, totalRowY, productsTableWidth, productsRowHeight);
       
       doc.text("TOTAL", 40 + productsCol1Width + productsCol2Width + productsCol3Width - 50, totalRowY + 12);
-      doc.text(`${Number(sale.total).toLocaleString('fr-FR')} XAF`, 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, totalRowY + 12);
+      doc.text(`${Number(sale.total).toLocaleString('fr-FR', { useGrouping: false })} XAF`, 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, totalRowY + 12);
       
       y = totalRowY + productsRowHeight + 20;
     });
@@ -351,7 +351,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   } else {
     for (const l of losses) {
       const d = new Date(l.createdAt).toLocaleString();
-      const line = `${d} • ${l.productName} x${l.quantity} • ${l.cost.toLocaleString('fr-FR')} XAF`;
+      const line = `${d} • ${l.productName} x${l.quantity} • ${l.cost.toLocaleString('fr-FR', { useGrouping: false })} XAF`;
       doc.text(line, 40, y); y += 14;
       if (y > 760) { doc.addPage(); y = 40; }
     }
