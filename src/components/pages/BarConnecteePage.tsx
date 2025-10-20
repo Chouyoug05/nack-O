@@ -73,6 +73,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
 
+  // Fonction utilitaire pour obtenir l'URL publique
+  const getPublicUrl = () => {
+    if (!user) return '';
+    const currentOrigin = window.location.origin;
+    const basePath = import.meta.env.BASE_URL || '';
+    return `${currentOrigin}${basePath}/commande/${user.uid}`;
+  };
+
   // Vérifier que l'utilisateur est connecté
   if (!user) {
     return (
@@ -239,9 +247,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           
           if (config.qrCodeGenerated) {
             // Utiliser l'URL sauvegardée ou générer une nouvelle
-            const currentOrigin = window.location.origin;
-            const basePath = import.meta.env.BASE_URL || '';
-            const publicUrl = config.publicUrl || `${currentOrigin}${basePath}/commande/${user.uid}`;
+            const publicUrl = config.publicUrl || getPublicUrl();
             
             console.log('Génération QR Code avec URL:', publicUrl);
             
@@ -280,15 +286,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     
     setIsGeneratingQR(true);
     try {
-      // Utiliser l'URL actuelle pour construire l'URL publique
-      const currentOrigin = window.location.origin;
-      const basePath = import.meta.env.BASE_URL || '';
-      const publicUrl = `${currentOrigin}${basePath}/commande/${user.uid}`;
+      const publicUrl = getPublicUrl();
       
       console.log('Génération QR Code pour URL:', publicUrl);
       console.log('Détails URL:', {
-        currentOrigin,
-        basePath,
+        currentOrigin: window.location.origin,
+        basePath: import.meta.env.BASE_URL || '',
         userId: user.uid,
         finalUrl: publicUrl
       });
@@ -577,6 +580,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                   <div className="p-4 bg-white rounded-lg border-2 border-dashed border-gray-300">
                     <img src={qrCodeUrl} alt="QR Code" className="w-64 h-64" />
                   </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-muted-foreground mb-1">URL du QR Code :</p>
+                    <p className="text-xs text-muted-foreground break-all bg-gray-50 p-2 rounded border">
+                      {getPublicUrl()}
+                    </p>
+                  </div>
                   <div className="flex gap-2">
                     <Button onClick={() => {
                       const link = document.createElement('a');
@@ -588,7 +597,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
                       Télécharger
                     </Button>
                     <Button variant="outline" onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/commande/${user?.uid}`);
+                      navigator.clipboard.writeText(getPublicUrl());
                       toast({ title: "URL copiée !", description: "L'URL publique a été copiée dans le presse-papiers." });
                     }}>
                       <Copy className="w-4 h-4 mr-2" />
