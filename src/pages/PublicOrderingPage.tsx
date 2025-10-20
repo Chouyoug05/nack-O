@@ -406,7 +406,10 @@ Merci pour votre commande !
         {/* Menu des produits */}
         <Card>
           <CardHeader>
-            <CardTitle>Menu</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <span>🍽️</span>
+              Notre Menu
+            </CardTitle>
             <CardDescription>
               Sélectionnez vos produits et ajoutez-les à votre commande
             </CardDescription>
@@ -424,34 +427,52 @@ Merci pour votre commande !
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
                 {products.map((product) => (
-                  <div key={product.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                    {product.imageUrl && (
-                      <img 
-                        src={product.imageUrl} 
-                        alt={product.name} 
-                        className="w-12 h-12 rounded-lg object-cover" 
-                      />
-                    )}
-                    <div className="flex-1">
-                      <h3 className="font-medium">{product.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {product.price.toLocaleString('fr-FR', { useGrouping: false })} XAF
-                      </p>
+                  <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-0 shadow-sm">
+                    <div className="aspect-square relative group">
+                      {product.imageUrl ? (
+                        <img 
+                          src={product.imageUrl} 
+                          alt={product.name} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-16 h-16 bg-primary/30 rounded-full flex items-center justify-center mx-auto mb-2">
+                              <span className="text-primary font-bold text-xl">
+                                {product.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Pas d'image</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="absolute top-3 right-3">
+                        <Button
+                          size="sm"
+                          className="h-9 w-9 rounded-full bg-white/95 hover:bg-white shadow-lg hover:shadow-xl transition-all duration-200 border-0"
+                          onClick={() => addToCart(product)}
+                        >
+                          <Plus className="w-4 h-4 text-primary" />
+                        </Button>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-3">
+                        <p className="text-white font-bold text-sm">
+                          {product.price.toLocaleString('fr-FR', { useGrouping: false })} XAF
+                        </p>
+                      </div>
+                    </div>
+                    <CardContent className="p-3">
+                      <h3 className="font-semibold text-sm mb-2 line-clamp-2 leading-tight">{product.name}</h3>
                       {product.category && (
-                        <Badge variant="outline" className="text-xs mt-1">
+                        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary border-primary/20">
                           {product.category}
                         </Badge>
                       )}
-                    </div>
-                    <Button
-                      size="sm"
-                      onClick={() => addToCart(product)}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
