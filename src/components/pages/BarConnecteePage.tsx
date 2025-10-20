@@ -70,6 +70,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
   const [newTableCapacity, setNewTableCapacity] = useState<number>(0);
   const [newTableDescription, setNewTableDescription] = useState("");
   const [error, setError] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
 
   // Vérifier que l'utilisateur est connecté
   if (!user) {
@@ -94,9 +95,29 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
           <AlertCircle className="w-16 h-16 mx-auto text-red-500 mb-4" />
           <h3 className="text-lg font-semibold mb-2 text-red-600">Erreur</h3>
           <p className="text-muted-foreground mb-4">{error}</p>
-          <Button onClick={() => setError("")}>
-            Réessayer
-          </Button>
+          <div className="flex gap-2 justify-center">
+            <Button onClick={() => setError("")}>
+              Réessayer
+            </Button>
+            <Button variant="outline" onClick={() => window.location.reload()}>
+              Recharger la page
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Écran de chargement
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="w-16 h-16 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+          <h3 className="text-lg font-semibold mb-2">Chargement...</h3>
+          <p className="text-muted-foreground">
+            Chargement de la page Bar Connectée
+          </p>
         </div>
       </div>
     );
@@ -105,6 +126,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
   // Charger les tables/zones
   useEffect(() => {
     if (!user) return;
+    
+    // Désactiver l'écran de chargement après un délai
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
     
     try {
       const tablesRef = collection(db, `establishments/${user.uid}/tables`);
@@ -115,16 +141,23 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
             ...doc.data()
           })) as TableZone[];
           setTables(tablesData);
+          setIsLoading(false);
         } catch (error) {
           console.error('Erreur traitement tables:', error);
           setError('Erreur lors du chargement des tables');
+          setIsLoading(false);
         }
       });
 
-      return () => unsubscribe();
+      return () => {
+        unsubscribe();
+        clearTimeout(timer);
+      };
     } catch (error) {
       console.error('Erreur chargement tables:', error);
       setError('Erreur lors du chargement des tables');
+      setIsLoading(false);
+      clearTimeout(timer);
     }
   }, [user]);
 
