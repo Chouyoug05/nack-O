@@ -608,17 +608,46 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
               {products.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {products.map((product) => (
-                    <div key={product.id} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">{product.name}</h4>
-                        <Badge variant="outline">{product.category}</Badge>
+                    <div key={product.id} className="border rounded-lg p-4 space-y-3">
+                      {/* Image du produit */}
+                      <div className="aspect-square relative">
+                        {product.imageUrl && product.imageUrl.trim() !== '' ? (
+                          <img 
+                            src={product.imageUrl} 
+                            alt={product.name} 
+                            className="w-full h-full object-cover rounded-lg" 
+                            onError={(e) => {
+                              console.log('Erreur chargement image pour', product.name, ':', product.imageUrl);
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                          />
+                        ) : null}
+                        <div className={`w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center rounded-lg ${product.imageUrl && product.imageUrl.trim() !== '' ? 'hidden' : ''}`}>
+                          <div className="text-center">
+                            <div className="w-12 h-12 bg-primary/30 rounded-full flex items-center justify-center mx-auto mb-2">
+                              <span className="text-primary font-bold text-lg">
+                                {product.name.charAt(0).toUpperCase()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Pas d'image</p>
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        Prix: {product.price?.toLocaleString('fr-FR', { useGrouping: false })} XAF
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Stock: {(product.quantity || product.stock || 0)} unités
-                      </p>
+                      
+                      {/* Informations du produit */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium">{product.name}</h4>
+                          <Badge variant="outline">{product.category}</Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Prix: {product.price?.toLocaleString('fr-FR', { useGrouping: false })} XAF
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Stock: {(product.quantity || product.stock || 0)} unités
+                        </p>
+                      </div>
                     </div>
                   ))}
                 </div>

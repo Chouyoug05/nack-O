@@ -24,7 +24,10 @@ interface Product {
   price: number;
   imageUrl?: string;
   category?: string;
-  available: boolean;
+  available?: boolean;
+  quantity?: number;
+  stock?: number;
+  icon?: string;
 }
 
 interface TableZone {
@@ -86,6 +89,11 @@ const PublicOrderingPage = () => {
             return stock > 0 && p.available !== false;
           });
           console.log('Produits chargés pour commande publique:', availableProducts.length);
+          console.log('Détails des produits:', availableProducts.map(p => ({
+            name: p.name,
+            imageUrl: p.imageUrl,
+            hasImage: !!p.imageUrl
+          })));
           setProducts(availableProducts);
         });
 
@@ -431,24 +439,28 @@ Merci pour votre commande !
                 {products.map((product) => (
                   <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-all duration-200 hover:scale-[1.02] border-0 shadow-sm">
                     <div className="aspect-square relative group">
-                      {product.imageUrl ? (
+                      {product.imageUrl && product.imageUrl.trim() !== '' ? (
                         <img 
                           src={product.imageUrl} 
                           alt={product.name} 
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                          onError={(e) => {
+                            console.log('Erreur chargement image pour', product.name, ':', product.imageUrl);
+                            e.currentTarget.style.display = 'none';
+                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                          }}
                         />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
-                          <div className="text-center">
-                            <div className="w-16 h-16 bg-primary/30 rounded-full flex items-center justify-center mx-auto mb-2">
-                              <span className="text-primary font-bold text-xl">
-                                {product.name.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">Pas d'image</p>
+                      ) : null}
+                      <div className={`w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center ${product.imageUrl && product.imageUrl.trim() !== '' ? 'hidden' : ''}`}>
+                        <div className="text-center">
+                          <div className="w-16 h-16 bg-primary/30 rounded-full flex items-center justify-center mx-auto mb-2">
+                            <span className="text-primary font-bold text-xl">
+                              {product.name.charAt(0).toUpperCase()}
+                            </span>
                           </div>
+                          <p className="text-xs text-muted-foreground">Pas d'image</p>
                         </div>
-                      )}
+                      </div>
                       <div className="absolute top-3 right-3">
                         <Button
                           size="sm"
