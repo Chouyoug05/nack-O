@@ -73,18 +73,24 @@ const PublicOrderingPage = () => {
         }
 
         // Charger les produits
-        const productsRef = collection(db, `establishments/${establishmentId}/products`);
+        const productsRef = collection(db, `profiles/${establishmentId}/products`);
         const productsQuery = query(productsRef, orderBy('name'));
         const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
           const productsData = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })) as Product[];
-          setProducts(productsData.filter(p => p.available !== false));
+          // Filtrer les produits en stock (quantity > 0)
+          const availableProducts = productsData.filter(p => {
+            const stock = p.quantity || p.stock || 0;
+            return stock > 0 && p.available !== false;
+          });
+          console.log('Produits chargés pour commande publique:', availableProducts.length);
+          setProducts(availableProducts);
         });
 
         // Charger les tables/zones
-        const tablesRef = collection(db, `establishments/${establishmentId}/tables`);
+        const tablesRef = collection(db, `profiles/${establishmentId}/tables`);
         const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
           const tablesData = snapshot.docs.map(doc => ({
             id: doc.id,
@@ -171,7 +177,7 @@ const PublicOrderingPage = () => {
         }
       };
 
-      await addDoc(collection(db, `establishments/${establishmentId}/barOrders`), orderData);
+      await addDoc(collection(db, `profiles/${establishmentId}/barOrders`), orderData);
 
       // Générer le QR du reçu
       const receiptData = {
@@ -407,9 +413,16 @@ Merci pour votre commande !
           </CardHeader>
           <CardContent>
             {products.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">
-                Aucun produit disponible pour le moment.
-              </p>
+              <div className="text-center py-4">
+                <p className="text-muted-foreground mb-2">
+                  Aucun produit disponible pour le moment.
+                </p>
+                <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+                  Debug: Collection profiles/{establishmentId}/products
+                  <br />
+                  Vérifiez la console pour plus de détails
+                </div>
+              </div>
             ) : (
               <div className="space-y-3">
                 {products.map((product) => (
