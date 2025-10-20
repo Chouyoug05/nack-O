@@ -24,7 +24,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, where } from "firebase/firestore";
+import { doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch } from "firebase/firestore";
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
 import { notificationsColRef } from "@/lib/collections";
@@ -415,7 +415,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     }
   };
 
-  // Marquer comme servie (avec paiement et intégration ventes)
+  // Marquer comme servie (avec paiement, diminution stock et intégration ventes)
   const markAsServed = async (orderId: string) => {
     if (!user || !profile) return;
     
@@ -431,13 +431,40 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
         return;
       }
 
-      // Marquer comme servie
-      await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
+      // Diminuer le stock pour chaque produit
+      const batch = writeBatch(db);
+      
+      for (const item of order.items) {
+        // Trouver le produit dans la liste des produits
+        const product = products.find(p => p.name === item.name);
+        if (product) {
+          const newStock = (product.quantity || product.stock || 0) - item.quantity;
+          if (newStock < 0) {
+            toast({
+              title: "Stock insuffisant",
+              description: `Stock insuffisant pour ${item.name}. Stock actuel: ${product.quantity || product.stock || 0}`,
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          // Mettre à jour le stock
+          const productRef = doc(db, `profiles/${user.uid}/products`, product.id);
+          batch.update(productRef, { 
+            quantity: newStock,
+            lastStockUpdate: Date.now()
+          });
+        }
+      }
+
+      // Marquer la commande comme servie
+      const orderRef = doc(db, `profiles/${user.uid}/barOrders`, orderId);
+      batch.update(orderRef, {
         status: 'served',
         servedAt: Date.now(),
         paidAt: Date.now(),
-        paymentMethod: 'cash' // Par défaut, paiement en espèces
-      }, { merge: true });
+        paymentMethod: 'cash'
+      });
 
       // Créer une vente dans la collection sales
       const saleData = {
@@ -458,11 +485,15 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
         source: 'Bar Connectée'
       };
 
-      await addDoc(collection(db, `profiles/${user.uid}/sales`), saleData);
+      const saleRef = doc(collection(db, `profiles/${user.uid}/sales`));
+      batch.set(saleRef, saleData);
+
+      // Exécuter toutes les opérations en batch
+      await batch.commit();
       
       toast({
         title: "Commande servie et payée !",
-        description: `Commande #${order.orderNumber} ajoutée aux ventes (${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF)`
+        description: `Commande #${order.orderNumber} finalisée (${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF)`
       });
     } catch (error) {
       console.error('Erreur marquage servie:', error);
