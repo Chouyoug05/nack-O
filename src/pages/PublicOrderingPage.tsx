@@ -65,20 +65,34 @@ const PublicOrderingPage = () => {
 
   // Charger les données de l'établissement
   useEffect(() => {
-    if (!establishmentId) return;
+    if (!establishmentId) {
+      console.log('Pas d\'establishmentId fourni');
+      return;
+    }
+
+    console.log('Chargement des données pour l\'établissement:', establishmentId);
 
     const loadEstablishmentData = async () => {
       try {
         // Charger les infos de l'établissement
+        console.log('Tentative de récupération du profil:', `profiles/${establishmentId}`);
         const profileDoc = await getDoc(doc(db, 'profiles', establishmentId));
+        
         if (profileDoc.exists()) {
-          setEstablishment(profileDoc.data() as Establishment);
+          const profileData = profileDoc.data();
+          console.log('Profil trouvé:', profileData);
+          setEstablishment(profileData as Establishment);
+        } else {
+          console.log('Profil non trouvé pour l\'ID:', establishmentId);
+          setEstablishment(null);
         }
 
         // Charger les produits
+        console.log('Chargement des produits depuis:', `profiles/${establishmentId}/products`);
         const productsRef = collection(db, `profiles/${establishmentId}/products`);
         const productsQuery = query(productsRef, orderBy('name'));
         const unsubscribeProducts = onSnapshot(productsQuery, (snapshot) => {
+          console.log('Snapshot produits reçu:', snapshot.size, 'documents');
           const productsData = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
@@ -95,16 +109,24 @@ const PublicOrderingPage = () => {
             hasImage: !!p.imageUrl
           })));
           setProducts(availableProducts);
+        }, (error) => {
+          console.error('Erreur lors du chargement des produits:', error);
         });
 
         // Charger les tables/zones
+        console.log('Chargement des tables depuis:', `profiles/${establishmentId}/tables`);
         const tablesRef = collection(db, `profiles/${establishmentId}/tables`);
         const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
+          console.log('Snapshot tables reçu:', snapshot.size, 'documents');
           const tablesData = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           })) as TableZone[];
-          setTables(tablesData.filter(t => !t.deleted));
+          const filteredTables = tablesData.filter(t => !t.deleted);
+          console.log('Tables chargées:', filteredTables.length);
+          setTables(filteredTables);
+        }, (error) => {
+          console.error('Erreur lors du chargement des tables:', error);
         });
 
         setIsLoading(false);
@@ -115,6 +137,11 @@ const PublicOrderingPage = () => {
         };
       } catch (error) {
         console.error('Erreur chargement données:', error);
+        console.error('Détails de l\'erreur:', {
+          establishmentId,
+          errorMessage: error instanceof Error ? error.message : 'Erreur inconnue',
+          errorCode: error instanceof Error ? (error as any).code : 'N/A'
+        });
         setIsLoading(false);
       }
     };

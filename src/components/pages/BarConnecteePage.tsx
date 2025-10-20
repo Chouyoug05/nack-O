@@ -230,11 +230,21 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     
     const loadExistingQRCode = async () => {
       try {
+        console.log('Chargement QR Code existant pour:', user.uid);
         const configDoc = await getDoc(doc(db, `profiles/${user.uid}/barConnectee`, 'config'));
+        
         if (configDoc.exists()) {
           const config = configDoc.data();
+          console.log('Configuration trouvée:', config);
+          
           if (config.qrCodeGenerated) {
-            const publicUrl = `${window.location.origin}/commande/${user.uid}`;
+            // Utiliser l'URL sauvegardée ou générer une nouvelle
+            const currentOrigin = window.location.origin;
+            const basePath = import.meta.env.BASE_URL || '';
+            const publicUrl = config.publicUrl || `${currentOrigin}${basePath}/commande/${user.uid}`;
+            
+            console.log('Génération QR Code avec URL:', publicUrl);
+            
             const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
               width: 300,
               margin: 2,
@@ -244,7 +254,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
               }
             });
             setQrCodeUrl(qrCodeDataUrl);
+            console.log('QR Code existant chargé');
           }
+        } else {
+          console.log('Aucune configuration QR Code trouvée');
         }
       } catch (error) {
         console.error('Erreur chargement QR Code:', error);
@@ -267,8 +280,18 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     
     setIsGeneratingQR(true);
     try {
-      const publicUrl = `${window.location.origin}/commande/${user.uid}`;
+      // Utiliser l'URL actuelle pour construire l'URL publique
+      const currentOrigin = window.location.origin;
+      const basePath = import.meta.env.BASE_URL || '';
+      const publicUrl = `${currentOrigin}${basePath}/commande/${user.uid}`;
+      
       console.log('Génération QR Code pour URL:', publicUrl);
+      console.log('Détails URL:', {
+        currentOrigin,
+        basePath,
+        userId: user.uid,
+        finalUrl: publicUrl
+      });
       
       const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
         width: 300,
