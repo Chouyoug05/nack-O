@@ -69,6 +69,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
   const [newTableType, setNewTableType] = useState<'table' | 'zone'>('table');
   const [newTableCapacity, setNewTableCapacity] = useState<number>(0);
   const [newTableDescription, setNewTableDescription] = useState("");
+  const [error, setError] = useState<string>("");
 
   // Vérifier que l'utilisateur est connecté
   if (!user) {
@@ -85,6 +86,22 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     );
   }
 
+  // Gestion d'erreur globale
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <AlertCircle className="w-16 h-16 mx-auto text-red-500 mb-4" />
+          <h3 className="text-lg font-semibold mb-2 text-red-600">Erreur</h3>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          <Button onClick={() => setError("")}>
+            Réessayer
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   // Charger les tables/zones
   useEffect(() => {
     if (!user) return;
@@ -92,16 +109,22 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     try {
       const tablesRef = collection(db, `establishments/${user.uid}/tables`);
       const unsubscribe = onSnapshot(tablesRef, (snapshot) => {
-        const tablesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as TableZone[];
-        setTables(tablesData);
+        try {
+          const tablesData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as TableZone[];
+          setTables(tablesData);
+        } catch (error) {
+          console.error('Erreur traitement tables:', error);
+          setError('Erreur lors du chargement des tables');
+        }
       });
 
       return () => unsubscribe();
     } catch (error) {
       console.error('Erreur chargement tables:', error);
+      setError('Erreur lors du chargement des tables');
     }
   }, [user]);
 
@@ -113,38 +136,44 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
       const ordersRef = collection(db, `establishments/${user.uid}/barOrders`);
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
       const unsubscribe = onSnapshot(q, (snapshot) => {
-        const ordersData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as BarOrder[];
-        
-        // Vérifier s'il y a de nouvelles commandes
-        const newOrders = ordersData.filter(order => 
-          order.status === 'pending' && 
-          order.createdAt > (Date.now() - 60000) // Commandes des dernières 60 secondes
-        );
-        
-        // Créer des notifications pour les nouvelles commandes
-        newOrders.forEach(async (order) => {
-          try {
-            await addDoc(notificationsColRef(db, user.uid), {
-              title: "Nouvelle commande Bar Connectée",
-              message: `Commande #${order.orderNumber} - ${order.tableZone} - ${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`,
-              type: "info",
-              createdAt: Date.now(),
-              read: false,
-            });
-          } catch (error) {
-            console.error('Erreur création notification:', error);
-          }
-        });
-        
-        setOrders(ordersData);
+        try {
+          const ordersData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as BarOrder[];
+          
+          // Vérifier s'il y a de nouvelles commandes
+          const newOrders = ordersData.filter(order => 
+            order.status === 'pending' && 
+            order.createdAt > (Date.now() - 60000) // Commandes des dernières 60 secondes
+          );
+          
+          // Créer des notifications pour les nouvelles commandes
+          newOrders.forEach(async (order) => {
+            try {
+              await addDoc(notificationsColRef(db, user.uid), {
+                title: "Nouvelle commande Bar Connectée",
+                message: `Commande #${order.orderNumber} - ${order.tableZone} - ${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`,
+                type: "info",
+                createdAt: Date.now(),
+                read: false,
+              });
+            } catch (error) {
+              console.error('Erreur création notification:', error);
+            }
+          });
+          
+          setOrders(ordersData);
+        } catch (error) {
+          console.error('Erreur traitement commandes:', error);
+          setError('Erreur lors du chargement des commandes');
+        }
       });
 
       return () => unsubscribe();
     } catch (error) {
       console.error('Erreur chargement commandes:', error);
+      setError('Erreur lors du chargement des commandes');
     }
   }, [user]);
 
@@ -185,16 +214,22 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
     try {
       const productsRef = collection(db, `establishments/${user.uid}/products`);
       const unsubscribe = onSnapshot(productsRef, (snapshot) => {
-        const productsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setProducts(productsData);
+        try {
+          const productsData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          setProducts(productsData);
+        } catch (error) {
+          console.error('Erreur traitement produits:', error);
+          setError('Erreur lors du chargement des produits');
+        }
       });
 
       return () => unsubscribe();
     } catch (error) {
       console.error('Erreur chargement produits:', error);
+      setError('Erreur lors du chargement des produits');
     }
   }, [user]);
 
