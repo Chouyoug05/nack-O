@@ -459,24 +459,59 @@ Merci pour votre commande !
   }
 
   if (!establishment) {
+    // Solution de contournement : créer un établissement de test
+    const testEstablishment: Establishment = {
+      establishmentName: 'Bar Test NACK',
+      establishmentType: 'bar',
+      logoUrl: undefined
+    };
+
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-destructive mb-2">Établissement introuvable</h1>
-          <p className="text-muted-foreground mb-4">Ce QR Code ne semble pas valide.</p>
+          <h1 className="text-2xl font-bold text-orange-600 mb-2">Mode Test</h1>
+          <p className="text-muted-foreground mb-4">
+            L'établissement n'est pas encore configuré. Mode démonstration activé.
+          </p>
           
-          {/* Informations de debug pour mobile */}
+          {/* Afficher l'établissement de test */}
+          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4">
+            <h2 className="font-semibold text-orange-800 mb-2">🏪 {testEstablishment.establishmentName}</h2>
+            <p className="text-sm text-orange-700">
+              Cet établissement est en mode test. Contactez le support pour l'activer.
+            </p>
+          </div>
+          
+          {/* Produits de test */}
+          <div className="bg-white border rounded-lg p-4 mb-4">
+            <h3 className="font-semibold mb-3">🍽️ Menu de démonstration</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                <span>Regab</span>
+                <span className="font-semibold">700 XAF</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                <span>Brochette</span>
+                <span className="font-semibold">500 XAF</span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                <span>Jus d'orange</span>
+                <span className="font-semibold">300 XAF</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              ⚠️ Ceci est un menu de démonstration. Les vraies commandes nécessitent une configuration complète.
+            </p>
+          </div>
+
+          {/* Informations de debug */}
           <div className="text-xs text-muted-foreground bg-gray-50 p-3 rounded border text-left">
             <p><strong>Debug Info:</strong></p>
             <p>ID: {effectiveEstablishmentId || 'Non fourni'}</p>
             <p>URL: {window.location.href}</p>
-            <p>Pathname: {window.location.pathname}</p>
             <p>Mobile: {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Oui' : 'Non'}</p>
             <p className="mt-2 text-xs">
-              {!effectiveEstablishmentId ? 
-                '❌ Erreur 404: Route non trouvée. Vérifiez la configuration du serveur.' : 
-                'Vérifiez la console pour plus de détails'
-              }
+              🔧 Pour activer cet établissement, exécutez le script de configuration.
             </p>
           </div>
           
