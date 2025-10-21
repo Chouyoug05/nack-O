@@ -478,7 +478,7 @@ Merci pour votre commande !
     );
   }
 
-  if ((!establishment && products.length === 0) || profilePermissionDenied || productsPermissionDenied) {
+  if ((productsPermissionDenied) || (products.length === 0 && (!establishment || profilePermissionDenied))) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
@@ -499,11 +499,13 @@ Merci pour votre commande !
             <p>Pathname: {window.location.pathname}</p>
             <p>Mobile: {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Oui' : 'Non'}</p>
             <p className="mt-2 text-xs">
-              {profilePermissionDenied || productsPermissionDenied
-                ? 'Code: permission-denied. Ouvrez les permissions de lecture publiques pour products et (optionnel) tables.'
-                : (!effectiveEstablishmentId 
-                    ? '❌ Erreur 404: Route non trouvée. Vérifiez la configuration du serveur.' 
-                    : 'Vérifiez la console pour plus de détails')}
+              {productsPermissionDenied
+                ? 'Code: permission-denied. Autorisez la lecture publique de profiles/{userId}/products/**.'
+                : (profilePermissionDenied
+                    ? 'Le profil est privé. Le menu reste accessible si les produits sont publics.'
+                    : (!effectiveEstablishmentId 
+                        ? '❌ Erreur 404: Route non trouvée. Vérifiez la configuration du serveur.' 
+                        : 'Vérifiez la console pour plus de détails'))}
             </p>
           </div>
         </div>
@@ -563,11 +565,11 @@ Merci pour votre commande !
       <div className="bg-card border-b p-4">
         <div className="max-w-md mx-auto">
           <div className="flex items-center gap-3">
-            {establishment.logoUrl && (
+            {establishment?.logoUrl ? (
               <img src={establishment.logoUrl} alt="Logo" className="w-10 h-10 rounded-full object-cover" />
-            )}
+            ) : null}
             <div>
-              <h1 className="font-bold text-lg">{establishment.establishmentName}</h1>
+              <h1 className="font-bold text-lg">{establishment?.establishmentName || 'Commande en ligne'}</h1>
               <p className="text-sm text-muted-foreground">Commande en ligne</p>
             </div>
           </div>
@@ -634,19 +636,28 @@ Merci pour votre commande !
             <CardContent>
               <div className="space-y-2">
                 <Label htmlFor="table">Table ou zone</Label>
-                <select
-                  id="table"
-                  value={selectedTable}
-                  onChange={(e) => setSelectedTable(e.target.value)}
-                  className="w-full px-3 py-2 border border-input rounded-md"
-                >
-                  <option value="">Sélectionnez votre table/zone</option>
-                  {tables.map((table) => (
-                    <option key={table.id} value={table.name}>
-                      {table.name} {table.description && `- ${table.description}`}
-                    </option>
-                  ))}
-                </select>
+                {tablesPermissionDenied || tables.length === 0 ? (
+                  <Input
+                    id="table"
+                    placeholder="Ex: Table 3, Comptoir, Zone VIP..."
+                    value={selectedTable}
+                    onChange={(e) => setSelectedTable(e.target.value)}
+                  />
+                ) : (
+                  <select
+                    id="table"
+                    value={selectedTable}
+                    onChange={(e) => setSelectedTable(e.target.value)}
+                    className="w-full px-3 py-2 border border-input rounded-md"
+                  >
+                    <option value="">Sélectionnez votre table/zone</option>
+                    {tables.map((table) => (
+                      <option key={table.id} value={table.name}>
+                        {table.name} {table.description && `- ${table.description}`}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </CardContent>
           </Card>
