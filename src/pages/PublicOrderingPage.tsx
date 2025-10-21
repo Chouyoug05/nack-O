@@ -63,6 +63,9 @@ const PublicOrderingPage = () => {
   const [orderNumber, setOrderNumber] = useState<string>("");
   const [receiptQR, setReceiptQR] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [profilePermissionDenied, setProfilePermissionDenied] = useState(false);
+  const [productsPermissionDenied, setProductsPermissionDenied] = useState(false);
+  const [tablesPermissionDenied, setTablesPermissionDenied] = useState(false);
 
   // Fallback pour Safari: extraire l'ID depuis les paramètres de recherche
   const getEstablishmentIdFromSearch = () => {
@@ -180,7 +183,16 @@ const PublicOrderingPage = () => {
         
         // Charger les infos de l'établissement
         console.log('📡 Tentative de récupération du profil...');
-        const profileDoc = await getDoc(doc(db, 'profiles', effectiveEstablishmentId));
+        let profileDoc;
+        try {
+          profileDoc = await getDoc(doc(db, 'profiles', effectiveEstablishmentId));
+        } catch (err: any) {
+          if (err?.code === 'permission-denied') {
+            console.log('🔒 Accès refusé au profil (permission-denied)');
+            setProfilePermissionDenied(true);
+          }
+          throw err;
+        }
         
         console.log('📄 Résultat getDoc:', {
           exists: profileDoc.exists(),
@@ -231,6 +243,10 @@ const PublicOrderingPage = () => {
           setProducts(availableProducts);
         }, (error) => {
           console.error('Erreur lors du chargement des produits:', error);
+          if ((error as any)?.code === 'permission-denied') {
+            console.log('🔒 Accès refusé aux produits (permission-denied)');
+            setProductsPermissionDenied(true);
+          }
         });
 
         // Charger les tables/zones
@@ -247,6 +263,10 @@ const PublicOrderingPage = () => {
           setTables(filteredTables);
         }, (error) => {
           console.error('Erreur lors du chargement des tables:', error);
+          if ((error as any)?.code === 'permission-denied') {
+            console.log('🔒 Accès refusé aux tables (permission-denied)');
+            setTablesPermissionDenied(true);
+          }
         });
 
         setIsLoading(false);
@@ -458,12 +478,18 @@ Merci pour votre commande !
     );
   }
 
-  if (!establishment) {
+  if ((!establishment && products.length === 0) || profilePermissionDenied || productsPermissionDenied) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold text-destructive mb-2">Établissement introuvable</h1>
-          <p className="text-muted-foreground mb-4">Ce QR Code ne semble pas valide.</p>
+          <h1 className="text-2xl font-bold text-destructive mb-2">
+            {profilePermissionDenied || productsPermissionDenied ? 'Accès restreint' : 'Établissement introuvable'}
+          </h1>
+          <p className="text-muted-foreground mb-4">
+            {profilePermissionDenied || productsPermissionDenied
+              ? "L'établissement existe mais ses données ne sont pas publiques. Contactez le gérant."
+              : 'Ce QR Code ne semble pas valide.'}
+          </p>
           
           {/* Informations de debug */}
           <div className="text-xs text-muted-foreground bg-gray-50 p-3 rounded border text-left">
@@ -473,10 +499,11 @@ Merci pour votre commande !
             <p>Pathname: {window.location.pathname}</p>
             <p>Mobile: {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? 'Oui' : 'Non'}</p>
             <p className="mt-2 text-xs">
-              {!effectiveEstablishmentId ? 
-                '❌ Erreur 404: Route non trouvée. Vérifiez la configuration du serveur.' : 
-                'Vérifiez la console pour plus de détails'
-              }
+              {profilePermissionDenied || productsPermissionDenied
+                ? 'Code: permission-denied. Ouvrez les permissions de lecture publiques pour products et (optionnel) tables.'
+                : (!effectiveEstablishmentId 
+                    ? '❌ Erreur 404: Route non trouvée. Vérifiez la configuration du serveur.' 
+                    : 'Vérifiez la console pour plus de détails')}
             </p>
           </div>
         </div>
