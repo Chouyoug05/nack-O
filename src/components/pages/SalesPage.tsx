@@ -25,7 +25,14 @@ import {
   IceCream,
   Cherry,
   Apple,
-  QrCode
+  QrCode,
+  Trash2,
+  Utensils,
+  Settings,
+  Box,
+  ShoppingBag,
+  Lightbulb,
+  Grid3x3
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -75,6 +82,7 @@ const SalesPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isFormulaDialogOpen, setIsFormulaDialogOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
+  const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -163,9 +171,48 @@ const SalesPage = () => {
     }
   }, []);
 
-  const filteredProducts = products.filter(product =>
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Produits vendables (avec prix et stock)
+  const sellableProducts = products
+    // Exclure les produits sans prix de vente (ce sont des affaires/équipements de l'entreprise)
+    .filter(product => {
+      const hasPrice = product.price > 0;
+      const hasFormulaPrice = product.formula && product.formula.price > 0;
+      return hasPrice || hasFormulaPrice;
+    })
+    // Exclure les produits sans stock
+    .filter(product => (product.stock || 0) > 0);
+
+  // Calculer les catégories disponibles dynamiquement
+  const availableCategories = [...new Set(sellableProducts.map(p => p.category).filter(Boolean))].sort();
+
+  // Fonction pour obtenir l'icône selon la catégorie
+  const getCategoryIcon = (category: string) => {
+    const cat = category.toLowerCase();
+    if (cat.includes('boisson') || cat.includes('eau') || cat.includes('jus') || cat.includes('soda')) return GlassWater;
+    if (cat.includes('alcool') || cat.includes('vin') || cat.includes('biere')) return Wine;
+    if (cat.includes('cafe')) return Coffee;
+    if (cat.includes('plat') || cat.includes('pizza') || cat.includes('sandwich')) return Pizza;
+    if (cat.includes('dessert') || cat.includes('glace') || cat.includes('sucre') || cat.includes('cookie')) return IceCream;
+    if (cat.includes('snack')) return Cookie;
+    if (cat.includes('ustensile')) return Utensils;
+    if (cat.includes('équipement') || cat.includes('equipement')) return Settings;
+    if (cat.includes('fourniture')) return Box;
+    return Package;
+  };
+
+  // Réinitialiser l'onglet actif si la catégorie n'existe plus
+  useEffect(() => {
+    if (activeCategoryTab !== "all" && !availableCategories.includes(activeCategoryTab)) {
+      setActiveCategoryTab("all");
+    }
+  }, [availableCategories, activeCategoryTab]);
+
+  const filteredProducts = sellableProducts
+    .filter(product => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(product => {
+      if (activeCategoryTab === "all") return true;
+      return product.category === activeCategoryTab;
+    });
 
   const addToCart = (product: Product, isFormula: boolean = false) => {
     const priceToUse = isFormula && product.formula ? product.formula.price : product.price;
@@ -356,9 +403,9 @@ const SalesPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="relative flex h-full min-h-[70vh] w-full flex-col">
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-0">
         {/* Products Grid */}
         <div className="lg:col-span-2">
           <Card className="shadow-card border-0">
@@ -369,21 +416,6 @@ const SalesPage = () => {
                   <CardDescription>Sélectionnez les produits à vendre</CardDescription>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      // Déclencher le changement d'onglet vers Bar Connectée avec focus sur les commandes
-                      const event = new CustomEvent('nack:tab:change', { 
-                        detail: { tab: 'bar-connectee', subTab: 'orders' } 
-                      });
-                      window.dispatchEvent(event);
-                    }}
-                    className="gap-2"
-                  >
-                    <QrCode className="w-4 h-4" />
-                    Commandes Clients
-                  </Button>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
                     <Input
@@ -395,36 +427,107 @@ const SalesPage = () => {
                   </div>
                 </div>
               </div>
+                {/* Onglets Catégories dynamiques */}
+                <div className="w-full border-b border-[#e6dfdb]">
+                  <div className="flex overflow-x-auto scrollbar-hide">
+                    {/* Onglet "Tout" */}
+                    <button
+                      key="all"
+                      type="button"
+                      onClick={() => setActiveCategoryTab("all")}
+                      className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
+                        activeCategoryTab === "all" ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
+                      }`}
+                      aria-pressed={activeCategoryTab === "all"}
+                    >
+                      <Grid3x3 className="h-6 w-6 flex-shrink-0" />
+                      <span className="hidden sm:inline font-semibold whitespace-nowrap">Tout</span>
+                    </button>
+                    {/* Onglets pour chaque catégorie disponible */}
+                    {availableCategories.length > 0 ? (
+                      availableCategories.map((category) => {
+                        const Icon = getCategoryIcon(category);
+                        return (
+                          <button
+                            key={category}
+                            type="button"
+                            onClick={() => setActiveCategoryTab(category)}
+                            className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
+                              activeCategoryTab === category ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
+                            }`}
+                            aria-pressed={activeCategoryTab === category}
+                          >
+                            <Icon className="h-6 w-6 flex-shrink-0" />
+                            <span className="hidden sm:inline font-semibold whitespace-nowrap">{category}</span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <div className="flex items-center justify-center px-3 py-3 text-sm text-muted-foreground">
+                        Aucune catégorie disponible
+                      </div>
+                    )}
+                  </div>
+                </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {filteredProducts.map((product) => (
-                  <Card 
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-4">
+                {filteredProducts.map((product) => {
+                  const imageUrl = product.imageUrl || undefined;
+                  const colorClass = (() => {
+                    const c = (product.category || '').toLowerCase();
+                    if (c.includes('vin') || c.includes('alcool')) return 'bg-red-500';
+                    if (c.includes('biere') || c.includes('boisson')) return 'bg-yellow-500';
+                    if (c.includes('cafe')) return 'bg-purple-500';
+                    if (c.includes('eau')) return 'bg-blue-500';
+                    if (c.includes('jus')) return 'bg-orange-500';
+                    if (c.includes('soda')) return 'bg-green-500';
+                    if (c.includes('dessert') || c.includes('glace')) return 'bg-pink-500';
+                    return 'bg-gray-200';
+                  })();
+                  return (
+                    <button
                     key={product.id} 
-                    className="shadow-card border-0 hover:shadow-elegant transition-shadow cursor-pointer relative"
+                      type="button"
+                      className="relative rounded-2xl border border-gray-200 bg-white p-3 shadow-lg transition hover:shadow-2xl hover:border-gray-300 text-left"
                     onClick={() => handleAddToCartClick(product)}
                   >
-                    <CardContent className="p-3 text-center">
-                      {renderProductVisual(product)}
-                      <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
-                      <p className="text-lg font-bold text-nack-red mb-1">{Number(product.price || 0).toLocaleString()} XAF</p>
-                      <p className="text-xs text-muted-foreground mb-2">Stock: {Number(product.stock || 0)}</p>
-                      <div className="flex gap-1">
-                        <Button 
-                          className="flex-1 bg-gradient-primary text-white shadow-button text-xs h-8"
-                          disabled={(product.stock || 0) === 0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddToCartClick(product);
-                          }}
-                        >
-                          <ShoppingCart size={12} className="mr-1" />
-                          Panier
-                        </Button>
+                      <div className={`absolute left-0 top-0 h-1 w-full rounded-t-2xl ${colorClass}`} />
+                      <div
+                        className="w-full bg-center bg-no-repeat aspect-square bg-cover rounded-xl"
+                        style={{ 
+                          backgroundImage: imageUrl ? `url(${imageUrl})` : 'linear-gradient(135deg,#f5f2f0,#e6dfdb)',
+                          display: 'block',
+                          visibility: 'visible',
+                          opacity: 1
+                        }}
+                      />
+                      <div className="mt-2 space-y-0.5">
+                        <h3 className="font-semibold text-base truncate">{product.name}</h3>
+                        <p className="text-xs text-muted-foreground">Stock: {Number(product.stock || 0)}</p>
+                        <p className="text-xl md:text-2xl font-extrabold text-nack-red" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                          {(() => {
+                            const price = Number(product.price || 0);
+                            if (price > 0) {
+                              return `${price.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF`;
+                            }
+                            return product.formula && product.formula.price > 0 
+                              ? `${Number(product.formula.price).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF`
+                              : '0 XAF';
+                          })()}
+                        </p>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      {(product.stock || 0) === 0 && (
+                        <div className="absolute top-1 right-1 flex h-8 min-w-[2rem] items-center justify-center rounded-full bg-white/95 backdrop-blur px-2 text-[11px] font-bold text-red-600 shadow">
+                          Rupture
+                        </div>
+                      )}
+                      <div className="absolute bottom-2 right-2 flex h-12 w-12 items-center justify-center rounded-full bg-nack-red text-white shadow-xl">
+                        <Plus className="h-7 w-7" />
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
@@ -446,8 +549,8 @@ const SalesPage = () => {
                     <DialogContent className="max-w-[90vw] sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle>Finaliser la vente</DialogTitle>
-                        <DialogDescription>
-                          Total: {cartTotal.toLocaleString()} XAF
+                        <DialogDescription style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                          Total: {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4 py-4">
@@ -475,11 +578,15 @@ const SalesPage = () => {
                           {cart.map(item => (
                             <div key={item.id + String(item.isFormula)} className="flex justify-between text-xs sm:text-sm">
                               <span>{item.name} x{item.quantity}</span>
-                              <span>{(item.price * item.quantity).toLocaleString()} XAF</span>
+                              <span style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                                {(item.price * item.quantity).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                              </span>
                             </div>
                           ))}
                           <div className="border-t mt-2 pt-2 font-semibold text-sm">
-                            Total: {cartTotal.toLocaleString()} XAF
+                            Total: <span style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                              {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -534,7 +641,9 @@ const SalesPage = () => {
                   <div className="border-t pt-3">
                     <div className="flex justify-between items-center font-bold text-lg">
                       <span>Total:</span>
-                      <span className="text-nack-red">{cartTotal.toLocaleString()} XAF</span>
+                      <span className="text-nack-red" style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                        {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -605,8 +714,8 @@ const SalesPage = () => {
 
                     {/* Montant */}
                     <div className="flex-shrink-0">
-                      <span className="font-semibold text-green-600">
-                        +{sale.total.toLocaleString()} XAF
+                      <span className="font-semibold text-green-600" style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                        +{sale.total.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
                       </span>
                     </div>
                   </div>
@@ -618,6 +727,32 @@ const SalesPage = () => {
         </div>
       </div>
       
+      {/* Barre flottante total / actions */}
+      <div className="pointer-events-none fixed left-0 right-0 bottom-20 z-20 px-4 md:px-6">
+        {cart.length > 0 && (
+          <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl bg-nack-red/95 p-3 text-white shadow-2xl">
+            <button
+              className="flex h-16 w-16 items-center justify-center rounded-xl bg-red-700/80"
+              onClick={() => setCart([])}
+              title="Vider"
+            >
+              <Trash2 className="h-8 w-8" />
+            </button>
+            <div className="flex flex-1 flex-col items-center justify-center">
+              <span className="text-4xl sm:text-5xl font-black tracking-tight" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+              </span>
+            </div>
+            <button
+              className="flex h-16 w-16 items-center justify-center rounded-xl bg-green-600/90"
+              onClick={() => setIsCheckoutOpen(true)}
+              title="Payer"
+            >
+              <CreditCard className="h-8 w-8" />
+            </button>
+          </div>
+        )}
+      </div>
       {/* Dialog de sélection formule/produit unitaire */}
       <Dialog open={isFormulaDialogOpen} onOpenChange={setIsFormulaDialogOpen}>
         <DialogContent className="max-w-[90vw] sm:max-w-md">

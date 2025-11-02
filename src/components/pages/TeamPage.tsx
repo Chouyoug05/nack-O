@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  Users, 
   Plus, 
   UserCheck, 
   UserX, 
@@ -17,13 +15,20 @@ import {
   Mail,
   Phone,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  ChevronLeft,
+  LogOut,
+  Calendar,
+  UtensilsCrossed,
+  Wallet,
+  QrCode
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { teamColRef, agentTokensTopColRef } from "@/lib/collections";
 import { addDoc, deleteDoc, doc as fsDoc, onSnapshot, updateDoc, setDoc, doc } from "firebase/firestore";
 import type { TeamMemberDoc, TeamRole } from "@/types/team";
+import { useNavigate } from "react-router-dom";
 
 interface TeamMember {
   id: string;
@@ -41,9 +46,13 @@ interface TeamMember {
 
 const TeamPage = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isRoleSelectionOpen, setIsRoleSelectionOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<'serveur' | 'caissier' | 'agent-evenement' | null>(null);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
@@ -67,7 +76,6 @@ const TeamPage = () => {
         };
       });
       setTeamMembers(list);
-      // Backfill public agentTokens mapping for existing members
       (async () => {
         for (const m of list) {
           if (m.agentToken) {
@@ -99,7 +107,7 @@ const TeamPage = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     const randomStr = (len: number) => Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     const existingCodes = new Set(teamMembers.map(m => m.agentCode).filter(Boolean) as string[]);
-    let code = `AGT-${randomStr(4)}-${randomStr(4)}`; // e.g., AGT-7K4M-Z9QD
+    let code = `AGT-${randomStr(4)}-${randomStr(4)}`;
     while (existingCodes.has(code)) code = `AGT-${randomStr(4)}-${randomStr(4)}`;
     return code;
   };
@@ -118,6 +126,24 @@ const TeamPage = () => {
     if (role === 'serveur') return `/serveur/${token}`;
     if (role === 'caissier') return `/caisse/${token}`;
     return `/agent-evenement/${token}`;
+  };
+
+  const getRoleIcon = (role: TeamMember['role']) => {
+    switch (role) {
+      case 'serveur': return UtensilsCrossed;
+      case 'caissier': return Wallet;
+      case 'agent-evenement': return QrCode;
+      default: return UserCheck;
+    }
+  };
+
+  const getRoleLabel = (role: TeamMember['role']) => {
+    switch (role) {
+      case 'serveur': return 'Serveur';
+      case 'caissier': return 'Caissier';
+      case 'agent-evenement': return 'Agent Événement';
+      default: return role;
+    }
   };
 
   const handleAddMember = async () => {
@@ -150,7 +176,6 @@ const TeamPage = () => {
     };
 
     const teamDocRef = await addDoc(teamColRef(db, user.uid), payload);
-    // Create public mapping for token → owner + code (for unauthenticated agent access)
     try {
       await setDoc(doc(agentTokensTopColRef(db), agentToken), {
         ownerUid: user.uid,
@@ -196,11 +221,12 @@ const TeamPage = () => {
     if (!user) return;
     const member = teamMembers.find(m => m.id === id);
     await deleteDoc(fsDoc(teamColRef(db, user.uid), id));
-    // Clean up token mapping if available
     try {
       if (member?.agentToken) await deleteDoc(doc(agentTokensTopColRef(db), member.agentToken));
     } catch { /* ignore */ }
     toast({ title: "Agent supprimé", description: `${name} a été retiré de l'équipe.` });
+    setIsBottomSheetOpen(false);
+    setSelectedMember(null);
   };
 
   const handleRegenerateCodes = async (member: TeamMember) => {
@@ -209,18 +235,15 @@ const TeamPage = () => {
     const newToken = generateAgentToken();
     const newLink = generateDashboardLink(member.role as TeamRole, newToken);
     try {
-      // Update team doc
       await updateDoc(fsDoc(teamColRef(db, user.uid), member.id), {
         agentCode: newCode,
         agentToken: newToken,
         dashboardLink: newLink,
         updatedAt: Date.now(),
       });
-      // Remove old mapping
       if (member.agentToken) {
         try { await deleteDoc(doc(agentTokensTopColRef(db), member.agentToken)); } catch { /* ignore */ }
       }
-      // Create new mapping
       await setDoc(doc(agentTokensTopColRef(db), newToken), {
         ownerUid: user.uid,
         agentCode: newCode,
@@ -237,440 +260,222 @@ const TeamPage = () => {
     }
   };
 
-  const serveurs = teamMembers.filter(member => member.role === 'serveur');
-  const caissiers = teamMembers.filter(member => member.role === 'caissier');
-  const agentsEvenement = teamMembers.filter(member => member.role === 'agent-evenement');
-  const activeMembers = teamMembers.filter(member => member.status === 'active');
-
   const openAddModal = (role: 'serveur' | 'caissier' | 'agent-evenement') => {
-    if (role === 'serveur' || role === 'caissier') {
-      toast({
-        title: "Bientôt disponible",
-        description: "Les fonctionnalités d’agent serveur et d’agent caisse seront disponibles en novembre.",
-      });
-      return;
-    }
+    // Fonctionnalités débloquées : tous les rôles sont disponibles
     setSelectedRole(role);
     setIsAddModalOpen(true);
+    setIsRoleSelectionOpen(false);
+  };
+
+  const handleMemberClick = (member: TeamMember) => {
+    setSelectedMember(member);
+    setIsBottomSheetOpen(true);
+  };
+
+  const openAddModalFromFAB = () => {
+    // Ouvrir le menu de sélection de rôle
+    setIsRoleSelectionOpen(true);
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-        <p className="text-sm text-yellow-800 font-medium">Fonctionnalités Équipe</p>
-        <p className="text-xs text-yellow-700">La gestion complète de l’équipe (création/édition/suppression) sera disponible en novembre. Merci pour votre patience.</p>
-      </div>
-      {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="shadow-card border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Équipe</p>
-                <p className="text-2xl font-bold">{teamMembers.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
-                <Users size={24} className="text-nack-red" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Membres Actifs</p>
-                <p className="text-2xl font-bold text-green-600">{activeMembers.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <UserCheck size={24} className="text-green-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-card border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">S / C / E</p>
-                <p className="text-2xl font-bold">{serveurs.length} / {caissiers.length} / {agentsEvenement.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
-                <Users size={24} className="text-nack-red" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="relative flex h-auto min-h-screen w-full flex-col bg-background">
+      {/* Top App Bar */}
+      <div className="sticky top-0 z-10 flex items-center bg-background p-4 pb-2 justify-between border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => navigate('/dashboard')}
+          className="text-[#181411] dark:text-white flex size-12 shrink-0 items-center justify-center"
+          aria-label="Retour"
+        >
+          <ChevronLeft size={24} />
+        </button>
+        <h2 className="text-[#181411] dark:text-white text-xl font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
+          Équipe
+        </h2>
+        <div className="size-12 shrink-0"></div>
       </div>
 
-      {/* Quick Actions */}
-      <Card className="shadow-card border-0">
-        <CardHeader>
-          <CardTitle>Actions rapides</CardTitle>
-          <CardDescription>Gérer votre équipe rapidement</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      {/* Image Grid */}
+      <main className="flex-grow p-4">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4">
+          {teamMembers.map((member) => {
+            const RoleIcon = getRoleIcon(member.role);
+            const initials = `${member.firstName[0]}${member.lastName[0]}`;
+            return (
+              <div
+                key={member.id}
+                onClick={() => handleMemberClick(member)}
+                className="flex flex-col gap-2 text-center pb-3 items-center bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer"
+              >
+                <div className="relative w-28 h-28">
+                  <div className="w-full h-full bg-center bg-no-repeat aspect-square bg-cover rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
+                    <span className="text-3xl font-bold text-primary">
+                      {initials}
+                    </span>
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 flex items-center justify-center size-9 bg-gray-200 dark:bg-gray-700 rounded-full border-2 border-white dark:border-gray-800">
+                    <RoleIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                  </div>
+                </div>
+                <div>
+                  <p className="text-[#181411] dark:text-white text-lg font-bold leading-normal">
+                    {member.firstName}
+                  </p>
+                  <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs mt-1">
+                    {member.status === 'active' ? 'Actif' : 'Inactif'}
+                  </Badge>
+                </div>
+              </div>
+            );
+          })}
+          {teamMembers.length === 0 && (
+            <div className="col-span-full text-center py-12">
+              <p className="text-muted-foreground">Aucun membre dans l'équipe</p>
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* FAB */}
+      <div className="fixed bottom-6 right-6 z-20">
+        <button
+          onClick={openAddModalFromFAB}
+          className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-16 w-16 bg-primary text-white shadow-lg hover:bg-blue-600 transition-colors"
+          aria-label="Ajouter un membre"
+        >
+          <Plus size={32} />
+        </button>
+      </div>
+
+      {/* Role Selection Dialog */}
+      <Dialog open={isRoleSelectionOpen} onOpenChange={setIsRoleSelectionOpen}>
+        <DialogContent className="max-w-[90vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajouter un membre d'équipe</DialogTitle>
+            <DialogDescription>
+              Sélectionnez le type d'agent à ajouter
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 py-4">
             <Button
+              variant="outline"
               onClick={() => openAddModal('serveur')}
-              className="flex-1 bg-blue-500/50 hover:bg-blue-500/50 cursor-not-allowed text-white h-12"
-              disabled
+              className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
             >
-              <Plus size={16} className="mr-2" />
-              Ajouter un Serveur
+              <div className="flex items-center gap-2">
+                <UtensilsCrossed className="w-6 h-6" />
+                <span className="font-semibold text-lg">Serveur</span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Prendre des commandes et gérer les produits
+              </span>
             </Button>
             <Button
+              variant="outline"
               onClick={() => openAddModal('caissier')}
-              className="flex-1 bg-green-500/50 hover:bg-green-500/50 cursor-not-allowed text-white h-12"
-              disabled
+              className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
             >
-              <Plus size={16} className="mr-2" />
-              Ajouter un Caissier
+              <div className="flex items-center gap-2">
+                <Wallet className="w-6 h-6" />
+                <span className="font-semibold text-lg">Caissier</span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Enregistrer les paiements à la caisse
+              </span>
             </Button>
             <Button
+              variant="outline"
               onClick={() => openAddModal('agent-evenement')}
-              className="flex-1 bg-purple-500/50 hover:bg-purple-500/50 cursor-not-allowed text-white h-12"
-              disabled
+              className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
             >
-              <Plus size={16} className="mr-2" />
-              Agent Événement
+              <div className="flex items-center gap-2">
+                <QrCode className="w-6 h-6" />
+                <span className="font-semibold text-lg">Agent Événement</span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Scanner et valider les billets d'événements
+              </span>
             </Button>
           </div>
-        </CardContent>
-      </Card>
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setIsRoleSelectionOpen(false)}>
+              Annuler
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-      {/* Team Members */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {/* Serveurs */}
-        <Card className="shadow-card border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Serveurs ({serveurs.length})</span>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => openAddModal('serveur')}
-                disabled
-                className="opacity-60 cursor-not-allowed"
-              >
-                <Plus size={16} className="mr-2" />
-                Ajouter
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {serveurs.map((member) => (
-                <div key={member.id} className="bg-nack-beige-light rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center text-white font-semibold">
-                        {member.firstName[0]}{member.lastName[0]}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{member.firstName} {member.lastName}</p>
-                        <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                          {member.status === 'active' ? 'Actif' : 'Inactif'}
-                        </Badge>
-                      </div>
-                    </div>
+      {/* Bottom Sheet */}
+      {isBottomSheetOpen && selectedMember && (
+        <div className="fixed inset-0 z-30 flex flex-col justify-end items-stretch bg-black/40" onClick={() => setIsBottomSheetOpen(false)}>
+          <div
+            className="flex flex-col items-stretch bg-background rounded-t-xl transition-transform duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsBottomSheetOpen(false)}
+              className="flex h-6 w-full items-center justify-center pt-2"
+            >
+              <div className="h-1.5 w-10 rounded-full bg-gray-300 dark:bg-gray-600"></div>
+            </button>
+            <div className="flex p-4 justify-center">
+              <div className="flex w-full flex-col gap-4 items-center">
+                <div className="flex gap-4 flex-col items-center">
+                  <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full min-h-32 w-32 shadow-md bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
+                    <span className="text-5xl font-bold text-primary">
+                      {`${selectedMember.firstName[0]}${selectedMember.lastName[0]}`}
+                    </span>
                   </div>
-                  
-                   <div className="space-y-2 text-sm">
-                     {member.agentCode && (
-                       <div className="flex items-center gap-2">
-                         <Badge variant="outline" className="text-xs">
-                           Code: {member.agentCode}
-                         </Badge>
-                       </div>
-                     )}
-                     <div className="flex items-center gap-2 text-muted-foreground">
-                       <Mail size={14} />
-                       <span>{member.email}</span>
-                     </div>
-                     <div className="flex items-center gap-2 text-muted-foreground">
-                       <Phone size={14} />
-                       <span>{member.phone}</span>
-                     </div>
-                     {member.lastConnection && (
-                       <p className="text-xs text-muted-foreground">
-                         Dernière connexion: {member.lastConnection.toLocaleString()}
-                       </p>
-                     )}
-                   </div>
-
-                   <div className="flex items-center gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(member.dashboardLink!, '_blank')}
-                        className="flex-1"
-                      >
-                        <Link size={14} className="mr-2" />
-                        Ouvrir l'interface
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyDashboardLink(member.dashboardLink!, `${member.firstName} ${member.lastName}`)}
-                      >
-                        <Copy size={14} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteMember(member.id, `${member.firstName} ${member.lastName}`)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Supprimer"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRegenerateCodes(member)}
-                        title="Régénérer code"
-                      >
-                        <RefreshCw size={16} />
-                      </Button>
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       onClick={() => toggleMemberStatus(member.id)}
-                       className={member.status === 'active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'}
-                     >
-                       {member.status === 'active' ? <UserX size={16} /> : <UserCheck size={16} />}
-                     </Button>
-                   </div>
-                </div>
-              ))}
-              {serveurs.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  Aucun serveur dans l'équipe
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Caissiers */}
-        <Card className="shadow-card border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Caissiers ({caissiers.length})</span>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => openAddModal('caissier')}
-                disabled
-                className="opacity-60 cursor-not-allowed"
-              >
-                <Plus size={16} className="mr-2" />
-                Ajouter
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {caissiers.map((member) => (
-                <div key={member.id} className="bg-nack-beige-light rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center text-white font-semibold">
-                        {member.firstName[0]}{member.lastName[0]}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{member.firstName} {member.lastName}</p>
-                        <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                          {member.status === 'active' ? 'Actif' : 'Inactif'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  
-                   <div className="space-y-2 text-sm">
-                     {member.agentCode && (
-                       <div className="flex items-center gap-2">
-                         <Badge variant="outline" className="text-xs">
-                           Code: {member.agentCode}
-                         </Badge>
-                       </div>
-                     )}
-                     <div className="flex items-center gap-2 text-muted-foreground">
-                       <Mail size={14} />
-                       <span>{member.email}</span>
-                     </div>
-                     <div className="flex items-center gap-2 text-muted-foreground">
-                       <Phone size={14} />
-                       <span>{member.phone}</span>
-                     </div>
-                     {member.lastConnection && (
-                       <p className="text-xs text-muted-foreground">
-                         Dernière connexion: {member.lastConnection.toLocaleString()}
-                       </p>
-                     )}
-                   </div>
-
-                   <div className="flex items-center gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(member.dashboardLink!, '_blank')}
-                        className="flex-1"
-                      >
-                        <Link size={14} className="mr-2" />
-                        Ouvrir l'interface
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => copyDashboardLink(member.dashboardLink!, `${member.firstName} ${member.lastName}`)}
-                      >
-                        <Copy size={14} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteMember(member.id, `${member.firstName} ${member.lastName}`)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        title="Supprimer"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRegenerateCodes(member)}
-                        title="Régénérer code"
-                      >
-                        <RefreshCw size={16} />
-                      </Button>
-                     <Button
-                       variant="ghost"
-                       size="sm"
-                       onClick={() => toggleMemberStatus(member.id)}
-                       className={member.status === 'active' ? 'text-red-600 hover:text-red-700 hover:bg-red-50' : 'text-green-600 hover:text-green-700 hover:bg-green-50'}
-                     >
-                       {member.status === 'active' ? <UserX size={16} /> : <UserCheck size={16} />}
-                     </Button>
-                   </div>
-                </div>
-              ))}
-              {caissiers.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  Aucun caissier dans l'équipe
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Agents Événement */}
-        <Card className="shadow-card border-0">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Agents Événement ({agentsEvenement.length})</span>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => openAddModal('agent-evenement')}
-                disabled
-                className="opacity-60 cursor-not-allowed"
-              >
-                <Plus size={16} className="mr-2" />
-                Ajouter
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {agentsEvenement.map((member) => (
-                <div key={member.id} className="bg-purple-50 rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white font-semibold">
-                        {member.firstName[0]}{member.lastName[0]}
-                      </div>
-                      <div>
-                        <p className="font-semibold">{member.firstName} {member.lastName}</p>
-                        <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs">
-                          {member.status === 'active' ? 'Actif' : 'Inactif'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                  
-                   <div className="space-y-2 text-sm">
-                     {member.agentCode && (
-                       <div className="flex items-center gap-2">
-                         <Badge variant="outline" className="text-xs">
-                           Code: {member.agentCode}
-                         </Badge>
-                       </div>
-                     )}
-                     <div className="flex items-center gap-2 text-muted-foreground">
-                       <Mail size={14} />
-                       <span>{member.email}</span>
-                     </div>
-                     <div className="flex items-center gap-2 text-muted-foreground">
-                       <Phone size={14} />
-                       <span>{member.phone}</span>
-                     </div>
-                     {member.lastConnection && (
-                       <p className="text-xs text-muted-foreground">
-                         Dernière connexion: {member.lastConnection.toLocaleString()}
-                       </p>
-                     )}
-                   </div>
-
-                  <div className="flex items-center gap-2 mt-4">
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => window.open(member.dashboardLink!, '_blank')}
-                       className="flex-1"
-                     >
-                       <Link size={14} className="mr-2" />
-                       Ouvrir l'interface
-                     </Button>
-                     <Button
-                       variant="outline"
-                       size="sm"
-                       onClick={() => copyDashboardLink(member.dashboardLink!, `${member.firstName} ${member.lastName}`)}
-                     >
-                       <Copy size={14} />
-                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteMember(member.id, `${member.firstName} ${member.lastName}`)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      title="Supprimer"
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRegenerateCodes(member)}
-                      title="Régénérer code"
-                    >
-                      <RefreshCw size={16} />
-                    </Button>
+                  <div className="flex flex-col items-center justify-center">
+                    <p className="text-[#181411] dark:text-white text-3xl font-bold leading-tight tracking-[-0.015em] text-center">
+                      {selectedMember.firstName} {selectedMember.lastName}
+                    </p>
+                    <p className="text-[#8a7260] dark:text-gray-400 text-lg font-normal leading-normal text-center flex items-center gap-2">
+                      {(() => {
+                        const RoleIcon = getRoleIcon(selectedMember.role);
+                        return <RoleIcon className="w-5 h-5" />;
+                      })()}
+                      {getRoleLabel(selectedMember.role)}
+                    </p>
                   </div>
                 </div>
-              ))}
-              {agentsEvenement.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">
-                  Aucun agent événement dans l'équipe
-                </p>
-              )}
+              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            {/* Contextual Actions */}
+            <div className="grid grid-cols-3 gap-4 p-4 pb-6">
+              <button
+                onClick={() => {
+                  // Action édition - à implémenter
+                  toast({ title: "Édition", description: "Fonctionnalité à venir" });
+                }}
+                className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-gray-200/50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-300/50 dark:hover:bg-gray-600/50 transition"
+              >
+                <Edit className="w-8 h-8 text-primary" />
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedMember.dashboardLink) {
+                    window.open(selectedMember.dashboardLink, '_blank');
+                  }
+                }}
+                className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-gray-200/50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-300/50 dark:hover:bg-gray-600/50 transition"
+              >
+                <Calendar className="w-8 h-8 text-primary" />
+              </button>
+              <button
+                onClick={() => {
+                  if (selectedMember) {
+                    handleDeleteMember(selectedMember.id, `${selectedMember.firstName} ${selectedMember.lastName}`);
+                  }
+                }}
+                className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-destructive/10 dark:bg-destructive/20 rounded-xl hover:bg-destructive/20 dark:hover:bg-destructive/30 transition"
+              >
+                <Trash2 className="w-8 h-8 text-destructive" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Member Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>

@@ -59,9 +59,22 @@ interface BarConnecteePageProps {
   onTabChange?: (tab: string) => void;
 }
 
-const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-code", onTabChange }) => {
+const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: externalActiveTab, onTabChange: externalOnTabChange }) => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  // State local pour gérer les onglets si pas fourni en props
+  const [localActiveTab, setLocalActiveTab] = useState<string>("qr-code");
+  
+  // Utiliser le state externe si fourni, sinon le state local
+  const activeTab = externalActiveTab ?? localActiveTab;
+  const handleTabChange = (val: string) => {
+    if (externalOnTabChange) {
+      externalOnTabChange(val);
+    } else {
+      setLocalActiveTab(val);
+    }
+  };
+  
   const [tables, setTables] = useState<TableZone[]>([]);
   const [orders, setOrders] = useState<BarOrder[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
@@ -616,12 +629,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab = "qr-cod
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="qr-code">QR Code</TabsTrigger>
-          <TabsTrigger value="tables">Tables & Zones</TabsTrigger>
-          <TabsTrigger value="orders">Commandes</TabsTrigger>
-          <TabsTrigger value="scanner">Scanner</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-4 gap-2">
+          <TabsTrigger value="qr-code" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">QR Code</TabsTrigger>
+          <TabsTrigger value="tables" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">Tables & Zones</TabsTrigger>
+          <TabsTrigger value="orders" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">Commandes</TabsTrigger>
+          <TabsTrigger value="scanner" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">Scanner</TabsTrigger>
         </TabsList>
 
         {/* QR Code Tab */}

@@ -2,12 +2,13 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { createBrowserRouter, RouterProvider, Outlet, useLocation, Navigate } from "react-router-dom";
 import { useEffect } from "react";
 import { OrderProvider } from "@/contexts/OrderContext";
 import { EventProvider } from "@/contexts/EventContext";
 import PWAInstallButton from "@/components/PWAInstallButton";
 import WhatsAppCommunityPopup from "@/components/WhatsAppCommunityPopup";
+import LocationRequestDialog from "@/components/LocationRequestDialog";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
@@ -26,6 +27,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentError from "./pages/PaymentError";
 import AdminDashboard from "./pages/AdminDashboard";
 import PublicOrderingPage from "./pages/PublicOrderingPage";
+import TeamPage from "@/components/pages/TeamPage";
 
 const queryClient = new QueryClient();
 
@@ -76,39 +78,45 @@ const HomeRedirect = () => {
   return <Onboarding />;
 };
 
-const AppContent = () => {
+const RootLayout = () => {
   const location = useLocation();
-  
-  // Fermer proprement tout overlay/portal (Radix Popover/Dropdown/Dialog) sur changement de route
-  // pour éviter des incohérences DOM sur certains Chrome
-  // Retiré: les dispatch global Escape peuvent provoquer des suppressions doubles côté Radix
-
   return (
     <>
-      <Routes>
-        <Route path="/" element={<HomeRedirect />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/complete-profile" element={<RequireAuth><CompleteProfile /></RequireAuth>} />
-        <Route path="/dashboard" element={<RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth>} />
-        <Route path="/admin" element={<RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth>} />
-        <Route path="/serveur/:agentCode" element={<ServeurInterface />} />
-        <Route path="/caisse/:agentCode" element={<CaisseInterface />} />
-        <Route path="/agent-evenement/:agentCode" element={<AgentEvenementInterface />} />
-        <Route path="/event/:eventId" element={<EventPublicPage />} />
-        <Route path="/commande/:establishmentId" element={<PublicOrderingPage />} />
-        <Route path="/payment/success" element={<RequireAuth><PaymentSuccess /></RequireAuth>} />
-        <Route path="/payment/error" element={<RequireAuth><PaymentError /></RequireAuth>} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Outlet />
       {!location.pathname.startsWith('/event/') && <PWAInstallButton />}
       <WhatsAppCommunityPopup />
+      <LocationRequestDialog />
     </>
   );
 };
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <RootLayout />,
+    children: [
+      { index: true, element: <HomeRedirect /> },
+      { path: "onboarding", element: <Onboarding /> },
+      { path: "login", element: <Login /> },
+      { path: "register", element: <Register /> },
+      { path: "forgot-password", element: <ForgotPassword /> },
+      { path: "complete-profile", element: <RequireAuth><CompleteProfile /></RequireAuth> },
+      { path: "dashboard", element: <RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth> },
+      { path: "team", element: <RequireAuth><RequireProfile><SubscriptionGate><TeamPage /></SubscriptionGate></RequireProfile></RequireAuth> },
+      { path: "admin", element: <RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth> },
+      { path: "serveur/:agentCode", element: <ServeurInterface /> },
+      { path: "caisse/:agentCode", element: <CaisseInterface /> },
+      { path: "agent-evenement/:agentCode", element: <AgentEvenementInterface /> },
+      { path: "event/:eventId", element: <EventPublicPage /> },
+      { path: "commande/:establishmentId", element: <PublicOrderingPage /> },
+      { path: "payment/success", element: <RequireAuth><PaymentSuccess /></RequireAuth> },
+      { path: "payment/error", element: <RequireAuth><PaymentError /></RequireAuth> },
+      { path: "*", element: <NotFound /> },
+    ],
+  },
+], {
+  basename: import.meta.env.BASE_URL,
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -118,9 +126,7 @@ const App = () => (
         <OrderProvider>
           <Toaster />
           <Sonner />
-          <BrowserRouter basename={import.meta.env.BASE_URL}>
-            <AppContent />
-          </BrowserRouter>
+          <RouterProvider router={router} future={{ v7_startTransition: true }} />
         </OrderProvider>
       </EventProvider>
       </AuthProvider>

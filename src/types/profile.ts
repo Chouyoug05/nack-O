@@ -18,6 +18,11 @@ export interface UserProfile {
   // Tutoriel
   tutorialCompleted?: boolean;
   tutorialStep?: 'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed';
+  // Géolocalisation
+  latitude?: number;
+  longitude?: number;
+  address?: string; // Adresse formatée
+  locationAsked?: boolean; // Indique si on a déjà demandé la géolocalisation
   createdAt: number;
   updatedAt: number;
 } 

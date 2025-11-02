@@ -129,12 +129,8 @@ const SubscriptionGate = ({ children }: Props) => {
 
   return (
     <>
-      {/* Contenu de l'app (non rendu si expiré) */}
-      {!isExpired && (
-        <>
-          {children}
-        </>
-      )}
+      {/* Contenu de l'app (toujours rendu, fonctionnalités débloquées) */}
+      {children}
 
       {/* Popup essai: non bloquant */}
       <Dialog open={trialOpen && showTrial} onOpenChange={setTrialOpen}>
@@ -152,7 +148,7 @@ const SubscriptionGate = ({ children }: Props) => {
                 <ul className="list-disc ml-5 mt-2 space-y-1">
                   <li>Ajoutez vos produits dans Stock</li>
                   <li>Réalisez une vente dans Point de Vente</li>
-                  <li>Invitez votre équipe (disponible en novembre)</li>
+                  <li>Invitez votre équipe</li>
                 </ul>
               </div>
               <div className="flex items-center gap-2 text-sm">
@@ -169,26 +165,7 @@ const SubscriptionGate = ({ children }: Props) => {
         </DialogContent>
       </Dialog>
 
-      {/* Popup expiré: bloquant */}
-      <Dialog open={isExpired} onOpenChange={() => {}}>
-        <DialogContent className="w-[90vw] max-w-[500px] sm:max-w-[520px] mx-auto max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Abonnement requis</DialogTitle>
-            <DialogDescription>
-              Votre période d’essai est terminée. Veuillez vous abonner pour continuer à utiliser Nack.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <Badge variant="destructive">Bloqué</Badge>
-              <span>Accès restreint jusqu’au paiement.</span>
-            </div>
-            <Button onClick={startPayment} disabled={creatingLink} className="bg-gradient-primary text-white w-full">
-              {creatingLink ? 'Ouverture du paiement…' : 'Payer 2500 XAF'}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Popup expiré: désactivé (non bloquant) - fonctionnalités débloquées */}
 
       {/* Info abonnement actif: discret, non bloquant */}
       {activeRemaining > 0 && (

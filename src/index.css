@@ -133,3 +133,33 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Utility class pour masquer la scrollbar */
+.scrollbar-hide {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+/* Force l'affichage des valeurs monétaires sur tablette et PC (Chrome) */
+@layer utilities {
+  .force-display {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-width: 1px !important;
+    width: 100% !important;
+    line-height: 1.2 !important;
+  }
+  
+  .force-display-inline {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    min-width: 1px !important;
+    line-height: 1.2 !important;
+  }
+}

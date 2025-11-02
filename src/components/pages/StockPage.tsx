@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,7 +26,14 @@ import {
   GlassWater,
   Cookie,
   Cherry,
-  Apple
+  Apple,
+  Utensils,
+  Settings,
+  Wrench,
+  Shirt,
+  Box,
+  ShoppingBag,
+  Lightbulb
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -61,11 +68,27 @@ const StockPage = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [formStep, setFormStep] = useState(1); // Étape du formulaire guidé
   
   const [products, setProducts] = useState<Product[]>([]);
 
+  const productsInitializedRef = useRef<string>('');
+  const hasReceivedValidProductsRef = useRef<boolean>(false);
+
   useEffect(() => {
     if (!user) return;
+    
+    const userKey = user.uid;
+    
+    // Réinitialiser uniquement si l'utilisateur change
+    if (productsInitializedRef.current !== userKey) {
+      productsInitializedRef.current = '';
+      hasReceivedValidProductsRef.current = false;
+      setProducts([]);
+    }
+
+    let productsInitialized = false;
+
     const unsub = onSnapshot(productsColRef(db, user.uid), (snap) => {
       const list: Product[] = snap.docs.map((d) => {
         const raw = d.data() as Partial<ProductDoc> & Record<string, unknown>;
@@ -87,8 +110,47 @@ const StockPage = () => {
           formula: formulaUnits !== undefined && formulaPrice !== undefined ? { units: formulaUnits, price: formulaPrice } : undefined,
         } as Product;
       });
-      setProducts(list);
+      
+      // Marquer qu'on a reçu des données valides si le snapshot contient des données
+      if (list.length > 0) {
+        hasReceivedValidProductsRef.current = true;
+      }
+      
+      // Toujours accepter les snapshots du serveur (source de vérité)
+      // Mais ignorer les snapshots vides du cache une fois qu'on a reçu des données valides
+      const isFromServer = !snap.metadata.fromCache;
+      
+      // Utiliser une fonction de mise à jour pour préserver les données si nécessaire
+      setProducts(prev => {
+        // Si c'est du serveur, toujours accepter (source de vérité)
+        if (isFromServer) {
+          return list;
+        }
+        
+        // Si c'est du cache et qu'on n'a jamais eu de données valides, accepter
+        if (!hasReceivedValidProductsRef.current) {
+          return list;
+        }
+        
+        // Si c'est du cache, on a déjà des données valides, et le nouveau snapshot est vide : conserver les données précédentes
+        if (list.length === 0 && prev.length > 0) {
+          return prev;
+        }
+        
+        // Sinon, accepter les nouvelles données
+        return list;
+      });
+      
+      if (!productsInitialized) {
+        productsInitialized = true;
+        if (productsInitializedRef.current !== userKey) {
+          productsInitializedRef.current = userKey;
+        }
+      }
+    }, (error) => {
+      console.error('Erreur snapshot products:', error);
     });
+    
     return () => unsub();
   }, [user]);
 
@@ -223,7 +285,7 @@ const StockPage = () => {
     }
   };
 
-  const categories = ["Boissons", "Plats", "Alcools", "Snacks", "Desserts"];
+  const categories = ["Boissons", "Plats", "Alcools", "Snacks", "Desserts", "Ustensiles", "Équipements", "Fournitures", "Autres"];
   
   const availableIcons = [
     { name: "Beer", icon: Beer, label: "Bière" },
@@ -235,7 +297,15 @@ const StockPage = () => {
     { name: "Cookie", icon: Cookie, label: "Snack" },
     { name: "IceCream", icon: IceCream, label: "Dessert" },
     { name: "Cherry", icon: Cherry, label: "Fruit" },
-    { name: "Apple", icon: Apple, label: "Pomme" }
+    { name: "Apple", icon: Apple, label: "Pomme" },
+    { name: "Utensils", icon: Utensils, label: "Couverts/Ustensiles" },
+    { name: "Settings", icon: Settings, label: "Équipement" },
+    { name: "Wrench", icon: Wrench, label: "Outils" },
+    { name: "Shirt", icon: Shirt, label: "Vêtements/Uniformes" },
+    { name: "Box", icon: Box, label: "Cartons/Emballages" },
+    { name: "ShoppingBag", icon: ShoppingBag, label: "Sacs" },
+    { name: "Lightbulb", icon: Lightbulb, label: "Ampoules/Éclairage" },
+    { name: "Package", icon: Package, label: "Général" }
   ];
 
   const getProductIcon = (iconName?: string) => {
@@ -252,23 +322,31 @@ const StockPage = () => {
   });
 
   const lowStockProducts = products.filter(p => (p.quantity ?? 0) <= 10);
-  const totalStockValue = products.reduce((total, product) => total + (Number(product.price || 0) * Number(product.quantity || 0)), 0);
+  // Calcul explicite de la valeur du stock pour forcer l'affichage dans Chrome
+  const totalStockValue = useMemo(() => {
+    const value = products.reduce((total, product) => {
+      const price = Number(product.price || 0);
+      const quantity = Number(product.quantity || 0);
+      return total + (price * quantity);
+    }, 0);
+    return Number(value) || 0;
+  }, [products]);
 
   const handleAddProduct = async () => {
     if (!user) return;
-    if (!newProduct.name || !newProduct.category || !newProduct.price || !newProduct.quantity) {
+    if (!newProduct.name || !newProduct.category || newProduct.quantity === "") {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs obligatoires",
+        description: "Veuillez remplir tous les champs obligatoires (nom, catégorie, quantité)",
         variant: "destructive"
       });
       return;
     }
 
-    // Validate numbers
-    const priceNum = Number(newProduct.price);
-    const qtyNum = Number(newProduct.quantity);
-    const costNum = Number(newProduct.cost || 0);
+    // Validate numbers - price can be 0 for non-sold items (utensils, equipment)
+    const priceNum = Number((newProduct.price ?? "").toString().trim() || 0);
+    const qtyNum = Number((newProduct.quantity ?? "").toString().trim());
+    const costNum = Number((newProduct.cost ?? "").toString().trim() || 0);
     if (Number.isNaN(priceNum) || Number.isNaN(qtyNum) || priceNum < 0 || qtyNum < 0 || costNum < 0) {
       toast({ title: "Valeurs invalides", description: "Prix, quantité et coût doivent être des nombres positifs.", variant: "destructive" });
       return;
@@ -329,7 +407,9 @@ const StockPage = () => {
       toast({ title: "Produit ajouté", description: `${payload.name} a été ajouté au stock avec succès` });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Erreur inconnue";
-      toast({ title: "Échec de l'ajout", description: message, variant: "destructive" });
+      // Affiche les infos d'erreur détaillées pour debug (console seulement)
+      console.error("Add product failed:", e);
+      toast({ title: "Échec de l'ajout", description: message || "Vérifiez votre connexion et vos permissions.", variant: "destructive" });
     } finally {
       setIsSavingProduct(false);
     }
@@ -497,7 +577,9 @@ const StockPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Produits</p>
-                <p className="text-2xl font-bold">{products.length}</p>
+                <p className="text-2xl font-bold" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                  {Number(products.length || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
               </div>
               <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
                 <Package size={24} className="text-nack-red" />
@@ -511,7 +593,9 @@ const StockPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Valeur du Stock</p>
-                <p className="text-2xl font-bold">{totalStockValue.toLocaleString()} XAF</p>
+                <p className="text-2xl font-bold force-display">
+                  {String(totalStockValue.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }))} XAF
+                </p>
               </div>
               <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
                 <DollarSign size={24} className="text-nack-red" />
@@ -525,7 +609,9 @@ const StockPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Stock Faible</p>
-                <p className="text-2xl font-bold text-red-600">{lowStockProducts.length}</p>
+                <p className="text-2xl font-bold text-red-600" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                  {Number(lowStockProducts.length || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                </p>
               </div>
               <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
                 <AlertTriangle size={24} className="text-red-600" />
@@ -571,179 +657,182 @@ const StockPage = () => {
                  >
                    Sécurité
                  </Button>
-                 <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+                 <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" onOpenAutoFocus={() => setFormStep(1)}>
                   <DialogHeader className="pb-4">
-                    <DialogTitle className="text-xl font-bold">{editingProduct ? "Modifier le produit" : "Ajouter un nouveau produit"}</DialogTitle>
-                    <DialogDescription className="text-base">
-                      Remplissez les informations du produit à ajouter au stock.
+                    <DialogTitle className="text-2xl font-bold text-center">{editingProduct ? "Modifier le produit" : "Ajouter un produit"}</DialogTitle>
+                    <DialogDescription className="text-base text-center">
+                      Étape {formStep} sur 3
                     </DialogDescription>
+                    {/* Barre de progression */}
+                    <div className="flex gap-2 mt-4">
+                      <div className={`h-2 flex-1 rounded-full ${formStep >= 1 ? 'bg-green-500' : 'bg-gray-200'}`} />
+                      <div className={`h-2 flex-1 rounded-full ${formStep >= 2 ? 'bg-green-500' : 'bg-gray-200'}`} />
+                      <div className={`h-2 flex-1 rounded-full ${formStep >= 3 ? 'bg-green-500' : 'bg-gray-200'}`} />
+                    </div>
                   </DialogHeader>
-                  <div className="space-y-6 py-4">
-                    {/* Informations de base */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold border-b pb-2">Informations de base</h3>
-                      <div className="space-y-4">
+                  <div className="space-y-6 py-4 min-h-[400px]">
+                    {/* ÉTAPE 1: Choisir la catégorie */}
+                    {formStep === 1 && (
+                      <div className="space-y-6">
+                        <h3 className="text-2xl font-bold text-center">Qu'est-ce que c'est ?</h3>
+                        <p className="text-center text-muted-foreground text-lg">Choisissez le type de produit</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {[
+                            { cat: "Boissons", icon: GlassWater, color: "bg-blue-50 border-blue-200 hover:bg-blue-100" },
+                            { cat: "Plats", icon: Pizza, color: "bg-orange-50 border-orange-200 hover:bg-orange-100" },
+                            { cat: "Alcools", icon: Wine, color: "bg-purple-50 border-purple-200 hover:bg-purple-100" },
+                            { cat: "Snacks", icon: Cookie, color: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" },
+                            { cat: "Desserts", icon: IceCream, color: "bg-pink-50 border-pink-200 hover:bg-pink-100" },
+                            { cat: "Ustensiles", icon: Utensils, color: "bg-gray-50 border-gray-200 hover:bg-gray-100" },
+                            { cat: "Équipements", icon: Settings, color: "bg-green-50 border-green-200 hover:bg-green-100" },
+                            { cat: "Fournitures", icon: Box, color: "bg-teal-50 border-teal-200 hover:bg-teal-100" },
+                            { cat: "Autres", icon: Package, color: "bg-slate-50 border-slate-200 hover:bg-slate-100" }
+                          ].map(({ cat, icon: Icon, color }) => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => {
+                                setNewProduct({...newProduct, category: cat});
+                                setFormStep(2);
+                              }}
+                              className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 p-6 transition-all ${color} ${newProduct.category === cat ? 'ring-4 ring-green-500' : ''}`}
+                            >
+                              <Icon size={48} className="text-gray-700" />
+                              <span className="text-lg font-semibold">{cat}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ÉTAPE 2: Nom et Icône */}
+                    {formStep === 2 && (
+                      <div className="space-y-6">
+                        <h3 className="text-2xl font-bold text-center">Comment ça s'appelle ?</h3>
+                        <p className="text-center text-muted-foreground">Catégorie : <strong>{newProduct.category}</strong></p>
+                        
                         <div>
-                          <Label htmlFor="name" className="text-sm font-medium mb-2 block">Nom du produit *</Label>
+                          <Label htmlFor="name" className="text-xl font-semibold mb-3 block text-center">Nom du produit</Label>
                           <Input
                             id="name"
                             value={newProduct.name}
                             onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: Bière Castel"
+                            className="w-full h-16 text-2xl text-center font-semibold"
+                            placeholder="Tapez le nom ici..."
+                            autoFocus
                           />
                         </div>
+
                         <div>
-                          <Label htmlFor="category" className="text-sm font-medium mb-2 block">Catégorie *</Label>
-                          <Select
-                            value={newProduct.category}
-                            onValueChange={(value) => setNewProduct({...newProduct, category: value})}
-                          >
-                            <SelectTrigger className="w-full h-11 text-base bg-background">
-                              <SelectValue placeholder="Sélectionner une catégorie" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50">
-                              {categories.map(cat => (
-                                <SelectItem key={cat} value={cat} className="text-base py-2 cursor-pointer hover:bg-muted">
-                                  {cat}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Label className="text-xl font-semibold mb-3 block text-center">Choisir une icône</Label>
+                          <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                            {availableIcons.map(({ name, icon: Icon, label }) => (
+                              <button
+                                key={name}
+                                type="button"
+                                onClick={() => setNewProduct({...newProduct, icon: name})}
+                                className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 p-4 transition-all hover:bg-gray-50 ${newProduct.icon === name ? 'ring-4 ring-green-500 bg-green-50' : 'bg-white'}`}
+                                title={label}
+                              >
+                                <Icon size={32} />
+                              </button>
+                            ))}
+                          </div>
                         </div>
+
                         <div>
-                          <Label htmlFor="icon" className="text-sm font-medium mb-2 block">Icône</Label>
-                          <Select
-                            value={newProduct.icon}
-                            onValueChange={(value) => setNewProduct({...newProduct, icon: value})}
-                          >
-                            <SelectTrigger className="w-full h-11 text-base bg-background">
-                              <SelectValue placeholder="Sélectionner une icône" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
-                              {availableIcons.map(iconItem => (
-                                <SelectItem key={iconItem.name} value={iconItem.name} className="text-base py-3 cursor-pointer hover:bg-muted">
-                                  <div className="flex items-center gap-3">
-                                    <iconItem.icon size={20} />
-                                    <span>{iconItem.label}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <Label htmlFor="productImage" className="text-sm font-medium mb-2 block">Image produit (fichier)</Label>
-                          <Input id="productImage" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} />
-                          <Label htmlFor="imageUrl" className="text-sm font-medium mb-2 block mt-2">ou Image (URL)</Label>
-                          <Input id="imageUrl" value={newProduct.imageUrl} onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})} placeholder="https://.../image.png" />
-                        </div>
-                        <div>
-                          <Label htmlFor="description" className="text-sm font-medium mb-2 block">Description</Label>
-                          <Textarea
-                            id="description"
-                            value={newProduct.description}
-                            onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
-                            className="w-full text-base min-h-[80px]"
-                            placeholder="Description du produit (optionnel)"
-                            rows={3}
-                          />
+                          <Label htmlFor="productImage" className="text-lg font-semibold mb-3 block text-center">Photo (optionnel)</Label>
+                          <Input id="productImage" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="h-14 text-lg" />
                         </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Prix et stock */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold border-b pb-2">Prix et stock</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* ÉTAPE 3: Quantité et Prix */}
+                    {formStep === 3 && (
+                      <div className="space-y-6">
+                        <h3 className="text-2xl font-bold text-center">Prix et Quantité</h3>
+                        <p className="text-center text-lg"><strong>{newProduct.name}</strong></p>
+
+                        {/* Hint volontairement retiré pour éviter la confusion. Le prix peut rester vide. */}
+
                         <div>
-                          <Label htmlFor="price" className="text-sm font-medium mb-2 block">Prix de vente (XAF) *</Label>
+                          <Label htmlFor="quantity" className="text-xl font-semibold mb-3 block text-center">Combien vous en avez ?</Label>
+                          <Input
+                            id="quantity"
+                            type="number"
+                            value={newProduct.quantity}
+                            onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})}
+                            className="w-full h-20 text-4xl text-center font-bold"
+                            placeholder=""
+                            min="0"
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="price" className="text-xl font-semibold mb-3 block text-center">Prix de vente (XAF)</Label>
                           <Input
                             id="price"
                             type="number"
                             value={newProduct.price}
                             onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 1500"
+                            className="w-full h-20 text-4xl text-center font-bold"
+                            placeholder=""
                             min="0"
                           />
+                          <p className="text-center text-sm text-muted-foreground mt-2">Laisser vide si non vendu.</p>
                         </div>
+
                         <div>
-                          <Label htmlFor="cost" className="text-sm font-medium mb-2 block">Coût d'achat (XAF)</Label>
+                          <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
                           <Input
                             id="cost"
                             type="number"
                             value={newProduct.cost}
                             onChange={(e) => setNewProduct({...newProduct, cost: e.target.value})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 1000"
+                            className="w-full h-16 text-2xl text-center font-semibold"
+                            placeholder=""
                             min="0"
                           />
                         </div>
                       </div>
-                      <div>
-                        <Label htmlFor="quantity" className="text-sm font-medium mb-2 block">Quantité initiale *</Label>
-                        <Input
-                          id="quantity"
-                          type="number"
-                          value={newProduct.quantity}
-                          onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})}
-                          className="w-full h-11 text-base"
-                          placeholder="Ex: 50"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Formule optionnelle */}
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold border-b pb-2">Formule (optionnel)</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="formulaUnits" className="text-sm font-medium mb-2 block">Nombre d'unités</Label>
-                          <Input
-                            id="formulaUnits"
-                            type="number"
-                            value={newProduct.formulaUnits}
-                            onChange={(e) => setNewProduct({...newProduct, formulaUnits: e.target.value})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 2"
-                            min="1"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="formulaPrice" className="text-sm font-medium mb-2 block">Prix de la formule (XAF)</Label>
-                          <Input
-                            id="formulaPrice"
-                            type="number"
-                            value={newProduct.formulaPrice}
-                            onChange={(e) => setNewProduct({...newProduct, formulaPrice: e.target.value})}
-                            className="w-full h-11 text-base"
-                            placeholder="Ex: 4500"
-                            min="0"
-                          />
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        La formule permet de proposer un prix spécial pour plusieurs unités
-                      </p>
-                    </div>
+                    )}
                   </div>
-                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setIsAddModalOpen(false)}
-                      className="h-11 px-6 text-base"
-                    >
-                      Annuler
-                    </Button>
-                    <Button 
-                      onClick={editingProduct ? handleUpdateProduct : handleAddProduct} 
-                      disabled={isSavingProduct}
-                      className="bg-gradient-primary text-white h-11 px-6 text-base font-medium"
-                    >
-                      {isSavingProduct ? 'Sauvegarde...' : (editingProduct ? 'Modifier le produit' : 'Ajouter le produit')}
-                    </Button>
+                  <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t">
+                    {formStep > 1 ? (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setFormStep(formStep - 1)}
+                        className="h-14 px-8 text-lg font-semibold"
+                      >
+                        Retour
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsAddModalOpen(false)}
+                        className="h-14 px-8 text-lg"
+                      >
+                        Annuler
+                      </Button>
+                    )}
+                    
+                    {formStep < 3 ? (
+                      <Button 
+                        onClick={() => setFormStep(formStep + 1)}
+                        disabled={formStep === 1 && !newProduct.category}
+                        className="bg-gradient-primary text-white h-14 px-8 text-lg font-semibold"
+                      >
+                        Suivant
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={editingProduct ? handleUpdateProduct : handleAddProduct} 
+                        disabled={isSavingProduct || !newProduct.name || !newProduct.quantity}
+                        className="bg-green-600 hover:bg-green-700 text-white h-14 px-8 text-lg font-bold"
+                      >
+                        {isSavingProduct ? 'Sauvegarde...' : 'Enregistrer'}
+                      </Button>
+                    )}
                   </div>
                 </DialogContent>
               </Dialog>
@@ -889,87 +978,133 @@ const StockPage = () => {
             </Select>
           </div>
 
-          {/* Products Table */}
-          <div className="rounded-lg border border-border overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="text-left p-4 font-semibold">Produit</th>
-                    <th className="text-left p-4 font-semibold">Catégorie</th>
-                    <th className="text-left p-4 font-semibold">Prix</th>
-                    <th className="text-left p-4 font-semibold">Stock</th>
-                    <th className="text-left p-4 font-semibold">Statut</th>
-                    <th className="text-left p-4 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredProducts.map((product) => (
-                    <tr key={product.id} className="border-t border-border hover:bg-muted/50">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.name} className="w-6 h-6 rounded object-cover" />
-                          ) : (
-                            (() => {
-                              const IconComponent = getProductIcon(product.icon);
-                              return <IconComponent size={20} className="text-nack-red" />;
-                            })()
-                          )}
-                          <div>
-                            <p className="font-medium">{product.name}</p>
-                            {product.description && (
-                              <p className="text-sm text-muted-foreground">{product.description}</p>
-                            )}
-                            {product.formula && (
-                              <Badge variant="outline" className="mt-1 text-xs">
-                                Formule: {product.formula.units} unités à {product.formula.price.toLocaleString()} XAF
-                              </Badge>
-                            )}
-                          </div>
+          {/* Products List - Card Style */}
+          <div className="flex flex-col gap-4">
+            {filteredProducts.map((product) => {
+              const stockColor = product.quantity > 20 ? "#34C759" : product.quantity > 10 ? "#FF9500" : "#FF3B30";
+              const stockPercentage = Math.min((product.quantity / 50) * 100, 100);
+              const isLowStock = product.quantity <= 10;
+
+              return (
+                <div key={product.id} className="relative flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-lg border border-gray-200 hover:shadow-2xl transition">
+                  {(() => {
+                    const c = (product.category || '').toLowerCase();
+                    const color = c.includes('vin') || c.includes('alcool') ? 'bg-red-500'
+                      : c.includes('biere') || c.includes('boisson') ? 'bg-yellow-500'
+                      : c.includes('cafe') ? 'bg-purple-500'
+                      : c.includes('eau') ? 'bg-blue-500'
+                      : c.includes('jus') ? 'bg-orange-500'
+                      : c.includes('soda') ? 'bg-green-500'
+                      : c.includes('dessert') || c.includes('glace') ? 'bg-pink-500'
+                      : 'bg-gray-200';
+                    return <div className={`absolute left-0 top-0 h-1 w-full rounded-t-2xl ${color}`} />;
+                  })()}
+                  {/* Product Header */}
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="aspect-square size-20 shrink-0 rounded-xl bg-cover bg-center bg-no-repeat"
+                      style={{
+                        backgroundImage: product.imageUrl
+                          ? `url(${product.imageUrl})`
+                          : "linear-gradient(135deg, #f5f2f0 0%, #e6dfdb 100%)",
+                      }}
+                    >
+                      {!product.imageUrl && (
+                        <div className="flex h-full w-full items-center justify-center">
+                          {(() => {
+                            const IconComponent = getProductIcon(product.icon);
+                            return <IconComponent size={32} className="text-[#8a7260]" />;
+                          })()}
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <Badge variant="secondary">{product.category}</Badge>
-                      </td>
-                      <td className="p-4 font-semibold">{Number(product.price || 0).toLocaleString()} XAF</td>
-                      <td className="p-4">
-                        <span className={`font-medium ${product.quantity <= 10 ? 'text-red-600' : 'text-foreground'}`}>
-                          {Number(product.quantity || 0)}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        {product.quantity <= 10 ? (
-                          <Badge variant="destructive" className="flex items-center gap-1 w-fit">
-                            <TrendingDown size={12} />
-                            Stock faible
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
-                            En stock
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
-                            <Edit size={16} />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => handleDeleteProduct(product.id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 size={16} />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </div>
+                    <div className="flex flex-1 flex-col justify-center">
+                      <div className="flex items-center gap-2">
+                        <p className="text-lg font-medium leading-normal text-[#181411]">
+                          {product.name}
+                        </p>
+                        <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 w-7 p-0">
+                          <Edit size={14} />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </div>
+                      <p className="text-sm font-normal leading-normal text-[#8a7260]">
+                        {product.category}
+                      </p>
+                      {product.formula && (
+                        <p className="text-xs text-[#8a7260] mt-1" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                          Formule: {product.formula.units} unités à <span className="force-display-inline">{String(Number(product.formula.price || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }))}</span> XAF
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stock Controls */}
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => {
+                        requireManagerAuth(() => {
+                          if (product.quantity > 0 && user) {
+                            updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
+                              quantity: product.quantity - 1,
+                            });
+                          }
+                        });
+                      }}
+                      disabled={product.quantity === 0}
+                      className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#f5f2f0] text-3xl font-light text-[#8a7260] disabled:opacity-50 transition-transform active:scale-95 shadow"
+                    >
+                      -
+                    </button>
+
+                    <div className="flex flex-1 flex-col gap-2">
+                      {/* Progress Bar */}
+                      <div className="h-2 rounded-full bg-[#e6dfdb]">
+                        <div
+                          className="h-2 rounded-full transition-all"
+                          style={{
+                            width: `${stockPercentage}%`,
+                            backgroundColor: stockColor,
+                          }}
+                        />
+                      </div>
+                      {/* Quantity */}
+                      <p
+                        className="text-right text-lg font-bold"
+                        style={{
+                          color: isLowStock ? stockColor : "#181411",
+                        }}
+                      >
+                        {product.quantity}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        requireManagerAuth(() => {
+                          if (user) {
+                            updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
+                              quantity: product.quantity + 1,
+                            });
+                          }
+                        });
+                      }}
+                      className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full text-3xl font-light text-white transition-transform active:scale-95 shadow"
+                      style={{ backgroundColor: stockColor }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

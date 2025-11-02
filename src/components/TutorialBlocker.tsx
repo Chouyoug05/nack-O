@@ -21,6 +21,10 @@ interface Props {
 }
 
 const TutorialBlocker = ({ children, feature }: Props) => {
+  // Fonctionnalités débloquées : toujours afficher le contenu
+  return <>{children}</>;
+  
+  /* Code original désactivé - fonctionnalités débloquées
   const { profile } = useAuth();
 
   // Si le tutoriel est terminé, afficher le contenu normal
@@ -52,7 +56,9 @@ const TutorialBlocker = ({ children, feature }: Props) => {
   if (canAccess) {
     return <>{children}</>;
   }
+  */
 
+  /* Code original désactivé - fonctionnalités débloquées
   // Définir les informations pour chaque fonctionnalité bloquée
   const featureInfo: Record<string, { title: string; description: string; icon: any; nextStep: string }> = {
     'sales': {
@@ -142,6 +148,7 @@ const TutorialBlocker = ({ children, feature }: Props) => {
       </DialogContent>
     </Dialog>
   );
+  */
 };
 
 export default TutorialBlocker;
