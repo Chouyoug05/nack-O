@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, Smartphone, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Smartphone, Loader2, Users, Shield, Clock } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -82,16 +82,33 @@ const Login = () => {
     <div className="min-h-screen bg-gradient-secondary flex items-center justify-center p-4">
       <div className="w-full max-w-md animate-scale-in">
         {/* Logo */}
-        <div className="text-center mb-8">
-          <NackLogo size="lg" className="mb-2" />
-          <p className="text-muted-foreground">Plateforme de gestion gabonaise</p>
+        <div className="text-center mb-6">
+          <NackLogo size="lg" className="mb-3" />
+          <p className="text-muted-foreground text-sm">Plateforme de gestion gabonaise</p>
+        </div>
+
+        {/* Message d'accueil pour l'équipe */}
+        <div className="mb-6 p-4 bg-gradient-to-r from-nack-red/10 to-nack-red/5 rounded-xl border border-nack-red/20">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5">
+              <Users className="text-nack-red" size={20} />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground mb-1">
+                Connexion équipe
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Gérants, serveurs, agents d'événements : connectez-vous pour accéder à vos outils de travail
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Login Card */}
         <Card className="shadow-card border-0">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-2xl">Se connecter</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl font-bold">Se connecter</CardTitle>
+            <CardDescription className="text-base">
               Accédez à votre espace de gestion
             </CardDescription>
           </CardHeader>
@@ -162,7 +179,7 @@ const Login = () => {
                 Pas encore de compte ?{" "}
                 <Link 
                   to="/register" 
-                  className="text-nack-red hover:text-nack-red-dark font-medium"
+                  className="text-nack-red hover:text-nack-red-dark font-medium transition-colors"
                 >
                   S'inscrire
                 </Link>
@@ -171,9 +188,42 @@ const Login = () => {
           </CardContent>
         </Card>
 
+        {/* Informations pour l'équipe */}
+        <div className="mt-6 grid grid-cols-1 gap-3">
+          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border border-gray-200/50">
+            <div className="flex-shrink-0 w-10 h-10 bg-nack-red/10 rounded-full flex items-center justify-center">
+              <Shield className="text-nack-red" size={18} />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-foreground">Sécurisé</p>
+              <p className="text-xs text-muted-foreground">Vos données sont protégées</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border border-gray-200/50">
+            <div className="flex-shrink-0 w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
+              <Users className="text-blue-600" size={18} />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-foreground">Accès équipe</p>
+              <p className="text-xs text-muted-foreground">Gérez avec votre équipe</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border border-gray-200/50">
+            <div className="flex-shrink-0 w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center">
+              <Clock className="text-green-600" size={18} />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-foreground">Disponible 24/7</p>
+              <p className="text-xs text-muted-foreground">Accès à tout moment</p>
+            </div>
+          </div>
+        </div>
+
         {/* Mobile App Hint */}
         <div className="mt-6 text-center">
-          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-white/50 px-4 py-2 rounded-full">
+          <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-white/50 backdrop-blur-sm px-4 py-2 rounded-full border border-gray-200/50">
             <Smartphone size={16} />
             <span>Optimisé pour mobile et tablette</span>
           </div>

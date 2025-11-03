@@ -417,6 +417,7 @@ const StockPage = () => {
 
   const openEditProductUnsafe = (product: Product) => {
     setEditingProduct(product);
+    setImageFile(null); // Réinitialiser le fichier image lors de l'ouverture
     setNewProduct({
       name: product.name,
       category: product.category,
@@ -477,6 +478,44 @@ const StockPage = () => {
 
     try {
       const productRef = fsDoc(productsColRef(db, user.uid), editingProduct.id);
+      
+      // Gérer l'upload de la nouvelle image si un fichier est sélectionné
+      let finalImageUrl: string | undefined = newProduct.imageUrl || editingProduct.imageUrl || undefined;
+      let finalDeleteToken: string | undefined;
+      
+      if (imageFile) {
+        try {
+          // Supprimer l'ancienne image si elle existe
+          if (editingProduct.imageUrl) {
+            const currentDoc = await getDoc(productRef);
+            if (currentDoc.exists()) {
+              const currentData = currentDoc.data() as ProductDoc;
+              if (currentData.imageDeleteToken) {
+                try { 
+                  await deleteImageByToken(currentData.imageDeleteToken); 
+                } catch (e) { 
+                  console.warn('Erreur suppression ancienne image:', e);
+                }
+              }
+            }
+          }
+          
+          // Uploader la nouvelle image
+          const up = await uploadImageToCloudinaryDetailed(imageFile, "products");
+          finalImageUrl = up.url;
+          finalDeleteToken = up.deleteToken;
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : "Échec de l'upload";
+          toast({ 
+            title: "Image non mise à jour", 
+            description: msg + ". Le produit sera mis à jour sans changer l'image.", 
+            variant: "destructive" 
+          });
+          // Garder l'ancienne image en cas d'échec
+          finalImageUrl = editingProduct.imageUrl || newProduct.imageUrl || undefined;
+        }
+      }
+      
       const payload: Partial<ProductDoc> = {
         name: newProduct.name,
         category: newProduct.category,
@@ -485,7 +524,8 @@ const StockPage = () => {
         ...(newProduct.cost !== "" ? { cost: costNum } : {}),
         ...(newProduct.description ? { description: newProduct.description } : {}),
         ...(newProduct.icon ? { icon: newProduct.icon } : {}),
-        ...(newProduct.imageUrl ? { imageUrl: newProduct.imageUrl } : {}),
+        ...(finalImageUrl ? { imageUrl: finalImageUrl } : {}),
+        ...(finalDeleteToken ? { imageDeleteToken: finalDeleteToken } : {}),
         ...(newProduct.formulaUnits && newProduct.formulaPrice ? {
           formula: {
             units: Number(newProduct.formulaUnits),
@@ -498,6 +538,7 @@ const StockPage = () => {
 
       setIsAddModalOpen(false);
       setEditingProduct(null);
+      setImageFile(null);
       setNewProduct({
         name: "",
         category: "",
@@ -1048,22 +1089,6 @@ const StockPage = () => {
 
                   {/* Stock Controls */}
                   <div className="flex items-center gap-4">
-                    <button
-                      onClick={() => {
-                        requireManagerAuth(() => {
-                          if (product.quantity > 0 && user) {
-                            updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
-                              quantity: product.quantity - 1,
-                            });
-                          }
-                        });
-                      }}
-                      disabled={product.quantity === 0}
-                      className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-[#f5f2f0] text-3xl font-light text-[#8a7260] disabled:opacity-50 transition-transform active:scale-95 shadow"
-                    >
-                      -
-                    </button>
-
                     <div className="flex flex-1 flex-col gap-2">
                       {/* Progress Bar */}
                       <div className="h-2 rounded-full bg-[#e6dfdb]">
@@ -1086,21 +1111,24 @@ const StockPage = () => {
                       </p>
                     </div>
 
-                    <button
-                      onClick={() => {
-                        requireManagerAuth(() => {
-                          if (user) {
-                            updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
-                              quantity: product.quantity + 1,
-                            });
-                          }
-                        });
-                      }}
-                      className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full text-3xl font-light text-white transition-transform active:scale-95 shadow"
-                      style={{ backgroundColor: stockColor }}
-                    >
-                      +
-                    </button>
+                    {/* Afficher le bouton + uniquement si un code gérant est configuré */}
+                    {profile?.managerPinHash && (
+                      <button
+                        onClick={() => {
+                          requireManagerAuth(() => {
+                            if (user) {
+                              updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
+                                quantity: product.quantity + 1,
+                              });
+                            }
+                          });
+                        }}
+                        className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full text-3xl font-light text-white transition-transform active:scale-95 shadow"
+                        style={{ backgroundColor: stockColor }}
+                      >
+                        +
+                      </button>
+                    )}
                   </div>
                 </div>
               );
