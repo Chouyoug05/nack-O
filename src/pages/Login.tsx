@@ -95,11 +95,19 @@ const Login = () => {
             </div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-foreground mb-1">
-                Connexion équipe
+                Connexion gérant
               </p>
-              <p className="text-xs text-muted-foreground">
-                Gérants, serveurs, agents d'événements : connectez-vous pour accéder à vos outils de travail
+              <p className="text-xs text-muted-foreground mb-2">
+                Utilisez votre email et mot de passe pour accéder à votre tableau de bord
               </p>
+              <div className="mt-2 pt-2 border-t border-nack-red/20">
+                <p className="text-xs font-medium text-foreground mb-1">
+                  👥 Membres d'équipe (serveurs, caissiers, agents) ?
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Demandez à votre gérant le lien d'accès personnalisé pour votre interface de travail
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -188,35 +196,22 @@ const Login = () => {
           </CardContent>
         </Card>
 
-        {/* Informations pour l'équipe */}
-        <div className="mt-6 grid grid-cols-1 gap-3">
-          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border border-gray-200/50">
-            <div className="flex-shrink-0 w-10 h-10 bg-nack-red/10 rounded-full flex items-center justify-center">
-              <Shield className="text-nack-red" size={18} />
+        {/* Guide de connexion */}
+        <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-200">
+          <p className="text-sm font-semibold text-blue-900 mb-2">ℹ️ Comment se connecter ?</p>
+          <div className="space-y-2 text-xs text-blue-800">
+            <div className="flex items-start gap-2">
+              <span className="font-bold">Gérant :</span>
+              <span>Connectez-vous avec votre email et mot de passe (formulaire ci-dessus)</span>
             </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground">Sécurisé</p>
-              <p className="text-xs text-muted-foreground">Vos données sont protégées</p>
+            <div className="flex items-start gap-2">
+              <span className="font-bold">Serveur/Caissier/Agent :</span>
+              <span>Utilisez le lien d'accès unique que votre gérant vous a envoyé</span>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border border-gray-200/50">
-            <div className="flex-shrink-0 w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
-              <Users className="text-blue-600" size={18} />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground">Accès équipe</p>
-              <p className="text-xs text-muted-foreground">Gérez avec votre équipe</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 p-3 bg-white/60 rounded-lg border border-gray-200/50">
-            <div className="flex-shrink-0 w-10 h-10 bg-green-500/10 rounded-full flex items-center justify-center">
-              <Clock className="text-green-600" size={18} />
-            </div>
-            <div className="flex-1">
-              <p className="text-xs font-semibold text-foreground">Disponible 24/7</p>
-              <p className="text-xs text-muted-foreground">Accès à tout moment</p>
+            <div className="mt-3 pt-2 border-t border-blue-300">
+              <p className="text-xs font-medium text-blue-900">
+                Vous êtes membre d'équipe sans lien ? Contactez votre gérant pour obtenir votre accès.
+              </p>
             </div>
           </div>
         </div>
