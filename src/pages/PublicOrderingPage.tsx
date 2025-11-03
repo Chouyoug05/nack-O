@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, ShoppingBag, MapPin, CheckCircle } from "lucide-react";
+import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 
@@ -145,10 +145,22 @@ const PublicOrderingPage = () => {
     const handleProductsSnapshot = (snapshot: any) => {
       if (!isMountedRef.current) return;
       
-      const productsData = snapshot.docs.map((doc: any) => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Product[];
+      const productsData = snapshot.docs.map((doc: any) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          name: data.name || '',
+          price: data.price || 0,
+          category: data.category || '',
+          available: data.available !== false,
+          quantity: data.quantity || data.stock || 0,
+          stock: data.quantity || data.stock || 0,
+          // S'assurer que imageUrl est bien récupéré
+          imageUrl: (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') 
+            ? data.imageUrl.trim() 
+            : undefined,
+        } as Product;
+      });
       
       // Filtrer les produits :
       // - Prix > 0 (exclure les produits gratuits/à 0 XAF)
@@ -171,6 +183,7 @@ const PublicOrderingPage = () => {
       });
       
       console.log('📦 Produits disponibles:', availableProducts.length, 'sur', productsData.length);
+      console.log('📦 Exemple produit avec image:', availableProducts.find(p => p.imageUrl)?.name, availableProducts.find(p => p.imageUrl)?.imageUrl);
       
       setProducts(availableProducts);
       setIsLoading(false);
@@ -459,11 +472,29 @@ const PublicOrderingPage = () => {
             
             return (
               <Card key={product.id} className="overflow-hidden">
-                {product.imageUrl && (
-                  <div 
-                    className="w-full h-48 bg-cover bg-center"
-                    style={{ backgroundImage: `url(${product.imageUrl})` }}
-                  />
+                {product.imageUrl ? (
+                  <div className="w-full h-48 bg-gray-100 overflow-hidden">
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Si l'image ne charge pas, afficher l'icône par défaut
+                        const target = e.currentTarget;
+                        target.style.display = 'none';
+                        const parent = target.parentElement;
+                        if (parent && !parent.querySelector('svg')) {
+                          parent.className = 'w-full h-48 bg-gray-100 flex items-center justify-center';
+                          parent.innerHTML = '<svg class="w-16 h-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>';
+                        }
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
+                    <Package className="w-16 h-16 text-gray-400" />
+                  </div>
                 )}
                 <CardContent className="p-4">
                   <h3 className="font-bold text-lg mb-2">{product.name}</h3>

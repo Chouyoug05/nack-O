@@ -270,7 +270,7 @@ const ServeurInterface = () => {
   };
 
   const renderProductVisual = (product: Product) => {
-    if (product.imageUrl) {
+    if (product.imageUrl && product.imageUrl.trim() !== '') {
       return (
         <div className="w-20 h-20 mx-auto mb-1 rounded-md overflow-hidden bg-nack-beige-light">
           <img
@@ -278,6 +278,18 @@ const ServeurInterface = () => {
             alt={product.name}
             className="w-full h-full object-cover"
             loading="lazy"
+            onError={(e) => {
+              // Si l'image ne charge pas, afficher l'icône par défaut
+              const target = e.currentTarget;
+              target.style.display = 'none';
+              const parent = target.parentElement;
+              if (parent) {
+                parent.className = 'w-20 h-20 mx-auto mb-1 rounded-md bg-nack-beige-light flex items-center justify-center';
+                const iconElement = document.createElement('div');
+                iconElement.innerHTML = '<svg class="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>';
+                parent.appendChild(iconElement);
+              }
+            }}
           />
         </div>
       );
