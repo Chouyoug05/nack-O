@@ -119,10 +119,10 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   text(`#${ticketData.orderNumber}`, pageWidth / 2, orderY + 4, 10, true, PRIMARY_COLOR, 'center');
   y = orderY + 8;
 
-  // Table et date avec icônes visuelles
+  // Table et date avec texte clair
   y += 3;
-  text('📍', margin + 2, y, 8);
-  text(`Table: ${ticketData.tableZone}`, margin + 8, y, 8, false, DARK_TEXT);
+  text('Table:', margin + 2, y, 7, false, LIGHT_TEXT);
+  text(ticketData.tableZone, margin + 12, y, 8, true, DARK_TEXT);
   
   y += 4;
   const dateStr = new Date(ticketData.createdAt).toLocaleString('fr-FR', {
@@ -132,8 +132,8 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
     hour: '2-digit',
     minute: '2-digit'
   });
-  text('🕐', margin + 2, y, 8);
-  text(dateStr, margin + 8, y, 8, false, LIGHT_TEXT);
+  text('Date:', margin + 2, y, 7, false, LIGHT_TEXT);
+  text(dateStr, margin + 12, y, 8, false, DARK_TEXT);
   
   y += 6;
   line(y, [230, 230, 230], 0.2);
@@ -160,20 +160,21 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
       doc.rect(margin, y - 3, contentWidth, 5, 'F');
     }
 
-    // Nom produit
-    const maxLength = 20;
-    const itemName = item.name.length > maxLength 
-      ? item.name.substring(0, maxLength - 3) + '...' 
-      : item.name;
-    text(itemName, margin + 1, y, 8, false, DARK_TEXT);
+      // Nom produit (truncated si trop long)
+    const maxLength = 18;
+    let itemName = String(item.name || 'Produit');
+    if (itemName.length > maxLength) {
+      itemName = itemName.substring(0, maxLength - 3) + '...';
+    }
+    text(itemName, margin + 1, y, 7, false, DARK_TEXT);
 
-    // Quantité
-    text(`${item.quantity}`, pageWidth / 2, y, 8, false, LIGHT_TEXT, 'center');
+    // Quantité (centrée)
+    text(`x${item.quantity}`, pageWidth / 2 - 8, y, 7, false, LIGHT_TEXT, 'center');
 
-    // Prix
-    const itemTotal = item.price * item.quantity;
-    const priceText = `${itemTotal.toLocaleString('fr-FR')} XAF`;
-    text(priceText, pageWidth - margin - 1, y, 8, true, DARK_TEXT, 'right');
+    // Prix (aligné à droite)
+    const itemTotal = Number(item.price) * Number(item.quantity);
+    const priceText = `${Math.round(itemTotal).toLocaleString('fr-FR')} XAF`;
+    text(priceText, pageWidth - margin - 1, y, 7, true, DARK_TEXT, 'right');
     
     y += 5;
   });
@@ -187,8 +188,9 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   doc.setFillColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
   doc.rect(margin + 2, y, contentWidth - 4, 9, 'F');
   
-  text('TOTAL À PAYER', margin + 4, y + 4, 8, true, WHITE);
-  const totalText = `${ticketData.total.toLocaleString('fr-FR')} XAF`;
+  text('TOTAL A PAYER', margin + 4, y + 4, 8, true, WHITE);
+  const totalValue = Math.round(ticketData.total);
+  const totalText = `${totalValue.toLocaleString('fr-FR')} XAF`;
   text(totalText, pageWidth - margin - 4, y + 4, 10, true, WHITE, 'right');
   
   y += 11;
@@ -240,12 +242,15 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   y += 4;
 
   // ===== PIED DE PAGE ÉLÉGANT =====
-  text('Merci pour votre confiance !', pageWidth / 2, y, 8, true, PRIMARY_COLOR, 'center');
+  y += 2;
+  line(y, [240, 240, 240], 0.2);
   y += 4;
-  text('NACK.PRO', pageWidth / 2, y, 7, false, LIGHT_TEXT, 'center');
+  text('Merci pour votre confiance !', pageWidth / 2, y, 7, true, PRIMARY_COLOR, 'center');
+  y += 3;
+  text('NACK.PRO', pageWidth / 2, y, 6, false, LIGHT_TEXT, 'center');
   
   // Barre inférieure décorative
-  y += 4;
+  y += 3;
   doc.setFillColor(PRIMARY_COLOR[0], PRIMARY_COLOR[1], PRIMARY_COLOR[2]);
   doc.rect(0, y, pageWidth, 2, 'F');
   

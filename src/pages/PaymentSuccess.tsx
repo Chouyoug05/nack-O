@@ -96,6 +96,10 @@ const PaymentSuccess = () => {
         }
         
         await updateDoc(doc(db, "profiles", user.uid), updateData);
+        
+        // Forcer le rafraîchissement du profil dans AuthContext pour activer immédiatement les fonctionnalités
+        // Le AuthContext écoute déjà les changements via onSnapshot, donc cette mise à jour
+        // devrait automatiquement déclencher le rafraîchissement du profil et activer les fonctionnalités
 
         // Enregistrer ou mettre à jour la transaction de paiement
         try {

@@ -65,8 +65,10 @@ export function getCurrentPlan(profile: UserProfile | null | undefined): Subscri
   }
   
   // Vérifier l'abonnement actif
-  if (profile.plan === 'active' && profile.subscriptionEndsAt) {
+  // Si plan est 'active' OU si subscriptionType est défini (pour assurer la compatibilité)
+  if ((profile.plan === 'active' || profile.subscriptionType) && profile.subscriptionEndsAt) {
     if (profile.subscriptionEndsAt > now) {
+      // Retourner le type d'abonnement ou 'transition' par défaut
       return profile.subscriptionType || 'transition';
     }
   }
