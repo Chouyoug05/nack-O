@@ -97,7 +97,12 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   const eventsLimit = currentPlan === 'transition-pro-max' ? SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsLimit : undefined;
 
   const payNow = async (planType: 'transition' | 'transition-pro-max' = 'transition') => {
+    if (!user) return;
     try {
+      // Créer un ID unique pour cette transaction
+      const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const now = Date.now();
+      
       // Utiliser la même méthode que SubscriptionGate pour garantir la cohérence
       const base = (
         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
@@ -105,18 +110,61 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       ).replace(/\/+$/, '');
       
       const plan = SUBSCRIPTION_PLANS[planType];
-      const redirectSuccess = `${base}/payment/success?reference=abonnement-${planType}`;
-      const redirectError = `${base}/payment/error`;
+      const reference = `abonnement-${planType}`;
+      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
+      const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
       const logoURL = `${base}/favicon.png`;
       
+      // Enregistrer la transaction en attente
+      try {
+        const { paymentsColRef } = await import('@/lib/collections');
+        const { db } = await import('@/lib/firebase');
+        const { addDoc } = await import('firebase/firestore');
+        const paymentsRef = paymentsColRef(db, user.uid);
+        
+        await addDoc(paymentsRef, {
+          userId: user.uid,
+          transactionId,
+          subscriptionType: planType,
+          amount: plan.price,
+          status: 'pending' as const,
+          paymentMethod: 'airtel-money' as const,
+          reference,
+          paymentLink: '', // Sera rempli après génération
+          redirectSuccess,
+          redirectError,
+          createdAt: now,
+        });
+      } catch (error) {
+        console.error('Erreur enregistrement transaction pending:', error);
+        // Continuer même si l'enregistrement échoue
+      }
+      
+      // Générer le lien de paiement
       const link = await createSubscriptionPaymentLink({
         amount: plan.price,
-        reference: `abonnement-${planType}`,
+        reference: `${reference}-${transactionId.substring(0, 8)}`, // Inclure un court ID dans la référence
         redirectSuccess,
         redirectError,
         logoURL,
         isTransfer: false,
       });
+      
+      // Mettre à jour la transaction avec le lien généré
+      try {
+        const { paymentsColRef } = await import('@/lib/collections');
+        const { db } = await import('@/lib/firebase');
+        const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+        const paymentsRef = paymentsColRef(db, user.uid);
+        const q = query(paymentsRef, where('transactionId', '==', transactionId));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
+        }
+      } catch (error) {
+        console.error('Erreur mise à jour lien paiement:', error);
+      }
+      
       window.location.href = link;
     } catch (error) {
       console.error('Erreur création lien paiement:', error);

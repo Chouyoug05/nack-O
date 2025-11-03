@@ -32,4 +32,7 @@ export const agentTokensTopColRef = (db: Firestore): CollectionReference =>
 export const notificationsColRef = (db: Firestore, uid: string): CollectionReference =>
   collection(db, "profiles", uid, "notifications") as CollectionReference;
 
-export const adminDocRef = (db: Firestore, uid: string) => doc(db, "admins", uid); 
+export const adminDocRef = (db: Firestore, uid: string) => doc(db, "admins", uid);
+
+export const paymentsColRef = (db: Firestore, uid: string): CollectionReference =>
+  collection(db, "profiles", uid, "payments") as CollectionReference; 

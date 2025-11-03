@@ -2,10 +2,11 @@ import { useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, addDoc } from "firebase/firestore";
-import { notificationsColRef } from "@/lib/collections";
+import { doc, updateDoc, addDoc, query, where, getDocs } from "firebase/firestore";
+import { notificationsColRef, paymentsColRef } from "@/lib/collections";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
+import type { PaymentTransaction } from "@/types/payment";
 
 const PaymentSuccess = () => {
   const { user, profile } = useAuth();
@@ -19,8 +20,11 @@ const PaymentSuccess = () => {
         const now = Date.now();
         const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
         
-        // Détecter le type d'abonnement depuis la référence ou l'URL
+        // Récupérer les paramètres de l'URL
         const reference = searchParams.get('reference') || '';
+        const transactionId = searchParams.get('transactionId') || '';
+        
+        // Détecter le type d'abonnement depuis la référence ou l'URL
         let subscriptionType: 'transition' | 'transition-pro-max' = 'transition';
         let amount = 2500;
         
@@ -30,6 +34,23 @@ const PaymentSuccess = () => {
         } else {
           subscriptionType = 'transition';
           amount = SUBSCRIPTION_PLANS.transition.price;
+        }
+        
+        // Chercher la transaction existante si transactionId fourni
+        let paymentTransaction: PaymentTransaction | null = null;
+        if (transactionId) {
+          try {
+            // Essayer de trouver la transaction dans la collection payments
+            const paymentsRef = paymentsColRef(db, user.uid);
+            const q = query(paymentsRef, where('transactionId', '==', transactionId));
+            const paymentsSnapshot = await getDocs(q);
+            if (!paymentsSnapshot.empty) {
+              const paymentDoc = paymentsSnapshot.docs[0];
+              paymentTransaction = { id: paymentDoc.id, ...paymentDoc.data() } as PaymentTransaction;
+            }
+          } catch (error) {
+            console.error('Erreur recherche transaction:', error);
+          }
         }
         
         // Calculer la nouvelle date de fin d'abonnement
@@ -75,6 +96,39 @@ const PaymentSuccess = () => {
         }
         
         await updateDoc(doc(db, "profiles", user.uid), updateData);
+
+        // Enregistrer ou mettre à jour la transaction de paiement
+        try {
+          const paymentsRef = paymentsColRef(db, user.uid);
+          
+          if (paymentTransaction) {
+            // Mettre à jour la transaction existante
+            await updateDoc(doc(paymentsRef, paymentTransaction.id), {
+              status: 'completed',
+              paidAt: now,
+              subscriptionEndsAt: newSubscriptionEndsAt,
+              updatedAt: now,
+            });
+          } else {
+            // Créer une nouvelle transaction (cas où transactionId manquant)
+            const newTransactionId = transactionId || `TXN-${user.uid}-${Date.now()}`;
+            await addDoc(paymentsRef, {
+              userId: user.uid,
+              transactionId: newTransactionId,
+              subscriptionType,
+              amount,
+              status: 'completed',
+              paymentMethod: 'airtel-money',
+              reference: reference || `abonnement-${subscriptionType}`,
+              createdAt: now,
+              paidAt: now,
+              subscriptionEndsAt: newSubscriptionEndsAt,
+            } as Omit<PaymentTransaction, 'id'>);
+          }
+        } catch (error) {
+          console.error('Erreur enregistrement transaction:', error);
+          // Ne pas bloquer le processus si l'enregistrement échoue
+        }
 
         // Notification de paiement réussi
         try {
