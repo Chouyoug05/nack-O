@@ -26,8 +26,9 @@ import SubscriptionGate from "@/components/subscription/SubscriptionGate";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentError from "./pages/PaymentError";
 import AdminDashboard from "./pages/AdminDashboard";
-import PublicOrderingPage from "./pages/PublicOrderingPage";
 import TeamPage from "@/components/pages/TeamPage";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
+import PublicOrderingPage from "./pages/PublicOrderingPage";
 
 const queryClient = new QueryClient();
 
@@ -103,7 +104,7 @@ const router = createBrowserRouter([
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "complete-profile", element: <RequireAuth><CompleteProfile /></RequireAuth> },
       { path: "dashboard", element: <RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth> },
-      { path: "team", element: <RequireAuth><RequireProfile><SubscriptionGate><TeamPage /></SubscriptionGate></RequireProfile></RequireAuth> },
+      { path: "team", element: <RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "admin", element: <RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth> },
       { path: "serveur/:agentCode", element: <ServeurInterface /> },
       { path: "caisse/:agentCode", element: <CaisseInterface /> },

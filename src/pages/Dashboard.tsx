@@ -22,6 +22,8 @@ import OrderManagement from "@/components/OrderManagement";
 import BarConnecteePage from "@/components/pages/BarConnecteePage";
 import EventsPage from "@/components/pages/EventsPage";
 import NotificationPanel from "@/components/NotificationPanel";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
+import TeamPage from "@/components/pages/TeamPage";
 import { db } from "@/lib/firebase";
 import { productsColRef, salesColRef, teamColRef } from "@/lib/collections";
 import { onSnapshot, orderBy, query, where, collection } from "firebase/firestore";
@@ -244,13 +246,21 @@ const Dashboard = () => {
       case "sales":
         return <SalesPage />;
       case "bar-connectee":
-        return <BarConnecteePage />;
+        return (
+          <FeatureGate feature="barConnectee">
+            <BarConnecteePage />
+          </FeatureGate>
+        );
       case "stock":
         return <StockPage />;
       case "reports":
         return <ReportsPage />;
       case "events":
-        return <EventsPage />;
+        return (
+          <FeatureGate feature="events">
+            <EventsPage />
+          </FeatureGate>
+        );
       case "profile":
         return <SettingsPage />;
       default:

@@ -97,14 +97,16 @@ const SubscriptionGate = ({ children }: Props) => {
       setCreatingLink(true);
       const base = (
         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
-        || (window.location.origin + import.meta.env.BASE_URL)
-      ).replace(/\/+$/, '/');
-      const redirectSuccess = new URL('payment/success', base).toString();
-      const redirectError = new URL('payment/error', base).toString();
-      const logoURL = new URL('favicon.png', base).toString();
+        || window.location.origin
+      ).replace(/\/+$/, '');
+      
+      const redirectSuccess = `${base}/payment/success?reference=abonnement-transition`;
+      const redirectError = `${base}/payment/error`;
+      const logoURL = `${base}/favicon.png`;
+      
       const link = await createSubscriptionPaymentLink({
         amount: 2500,
-        reference: 'abonnement',
+        reference: 'abonnement-transition',
         redirectSuccess,
         redirectError,
         logoURL,
@@ -155,10 +157,85 @@ const SubscriptionGate = ({ children }: Props) => {
                 <Badge variant="secondary">Temps restant</Badge>
                 <span className="font-medium">{formatCountdown(trialRemaining)}</span>
               </div>
-              <div className="pt-2">
-                <Button onClick={startPayment} disabled={creatingLink} className="bg-gradient-primary text-white">
-                  {creatingLink ? 'Ouverture du paiement…' : 'Passer à l’abonnement (2500 XAF)'}
-                </Button>
+              <div className="pt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    onClick={async () => {
+                      if (!user) return;
+                      try {
+                        setCreatingLink(true);
+                        const base = (
+                          (import.meta.env.VITE_PUBLIC_BASE_URL as string)
+                          || window.location.origin
+                        ).replace(/\/+$/, '');
+                        
+                        const redirectSuccess = `${base}/payment/success?reference=abonnement-transition`;
+                        const redirectError = `${base}/payment/error`;
+                        const logoURL = `${base}/favicon.png`;
+                        
+                        const link = await createSubscriptionPaymentLink({
+                          amount: 2500,
+                          reference: 'abonnement-transition',
+                          redirectSuccess,
+                          redirectError,
+                          logoURL,
+                          isTransfer: false,
+                        });
+                        window.location.href = link;
+                      } catch (e) {
+                        console.error(e);
+                        const msg = e instanceof Error ? e.message : String(e);
+                        alert(`Impossible de créer le lien de paiement: ${msg}`);
+                      } finally {
+                        setCreatingLink(false);
+                      }
+                    }}
+                    disabled={creatingLink}
+                    variant="outline"
+                    className="w-full"
+                  >
+                    Transition (2500 XAF)
+                  </Button>
+                  <Button
+                    onClick={async () => {
+                      if (!user) return;
+                      try {
+                        setCreatingLink(true);
+                        const base = (
+                          (import.meta.env.VITE_PUBLIC_BASE_URL as string)
+                          || window.location.origin
+                        ).replace(/\/+$/, '');
+                        
+                        const redirectSuccess = `${base}/payment/success?reference=abonnement-transition-pro-max`;
+                        const redirectError = `${base}/payment/error`;
+                        const logoURL = `${base}/favicon.png`;
+                        
+                        const link = await createSubscriptionPaymentLink({
+                          amount: 7500,
+                          reference: 'abonnement-transition-pro-max',
+                          redirectSuccess,
+                          redirectError,
+                          logoURL,
+                          isTransfer: false,
+                        });
+                        window.location.href = link;
+                      } catch (e) {
+                        console.error(e);
+                        const msg = e instanceof Error ? e.message : String(e);
+                        alert(`Impossible de créer le lien de paiement: ${msg}`);
+                      } finally {
+                        setCreatingLink(false);
+                      }
+                    }}
+                    disabled={creatingLink}
+                    className="w-full bg-gradient-primary text-white"
+                  >
+                    Pro Max (7500 XAF)
+                  </Button>
+                </div>
+                <p className="text-xs text-center text-muted-foreground">
+                  Transition: Produits, Ventes, Stock, Rapports • Pro Max: Tout + Équipiers + Bar Connectée + 5 Événements
+                </p>
               </div>
             </CardContent>
           </Card>

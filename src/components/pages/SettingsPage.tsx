@@ -33,6 +33,7 @@ import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
+import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "";
@@ -85,24 +86,45 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     });
   };
 
-  const planLabel = profile?.plan === 'trial' ? 'Essai (7 jours)' : profile?.plan === 'active' ? 'Actif' : 'Expiré';
+  const currentPlan = getCurrentPlan(profile);
+  const planLabel = currentPlan === 'trial' ? 'Essai (7 jours)' 
+    : currentPlan === 'transition' ? 'Transition' 
+    : currentPlan === 'transition-pro-max' ? 'Transition Pro Max'
+    : 'Expiré';
   const now = Date.now();
   const remaining = profile?.plan === 'trial' && profile.trialEndsAt ? (profile.trialEndsAt - now) : (profile?.plan === 'active' && profile.subscriptionEndsAt ? (profile.subscriptionEndsAt - now) : 0);
+  const eventsCount = getCurrentEventsCount(profile);
+  const eventsLimit = currentPlan === 'transition-pro-max' ? SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsLimit : undefined;
 
-  const payNow = async () => {
+  const payNow = async (planType: 'transition' | 'transition-pro-max' = 'transition') => {
     try {
-      const origin = (import.meta.env.VITE_PUBLIC_BASE_URL as string) || window.location.origin;
+      // Utiliser la même méthode que SubscriptionGate pour garantir la cohérence
+      const base = (
+        (import.meta.env.VITE_PUBLIC_BASE_URL as string)
+        || window.location.origin
+      ).replace(/\/+$/, '');
+      
+      const plan = SUBSCRIPTION_PLANS[planType];
+      const redirectSuccess = `${base}/payment/success?reference=abonnement-${planType}`;
+      const redirectError = `${base}/payment/error`;
+      const logoURL = `${base}/favicon.png`;
+      
       const link = await createSubscriptionPaymentLink({
-        amount: 2500,
-        reference: 'abonnement',
-        redirectSuccess: `${origin}/payment/success`,
-        redirectError: `${origin}/payment/error`,
-        logoURL: `${origin}/favicon.png`,
+        amount: plan.price,
+        reference: `abonnement-${planType}`,
+        redirectSuccess,
+        redirectError,
+        logoURL,
         isTransfer: false,
       });
       window.location.href = link;
-    } catch {
-      toast({ title: "Paiement indisponible", description: "Réessayez dans quelques instants.", variant: "destructive" });
+    } catch (error) {
+      console.error('Erreur création lien paiement:', error);
+      toast({ 
+        title: "Paiement indisponible", 
+        description: "Réessayez dans quelques instants.", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -146,7 +168,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
         {/* Subscription Tab */}
         <TabsContent value="subscription">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-6">
+            {/* Plan Actuel */}
             <Card className="shadow-card border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -158,19 +181,47 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold">{planLabel}</h3>
-                      <p className="text-2xl font-bold text-nack-red">{profile?.plan === 'trial' ? '0 XAF' : '2,500 XAF / 30 jours'}</p>
+                      <h3 className="font-semibold text-lg">{planLabel}</h3>
+                      {currentPlan === 'trial' ? (
+                        <p className="text-2xl font-bold text-nack-red">Gratuit (7 jours)</p>
+                      ) : currentPlan === 'transition' ? (
+                        <p className="text-2xl font-bold text-nack-red">2,500 XAF / 30 jours</p>
+                      ) : currentPlan === 'transition-pro-max' ? (
+                        <p className="text-2xl font-bold text-nack-red">7,500 XAF / 30 jours</p>
+                      ) : (
+                        <p className="text-2xl font-bold text-red-600">Expiré</p>
+                      )}
                     </div>
-                    <Badge className={profile?.plan === 'active' ? 'bg-green-100 text-green-800 hover:bg-green-100' : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'}>
+                    <Badge className={
+                      (currentPlan === 'transition' || currentPlan === 'transition-pro-max' || currentPlan === 'trial')
+                        ? 'bg-green-100 text-green-800 hover:bg-green-100'
+                        : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+                    }>
                       {planLabel}
                     </Badge>
                   </div>
 
-                  <div className="bg-nack-beige-light p-3 rounded-lg">
-                    <p className="text-sm">
-                      <strong>Temps restant:</strong> {formatCountdown(remaining)}
-                    </p>
-                  </div>
+                  {remaining > 0 && (
+                    <div className="bg-nack-beige-light p-3 rounded-lg">
+                      <p className="text-sm">
+                        <strong>Temps restant:</strong> {formatCountdown(remaining)}
+                      </p>
+                    </div>
+                  )}
+
+                  {currentPlan === 'transition-pro-max' && eventsLimit !== undefined && (
+                    <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                      <p className="text-sm font-medium text-blue-900 mb-1">Événements créés</p>
+                      <p className="text-sm text-blue-800">
+                        {eventsCount} / {eventsLimit} événements inclus
+                        {eventsCount >= eventsLimit && (
+                          <span className="block mt-1 text-xs">
+                            Chaque événement supplémentaire: {SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsExtraPrice?.toLocaleString()} XAF
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
 
                   <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
                     <p className="text-sm text-yellow-800">
@@ -178,54 +229,124 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       Moov Money est momentanément indisponible.
                     </p>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
 
-                  <div className="pt-2">
-                    <Button onClick={payNow} className="w-full bg-gradient-primary text-white">
-                      {profile?.plan === 'trial' || profile?.plan === 'expired' ? 'Activer mon abonnement (2500 XAF)' : 'Renouveler (2500 XAF)'}
+            {/* Offres disponibles */}
+            {(currentPlan === 'trial' || currentPlan === 'expired') && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Offre Transition */}
+                <Card className="shadow-card border-0">
+                  <CardHeader>
+                    <CardTitle>Transition</CardTitle>
+                    <CardDescription>Plan de base</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-nack-red">{SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF</p>
+                      <p className="text-sm text-muted-foreground">par mois</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">Produits</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">Ventes</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">Stock</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">Rapports</span>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => payNow('transition')}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Choisir Transition
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Offre Transition Pro Max */}
+                <Card className="shadow-card border-0 border-2 border-nack-red">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      Transition Pro Max
+                      <Badge className="bg-nack-red text-white">Recommandé</Badge>
+                    </CardTitle>
+                    <CardDescription>Plan complet</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-center">
+                      <p className="text-3xl font-bold text-nack-red">{SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF</p>
+                      <p className="text-sm text-muted-foreground">par mois</p>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">Tout de Transition</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">Équipiers</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">Bar Connectée</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Check size={16} className="text-green-600" />
+                        <span className="text-sm">5 Événements inclus</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Check size={14} className="text-gray-500" />
+                        <span>+1,500 XAF par événement supplémentaire</span>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => payNow('transition-pro-max')}
+                      className="w-full bg-gradient-primary text-white"
+                    >
+                      Choisir Pro Max
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Si déjà abonné, afficher option de renouvellement */}
+            {(currentPlan === 'transition' || currentPlan === 'transition-pro-max') && (
+              <Card className="shadow-card border-0">
+                <CardHeader>
+                  <CardTitle>Renouveler l'abonnement</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button
+                      onClick={() => payNow('transition')}
+                      variant="outline"
+                      className="w-full"
+                    >
+                      Renouveler Transition (2,500 XAF)
+                    </Button>
+                    <Button
+                      onClick={() => payNow('transition-pro-max')}
+                      className="w-full bg-gradient-primary text-white"
+                    >
+                      Renouveler Pro Max (7,500 XAF)
                     </Button>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-card border-0">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard size={20} />
-                  Facturation
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="bg-nack-beige-light p-4 rounded-lg space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Montant</span>
-                      <span className="text-sm">2,500 XAF / 30 jours</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Dernier paiement</span>
-                      <span className="text-sm">{profile?.lastPaymentAt ? new Date(profile.lastPaymentAt).toLocaleString() : "—"}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Méthode</span>
-                      <span className="text-sm">{profile?.lastPaymentAt ? "Airtel Money" : "—"}</span>
-                    </div>
-                    <div className="pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={downloadReceipt}
-                        disabled={!profile?.lastPaymentAt}
-                      >
-                        <Download className="mr-2" size={16} />
-                        Télécharger le reçu
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </TabsContent>
 

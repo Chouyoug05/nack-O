@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useEvents, Event } from "@/contexts/EventContext";
+import { canCreateEvent, getCurrentEventsCount } from "@/utils/subscription";
 import { 
   Calendar, 
   Plus, 
@@ -28,7 +29,7 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { eventTicketsColRef } from "@/lib/collections";
-import { onSnapshot, orderBy, query, addDoc } from "firebase/firestore";
+import { onSnapshot, orderBy, query, addDoc, doc, updateDoc } from "firebase/firestore";
 import type { TicketDoc } from "@/types/event";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { generateEventTicket } from "@/utils/ticketGenerator";
@@ -61,7 +62,7 @@ interface Ticket {
 
 const EventsPage = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { events, addEvent, updateEvent, deleteEvent: removeEvent } = useEvents();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
@@ -125,6 +126,30 @@ const EventsPage = () => {
       return;
     }
 
+    // Vérifier les permissions d'abonnement
+    if (!isEditingEvent) {
+      const eventCheck = canCreateEvent(profile);
+      if (!eventCheck.allowed) {
+        toast({ 
+          title: "Événement non disponible", 
+          description: eventCheck.reason || "Vous n'avez pas accès à cette fonctionnalité",
+          variant: "destructive" 
+        });
+        return;
+      }
+      
+      // Si paiement nécessaire pour événement supplémentaire
+      if (eventCheck.needsPayment && eventCheck.extraPrice) {
+        const confirm = window.confirm(
+          `Vous avez atteint la limite d'événements inclus. Cet événement supplémentaire coûtera ${eventCheck.extraPrice.toLocaleString()} XAF. Continuer ?`
+        );
+        if (!confirm) return;
+        
+        // TODO: Ici, on devrait créer un lien de paiement pour l'événement supplémentaire
+        // Pour l'instant, on continue avec la création
+      }
+    }
+
     let finalImageUrl = newEvent.imageUrl;
     try {
       if (selectedImage) {
@@ -165,7 +190,39 @@ const EventsPage = () => {
         });
         toast({ title: "Événement modifié", description: `${data.title} a été mis à jour avec succès` });
       } else {
-      await addEvent(data);
+        await addEvent(data);
+        
+        // Mettre à jour le compteur d'événements dans le profil
+        if (user && profile) {
+          const currentCount = getCurrentEventsCount(profile);
+          const eventsResetAt = profile.eventsResetAt ?? profile.subscriptionEndsAt ?? Date.now();
+          const now = Date.now();
+          
+          // Si on est dans une nouvelle période, réinitialiser
+          let newCount = 1;
+          let newEventsResetAt = eventsResetAt;
+          
+          if (eventsResetAt && now > eventsResetAt) {
+            // Nouvelle période
+            const oneMonth = 30 * 24 * 60 * 60 * 1000;
+            newEventsResetAt = now + oneMonth;
+            newCount = 1;
+          } else {
+            // Même période, incrémenter
+            newCount = currentCount + 1;
+          }
+          
+          try {
+            await updateDoc(doc(db, 'profiles', user.uid), {
+              eventsCount: newCount,
+              eventsResetAt: newEventsResetAt,
+              updatedAt: Date.now(),
+            });
+          } catch (e) {
+            console.error('Erreur mise à jour compteur événements:', e);
+          }
+        }
+        
         toast({ title: "Événement créé", description: `${data.title} a été créé avec succès` });
       }
       setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "" });
