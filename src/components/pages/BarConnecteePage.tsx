@@ -245,11 +245,23 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           console.log('Tous les produits chargés:', allProducts.length);
           console.log('Détails des produits:', allProducts);
           
-          // Filtrer les produits en stock côté client
+          // Filtrer les produits en stock côté client et avec prix > 0
           const productsInStock = allProducts.filter(product => {
             const stock = product.quantity || product.stock || 0; // Utiliser quantity comme dans StockPage
-            console.log(`Produit ${product.name}: quantity = ${product.quantity}, stock = ${product.stock}`);
-            return stock > 0;
+            // Vérifier le prix de manière très stricte (gérer string, number, null, undefined, NaN, chaînes vides)
+            let priceValue = 0;
+            if (typeof product.price === 'number' && !isNaN(product.price)) {
+              priceValue = product.price;
+            } else if (typeof product.price === 'string' && product.price.trim() !== '') {
+              const parsed = parseFloat(product.price.trim());
+              priceValue = isNaN(parsed) ? 0 : parsed;
+            }
+            // Exclusion stricte : prix doit être un nombre > 0
+            const isValid = stock > 0 && priceValue > 0;
+            if (!isValid) {
+              console.log(`❌ Produit "${product.name}" exclu: stock=${stock}, price=${priceValue} (original: ${product.price}, type: ${typeof product.price})`);
+            }
+            return isValid;
           });
           
           console.log('Produits en stock après filtrage:', productsInStock.length);
@@ -771,7 +783,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                       Collection: profiles/{user?.uid}/products
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Filtre: stock &gt; 0
+                      Filtre: stock &gt; 0 et prix &gt; 0
                     </p>
                     <p className="text-xs text-muted-foreground">
                       Vérifiez la console pour plus de détails

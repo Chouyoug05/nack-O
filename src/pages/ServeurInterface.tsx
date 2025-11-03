@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useOrders } from "@/contexts/OrderContext";
 import { Product, CartItem, OrderStatus } from "@/types/order";
-import ProductGrid from "@/components/ProductGrid";
 import OrderHistory from "@/components/OrderHistory";
 import { 
   LogOut,
@@ -15,7 +15,22 @@ import {
   Clock,
   Send,
   Trash2,
-  ShoppingCart
+  Plus,
+  Minus,
+  Search,
+  CreditCard,
+  Banknote,
+  Coffee,
+  Wine,
+  GlassWater,
+  Pizza,
+  Sandwich,
+  Cookie,
+  IceCream,
+  Utensils,
+  Settings,
+  Box,
+  Grid3x3
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -34,6 +49,8 @@ interface FirestoreProductDoc {
   price: number;
   category: string;
   quantity: number;
+  imageUrl?: string;
+  icon?: string;
 }
 
 // Offline helpers
@@ -64,12 +81,13 @@ const ServeurInterface = () => {
   const [agentInfo, setAgentInfo] = useState<{ name: string; code: string; memberId?: string } | null>(null);
   const [ownerUid, setOwnerUid] = useState<string | null>(null);
   const [fsProducts, setFsProducts] = useState<Product[] | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   useEffect(() => {
-    // Resolve ownerUid via agentTokens first, then collectionGroup as fallback
     const resolveOwner = async () => {
       if (!agentCode) return;
-      // Try public token mapping first
       try {
         const tokenDoc = await getDoc(doc(agentTokensTopColRef(db), agentCode));
         if (tokenDoc.exists()) {
@@ -82,7 +100,6 @@ const ServeurInterface = () => {
           }
         }
       } catch { /* ignore */ }
-      // Fallback to collectionGroup if permitted
       try {
         const cg = collectionGroup(db, 'team');
         let foundOwner: string | null = null;
@@ -116,10 +133,8 @@ const ServeurInterface = () => {
     resolveOwner();
   }, [agentCode]);
 
-  // Load products from Firestore and cache locally; fallback to cache if offline or unavailable
   useEffect(() => {
     if (!ownerUid) { setFsProducts(null); return; }
-    // Try loading from cache first for faster UI
     try {
       const cached = localStorage.getItem(getProductsCacheKey(ownerUid));
       if (cached) {
@@ -130,7 +145,7 @@ const ServeurInterface = () => {
 
     const unsub = onSnapshot(productsColRef(db, ownerUid), (snap) => {
       const list: Product[] = snap.docs.map((d) => {
-        const data = d.data() as FirestoreProductDoc & { imageUrl?: string };
+        const data = d.data() as FirestoreProductDoc;
         return {
           id: d.id,
           name: data.name,
@@ -138,24 +153,26 @@ const ServeurInterface = () => {
           category: data.category,
           stock: Number(data.quantity),
           image: 'menu',
-          imageUrl: (data as unknown as { imageUrl?: string }).imageUrl,
+          imageUrl: data.imageUrl,
         } as Product;
       });
       setFsProducts(list);
       try { localStorage.setItem(getProductsCacheKey(ownerUid), JSON.stringify(list)); } catch (e) { /* ignore quota errors */ }
-    }, () => {
+    }, (error) => {
       // Snapshot error: stay on cache if any
-      if (!fsProducts) {
-        try {
-          const cached = localStorage.getItem(getProductsCacheKey(ownerUid));
-          if (cached) setFsProducts(JSON.parse(cached));
-        } catch (e) { /* ignore parse errors */ }
-      }
+      setFsProducts(prev => {
+        if (!prev) {
+          try {
+            const cached = localStorage.getItem(getProductsCacheKey(ownerUid));
+            if (cached) return JSON.parse(cached);
+          } catch (e) { /* ignore parse errors */ }
+        }
+        return prev;
+      });
     });
     return () => unsub();
   }, [ownerUid]);
 
-  // Flush outbox when back online or when ownerUid is ready
   useEffect(() => {
     const flush = async () => {
       if (!ownerUid || !agentCode) return;
@@ -170,7 +187,6 @@ const ServeurInterface = () => {
       for (const o of queued) {
         try {
           await addDoc(ordersColRef(db, ownerUid), o);
-          // Try to notify the manager, but ignore permission errors for agents
           try {
             await addDoc(notificationsColRef(db, ownerUid), {
               title: "Nouvelle commande",
@@ -195,6 +211,16 @@ const ServeurInterface = () => {
     return () => window.removeEventListener('online', onOnline);
   }, [ownerUid, agentCode]);
 
+  const products = fsProducts ?? [];
+  const sellableProducts = products.filter(product => (product.stock || 0) > 0);
+  const availableCategories = [...new Set(sellableProducts.map(p => p.category).filter(Boolean))].sort();
+
+  useEffect(() => {
+    if (activeCategoryTab !== "all" && !availableCategories.includes(activeCategoryTab)) {
+      setActiveCategoryTab("all");
+    }
+  }, [availableCategories, activeCategoryTab]);
+
   if (!agentCode) {
     return <Navigate to="/not-found" replace />;
   }
@@ -202,6 +228,62 @@ const ServeurInterface = () => {
   const agentOrders = getOrdersByAgent(agentCode);
   const pendingOrders = agentOrders.filter(order => order.status === 'pending');
   const sentOrders = agentOrders.filter(order => order.status === 'sent');
+
+  const getCategoryIcon = (category: string) => {
+    const cat = category.toLowerCase();
+    if (cat.includes('boisson') || cat.includes('eau') || cat.includes('jus') || cat.includes('soda')) return GlassWater;
+    if (cat.includes('alcool') || cat.includes('vin') || cat.includes('biere')) return Wine;
+    if (cat.includes('cafe')) return Coffee;
+    if (cat.includes('plat') || cat.includes('pizza') || cat.includes('sandwich')) return Pizza;
+    if (cat.includes('dessert') || cat.includes('glace') || cat.includes('sucre') || cat.includes('cookie')) return IceCream;
+    if (cat.includes('snack')) return Cookie;
+    if (cat.includes('ustensile')) return Utensils;
+    if (cat.includes('équipement') || cat.includes('equipement')) return Settings;
+    if (cat.includes('fourniture')) return Box;
+    return Package;
+  };
+
+  const filteredProducts = sellableProducts
+    .filter(product => product.name.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(product => {
+      if (activeCategoryTab === "all") return true;
+      return product.category === activeCategoryTab;
+    });
+
+  const renderIconByName = (name?: string) => {
+    switch (name) {
+      case 'Beer': return <Package size={32} className="text-nack-red" />;
+      case 'Wine': return <Wine size={32} className="text-nack-red" />;
+      case 'Coffee': return <Coffee size={32} className="text-nack-red" />;
+      case 'GlassWater': return <GlassWater size={32} className="text-nack-red" />;
+      case 'Pizza': return <Pizza size={32} className="text-nack-red" />;
+      case 'Sandwich': return <Sandwich size={32} className="text-nack-red" />;
+      case 'Cookie': return <Cookie size={32} className="text-nack-red" />;
+      case 'IceCream': return <IceCream size={32} className="text-nack-red" />;
+      default: return <Package size={32} className="text-muted-foreground" />;
+    }
+  };
+
+  const renderProductVisual = (product: Product) => {
+    if (product.imageUrl) {
+      return (
+        <div className="w-20 h-20 mx-auto mb-1 rounded-md overflow-hidden bg-nack-beige-light">
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </div>
+      );
+    }
+    const productWithIcon = product as Product & { icon?: string };
+    return (
+      <div className="w-20 h-20 mx-auto mb-1 rounded-md bg-nack-beige-light flex items-center justify-center">
+        {renderIconByName(productWithIcon.icon)}
+      </div>
+    );
+  };
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find(item => item.id === product.id);
@@ -235,7 +317,6 @@ const ServeurInterface = () => {
     if (cart.length === 0 || !tableNumber.trim()) return;
 
     const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    // local context for UI responsiveness
     addOrder({ orderNumber: orderCounter, tableNumber: tableNumber.trim(), items: [...cart], total, status, agentCode: agentCode! });
     
     const orderPayload: OutboxOrder = {
@@ -257,7 +338,6 @@ const ServeurInterface = () => {
     } else {
       try {
         await addDoc(ordersColRef(db, ownerUid), orderPayload);
-        // Try to create a notification; ignore if forbidden for agents
         try {
           await addDoc(notificationsColRef(db, ownerUid), {
             title: "Nouvelle commande",
@@ -285,6 +365,7 @@ const ServeurInterface = () => {
 
     setCart([]);
     setTableNumber("");
+    setIsCheckoutOpen(false);
 
     const statusText = status === 'pending' ? 'mise en attente' : 'envoyée à la caisse';
     toast({
@@ -309,7 +390,6 @@ const ServeurInterface = () => {
       });
       return;
     }
-
     if (!tableNumber.trim()) {
       toast({
         title: "Numéro de table requis",
@@ -318,36 +398,13 @@ const ServeurInterface = () => {
       });
       return;
     }
-
-    createOrder('pending');
-  };
-
-  const handleSaveAsDraft = () => {
-    if (cart.length === 0) {
-      toast({
-        title: "Panier vide",
-        description: "Ajoutez des produits avant de sauvegarder",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!tableNumber.trim()) {
-      toast({
-        title: "Numéro de table requis",
-        description: "Veuillez saisir le numéro de table",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    createOrder('pending');
+    setIsCheckoutOpen(true);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-nack-beige-light to-white">
+    <div className="relative flex h-full min-h-screen w-full flex-col bg-background">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center gap-3">
@@ -359,155 +416,352 @@ const ServeurInterface = () => {
                 <p className="text-sm text-muted-foreground">Code: {agentCode}</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-              <LogOut size={16} className="mr-2" />
-              Déconnexion
+            <div className="flex items-center gap-2">
+              {/* Navigation Tabs */}
+              <div className="hidden md:flex gap-2">
+                <Button 
+                  variant={activeView === 'products' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveView('products')}
+                  className={activeView === 'products' ? 'bg-gradient-primary text-white shadow-button' : ''}
+                >
+                  <Package className="mr-2 h-4 w-4" />
+                  Produits
+                </Button>
+                <Button 
+                  variant={activeView === 'pending' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveView('pending')}
+                  className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : ''}
+                >
+                  <Clock className="mr-2 h-4 w-4" />
+                  En attente ({pendingOrders.length})
+                </Button>
+                <Button 
+                  variant={activeView === 'sent' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setActiveView('sent')}
+                  className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : ''}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Envoyées ({sentOrders.length})
+                </Button>
+              </div>
+              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                <LogOut size={16} className="mr-2" />
+                <span className="hidden sm:inline">Déconnexion</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+        {/* Mobile Navigation Tabs */}
+        <div className="md:hidden border-t bg-white">
+          <div className="flex gap-2 px-4 py-2 overflow-x-auto">
+            <Button 
+              variant={activeView === 'products' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveView('products')}
+              className={activeView === 'products' ? 'bg-gradient-primary text-white shadow-button' : ''}
+            >
+              <Package className="mr-2 h-4 w-4" />
+              Produits
+            </Button>
+            <Button 
+              variant={activeView === 'pending' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveView('pending')}
+              className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : ''}
+            >
+              <Clock className="mr-2 h-4 w-4" />
+              En attente ({pendingOrders.length})
+            </Button>
+            <Button 
+              variant={activeView === 'sent' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveView('sent')}
+              className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : ''}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Envoyées ({sentOrders.length})
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Navigation Tabs */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
-          <Button 
-            variant={activeView === 'products' ? 'default' : 'outline'}
-            onClick={() => setActiveView('products')}
-            className={activeView === 'products' ? 'bg-gradient-primary text-white shadow-button' : ''}
-          >
-            <Package className="mr-2 h-4 w-4" />
-            Produits
-          </Button>
-          <Button 
-            variant={activeView === 'pending' ? 'default' : 'outline'}
-            onClick={() => setActiveView('pending')}
-            className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : ''}
-          >
-            <Clock className="mr-2 h-4 w-4" />
-            En attente ({pendingOrders.length})
-          </Button>
-          <Button 
-            variant={activeView === 'sent' ? 'default' : 'outline'}
-            onClick={() => setActiveView('sent')}
-            className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : ''}
-          >
-            <Send className="mr-2 h-4 w-4" />
-            Envoyées ({sentOrders.length})
-          </Button>
-        </div>
-
-        {activeView === 'products' ? (
+      {activeView === 'products' ? (
+        <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Products Grid */}
             <div className="lg:col-span-2">
-              <ProductGrid 
-                cart={cart}
-                onAddToCart={addToCart}
-                onUpdateQuantity={updateQuantity}
-                productsOverride={fsProducts ?? []}
-              />
-            </div>
-
-            {/* Current Order */}
-            <div className="space-y-4">
-              {/* Table Number Input */}
-              <div className="bg-card p-4 rounded-lg border shadow-card">
-                <Label htmlFor="table-number" className="text-sm font-medium">
-                  Numéro de table *
-                </Label>
-                <Input
-                  id="table-number"
-                  placeholder="Ex: T01, 15, VIP-A..."
-                  value={tableNumber}
-                  onChange={(e) => setTableNumber(e.target.value)}
-                  className="mt-2"
-                />
-              </div>
-
-              {/* Cart Summary */}
-              <div className="bg-card p-4 rounded-lg border shadow-card">
-                <h3 className="font-semibold mb-3">Commande en cours</h3>
-                {cart.length === 0 ? (
-                  <p className="text-center text-muted-foreground py-8">
-                    Aucun article dans la commande
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {cart.map((item) => (
-                      <div key={item.id} className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
-                        <div className="flex-1">
-                          <p className="font-medium text-sm">{item.name}</p>
-                          <p className="text-sm text-muted-foreground">{Number(item.price || 0).toLocaleString()} XAF</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                          >
-                            -
-                          </Button>
-                          <span className="w-8 text-center font-medium">{item.quantity}</span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            disabled={item.quantity >= item.stock}
-                          >
-                            +
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                    
-                    <div className="border-t pt-3 space-y-3">
-                      <div className="flex justify-between items-center font-bold text-lg">
-                        <span>Total:</span>
-                        <span className="text-nack-red">{Number(cartTotal || 0).toLocaleString()} XAF</span>
-                      </div>
-                      
-                      <div className="flex flex-col gap-2">
-                        <Button 
-                          onClick={handleSendOrder}
-                          className="w-full bg-gradient-primary text-white shadow-button h-12"
-                        >
-                          <Send className="mr-2 h-4 w-4" />
-                          Envoyer à la caisse
-                        </Button>
-                        
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button 
-                            variant="outline"
-                            onClick={handleSaveAsDraft}
-                            className="h-10"
-                          >
-                            <Clock className="mr-2 h-4 w-4" />
-                            En attente
-                          </Button>
-                          
-                          <Button 
-                            variant="destructive"
-                            onClick={clearCart}
-                            className="h-10"
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Vider
-                          </Button>
-                        </div>
+              <Card className="shadow-card border-0">
+                <CardHeader>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <CardTitle>Produits disponibles</CardTitle>
+                      <CardDescription>Sélectionnez les produits pour la commande</CardDescription>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
+                        <Input
+                          placeholder="Rechercher un produit..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10 w-full md:w-[300px]"
+                        />
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
+                  {/* Onglets Catégories dynamiques */}
+                  <div className="w-full border-b border-[#e6dfdb] mt-4">
+                    <div className="flex overflow-x-auto scrollbar-hide">
+                      <button
+                        key="all"
+                        type="button"
+                        onClick={() => setActiveCategoryTab("all")}
+                        className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
+                          activeCategoryTab === "all" ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
+                        }`}
+                      >
+                        <Grid3x3 className="h-6 w-6 flex-shrink-0" />
+                        <span className="hidden sm:inline font-semibold whitespace-nowrap">Tout</span>
+                      </button>
+                      {availableCategories.length > 0 ? (
+                        availableCategories.map((category) => {
+                          const Icon = getCategoryIcon(category);
+                          return (
+                            <button
+                              key={category}
+                              type="button"
+                              onClick={() => setActiveCategoryTab(category)}
+                              className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
+                                activeCategoryTab === category ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
+                              }`}
+                            >
+                              <Icon className="h-6 w-6 flex-shrink-0" />
+                              <span className="hidden sm:inline font-semibold whitespace-nowrap">{category}</span>
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="flex items-center justify-center px-3 py-3 text-sm text-muted-foreground">
+                          Aucune catégorie disponible
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-4">
+                    {filteredProducts.map((product) => {
+                      const imageUrl = product.imageUrl || undefined;
+                      const colorClass = (() => {
+                        const c = (product.category || '').toLowerCase();
+                        if (c.includes('vin') || c.includes('alcool')) return 'bg-red-500';
+                        if (c.includes('biere') || c.includes('boisson')) return 'bg-yellow-500';
+                        if (c.includes('cafe')) return 'bg-purple-500';
+                        if (c.includes('eau')) return 'bg-blue-500';
+                        if (c.includes('jus')) return 'bg-orange-500';
+                        if (c.includes('soda')) return 'bg-green-500';
+                        if (c.includes('dessert') || c.includes('glace')) return 'bg-pink-500';
+                        return 'bg-gray-200';
+                      })();
+                      return (
+                        <button
+                          key={product.id} 
+                          type="button"
+                          className="relative rounded-2xl border border-gray-200 bg-white p-3 shadow-lg transition hover:shadow-2xl hover:border-gray-300 text-left"
+                          onClick={() => addToCart(product)}
+                        >
+                          <div className={`absolute left-0 top-0 h-1 w-full rounded-t-2xl ${colorClass}`} />
+                          {imageUrl && imageUrl.trim() !== '' ? (
+                            <div className="w-full aspect-square rounded-xl overflow-hidden bg-nack-beige-light relative">
+                              <img
+                                src={imageUrl}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                  if (fallback) fallback.style.display = 'flex';
+                                }}
+                              />
+                              <div className="hidden w-full h-full items-center justify-center bg-gradient-to-br from-nack-beige-light to-nack-beige-light">
+                                {(() => {
+                                  const productWithIcon = product as Product & { icon?: string };
+                                  return renderIconByName(productWithIcon.icon);
+                                })()}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-full aspect-square rounded-xl flex items-center justify-center bg-gradient-to-br from-nack-beige-light to-nack-beige-light">
+                              {(() => {
+                                const productWithIcon = product as Product & { icon?: string };
+                                return renderIconByName(productWithIcon.icon);
+                              })()}
+                            </div>
+                          )}
+                          <div className="mt-2 space-y-0.5">
+                            <h3 className="font-semibold text-base truncate">{product.name}</h3>
+                            <p className="text-xs text-muted-foreground">Stock: {Number(product.stock || 0)}</p>
+                            <p className="text-xl md:text-2xl font-extrabold text-nack-red" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                              {Number(product.price || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                            </p>
+                          </div>
+                          {(product.stock || 0) === 0 && (
+                            <div className="absolute top-1 right-1 flex h-8 min-w-[2rem] items-center justify-center rounded-full bg-white/95 backdrop-blur px-2 text-[11px] font-bold text-red-600 shadow">
+                              Rupture
+                            </div>
+                          )}
+                          <div className="absolute bottom-2 right-2 flex h-12 w-12 items-center justify-center rounded-full bg-nack-red text-white shadow-xl">
+                            <Plus className="h-7 w-7" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Cart */}
+            <div>
+              <Card className="shadow-card border-0">
+                <CardHeader>
+                  <CardTitle>Commande en cours</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Table Number Input */}
+                  <div className="space-y-2">
+                    <Label htmlFor="table-number" className="text-sm font-medium">
+                      Numéro de table *
+                    </Label>
+                    <Input
+                      id="table-number"
+                      placeholder="Ex: T01, 15, VIP-A..."
+                      value={tableNumber}
+                      onChange={(e) => setTableNumber(e.target.value)}
+                    />
+                  </div>
+
+                  {/* Cart Items */}
+                  {cart.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">
+                      Aucun article dans la commande
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {cart.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.name}</p>
+                            <p className="text-sm text-muted-foreground">{Number(item.price || 0).toLocaleString()} XAF</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                            >
+                              <Minus size={16} />
+                            </Button>
+                            <span className="w-8 text-center font-medium">{item.quantity}</span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                              disabled={item.quantity >= item.stock}
+                            >
+                              <Plus size={16} />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                      
+                      <div className="border-t pt-3 space-y-3">
+                        <div className="flex justify-between items-center font-bold text-lg">
+                          <span>Total:</span>
+                          <span className="text-nack-red" style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                            {Number(cartTotal || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                          </span>
+                        </div>
+                        
+                        <div className="flex flex-col gap-2">
+                          <Button 
+                            onClick={handleSendOrder}
+                            className="w-full bg-gradient-primary text-white shadow-button h-12"
+                            disabled={!tableNumber.trim()}
+                          >
+                            <Send className="mr-2 h-4 w-4" />
+                            Envoyer à la caisse
+                          </Button>
+                          
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button 
+                              variant="outline"
+                              onClick={() => createOrder('pending')}
+                              className="h-10"
+                              disabled={!tableNumber.trim()}
+                            >
+                              <Clock className="mr-2 h-4 w-4" />
+                              En attente
+                            </Button>
+                            
+                            <Button 
+                              variant="destructive"
+                              onClick={clearCart}
+                              className="h-10"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Vider
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </div>
-        ) : (
+
+          {/* Barre flottante total / actions */}
+          <div className="pointer-events-none fixed left-0 right-0 bottom-20 z-20 px-4 md:px-6">
+            {cart.length > 0 && (
+              <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl bg-nack-red/95 p-3 text-white shadow-2xl">
+                <button
+                  className="flex h-16 w-16 items-center justify-center rounded-xl bg-red-700/80"
+                  onClick={clearCart}
+                  title="Vider"
+                >
+                  <Trash2 className="h-8 w-8" />
+                </button>
+                <div className="flex flex-1 flex-col items-center justify-center">
+                  <span className="text-4xl sm:text-5xl font-black tracking-tight" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                    {Number(cartTotal || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                  </span>
+                </div>
+                <button
+                  className="flex h-16 w-16 items-center justify-center rounded-xl bg-green-600/90"
+                  onClick={handleSendOrder}
+                  title="Envoyer"
+                  disabled={!tableNumber.trim()}
+                >
+                  <Send className="h-8 w-8" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
           <OrderHistory 
             orders={activeView === 'pending' ? pendingOrders : sentOrders}
             onUpdateOrderStatus={updateOrderStatus}
           />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

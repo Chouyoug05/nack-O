@@ -26,7 +26,6 @@ const CaisseInterfaceContent = () => {
   useEffect(() => {
     const resolveOwner = async () => {
       if (!agentCode) return;
-      // Try top-level agentTokens mapping first
       try {
         const tokenDoc = await getDoc(doc(agentTokensTopColRef(db), agentCode));
         if (tokenDoc.exists()) {
@@ -80,7 +79,6 @@ const CaisseInterfaceContent = () => {
     const norm = (s: string) => s.replace(/\s+/g, '').toUpperCase();
     const input = norm(agentCodeInput);
 
-    // If we already know the expected agent code, accept it; also accept URL token as fallback
     const expected = expectedAgentCode ? norm(expectedAgentCode) : '';
     const tokenOk = norm(agentCode);
 
@@ -90,9 +88,7 @@ const CaisseInterfaceContent = () => {
       return;
     }
 
-    // Otherwise, try resolving by entered agent code directly
     try {
-      // Prefer public top-level agentTokens lookup by agentCode (no auth required)
       const byCodeToken = query(agentTokensTopColRef(db), where('agentCode', '==', agentCodeInput.trim()), limit(1));
       const sTok = await getDocs(byCodeToken);
       if (!sTok.empty) {
@@ -117,100 +113,101 @@ const CaisseInterfaceContent = () => {
     return null;
   }
 
-    return (
-    <div className="min-h-screen bg-gradient-to-br from-nack-beige-light to-white">
+  return (
+    <div className="relative flex h-full min-h-screen w-full flex-col bg-background">
       {!isAuthenticated ? (
-      <div className="min-h-screen bg-gradient-to-br from-nack-beige-light to-white flex items-center justify-center">
-        <Card className="w-full max-w-md shadow-elegant border-0">
-          <CardHeader className="text-center">
-            <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
-              <Calculator className="text-white" size={28} />
-            </div>
-            <CardTitle>Interface Caisse</CardTitle>
-            <CardDescription>
-                Veuillez saisir votre numéro d'agent (format AGT-XXXX-XXXX)
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="agentCode">Numéro d'agent</Label>
-              <Input
-                id="agentCode"
-                value={agentCodeInput}
-                onChange={(e) => setAgentCodeInput(e.target.value)}
-                  placeholder="AGT-XXXX-XXXX"
-                className="text-center font-mono"
-              />
-            </div>
-            <Button 
-              onClick={handleAgentLogin}
-              className="w-full bg-gradient-primary text-white shadow-button h-12"
-            >
-              Se connecter
-            </Button>
-              {expectedAgentCode && (
-                <p className="text-xs text-center text-muted-foreground">
-                  Indice: commence par {expectedAgentCode.slice(0, 4)}...
-                </p>
-              )}
-              {!expectedAgentCode && (
-            <p className="text-xs text-center text-muted-foreground">
-                  Astuce: ré-ouvrez ce lien depuis "Équipe" pour auto-connexion.
-            </p>
-              )}
-          </CardContent>
-        </Card>
-      </div>
-      ) : (
-        <div>
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-                <Calculator className="text-white" size={20} />
+        <div className="min-h-screen bg-background flex items-center justify-center p-4">
+          <Card className="w-full max-w-md shadow-elegant border-0">
+            <CardHeader className="text-center">
+              <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
+                <Calculator className="text-white" size={28} />
               </div>
-              <div>
-                <h1 className="text-lg font-semibold">Interface Caisse</h1>
-                    <p className="text-sm text-muted-foreground">Code: {agentInfo?.code}</p>
+              <CardTitle>Interface Caisse</CardTitle>
+              <CardDescription>
+                  Veuillez saisir votre numéro d'agent (format AGT-XXXX-XXXX)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="agentCode">Numéro d'agent</Label>
+                <Input
+                  id="agentCode"
+                  value={agentCodeInput}
+                  onChange={(e) => setAgentCodeInput(e.target.value)}
+                    placeholder="AGT-XXXX-XXXX"
+                  className="text-center font-mono"
+                />
               </div>
-            </div>
-                <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => setIsAuthenticated(false)}>
-                <LogOut size={16} className="mr-2" />
-                Déconnexion
+              <Button 
+                onClick={handleAgentLogin}
+                className="w-full bg-gradient-primary text-white shadow-button h-12"
+              >
+                Se connecter
               </Button>
-          </div>
+                {expectedAgentCode && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    Indice: commence par {expectedAgentCode.slice(0, 4)}...
+                  </p>
+                )}
+                {!expectedAgentCode && (
+              <p className="text-xs text-center text-muted-foreground">
+                    Astuce: ré-ouvrez ce lien depuis "Équipe" pour auto-connexion.
+              </p>
+                )}
+            </CardContent>
+          </Card>
         </div>
-      </header>
+      ) : (
+        <div className="flex flex-col min-h-screen">
+          {/* Header */}
+          <header className="bg-white shadow-sm border-b sticky top-0 z-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex justify-between items-center h-16">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
+                    <Calculator className="text-white" size={20} />
+                  </div>
+                  <div>
+                    <h1 className="text-lg font-semibold">Interface Caisse</h1>
+                        <p className="text-sm text-muted-foreground">Code: {agentInfo?.code}</p>
+                  </div>
+                </div>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => setIsAuthenticated(false)}>
+                    <LogOut size={16} className="mr-2" />
+                    <span className="hidden sm:inline">Déconnexion</span>
+                  </Button>
+              </div>
+            </div>
+          </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Orders from Servers */}
-          <div>
-            <OrderManagement 
-              title="Commandes à encaisser"
-              description="Commandes envoyées par les serveurs"
-                  showActions={true}
-                  ownerOverrideUid={ownerUid || undefined}
-                  agentToken={agentInfo?.code}
-            />
-          </div>
+          {/* Main Content */}
+          <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Orders from Servers */}
+              <div>
+                <OrderManagement 
+                  title="Commandes à encaisser"
+                  description="Commandes envoyées par les serveurs"
+                      showActions={true}
+                      ownerOverrideUid={ownerUid || undefined}
+                      agentToken={agentInfo?.code}
+                />
+              </div>
 
-              {/* Payment Panel (placeholder) */}
-          <div className="space-y-6">
-            <Card className="shadow-card border-0">
-              <CardHeader>
-                <CardTitle>Mode de paiement</CardTitle>
-                    <CardDescription>Sélectionnez le mode de paiement lors de la validation</CardDescription>
-              </CardHeader>
-              <CardContent>
-                    <p className="text-sm text-muted-foreground">La validation côté droite déclenche l'encaissement.</p>
-              </CardContent>
-            </Card>
+                  {/* Payment Panel */}
+              <div className="space-y-6">
+                <Card className="shadow-card border-0">
+                  <CardHeader>
+                    <CardTitle>Mode de paiement</CardTitle>
+                        <CardDescription>Sélectionnez le mode de paiement lors de la validation</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                        <p className="text-sm text-muted-foreground">La validation côté droite déclenche l'encaissement.</p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
         </div>
       )}
     </div>

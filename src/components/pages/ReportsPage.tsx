@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { 
   Calendar,
   Download,
-  ChevronLeft,
   BarChart3,
   Star,
   CreditCard,
@@ -17,7 +16,6 @@ import { lossesColRef, salesColRef, ordersColRef, productsColRef } from "@/lib/c
 import { onSnapshot, orderBy, query, where, getDocs } from "firebase/firestore";
 import type { SaleDoc, LossDoc, SaleItem } from "@/types/inventory";
 import { exportSalesCsv, exportSalesPdf } from "@/utils/exportReports";
-import { useNavigate } from "react-router-dom";
 
 interface FsOrderDoc {
   createdAt?: number;
@@ -201,7 +199,6 @@ const usePeriodData = (uid: string | undefined, period: 'daily' | 'weekly' | 'mo
 
 const ReportsPage = () => {
   const { user, profile } = useAuth();
-  const navigate = useNavigate();
   const uid = user?.uid;
   const [products, setProducts] = useState<Product[]>([]);
   const [activePeriod, setActivePeriod] = useState<'daily' | 'weekly' | 'monthly'>('daily');
@@ -510,21 +507,6 @@ const ReportsPage = () => {
 
   return (
     <div className="relative flex h-auto min-h-screen w-full flex-col bg-background-light dark:bg-background-dark text-[#181411] dark:text-white">
-      {/* Top App Bar */}
-      <header className="flex items-center p-4 pb-2 justify-between bg-background-light dark:bg-background-dark sticky top-0 z-10">
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="flex items-center justify-center size-12 shrink-0 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-          aria-label="Retour"
-        >
-          <ChevronLeft size={24} className="text-[#181411] dark:text-white" />
-        </button>
-        <h1 className="flex items-center justify-center flex-1">
-          <BarChart3 size={32} className="text-nack-red" />
-        </h1>
-        <div className="size-12 shrink-0"></div>
-      </header>
-
       {/* Time Period Selector */}
       <div className="flex px-4 py-3">
         <div className="flex h-12 flex-1 items-center justify-center rounded-xl bg-white dark:bg-background-dark/50 p-1 shadow-sm">

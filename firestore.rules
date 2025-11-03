@@ -33,6 +33,12 @@ service cloud.firestore {
       allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
 
+    // Tables: public read for QR ordering, owner or admin write
+    match /profiles/{userId}/tables/{tableId} {
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
     // Orders: public read; writes allowed for owner, valid agent token mapping, or admin
     match /profiles/{userId}/orders/{orderId} {
       allow read: if true;
@@ -46,19 +52,31 @@ service cloud.firestore {
       );
     }
 
+    // BarOrders: public write for QR code ordering, owner/admin read
+    match /profiles/{userId}/barOrders/{orderId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if true; // Permettre à tout le monde de créer des commandes (QR code public)
+      allow update, delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
     // Team subcollection: owner or admin
     match /profiles/{userId}/team/{memberId} {
       allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
     }
 
-    // Profiles: public read for map functionality (only for profiles with location), owner/admin write
+    // Profiles: public read for map functionality, owner/admin write
     // Note: The locations.ts library filters sensitive data before returning
     match /profiles/{userId} {
-      // Allow public read if profile has location data (for map display)
+      // Allow public read for QR code ordering functionality
       allow read: if true;
       // Only owner or admin can write
       allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      
+      // Note: Les sous-collections spécifiques (products, tables, orders, events) sont définies AVANT
+      // cette règle générale pour éviter les conflits. Cette règle générale ne s'applique qu'aux
+      // autres sous-collections non spécifiées (team, notifications, etc.)
       match /{document=**} {
+        // Pour les autres sous-collections non spécifiées, seul le propriétaire ou admin peut accéder
         allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
       }
     }

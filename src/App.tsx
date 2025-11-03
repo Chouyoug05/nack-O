@@ -80,12 +80,13 @@ const HomeRedirect = () => {
 
 const RootLayout = () => {
   const location = useLocation();
+  const isPublicPage = location.pathname.startsWith('/event/') || location.pathname.startsWith('/commande/');
   return (
     <>
       <Outlet />
-      {!location.pathname.startsWith('/event/') && <PWAInstallButton />}
-      <WhatsAppCommunityPopup />
-      <LocationRequestDialog />
+      {!isPublicPage && <PWAInstallButton />}
+      {!isPublicPage && <WhatsAppCommunityPopup />}
+      {!isPublicPage && <LocationRequestDialog />}
     </>
   );
 };

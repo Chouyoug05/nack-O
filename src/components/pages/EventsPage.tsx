@@ -23,8 +23,7 @@ import {
   Mic,
   Music,
   DollarSign,
-  Settings,
-  ChevronLeft
+  Settings
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -270,13 +269,6 @@ const EventsPage = () => {
 
   return (
     <div className="relative flex min-h-screen w-full flex-col bg-background">
-      {/* Top App Bar */}
-      <header className="sticky top-0 z-10 flex items-center bg-background/80 p-4 pb-3 justify-between backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
-        <div className="size-10"></div>
-        <h1 className="text-xl font-bold leading-tight tracking-tight flex-1 text-center text-gray-900 dark:text-white">Événements</h1>
-        <div className="size-10"></div>
-      </header>
-
       {/* Main Content: Event List */}
       <main className="flex-grow p-4 space-y-4">
         {/* Event Cards */}
@@ -386,8 +378,17 @@ const EventsPage = () => {
 
       {/* Floating Action Button */}
       <div className="fixed bottom-6 right-6 z-20">
-            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
-              <DialogTrigger asChild>
+        <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
+          setIsCreateModalOpen(open);
+          if (!open) {
+            setIsEditingEvent(false);
+            setSelectedEvent(null);
+            setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "" });
+            setSelectedImage(null);
+            setImagePreview(null);
+          }
+        }}>
+          <DialogTrigger asChild>
             <button 
               onClick={() => {
                 setIsEditingEvent(false);
@@ -401,7 +402,7 @@ const EventsPage = () => {
               <Plus className="text-2xl" size={24} />
               <span className="truncate">Ajouter un événement</span>
             </button>
-              </DialogTrigger>
+          </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>{isEditingEvent ? "Modifier l'événement" : "Créer un nouvel événement"}</DialogTitle>
