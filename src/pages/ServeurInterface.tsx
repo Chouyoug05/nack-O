@@ -212,7 +212,12 @@ const ServeurInterface = () => {
   }, [ownerUid, agentCode]);
 
   const products = fsProducts ?? [];
-  const sellableProducts = products.filter(product => (product.stock || 0) > 0);
+  // Filtrer les produits avec stock > 0 ET prix > 0
+  const sellableProducts = products.filter(product => {
+    const stock = (product.stock || 0) > 0;
+    const price = Number(product.price || 0) > 0;
+    return stock && price;
+  });
   const availableCategories = [...new Set(sellableProducts.map(p => p.category).filter(Boolean))].sort();
 
   useEffect(() => {

@@ -232,7 +232,11 @@ const OrderManagement = ({
         }
 
         // 3) Marquer la commande comme validée (autorisé via agentToken même sans auth)
-        const updatePayload = agentToken && !isOwnerAuthed ? { status: 'sent', agentToken } : { status: 'sent' };
+        // Pour les caissiers, on doit inclure agentToken dans le payload pour que les règles Firestore l'autorisent
+        const updatePayload: { status: 'sent'; agentToken?: string } = { status: 'sent' };
+        if (agentToken && !isOwnerAuthed) {
+          updatePayload.agentToken = agentToken;
+        }
         await updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), updatePayload);
 
         setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'sent' } : o));
@@ -263,7 +267,10 @@ const OrderManagement = ({
 
   const handleCancelOrder = (order: Order) => {
     if (uidToUse && (typeof navigator === 'undefined' || navigator.onLine)) {
-      const updatePayload = agentToken && !isOwnerAuthed ? { status: 'cancelled', agentToken } : { status: 'cancelled' };
+      const updatePayload: { status: 'cancelled'; agentToken?: string } = { status: 'cancelled' };
+      if (agentToken && !isOwnerAuthed) {
+        updatePayload.agentToken = agentToken;
+      }
       updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), updatePayload).catch(() => {
         queueManagerUpdate(order.id, 'cancelled');
         toast({ title: "Annulation mise en file", description: "La commande sera annulée dès le retour en ligne." });
