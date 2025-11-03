@@ -53,6 +53,14 @@ const TeamPage = () => {
   const [selectedRole, setSelectedRole] = useState<'serveur' | 'caissier' | 'agent-evenement' | null>(null);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
+  const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: ""
+  });
   
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
@@ -272,6 +280,70 @@ const TeamPage = () => {
     setIsBottomSheetOpen(true);
   };
 
+  const handleEditClick = (member: TeamMember) => {
+    setEditingMember({
+      firstName: member.firstName,
+      lastName: member.lastName,
+      email: member.email || "",
+      phone: member.phone
+    });
+    setSelectedMember(member);
+    setIsEditDialogOpen(true);
+    setIsBottomSheetOpen(false);
+  };
+
+  const handleUpdateMember = async () => {
+    if (!user || !selectedMember) return;
+    if (!editingMember.firstName || !editingMember.lastName || !editingMember.phone) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs obligatoires",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      await updateDoc(fsDoc(teamColRef(db, user.uid), selectedMember.id), {
+        firstName: editingMember.firstName,
+        lastName: editingMember.lastName,
+        email: editingMember.email || undefined,
+        phone: editingMember.phone,
+        updatedAt: Date.now(),
+      });
+
+      // Mettre à jour aussi dans agentTokens si le token existe
+      if (selectedMember.agentToken) {
+        try {
+          await setDoc(doc(agentTokensTopColRef(db), selectedMember.agentToken), {
+            firstName: editingMember.firstName,
+            lastName: editingMember.lastName,
+            updatedAt: Date.now(),
+          }, { merge: true });
+        } catch { /* ignore */ }
+      }
+
+      toast({
+        title: "Membre modifié",
+        description: `${editingMember.firstName} ${editingMember.lastName} a été mis à jour.`,
+      });
+      setIsEditDialogOpen(false);
+      setSelectedMember(null);
+    } catch (error: unknown) {
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de modifier le membre",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleInfoClick = (member: TeamMember) => {
+    setSelectedMember(member);
+    setIsInfoDialogOpen(true);
+    setIsBottomSheetOpen(false);
+  };
+
   const openAddModalFromFAB = () => {
     // Ouvrir le menu de sélection de rôle
     setIsRoleSelectionOpen(true);
@@ -444,23 +516,18 @@ const TeamPage = () => {
             {/* Contextual Actions */}
             <div className="grid grid-cols-3 gap-4 p-4 pb-6">
               <button
-                onClick={() => {
-                  // Action édition - à implémenter
-                  toast({ title: "Édition", description: "Fonctionnalité à venir" });
-                }}
+                onClick={() => handleEditClick(selectedMember)}
                 className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-gray-200/50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-300/50 dark:hover:bg-gray-600/50 transition"
               >
                 <Edit className="w-8 h-8 text-primary" />
+                <span className="text-xs font-medium">Modifier</span>
               </button>
               <button
-                onClick={() => {
-                  if (selectedMember.dashboardLink) {
-                    window.open(selectedMember.dashboardLink, '_blank');
-                  }
-                }}
+                onClick={() => handleInfoClick(selectedMember)}
                 className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-gray-200/50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-300/50 dark:hover:bg-gray-600/50 transition"
               >
                 <Calendar className="w-8 h-8 text-primary" />
+                <span className="text-xs font-medium">Infos</span>
               </button>
               <button
                 onClick={() => {
@@ -471,6 +538,7 @@ const TeamPage = () => {
                 className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-destructive/10 dark:bg-destructive/20 rounded-xl hover:bg-destructive/20 dark:hover:bg-destructive/30 transition"
               >
                 <Trash2 className="w-8 h-8 text-destructive" />
+                <span className="text-xs font-medium">Supprimer</span>
               </button>
             </div>
           </div>
@@ -570,6 +638,181 @@ const TeamPage = () => {
             </Button>
             <Button onClick={handleAddMember} className="bg-gradient-primary text-white w-full sm:w-auto">
               Ajouter l'agent
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Info Dialog */}
+      <Dialog open={isInfoDialogOpen} onOpenChange={setIsInfoDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Informations de l'équipier</DialogTitle>
+            <DialogDescription>
+              Détails complets du membre de l'équipe
+            </DialogDescription>
+          </DialogHeader>
+          {selectedMember && (
+            <div className="space-y-4 py-4">
+              <div className="flex flex-col items-center gap-4">
+                <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full min-h-24 w-24 shadow-md bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
+                  <span className="text-3xl font-bold text-primary">
+                    {`${selectedMember.firstName[0]}${selectedMember.lastName[0]}`}
+                  </span>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold">
+                    {selectedMember.firstName} {selectedMember.lastName}
+                  </p>
+                  <p className="text-sm text-muted-foreground flex items-center justify-center gap-2 mt-1">
+                    {(() => {
+                      const RoleIcon = getRoleIcon(selectedMember.role);
+                      return <RoleIcon className="w-4 h-4" />;
+                    })()}
+                    {getRoleLabel(selectedMember.role)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex items-center gap-3">
+                  <Phone className="w-5 h-5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Téléphone</p>
+                    <p className="text-sm text-muted-foreground">{selectedMember.phone}</p>
+                  </div>
+                </div>
+
+                {selectedMember.email && (
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-muted-foreground" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Email</p>
+                      <p className="text-sm text-muted-foreground">{selectedMember.email}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <Badge variant={selectedMember.status === 'active' ? 'default' : 'secondary'}>
+                    {selectedMember.status === 'active' ? 'Actif' : 'Inactif'}
+                  </Badge>
+                </div>
+
+                {selectedMember.agentCode && (
+                  <div className="bg-nack-beige-light p-3 rounded-lg space-y-2">
+                    <p className="text-sm font-medium">Code d'agent</p>
+                    <Badge variant="outline" className="font-mono text-sm">
+                      {selectedMember.agentCode}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(selectedMember.agentCode || '');
+                        toast({ title: "Code copié", description: "Le code d'agent a été copié" });
+                      }}
+                      className="w-full"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copier le code
+                    </Button>
+                  </div>
+                )}
+
+                {selectedMember.dashboardLink && (
+                  <div className="bg-nack-beige-light p-3 rounded-lg space-y-2">
+                    <p className="text-sm font-medium">Lien d'accès</p>
+                    <code className="text-xs bg-background p-2 rounded border block break-all">
+                      {window.location.origin}{selectedMember.dashboardLink}
+                    </code>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const fullLink = `${window.location.origin}${selectedMember.dashboardLink}`;
+                        navigator.clipboard.writeText(fullLink);
+                        toast({ title: "Lien copié", description: "Le lien a été copié" });
+                      }}
+                      className="w-full"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copier le lien
+                    </Button>
+                  </div>
+                )}
+
+                {selectedMember.lastConnection && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="font-medium">Dernière connexion</p>
+                    <p>{new Date(selectedMember.lastConnection).toLocaleString('fr-FR')}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={() => setIsInfoDialogOpen(false)}>
+              Fermer
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Modifier le membre</DialogTitle>
+            <DialogDescription>
+              Modifiez les informations de {selectedMember?.firstName} {selectedMember?.lastName}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editFirstName">Prénom *</Label>
+              <Input
+                id="editFirstName"
+                value={editingMember.firstName}
+                onChange={(e) => setEditingMember({...editingMember, firstName: e.target.value})}
+                placeholder="Marie"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editLastName">Nom de famille *</Label>
+              <Input
+                id="editLastName"
+                value={editingMember.lastName}
+                onChange={(e) => setEditingMember({...editingMember, lastName: e.target.value})}
+                placeholder="Mvondo"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editPhone">Téléphone *</Label>
+              <Input
+                id="editPhone"
+                value={editingMember.phone}
+                onChange={(e) => setEditingMember({...editingMember, phone: e.target.value})}
+                placeholder="+241 01 23 45 67"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editEmail">Email (optionnel)</Label>
+              <Input
+                id="editEmail"
+                type="email"
+                value={editingMember.email}
+                onChange={(e) => setEditingMember({...editingMember, email: e.target.value})}
+                placeholder="marie.mvondo@gmail.com"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleUpdateMember} className="bg-gradient-primary text-white">
+              Enregistrer
             </Button>
           </div>
         </DialogContent>
