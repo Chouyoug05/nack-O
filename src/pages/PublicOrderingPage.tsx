@@ -140,30 +140,85 @@ const PublicOrderingPage = () => {
 
     // Charger les produits
     const productsRef = collection(db, `profiles/${establishmentId}/products`);
-    const productsQuery = query(productsRef, orderBy('name'));
-    const unsubscribeProducts = onSnapshot(
-      productsQuery,
-      (snapshot) => {
-        if (!isMountedRef.current) return;
-        const productsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Product[];
+    
+    // Fonction pour traiter les produits
+    const handleProductsSnapshot = (snapshot: any) => {
+      if (!isMountedRef.current) return;
+      
+      const productsData = snapshot.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Product[];
+      
+      // Filtrer les produits :
+      // - Prix > 0 (exclure les produits gratuits/à 0 XAF)
+      // - available !== false (inclure si undefined/null)
+      // - Stock non obligatoire (on affiche même si stock = 0 ou undefined)
+      const availableProducts = productsData.filter(p => {
+        const priceValue = typeof p.price === 'number' 
+          ? p.price 
+          : parseFloat(String(p.price || '0')) || 0;
         
-        const availableProducts = productsData.filter(p => {
-          const stock = p.quantity || p.stock || 0;
-          const priceValue = typeof p.price === 'number' ? p.price : parseFloat(String(p.price)) || 0;
-          return stock > 0 && priceValue > 0 && p.available !== false;
-        });
-        
-        setProducts(availableProducts);
-      },
-      (error) => {
-        if (!isMountedRef.current) return;
-        console.error('Erreur produits:', error);
-      }
-    );
-    unsubscribeProductsRef.current = unsubscribeProducts;
+        // Produit disponible si prix > 0 et pas explicitement désactivé
+        return priceValue > 0 && p.available !== false;
+      });
+      
+      // Trier par nom manuellement
+      availableProducts.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        return nameA.localeCompare(nameB);
+      });
+      
+      console.log('📦 Produits disponibles:', availableProducts.length, 'sur', productsData.length);
+      
+      setProducts(availableProducts);
+      setIsLoading(false);
+    };
+    
+    // Essayer avec orderBy, mais si ça échoue, charger sans tri
+    let unsubscribeProducts: (() => void) | null = null;
+    
+    try {
+      const productsQuery = query(productsRef, orderBy('name'));
+      unsubscribeProducts = onSnapshot(
+        productsQuery,
+        handleProductsSnapshot,
+        (error) => {
+          // Si orderBy échoue (champ name manquant), charger sans tri
+          console.warn('⚠️ Erreur avec orderBy, chargement sans tri:', error);
+          if (unsubscribeProducts) {
+            unsubscribeProducts();
+            unsubscribeProducts = null;
+          }
+          const simpleQuery = query(productsRef);
+          unsubscribeProducts = onSnapshot(
+            simpleQuery,
+            handleProductsSnapshot,
+            (err) => {
+              if (!isMountedRef.current) return;
+              console.error('❌ Erreur produits:', err);
+              setIsLoading(false);
+            }
+          );
+          unsubscribeProductsRef.current = unsubscribeProducts;
+        }
+      );
+      unsubscribeProductsRef.current = unsubscribeProducts;
+    } catch (error) {
+      // Si la création de la query échoue, charger directement
+      console.warn('⚠️ Erreur création query, chargement direct:', error);
+      unsubscribeProducts = onSnapshot(
+        productsRef,
+        handleProductsSnapshot,
+        (err) => {
+          if (!isMountedRef.current) return;
+          console.error('❌ Erreur produits:', err);
+          setIsLoading(false);
+        }
+      );
+      unsubscribeProductsRef.current = unsubscribeProducts;
+    }
 
     // Charger les tables
     const tablesRef = collection(db, `profiles/${establishmentId}/tables`);
