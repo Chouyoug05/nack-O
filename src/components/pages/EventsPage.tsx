@@ -529,11 +529,19 @@ const EventsPage = () => {
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsCreateModalOpen(false)} className="w-full sm:w-auto">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsCreateModalOpen(false);
+                      setIsEditingEvent(false);
+                      setSelectedEvent(null);
+                    }} 
+                    className="w-full sm:w-auto"
+                  >
                     Annuler
                   </Button>
                   <Button onClick={handleCreateEvent} className="bg-gradient-primary text-white w-full sm:w-auto">
-                    Créer l'événement
+                    {isEditingEvent ? "Enregistrer" : "Créer l'événement"}
                   </Button>
                 </div>
               </DialogContent>
