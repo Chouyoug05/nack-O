@@ -145,15 +145,15 @@ const ServeurInterface = () => {
 
     const unsub = onSnapshot(productsColRef(db, ownerUid), (snap) => {
       const list: Product[] = snap.docs.map((d) => {
-        const data = d.data() as FirestoreProductDoc;
+        const data = d.data() as FirestoreProductDoc & { imageUrl?: string; icon?: string };
         return {
           id: d.id,
-          name: data.name,
-          price: Number(data.price),
-          category: data.category,
-          stock: Number(data.quantity),
+          name: data.name || '',
+          price: Number(data.price || 0),
+          category: data.category || '',
+          stock: Number(data.quantity || 0),
           image: 'menu',
-          imageUrl: data.imageUrl,
+          imageUrl: data.imageUrl && data.imageUrl.trim() !== '' ? data.imageUrl : undefined,
         } as Product;
       });
       setFsProducts(list);
