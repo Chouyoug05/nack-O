@@ -19,7 +19,12 @@ import {
   Edit,
   Trash2,
   ExternalLink,
-  Copy
+  Copy,
+  Mic,
+  Music,
+  DollarSign,
+  Settings,
+  ChevronLeft
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -58,9 +63,10 @@ interface Ticket {
 const EventsPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
-  const { events, addEvent, deleteEvent: removeEvent } = useEvents();
+  const { events, addEvent, updateEvent, deleteEvent: removeEvent } = useEvents();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [isEditingEvent, setIsEditingEvent] = useState(false);
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
@@ -145,12 +151,30 @@ const EventsPage = () => {
     } satisfies NewEventPayload;
 
     try {
+      if (isEditingEvent && selectedEvent) {
+        await updateEvent(selectedEvent.id, {
+          title: data.title,
+          description: data.description,
+          date: data.date,
+          time: data.time,
+          location: data.location,
+          maxCapacity: data.maxCapacity,
+          ticketPrice: data.ticketPrice,
+          currency: data.currency,
+          imageUrl: data.imageUrl,
+          organizerWhatsapp: data.organizerWhatsapp,
+        });
+        toast({ title: "Événement modifié", description: `${data.title} a été mis à jour avec succès` });
+      } else {
       await addEvent(data);
+        toast({ title: "Événement créé", description: `${data.title} a été créé avec succès` });
+      }
       setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "" });
       setSelectedImage(null);
       setImagePreview(null);
       setIsCreateModalOpen(false);
-      toast({ title: "Événement créé", description: `${data.title} a été créé avec succès` });
+      setIsEditingEvent(false);
+      setSelectedEvent(null);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Réessayez.";
       toast({ title: "Erreur", description: message, variant: "destructive" });
@@ -218,85 +242,169 @@ const EventsPage = () => {
     return total + (event.ticketsSold * event.ticketPrice);
   }, 0);
 
+  const getEventIcon = (event: Event) => {
+    const title = event.title.toLowerCase();
+    if (title.includes('karaoké') || title.includes('karaoke') || title.includes('mic')) {
+      return { Icon: Mic, color: 'amber' };
+    }
+    if (title.includes('concert') || title.includes('live') || title.includes('music')) {
+      return { Icon: Music, color: 'rose' };
+    }
+    return { Icon: Calendar, color: 'blue' };
+  };
+
+  const formatEventDate = (date: string, time: string) => {
+    try {
+      const eventDate = new Date(date);
+      const days = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+      const months = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+      const dayName = days[eventDate.getDay()];
+      const day = eventDate.getDate();
+      const month = months[eventDate.getMonth()];
+      const timeStr = time || '';
+      return `${dayName} ${day} ${month} - ${timeStr}`;
+    } catch {
+      return `${date} - ${time}`;
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      {/* Header Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="shadow-card border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Total Événements</p>
-                <p className="text-2xl font-bold">{events.length}</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
-                <Calendar size={24} className="text-nack-red" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+    <div className="relative flex min-h-screen w-full flex-col bg-background">
+      {/* Top App Bar */}
+      <header className="sticky top-0 z-10 flex items-center bg-background/80 p-4 pb-3 justify-between backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
+        <div className="size-10"></div>
+        <h1 className="text-xl font-bold leading-tight tracking-tight flex-1 text-center text-gray-900 dark:text-white">Événements</h1>
+        <div className="size-10"></div>
+      </header>
 
-        <Card className="shadow-card border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Billets Vendus</p>
-                <p className="text-2xl font-bold">{events.reduce((total, e) => total + e.ticketsSold, 0)}</p>
-              </div>
-              <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
-                <Ticket size={24} className="text-nack-red" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Content: Event List */}
+      <main className="flex-grow p-4 space-y-4">
+        {/* Event Cards */}
+        {events.map((event) => {
+          const { Icon, color } = getEventIcon(event);
+          const colorClasses = {
+            amber: {
+              bg: 'bg-amber-50 dark:bg-amber-900/30',
+              iconBg: 'bg-amber-100 dark:bg-amber-800/50',
+              iconColor: 'text-amber-600 dark:text-amber-400'
+            },
+            rose: {
+              bg: 'bg-rose-50 dark:bg-rose-900/30',
+              iconBg: 'bg-rose-100 dark:bg-rose-800/50',
+              iconColor: 'text-rose-600 dark:text-rose-400'
+            },
+            blue: {
+              bg: 'bg-blue-50 dark:bg-blue-900/30',
+              iconBg: 'bg-blue-100 dark:bg-blue-800/50',
+              iconColor: 'text-blue-600 dark:text-blue-400'
+            }
+          };
+          const colors = colorClasses[color as keyof typeof colorClasses] || colorClasses.blue;
 
-        <Card className="shadow-card border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Revenus</p>
-                <p className="text-2xl font-bold">{Number(totalRevenue || 0).toLocaleString()} XAF</p>
+          return (
+            <div key={event.id} className="flex flex-col items-stretch justify-start rounded-lg bg-white dark:bg-gray-800 shadow-sm overflow-hidden">
+              {/* Event Header */}
+              <div className={`flex items-center gap-4 p-4 ${colors.bg}`}>
+                <div className={`flex items-center justify-center size-12 rounded-full ${colors.iconBg}`}>
+                  <Icon className={`text-3xl ${colors.iconColor}`} size={32} />
               </div>
-              <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">
-                <Users size={24} className="text-nack-red" />
+                <div className="flex-grow">
+                  <h2 className="text-lg font-bold leading-tight tracking-tight text-gray-900 dark:text-white">{event.title}</h2>
+                  <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    <Calendar size={14} />
+                    <p>{formatEventDate(event.date, event.time)}</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+              </div>
 
-        <Card className="shadow-card border-0">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Événements Actifs</p>
-                <p className="text-2xl font-bold text-green-600">{events.filter(e => e.isActive).length}</p>
+              {/* Event Actions */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+                <div className="gap-2 grid-cols-[repeat(auto-fit,_minmax(80px,_1fr))] grid">
+                  <button
+                    onClick={() => setSelectedEvent(event)}
+                    className="flex flex-col items-center gap-2 py-2.5 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Voir les participants et billets"
+                  >
+                    <div className="flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 p-2.5">
+                      <Users className="text-xl text-gray-700 dark:text-gray-300" size={20} />
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <Calendar size={24} className="text-green-600" />
+                    <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Participants</p>
+                  </button>
+                  <button
+                    onClick={() => setSelectedEvent(event)}
+                    className="flex flex-col items-center gap-2 py-2.5 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Voir les finances et revenus"
+                  >
+                    <div className="flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 p-2.5">
+                      <DollarSign className="text-xl text-gray-700 dark:text-gray-300" size={20} />
+              </div>
+                    <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Finances</p>
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Ouvrir le dialog de modification avec les informations de l'événement
+                      setNewEvent({
+                        title: event.title,
+                        description: event.description || "",
+                        date: event.date,
+                        time: event.time,
+                        location: event.location || "",
+                        maxCapacity: String(event.maxCapacity),
+                        ticketPrice: String(event.ticketPrice),
+                        currency: event.currency,
+                        imageUrl: event.imageUrl || "",
+                        organizerWhatsapp: event.organizerWhatsapp || ""
+                      });
+                      if (event.imageUrl) setImagePreview(event.imageUrl);
+                      setSelectedEvent(event);
+                      setIsEditingEvent(true);
+                      setIsCreateModalOpen(true);
+                    }}
+                    className="flex flex-col items-center gap-2 py-2.5 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                    title="Modifier l'événement"
+                  >
+                    <div className="flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 p-2.5">
+                      <Settings className="text-xl text-gray-700 dark:text-gray-300" size={20} />
+            </div>
+                    <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Modifier</p>
+                  </button>
+              </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          );
+        })}
+
+        {/* Empty State */}
+        {events.length === 0 && (
+          <div className="flex flex-col items-center justify-center text-center py-16 px-4">
+            <Calendar className="text-6xl text-gray-300 dark:text-gray-600" size={64} />
+            <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Aucun événement à venir</h3>
+            <p className="mt-1 text-gray-500 dark:text-gray-400">Créez-en un pour commencer !</p>
       </div>
+        )}
+      </main>
 
-      {/* Controls */}
-      <Card className="shadow-card border-0">
-        <CardHeader>
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <CardTitle>Gestion des Événements</CardTitle>
-              <CardDescription>Créez et gérez vos événements avec vente de billets</CardDescription>
-            </div>
+      {/* Floating Action Button */}
+      <div className="fixed bottom-6 right-6 z-20">
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-gradient-primary text-white shadow-button hover:shadow-elegant">
-                  <Plus className="mr-2" size={18} />
-                  Créer un événement
-                </Button>
+            <button 
+              onClick={() => {
+                setIsEditingEvent(false);
+                setSelectedEvent(null);
+                setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "" });
+                setSelectedImage(null);
+                setImagePreview(null);
+              }}
+              className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-14 bg-gradient-primary text-white text-base font-bold leading-normal shadow-lg transition-transform hover:scale-105 active:scale-95 min-w-0 gap-3 pl-5 pr-6"
+            >
+              <Plus className="text-2xl" size={24} />
+              <span className="truncate">Ajouter un événement</span>
+            </button>
               </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Créer un nouvel événement</DialogTitle>
+                  <DialogTitle>{isEditingEvent ? "Modifier l'événement" : "Créer un nouvel événement"}</DialogTitle>
                   <DialogDescription>
                     Remplissez les informations de votre événement
                   </DialogDescription>
@@ -431,110 +539,6 @@ const EventsPage = () => {
               </DialogContent>
             </Dialog>
           </div>
-        </CardHeader>
-        <CardContent>
-          {/* Events List */}
-          <div className="space-y-4">
-            {events.map((event) => (
-              <Card key={event.id} className="border-l-4 border-l-nack-red">
-                <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="text-xl font-semibold">{event.title}</h3>
-                        <Badge variant={event.isActive ? "default" : "secondary"}>
-                          {event.isActive ? "Actif" : "Inactif"}
-                        </Badge>
-                      </div>
-                      <p className="text-muted-foreground mb-3">{event.description}</p>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Calendar size={16} className="text-nack-red" />
-                          <span>{new Date(event.date).toLocaleDateString('fr-FR')} à {event.time}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin size={16} className="text-nack-red" />
-                          <span>{event.location}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Ticket size={16} className="text-nack-red" />
-                          <span>{event.ticketsSold}/{event.maxCapacity} billets</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users size={16} className="text-nack-red" />
-                          <span>{Number(event.ticketPrice || 0).toLocaleString()} {event.currency}</span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setReserveDialogEvent(event)}
-                        className="flex items-center gap-2"
-                      >
-                        <Ticket size={16} />
-                        Nouvelle réservation
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyLink(event.shareableLink)}
-                        className="flex items-center gap-2"
-                      >
-                        <Copy size={16} />
-                        Copier le lien
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(event.shareableLink, '_blank')}
-                        className="flex items-center gap-2"
-                      >
-                        <ExternalLink size={16} />
-                        Voir la page
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedEvent(event)}
-                        className="flex items-center gap-2"
-                      >
-                        <Ticket size={16} />
-                        Billets
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteEvent(event.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            
-            {events.length === 0 && (
-              <div className="text-center py-12">
-                <Calendar size={48} className="mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">Aucun événement</h3>
-                <p className="text-muted-foreground mb-4">
-                  Commencez par créer votre premier événement avec vente de billets
-                </p>
-                <Button onClick={() => setIsCreateModalOpen(true)} className="bg-gradient-primary text-white">
-                  <Plus className="mr-2" size={18} />
-                  Créer un événement
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Tickets Modal */}
       {selectedEvent && (

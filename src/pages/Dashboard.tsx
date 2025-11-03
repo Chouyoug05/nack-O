@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   Bell,
   QrCode,
+  Calendar,
 } from "lucide-react";
 import { Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +20,7 @@ import ReportsPage from "@/components/pages/ReportsPage";
 import SettingsPage from "@/components/pages/SettingsPage";
 import OrderManagement from "@/components/OrderManagement";
 import BarConnecteePage from "@/components/pages/BarConnecteePage";
+import EventsPage from "@/components/pages/EventsPage";
 import NotificationPanel from "@/components/NotificationPanel";
 import { db } from "@/lib/firebase";
 import { productsColRef, salesColRef, teamColRef } from "@/lib/collections";
@@ -53,7 +55,7 @@ const fallbackStats: StatCard[] = [
   },
 ];
 
-type ActionKey = "sales" | "stock" | "reports" | "profile" | "team" | "bar-connectee";
+type ActionKey = "sales" | "stock" | "reports" | "profile" | "team" | "bar-connectee" | "events";
 
 type MenuCard = {
   key: ActionKey | "logout";
@@ -110,6 +112,15 @@ const menuCards: MenuCard[] = [
     hint: "QR",
     accentBg: "",
     accentColor: "text-[#FD7E14]",
+  },
+  {
+    key: "events",
+    title: "Événements",
+    description: "",
+    icon: Calendar,
+    hint: "",
+    accentBg: "",
+    accentColor: "text-[#E91E63]",
   },
   {
     key: "profile",
@@ -238,6 +249,8 @@ const Dashboard = () => {
         return <StockPage />;
       case "reports":
         return <ReportsPage />;
+      case "events":
+        return <EventsPage />;
       case "profile":
         return <SettingsPage />;
       default:
