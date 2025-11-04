@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package } from "lucide-react";
+import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download } from "lucide-react";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
+import { printThermalTicket, downloadThermalTicket } from "@/utils/ticketThermal";
 
 interface Product {
   id: string;
@@ -383,6 +384,30 @@ const PublicOrderingPage = () => {
     }
   };
 
+  const printReceipt = () => {
+    if (!establishment || !orderNumber) return;
+
+    try {
+      const thermalData = {
+        orderNumber,
+        establishmentName: establishment.establishmentName,
+        tableZone: selectedTable,
+        items: cart.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        total,
+        createdAt: Date.now()
+      };
+
+      printThermalTicket(thermalData);
+    } catch (error) {
+      console.error('Erreur impression ticket:', error);
+      alert('Erreur lors de l\'impression. Veuillez réessayer.');
+    }
+  };
+
   // ==========================================
   // RENDU CONDITIONNEL - APRÈS TOUS LES HOOKS
   // ==========================================
@@ -417,9 +442,16 @@ const PublicOrderingPage = () => {
               Montrez ce QR Code au serveur
             </p>
           </div>
-          <Button onClick={downloadReceipt} className="w-full">
-            Télécharger mon Reçu
-          </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <Button onClick={printReceipt} className="w-full bg-gradient-primary text-white">
+              <Printer className="w-4 h-4 mr-2" />
+              Imprimer
+            </Button>
+            <Button onClick={downloadReceipt} variant="outline" className="w-full">
+              <Download className="w-4 h-4 mr-2" />
+              Télécharger
+            </Button>
+          </div>
           <Button 
             variant="outline"
             onClick={() => {
