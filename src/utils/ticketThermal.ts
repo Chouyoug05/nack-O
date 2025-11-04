@@ -32,13 +32,15 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
   });
 
   // Formatage des produits avec alignement (ticket 58mm = ~32 caractères)
+  // Format: PRODUIT            QTE    PRIX
+  //         Biere Castel        2    2 000
   const productsRows = data.items.map(item => {
     const itemTotal = item.price * item.quantity;
-    // Nom max 16 caractères pour laisser de la place aux colonnes
-    const name = item.name.length > 16 ? item.name.substring(0, 13) + '...' : item.name;
-    const namePadded = name.padEnd(16);
+    // Nom max 18 caractères pour correspondre au format demandé
+    const name = item.name.length > 18 ? item.name.substring(0, 15) + '...' : item.name;
+    const namePadded = name.padEnd(18);
     const qte = item.quantity.toString().padStart(3);
-    const price = itemTotal.toLocaleString('fr-FR').padStart(10);
+    const price = itemTotal.toLocaleString('fr-FR').padStart(8);
     return `${namePadded} ${qte} ${price}`;
   }).join('\n');
 
@@ -200,7 +202,7 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
     <div class="separator"></div>
     
     <div class="products-header">
-PRODUIT          QTE      PRIX
+PRODUIT            QTE    PRIX
     </div>
     
     <div class="products">
@@ -210,7 +212,7 @@ ${productsRows}
     <div class="separator"></div>
     
     <div class="total-line">
-TOTAL              ${totalFormatted.padStart(10)} FCFA
+TOTAL                ${totalFormatted.padStart(8)} FCFA
     </div>
     
     <div class="separator"></div>
