@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
-import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, runTransaction, addDoc } from "firebase/firestore";
+import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc } from "firebase/firestore";
 import type { SaleDoc, SaleItem, PaymentMethod } from "@/types/inventory";
 
 interface FirestoreOrderItem {
@@ -242,6 +242,36 @@ const OrderManagement = ({
         setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'sent' } : o));
         updateOrderStatus(order.id, 'sent');
         toast({ title: isOwnerAuthed ? "Encaissement réussi" : "Commande validée", description: `Commande #${order.orderNumber} ${isOwnerAuthed ? 'encaissée' : 'validée'}` });
+        
+        // Proposer d'imprimer le reçu pour le client
+        const shouldPrint = window.confirm(`Commande validée avec succès !\n\nSouhaitez-vous imprimer le reçu pour le client ?`);
+        if (shouldPrint) {
+          try {
+            // Récupérer le nom de l'établissement
+            const profileRef = fsDoc(db, 'profiles', uidToUse);
+            const profileSnap = await getDoc(profileRef);
+            const establishmentName = profileSnap.exists() ? (profileSnap.data() as { establishmentName?: string }).establishmentName || 'Établissement' : 'Établissement';
+            
+            const thermalData = {
+              orderNumber: order.orderNumber || `C-${Date.now()}`,
+              establishmentName,
+              tableZone: order.tableNumber || order.tableZone || 'Table',
+              items: order.items.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                price: item.price
+              })),
+              total: order.total,
+              createdAt: order.createdAt || Date.now()
+            };
+
+            const { printThermalTicket } = await import('@/utils/ticketThermal');
+            printThermalTicket(thermalData);
+          } catch (error) {
+            console.error('Erreur impression reçu:', error);
+            // Ne pas bloquer, juste logger l'erreur
+          }
+        }
       } catch (e: unknown) {
         // Si l'agent n'est pas le gérant, on met en file et on met à jour l'UI pour ne pas bloquer
         if (!isOwnerAuthed && agentToken && uidToUse) {

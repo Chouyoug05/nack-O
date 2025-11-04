@@ -355,6 +355,37 @@ const SalesPage = () => {
       } catch { /* ignore */ }
 
       toast({ title: "Vente enregistrée", description: `Vente de ${cartTotal.toLocaleString()} XAF` });
+      
+      // Proposer d'imprimer le reçu pour le client
+      const shouldPrint = window.confirm(`Vente enregistrée avec succès !\n\nSouhaitez-vous imprimer le reçu pour le client ?`);
+      if (shouldPrint) {
+        try {
+          // Récupérer le nom de l'établissement
+          const profileRef = fsDoc(db, 'profiles', ownerUidForWrites);
+          const profileSnap = await getDoc(profileRef);
+          const establishmentName = profileSnap.exists() ? (profileSnap.data() as { establishmentName?: string }).establishmentName || 'Établissement' : 'Établissement';
+          
+          const thermalData = {
+            orderNumber: `V-${Date.now()}`,
+            establishmentName,
+            tableZone: 'Caisse',
+            items: cart.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price
+            })),
+            total: cartTotal,
+            createdAt: Date.now()
+          };
+
+          const { printThermalTicket } = await import('@/utils/ticketThermal');
+          printThermalTicket(thermalData);
+        } catch (error) {
+          console.error('Erreur impression reçu:', error);
+          // Ne pas bloquer, juste logger l'erreur
+        }
+      }
+      
       setCart([]);
       setSelectedPayment(null);
       setIsCheckoutOpen(false);

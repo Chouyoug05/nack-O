@@ -55,11 +55,18 @@ const usePeriodData = (uid: string | undefined, period: 'daily' | 'weekly' | 'mo
     if (!uid) return;
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
-    const start = period === 'daily'
-      ? now - dayMs
-      : period === 'weekly'
-        ? now - 7 * dayMs
-        : now - 30 * dayMs;
+    
+    // Pour la période 'daily', calculer depuis minuit (00:00:00) du jour actuel
+    let start: number;
+    if (period === 'daily') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Mettre à minuit
+      start = today.getTime();
+    } else if (period === 'weekly') {
+      start = now - 7 * dayMs;
+    } else {
+      start = now - 30 * dayMs;
+    }
 
     const periodKey = `${uid}-${period}`;
     
