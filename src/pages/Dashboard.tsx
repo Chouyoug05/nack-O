@@ -244,7 +244,11 @@ const Dashboard = () => {
   const renderAction = (action: ActionKey) => {
     switch (action) {
       case "sales":
-        return <SalesPage />;
+        return (
+          <FeatureGate feature="sales">
+            <SalesPage />
+          </FeatureGate>
+        );
       case "bar-connectee":
         return (
           <FeatureGate feature="barConnectee">
@@ -252,9 +256,17 @@ const Dashboard = () => {
           </FeatureGate>
         );
       case "stock":
-        return <StockPage />;
+        return (
+          <FeatureGate feature="stock">
+            <StockPage />
+          </FeatureGate>
+        );
       case "reports":
-        return <ReportsPage />;
+        return (
+          <FeatureGate feature="reports">
+            <ReportsPage />
+          </FeatureGate>
+        );
       case "events":
         return (
           <FeatureGate feature="events">

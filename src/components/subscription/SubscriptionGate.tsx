@@ -175,9 +175,218 @@ const SubscriptionGate = ({ children }: Props) => {
   const trialRemaining = showTrial ? state.remaining : 0;
   const activeRemaining = state.status === 'active' ? state.remaining : 0;
 
+  // BLOQUER l'accès si l'essai est expiré ou l'abonnement est expiré
+  if (isExpired) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <Card className="w-full max-w-md shadow-lg">
+          <CardContent className="p-6 space-y-4">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Accès bloqué</h2>
+              <p className="text-gray-600 mb-4">
+                Votre période d'essai gratuite est terminée ou votre abonnement a expiré.
+              </p>
+              <p className="text-sm text-gray-500 mb-6">
+                Pour continuer à utiliser l'application, veuillez vous abonner à l'un de nos forfaits.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 mb-2">Transition - 2 500 XAF/mois</h3>
+                <ul className="text-sm text-blue-800 space-y-1 mb-3">
+                  <li>✓ Gestion des produits</li>
+                  <li>✓ Point de vente</li>
+                  <li>✓ Gestion du stock</li>
+                  <li>✓ Rapports</li>
+                </ul>
+                <Button
+                  onClick={async () => {
+                    if (!user) return;
+                    try {
+                      setCreatingLink(true);
+                      
+                      const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                      const now = Date.now();
+                      const base = (
+                        (import.meta.env.VITE_PUBLIC_BASE_URL as string)
+                        || window.location.origin
+                      ).replace(/\/+$/, '');
+                      
+                      const reference = 'abonnement-transition';
+                      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
+                      const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
+                      const logoURL = `${base}/favicon.png`;
+                      
+                      try {
+                        const { paymentsColRef } = await import('@/lib/collections');
+                        const { db } = await import('@/lib/firebase');
+                        const { addDoc } = await import('firebase/firestore');
+                        const paymentsRef = paymentsColRef(db, user.uid);
+                        
+                        await addDoc(paymentsRef, {
+                          userId: user.uid,
+                          transactionId,
+                          subscriptionType: 'transition',
+                          amount: 2500,
+                          status: 'pending',
+                          paymentMethod: 'airtel-money',
+                          reference,
+                          paymentLink: '',
+                          redirectSuccess,
+                          redirectError,
+                          createdAt: now,
+                        });
+                      } catch (error) {
+                        console.error('Erreur enregistrement transaction pending:', error);
+                      }
+                      
+                      const link = await createSubscriptionPaymentLink({
+                        amount: 2500,
+                        reference: `${reference}-${transactionId.substring(0, 8)}`,
+                        redirectSuccess,
+                        redirectError,
+                        logoURL,
+                        isTransfer: false,
+                      });
+                      
+                      try {
+                        const { paymentsColRef } = await import('@/lib/collections');
+                        const { db } = await import('@/lib/firebase');
+                        const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+                        const paymentsRef = paymentsColRef(db, user.uid);
+                        const q = query(paymentsRef, where('transactionId', '==', transactionId));
+                        const snapshot = await getDocs(q);
+                        if (!snapshot.empty) {
+                          await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
+                        }
+                      } catch (error) {
+                        console.error('Erreur mise à jour lien paiement:', error);
+                      }
+                      
+                      window.location.href = link;
+                    } catch (e) {
+                      console.error(e);
+                      const msg = e instanceof Error ? e.message : String(e);
+                      alert(`Impossible de créer le lien de paiement: ${msg}`);
+                    } finally {
+                      setCreatingLink(false);
+                    }
+                  }}
+                  disabled={creatingLink}
+                  variant="outline"
+                  className="w-full"
+                >
+                  {creatingLink ? 'Chargement...' : 'S\'abonner - Transition (2 500 XAF)'}
+                </Button>
+              </div>
+
+              <div className="bg-gradient-to-r from-red-600 to-red-700 border border-red-800 rounded-lg p-4">
+                <h3 className="font-semibold text-white mb-2">Transition Pro Max - 7 500 XAF/mois</h3>
+                <ul className="text-sm text-red-100 space-y-1 mb-3">
+                  <li>✓ Toutes les fonctionnalités Transition</li>
+                  <li>✓ Gestion des équipiers</li>
+                  <li>✓ Bar Connectée</li>
+                  <li>✓ Événements (5 inclus, puis 1 500 XAF/événement)</li>
+                </ul>
+                <Button
+                  onClick={async () => {
+                    if (!user) return;
+                    try {
+                      setCreatingLink(true);
+                      
+                      const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+                      const now = Date.now();
+                      const base = (
+                        (import.meta.env.VITE_PUBLIC_BASE_URL as string)
+                        || window.location.origin
+                      ).replace(/\/+$/, '');
+                      
+                      const reference = 'abonnement-transition-pro-max';
+                      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
+                      const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
+                      const logoURL = `${base}/favicon.png`;
+                      
+                      try {
+                        const { paymentsColRef } = await import('@/lib/collections');
+                        const { db } = await import('@/lib/firebase');
+                        const { addDoc } = await import('firebase/firestore');
+                        const paymentsRef = paymentsColRef(db, user.uid);
+                        
+                        await addDoc(paymentsRef, {
+                          userId: user.uid,
+                          transactionId,
+                          subscriptionType: 'transition-pro-max',
+                          amount: 7500,
+                          status: 'pending',
+                          paymentMethod: 'airtel-money',
+                          reference,
+                          paymentLink: '',
+                          redirectSuccess,
+                          redirectError,
+                          createdAt: now,
+                        });
+                      } catch (error) {
+                        console.error('Erreur enregistrement transaction pending:', error);
+                      }
+                      
+                      const link = await createSubscriptionPaymentLink({
+                        amount: 7500,
+                        reference: `${reference}-${transactionId.substring(0, 8)}`,
+                        redirectSuccess,
+                        redirectError,
+                        logoURL,
+                        isTransfer: false,
+                      });
+                      
+                      try {
+                        const { paymentsColRef } = await import('@/lib/collections');
+                        const { db } = await import('@/lib/firebase');
+                        const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+                        const paymentsRef = paymentsColRef(db, user.uid);
+                        const q = query(paymentsRef, where('transactionId', '==', transactionId));
+                        const snapshot = await getDocs(q);
+                        if (!snapshot.empty) {
+                          await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
+                        }
+                      } catch (error) {
+                        console.error('Erreur mise à jour lien paiement:', error);
+                      }
+                      
+                      window.location.href = link;
+                    } catch (e) {
+                      console.error(e);
+                      const msg = e instanceof Error ? e.message : String(e);
+                      alert(`Impossible de créer le lien de paiement: ${msg}`);
+                    } finally {
+                      setCreatingLink(false);
+                    }
+                  }}
+                  disabled={creatingLink}
+                  className="w-full bg-white text-red-600 hover:bg-red-50"
+                >
+                  {creatingLink ? 'Chargement...' : 'S\'abonner - Pro Max (7 500 XAF)'}
+                </Button>
+              </div>
+            </div>
+
+            <p className="text-xs text-center text-gray-500 mt-4">
+              Le paiement est disponible uniquement via <strong>Airtel Money</strong>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <>
-      {/* Contenu de l'app (toujours rendu, fonctionnalités débloquées) */}
+      {/* Contenu de l'app - uniquement si l'utilisateur a un essai actif ou un abonnement actif */}
       {children}
 
       {/* Popup essai: non bloquant */}
