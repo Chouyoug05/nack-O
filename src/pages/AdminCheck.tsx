@@ -139,11 +139,33 @@ const AdminCheck = () => {
 
           <div className="pt-4 border-t space-y-2">
             <h3 className="font-semibold">Instructions pour devenir admin :</h3>
-            <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
-              <li>Exécutez le script : <code className="bg-muted px-1 rounded">node scripts/promoteAdmin.mjs {user.uid}</code></li>
-              <li>Assurez-vous d'avoir configuré les variables d'environnement nécessaires</li>
-              <li>Rechargez cette page après avoir exécuté le script</li>
-            </ol>
+            <div className="space-y-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="font-semibold text-blue-900 mb-2">Méthode 1 : Script (Recommandé)</p>
+                <p className="text-sm text-blue-800 mb-2">Exécutez cette commande dans le terminal :</p>
+                <code className="block bg-blue-100 p-2 rounded text-xs break-all">
+                  node scripts/promoteAdmin.mjs {user.uid}
+                </code>
+                <p className="text-xs text-blue-700 mt-2">
+                  ⚠️ Assurez-vous d'avoir configuré FIREBASE_PROJECT_ID et SERVICE_ACCOUNT_JSON
+                </p>
+              </div>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="font-semibold text-green-900 mb-2">Méthode 2 : Firebase Console (Manuel)</p>
+                <ol className="list-decimal list-inside space-y-1 text-sm text-green-800">
+                  <li>Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline">Firebase Console</a></li>
+                  <li>Projet : <strong>nack-8c299</strong></li>
+                  <li>Firestore Database → Créez collection <code className="bg-green-100 px-1 rounded">admins</code></li>
+                  <li>Créez document avec ID : <code className="bg-green-100 px-1 rounded">{user.uid}</code></li>
+                  <li>Ajoutez les champs : <code className="bg-green-100 px-1 rounded">role: "admin"</code>, <code className="bg-green-100 px-1 rounded">createdAt</code>, <code className="bg-green-100 px-1 rounded">updatedAt</code></li>
+                </ol>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                Après avoir créé le document admin, rechargez cette page.
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-2 pt-4">
