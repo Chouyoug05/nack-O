@@ -14,7 +14,6 @@ import {
   Shield, 
   Database,
   Bell,
-  Download,
   Upload,
   Crown,
   Check,
@@ -23,7 +22,8 @@ import {
   ExternalLink,
   Info,
   Wrench,
-  Paintbrush
+  Paintbrush,
+  Download
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadLogo } from "@/lib/upload";
