@@ -921,9 +921,9 @@ const StockPage = () => {
                          </p>
                          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                            <p className="text-xs font-semibold text-blue-900 mb-1">Exemple de format CSV:</p>
-                           <pre className="text-xs text-blue-800 overflow-x-auto">
+                           <pre className="text-xs text-blue-800 overflow-x-auto whitespace-pre-wrap">
 {`Nom,Catégorie,Prix,Quantité,Coût,Description
-"Bière 33cl","Boissons",1500,50,1000,"Bière locale
+"Bière 33cl","Boissons",1500,50,1000,"Bière locale"
 "Vin rouge","Alcools",5000,20,3500,"Vin importé"`}
                            </pre>
                          </div>
