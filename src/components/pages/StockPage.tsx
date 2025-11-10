@@ -1520,19 +1520,24 @@ const StockPage = () => {
           </div>
 
           {/* Sélection multiple */}
-          {filteredProducts.length > 0 && (
+          {products.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
               <div className="flex items-center gap-3 flex-1">
                 <Checkbox
                   id="select-all"
-                  checked={selectedProducts.size > 0 && selectedProducts.size === filteredProducts.filter(p => p.id).length}
+                  checked={filteredProducts.length > 0 && selectedProducts.size > 0 && selectedProducts.size === filteredProducts.filter(p => p.id).length}
                   onCheckedChange={handleSelectAll}
+                  disabled={filteredProducts.length === 0}
                 />
                 <label 
                   htmlFor="select-all" 
                   className="text-sm font-medium cursor-pointer flex-1"
                 >
-                  Tout sélectionner ({selectedProducts.size} sélectionné{selectedProducts.size > 1 ? 's' : ''})
+                  {filteredProducts.length > 0 ? (
+                    <>Tout sélectionner ({selectedProducts.size} sélectionné{selectedProducts.size > 1 ? 's' : ''})</>
+                  ) : (
+                    <>Aucun produit à sélectionner</>
+                  )}
                 </label>
               </div>
               {selectedProducts.size > 0 && (
