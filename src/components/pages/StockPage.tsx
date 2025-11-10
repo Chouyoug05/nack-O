@@ -33,7 +33,9 @@ import {
   Shirt,
   Box,
   ShoppingBag,
-  Lightbulb
+  Lightbulb,
+  Upload,
+  FileText
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,8 +69,13 @@ const StockPage = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formStep, setFormStep] = useState(1); // Étape du formulaire guidé
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importType, setImportType] = useState<'csv' | 'pdf' | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importPreview, setImportPreview] = useState<Array<Partial<Product>>>([]);
   
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -558,6 +565,157 @@ const StockPage = () => {
     }
   };
 
+  // Fonction pour parser CSV
+  const parseCSV = (text: string): Array<Partial<Product>> => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return [];
+    
+    // Détecter l'en-tête (première ligne)
+    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const nameIdx = header.findIndex(h => h.includes('nom') || h.includes('name') || h.includes('produit'));
+    const categoryIdx = header.findIndex(h => h.includes('catégorie') || h.includes('category') || h.includes('categorie'));
+    const priceIdx = header.findIndex(h => h.includes('prix') || h.includes('price'));
+    const quantityIdx = header.findIndex(h => h.includes('quantité') || h.includes('quantity') || h.includes('quantite') || h.includes('stock'));
+    const costIdx = header.findIndex(h => h.includes('coût') || h.includes('cost') || h.includes('cout'));
+    const descriptionIdx = header.findIndex(h => h.includes('description') || h.includes('desc'));
+    
+    const products: Array<Partial<Product>> = [];
+    
+    // Parser les lignes de données
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      
+      if (nameIdx >= 0 && values[nameIdx]) {
+        const name = values[nameIdx];
+        const category = categoryIdx >= 0 && values[categoryIdx] ? values[categoryIdx] : 'Autres';
+        const price = priceIdx >= 0 ? parseFloat(values[priceIdx] || '0') : 0;
+        const quantity = quantityIdx >= 0 ? parseFloat(values[quantityIdx] || '0') : 0;
+        const cost = costIdx >= 0 ? parseFloat(values[costIdx] || '0') : 0;
+        const description = descriptionIdx >= 0 ? values[descriptionIdx] : undefined;
+        
+        if (name && quantity >= 0) {
+          products.push({
+            name,
+            category,
+            price: isNaN(price) ? 0 : price,
+            quantity: isNaN(quantity) ? 0 : Math.floor(quantity),
+            cost: isNaN(cost) ? 0 : cost,
+            description
+          });
+        }
+      }
+    }
+    
+    return products;
+  };
+
+  // Fonction pour parser PDF (basique - extraction de texte)
+  const parsePDF = async (file: File): Promise<Array<Partial<Product>>> => {
+    // Pour le PDF, on va utiliser une approche simple avec une bibliothèque
+    // Pour l'instant, on va suggérer d'utiliser CSV ou une conversion manuelle
+    // On peut utiliser pdfjs-dist si nécessaire, mais pour simplifier, on va d'abord implémenter CSV
+    throw new Error('L\'import PDF nécessite une bibliothèque spécialisée. Veuillez convertir votre PDF en CSV d\'abord.');
+  };
+
+  // Gérer le changement de fichier
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setImportFile(file);
+    
+    // Détecter le type de fichier
+    if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+      setImportType('csv');
+      const text = await file.text();
+      const parsed = parseCSV(text);
+      setImportPreview(parsed);
+    } else if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
+      setImportType('pdf');
+      try {
+        // Pour PDF, on va afficher un message d'aide
+        toast({
+          title: "Import PDF",
+          description: "L'import PDF est en cours de développement. Veuillez convertir votre PDF en CSV pour l'instant.",
+          variant: "destructive"
+        });
+        setImportFile(null);
+        setImportType(null);
+      } catch (error) {
+        toast({
+          title: "Erreur",
+          description: "Impossible de lire le fichier PDF. Veuillez utiliser un fichier CSV.",
+          variant: "destructive"
+        });
+        setImportFile(null);
+        setImportType(null);
+      }
+    } else {
+      toast({
+        title: "Format non supporté",
+        description: "Veuillez sélectionner un fichier CSV ou PDF.",
+        variant: "destructive"
+      });
+      setImportFile(null);
+      setImportType(null);
+    }
+  };
+
+  // Importer les produits
+  const handleImportProducts = async () => {
+    if (!user || !importPreview.length) return;
+    
+    setIsImporting(true);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    try {
+      for (const product of importPreview) {
+        if (!product.name || !product.category || product.quantity === undefined) {
+          errorCount++;
+          continue;
+        }
+        
+        try {
+          const payload: ProductDoc = {
+            name: product.name,
+            category: product.category,
+            price: product.price || 0,
+            quantity: product.quantity || 0,
+            cost: product.cost || 0,
+            ...(product.description ? { description: product.description } : {}),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          };
+          
+          await addDoc(productsColRef(db, user.uid), payload as ProductDoc);
+          successCount++;
+        } catch (error) {
+          console.error('Erreur import produit:', error);
+          errorCount++;
+        }
+      }
+      
+      toast({
+        title: "Import terminé",
+        description: `${successCount} produit(s) importé(s) avec succès${errorCount > 0 ? `. ${errorCount} erreur(s).` : '.'}`
+      });
+      
+      setIsImportModalOpen(false);
+      setImportFile(null);
+      setImportPreview([]);
+      setImportType(null);
+    } catch (error) {
+      toast({
+        title: "Erreur d'import",
+        description: "Une erreur est survenue lors de l'import.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleRecordLoss = async () => {
     if (!user) return;
     if (!lossData.productId || !lossData.quantity || !lossData.reason) {
@@ -690,6 +848,99 @@ const StockPage = () => {
                      Ajouter un produit
                    </Button>
                  </DialogTrigger>
+                 {/* Bouton Import */}
+                 <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+                   <DialogTrigger asChild>
+                     <Button 
+                       variant="outline"
+                       className="w-full sm:w-auto"
+                       onClick={() => {
+                         setImportFile(null);
+                         setImportPreview([]);
+                         setImportType(null);
+                         setIsImportModalOpen(true);
+                       }}
+                     >
+                       <Upload className="mr-2" size={18} />
+                       Importer
+                     </Button>
+                   </DialogTrigger>
+                   <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+                     <DialogHeader>
+                       <DialogTitle className="text-2xl font-bold">Importer des produits</DialogTitle>
+                       <DialogDescription>
+                         Importez vos produits depuis un fichier CSV ou PDF
+                       </DialogDescription>
+                     </DialogHeader>
+                     <div className="space-y-6 py-4">
+                       <div>
+                         <Label htmlFor="importFile" className="text-lg font-semibold mb-3 block">
+                           Sélectionner un fichier
+                         </Label>
+                         <Input
+                           id="importFile"
+                           type="file"
+                           accept=".csv,.pdf,text/csv,application/pdf"
+                           onChange={handleFileChange}
+                           className="h-14 text-lg"
+                         />
+                         <p className="text-sm text-muted-foreground mt-2">
+                           Formats supportés: CSV, PDF. Pour CSV, utilisez les colonnes: Nom, Catégorie, Prix, Quantité, Coût (optionnel), Description (optionnel)
+                         </p>
+                       </div>
+                       
+                       {importPreview.length > 0 && (
+                         <div>
+                           <Label className="text-lg font-semibold mb-3 block">
+                             Aperçu ({importPreview.length} produit(s) détecté(s))
+                           </Label>
+                           <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
+                             {importPreview.slice(0, 10).map((product, idx) => (
+                               <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded">
+                                 <div>
+                                   <p className="font-medium">{product.name || 'Sans nom'}</p>
+                                   <p className="text-sm text-muted-foreground">
+                                     {product.category || 'Autres'} • Qté: {product.quantity || 0} • Prix: {product.price || 0} XAF
+                                   </p>
+                                 </div>
+                                 {(!product.name || product.quantity === undefined) && (
+                                   <Badge variant="destructive">Incomplet</Badge>
+                                 )}
+                               </div>
+                             ))}
+                             {importPreview.length > 10 && (
+                               <p className="text-sm text-muted-foreground text-center">
+                                 ... et {importPreview.length - 10} autre(s) produit(s)
+                               </p>
+                             )}
+                           </div>
+                         </div>
+                       )}
+                     </div>
+                     <div className="flex justify-end gap-3 pt-4 border-t">
+                       <Button 
+                         variant="outline" 
+                         onClick={() => {
+                           setIsImportModalOpen(false);
+                           setImportFile(null);
+                           setImportPreview([]);
+                           setImportType(null);
+                         }}
+                         className="h-11 px-6"
+                       >
+                         Annuler
+                       </Button>
+                       <Button 
+                         onClick={handleImportProducts}
+                         disabled={isImporting || importPreview.length === 0}
+                         className="bg-gradient-primary text-white h-11 px-6"
+                       >
+                         {isImporting ? 'Import en cours...' : `Importer ${importPreview.length} produit(s)`}
+                       </Button>
+                     </div>
+                   </DialogContent>
+                 </Dialog>
+                 
                  {/* Bouton Sécurité */}
                  <Button 
                    variant="outline"
