@@ -317,7 +317,22 @@ const AdminDashboard = () => {
                   <SelectItem value="expired">Expirés</SelectItem>
                 </SelectContent>
               </Select>
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex items-center gap-2 flex-wrap">
+                <Input 
+                  type="text" 
+                  className="w-48" 
+                  placeholder="Rechercher par email..." 
+                  onChange={e => {
+                    const email = e.target.value.trim();
+                    if (email) {
+                      const found = allProfiles.find(p => p.email?.toLowerCase() === email.toLowerCase());
+                      if (found) {
+                        setSearch(found.email || found.ownerName || '');
+                        setStatusFilter('all');
+                      }
+                    }
+                  }}
+                />
                 <Input type="number" className="w-28" min={1} value={activationDays} onChange={e => setActivationDays(Number(e.target.value || 0))} />
                 <Button 
                   variant="destructive" 
@@ -326,7 +341,7 @@ const AdminDashboard = () => {
                   title="Corriger tous les abonnements avec plus de 30 jours"
                 >
                   <Wrench size={16} className="mr-2"/>
-                  {isFixingAbnormal ? "Correction..." : "Corriger abonnements anormaux"}
+                  {isFixingAbnormal ? "Correction..." : "Corriger tous les anormaux"}
                 </Button>
                 <Button variant="outline" onClick={async () => {
                   const uids = Array.from(selectedUids);
@@ -375,6 +390,9 @@ const AdminDashboard = () => {
                               {p.plan === 'active' && p.subscriptionEndsAt > now && (
                                 <span className={`text-xs ${((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
                                   {Math.floor((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000))} jours restants
+                                  {((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 && (
+                                    <span className="ml-1 text-red-500">⚠️ Anormal</span>
+                                  )}
                                 </span>
                               )}
                             </div>
