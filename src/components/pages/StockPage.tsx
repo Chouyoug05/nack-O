@@ -730,7 +730,7 @@ const StockPage = () => {
       
       toast({
         title: "Import terminé",
-        description: `${successCount} produit(s) importé(s) avec succès${errorCount > 0 ? `. ${errorCount} erreur(s).` : '.'}`
+        description: `${successCount} produit(s) importé(s) avec succès${errorCount > 0 ? `. ${errorCount} erreur(s).` : '.'} Vous pouvez maintenant les modifier et ajouter des images comme les autres produits.`
       });
       
       setIsImportModalOpen(false);
@@ -901,7 +901,7 @@ const StockPage = () => {
                      <DialogHeader>
                        <DialogTitle className="text-2xl font-bold">Importer des produits</DialogTitle>
                        <DialogDescription>
-                         Importez vos produits depuis un fichier CSV ou PDF
+                         Importez vos produits depuis un fichier CSV ou PDF. Les produits importés peuvent être modifiés et complétés (images, icônes, etc.) comme les produits créés manuellement.
                        </DialogDescription>
                      </DialogHeader>
                      <div className="space-y-6 py-4">
