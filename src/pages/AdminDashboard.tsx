@@ -24,24 +24,6 @@ interface NotificationForm {
 const AdminDashboard = () => {
   const { isAdmin, isAdminLoading } = useAuth();
   const { toast } = useToast();
-  
-  // Si pas admin, rediriger (sécurité supplémentaire)
-  useEffect(() => {
-    if (!isAdminLoading && !isAdmin) {
-      window.location.href = '/admin-check';
-    }
-  }, [isAdmin, isAdminLoading]);
-  
-  if (isAdminLoading || !isAdmin) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Vérification des droits d'accès...</p>
-        </div>
-      </div>
-    );
-  }
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "trial" | "active" | "expired">("all");
@@ -54,6 +36,13 @@ const AdminDashboard = () => {
   const [isFixingPastDates, setIsFixingPastDates] = useState(false);
   const [allPayments, setAllPayments] = useState<Array<PaymentTransaction & { userEmail?: string; userName?: string }>>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(false);
+
+  // Si pas admin, rediriger (sécurité supplémentaire)
+  useEffect(() => {
+    if (!isAdminLoading && !isAdmin) {
+      window.location.href = '/admin-check';
+    }
+  }, [isAdmin, isAdminLoading]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -318,6 +307,18 @@ const AdminDashboard = () => {
       setIsFixingPastDates(false);
     }
   };
+
+  // Afficher un loader si en cours de vérification ou pas admin
+  if (isAdminLoading || !isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Vérification des droits d'accès...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen p-4 lg:p-8">
