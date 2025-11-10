@@ -53,6 +53,15 @@ const CaisseInterfaceContent = () => {
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent Caissier';
             setAgentInfo({ name, code: agentCode });
             if (data.agentCode) setExpectedAgentCode(data.agentCode);
+            // Sauvegarder l'authentification dans localStorage
+            try {
+              localStorage.setItem(getAuthStorageKey(agentCode), JSON.stringify({
+                authenticated: true,
+                timestamp: Date.now(),
+                ownerUid: data.ownerUid,
+                agentName: name,
+              }));
+            } catch { /* ignore */ }
             setIsAuthenticated(true);
             return;
           }

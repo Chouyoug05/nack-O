@@ -29,22 +29,7 @@ const AgentEvenementInterface = () => {
   const { agentCode } = useParams<{ agentCode: string }>();
   const { toast } = useToast();
   const { user, loading: authLoading } = useAuth();
-  const [agentName, setAgentName] = useState<string>(() => {
-    // Restaurer depuis localStorage
-    if (!agentCode) return "";
-    try {
-      const stored = localStorage.getItem(getAgentEventAuthKey(agentCode, user?.uid));
-      if (stored) {
-        const data = JSON.parse(stored);
-        if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-          return data.agentName || "";
-        } else {
-          localStorage.removeItem(getAgentEventAuthKey(agentCode, user?.uid));
-        }
-      }
-    } catch { /* ignore */ }
-    return "";
-  });
+  const [agentName, setAgentName] = useState<string>("");
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [events, setEvents] = useState<Array<{ id: string; title: string }>>([]);
   const [tickets, setTickets] = useState<Array<{ id: string; data: TicketDoc }>>([]);
@@ -58,21 +43,41 @@ const AgentEvenementInterface = () => {
         return;
       }
       
-      // Si on a déjà un agentName depuis localStorage et user existe, on peut continuer
+      // Si on a déjà un agentName et user existe, vérifier si c'est toujours valide
       if (agentName && user) {
+        // Vérifier que l'agentName correspond toujours au bon utilisateur
+        try {
+          const stored = localStorage.getItem(getAgentEventAuthKey(agentCode, user.uid));
+          if (stored) {
+            const data = JSON.parse(stored);
+            if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000 && data.agentName === agentName) {
+              setLoading(false);
+              return;
+            }
+          }
+        } catch { /* ignore */ }
+      }
+      
+      if (!user) {
+        // Si pas de user, on ne peut pas valider l'agent
         setLoading(false);
         return;
       }
       
-      if (!user) {
-        // Si pas de user mais qu'on a un agentName sauvegardé, on peut quand même afficher
-        if (agentName) {
-          setLoading(false);
-          return;
+      // Essayer de restaurer depuis localStorage d'abord
+      try {
+        const stored = localStorage.getItem(getAgentEventAuthKey(agentCode, user.uid));
+        if (stored) {
+          const data = JSON.parse(stored);
+          if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000 && data.agentName) {
+            setAgentName(data.agentName);
+            setLoading(false);
+            return;
+          } else {
+            localStorage.removeItem(getAgentEventAuthKey(agentCode, user.uid));
+          }
         }
-        setLoading(false);
-        return;
-      }
+      } catch { /* ignore */ }
       
       // token first
       const byToken = query(teamColRef(db, user.uid), where('agentToken', '==', agentCode), limit(1));
