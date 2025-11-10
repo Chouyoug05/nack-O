@@ -238,7 +238,8 @@ const AgentEvenementInterface = () => {
             )}
           </CardContent>
         </Card>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

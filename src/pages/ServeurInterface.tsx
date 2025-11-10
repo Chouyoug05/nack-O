@@ -794,33 +794,33 @@ const ServeurInterface = () => {
             </div>
           </div>
 
-          {/* Barre flottante total / actions */}
-          <div className="pointer-events-none fixed left-0 right-0 bottom-20 z-20 px-4 md:px-6">
-            {cart.length > 0 && (
-              <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl bg-nack-red/95 p-3 text-white shadow-2xl">
-                <button
-                  className="flex h-16 w-16 items-center justify-center rounded-xl bg-red-700/80"
-                  onClick={clearCart}
-                  title="Vider"
-                >
-                  <Trash2 className="h-8 w-8" />
-                </button>
-                <div className="flex flex-1 flex-col items-center justify-center">
-                  <span className="text-4xl sm:text-5xl font-black tracking-tight" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
-                    {Number(cartTotal || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
-                  </span>
+            </div>
+            {/* Barre flottante total / actions */}
+            <div className="pointer-events-none fixed left-0 right-0 bottom-20 z-20 px-4 md:px-6">
+              {cart.length > 0 && (
+                <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl bg-nack-red/95 p-3 text-white shadow-2xl">
+                  <button
+                    className="flex h-16 w-16 items-center justify-center rounded-xl bg-red-700/80"
+                    onClick={clearCart}
+                    title="Vider"
+                  >
+                    <Trash2 className="h-8 w-8" />
+                  </button>
+                  <div className="flex flex-1 flex-col items-center justify-center">
+                    <span className="text-4xl sm:text-5xl font-black tracking-tight" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                      {Number(cartTotal || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                    </span>
+                  </div>
+                  <button
+                    className="flex h-16 w-16 items-center justify-center rounded-xl bg-green-600/90"
+                    onClick={handleSendOrder}
+                    title="Envoyer"
+                    disabled={!tableNumber.trim()}
+                  >
+                    <Send className="h-8 w-8" />
+                  </button>
                 </div>
-                <button
-                  className="flex h-16 w-16 items-center justify-center rounded-xl bg-green-600/90"
-                  onClick={handleSendOrder}
-                  title="Envoyer"
-                  disabled={!tableNumber.trim()}
-                >
-                  <Send className="h-8 w-8" />
-                </button>
-              </div>
-            )}
-          </div>
+              )}
             </div>
           </div>
         </main>
