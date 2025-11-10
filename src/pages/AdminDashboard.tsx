@@ -470,8 +470,12 @@ const AdminDashboard = () => {
                     Prolonger de {extendDays} jour(s)
                   </Button>
                   <Button 
-                    onClick={() => {
-                      extendSubscriptionByEmail("sericsackerkoumba@gmail.com", 1);
+                    onClick={async () => {
+                      try {
+                        await extendSubscriptionByEmail("sericsackerkoumba@gmail.com", 1);
+                      } catch (error) {
+                        console.error('Erreur:', error);
+                      }
                     }}
                     variant="outline"
                     className="border-green-500 text-green-600 hover:bg-green-50"
