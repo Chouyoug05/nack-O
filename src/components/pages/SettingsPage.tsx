@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,9 @@ import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
+import { receiptsColRef, paymentsColRef } from "@/lib/collections";
+import { db } from "@/lib/firebase";
+import { getDocs, query, orderBy } from "firebase/firestore";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "0 jour";
@@ -60,6 +63,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [receipts, setReceipts] = useState<Array<{ id: string; transactionId: string; amount: number; paidAt: number; reference: string; subscriptionType: string }>>([]);
+  const [isLoadingReceipts, setIsLoadingReceipts] = useState(false);
 
   const [notificationSettings, setNotificationSettings] = useState({
     lowStock: true,
@@ -179,20 +184,92 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     }
   };
 
-  const downloadReceipt = async () => {
-    if (!profile || !user || !profile.lastPaymentAt) return;
-    await generateSubscriptionReceiptPDF({
-      establishmentName: profile.establishmentName,
-      email: profile.email,
-      phone: profile.phone,
-      logoUrl: profile.logoUrl,
-      uid: user.uid,
-    }, {
-      amountXaf: 2500,
-      paidAt: profile.lastPaymentAt,
-      paymentMethod: "Airtel Money",
-      reference: "abonnement",
-    });
+  useEffect(() => {
+    const loadReceipts = async () => {
+      if (!user) return;
+      setIsLoadingReceipts(true);
+      try {
+        const receiptsRef = receiptsColRef(db, user.uid);
+        const receiptsQuery = query(receiptsRef, orderBy('paidAt', 'desc'));
+        const receiptsSnapshot = await getDocs(receiptsQuery);
+        const receiptsList = receiptsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        } as { id: string; transactionId: string; amount: number; paidAt: number; reference: string; subscriptionType: string }));
+        setReceipts(receiptsList);
+      } catch (error) {
+        console.error('Erreur chargement reçus:', error);
+      } finally {
+        setIsLoadingReceipts(false);
+      }
+    };
+    loadReceipts();
+  }, [user]);
+
+  const downloadReceipt = async (receipt?: { transactionId: string; amount: number; paidAt: number; reference: string; subscriptionType: string }) => {
+    if (!profile || !user) return;
+    
+    // Si un reçu spécifique est fourni, l'utiliser
+    if (receipt) {
+      await generateSubscriptionReceiptPDF({
+        establishmentName: profile.establishmentName,
+        email: profile.email,
+        phone: profile.phone,
+        logoUrl: profile.logoUrl,
+        uid: user.uid,
+      }, {
+        amountXaf: receipt.amount,
+        paidAt: receipt.paidAt,
+        paymentMethod: "Airtel Money",
+        reference: receipt.reference,
+      });
+      return;
+    }
+    
+    // Sinon, utiliser le dernier paiement depuis le profil
+    if (!profile.lastPaymentAt) {
+      toast({ title: "Aucun reçu", description: "Aucun paiement trouvé", variant: "destructive" });
+      return;
+    }
+    
+    // Essayer de trouver le paiement correspondant
+    try {
+      const paymentsRef = paymentsColRef(db, user.uid);
+      const paymentsQuery = query(paymentsRef, orderBy('paidAt', 'desc'), orderBy('createdAt', 'desc'));
+      const paymentsSnapshot = await getDocs(paymentsQuery);
+      if (!paymentsSnapshot.empty) {
+        const lastPayment = paymentsSnapshot.docs[0].data();
+        await generateSubscriptionReceiptPDF({
+          establishmentName: profile.establishmentName,
+          email: profile.email,
+          phone: profile.phone,
+          logoUrl: profile.logoUrl,
+          uid: user.uid,
+        }, {
+          amountXaf: lastPayment.amount || SUBSCRIPTION_PLANS[profile.subscriptionType || 'transition'].price,
+          paidAt: lastPayment.paidAt || profile.lastPaymentAt,
+          paymentMethod: lastPayment.paymentMethod === 'airtel-money' ? "Airtel Money" : "Airtel Money",
+          reference: lastPayment.reference || "abonnement",
+        });
+      } else {
+        // Fallback avec les données du profil
+        await generateSubscriptionReceiptPDF({
+          establishmentName: profile.establishmentName,
+          email: profile.email,
+          phone: profile.phone,
+          logoUrl: profile.logoUrl,
+          uid: user.uid,
+        }, {
+          amountXaf: SUBSCRIPTION_PLANS[profile.subscriptionType || 'transition'].price,
+          paidAt: profile.lastPaymentAt,
+          paymentMethod: "Airtel Money",
+          reference: "abonnement",
+        });
+      }
+    } catch (error) {
+      console.error('Erreur génération reçu:', error);
+      toast({ title: "Erreur", description: "Impossible de générer le reçu", variant: "destructive" });
+    }
   };
 
   return (
@@ -379,22 +456,79 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                 <CardHeader>
                   <CardTitle>Renouveler l'abonnement</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button
                       onClick={() => payNow('transition')}
                       variant="outline"
-                      className="w-full"
+                      className="w-full flex flex-col items-center justify-center py-4 h-auto"
                     >
-                      Renouveler Transition (2,500 XAF)
+                      <span className="font-semibold text-base">Renouveler Transition</span>
+                      <span className="text-sm text-muted-foreground mt-1">{SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF</span>
                     </Button>
                     <Button
                       onClick={() => payNow('transition-pro-max')}
-                      className="w-full bg-gradient-primary text-white"
+                      className="w-full bg-gradient-primary text-white flex flex-col items-center justify-center py-4 h-auto"
                     >
-                      Renouveler Pro Max (7,500 XAF)
+                      <span className="font-semibold text-base">Renouveler Pro Max</span>
+                      <span className="text-sm opacity-90 mt-1">{SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF</span>
                     </Button>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Section des reçus */}
+            {receipts.length > 0 && (
+              <Card className="shadow-card border-0">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Download size={18} />
+                    Mes reçus de paiement
+                  </CardTitle>
+                  <CardDescription>Téléchargez vos reçus d'abonnement</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingReceipts ? (
+                    <div className="text-center py-4 text-muted-foreground">Chargement des reçus...</div>
+                  ) : (
+                    <div className="space-y-2">
+                      {receipts.map((receipt) => (
+                        <div key={receipt.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">
+                              {receipt.subscriptionType === 'transition-pro-max' ? 'Transition Pro Max' : 'Transition'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(receipt.paidAt).toLocaleDateString('fr-FR', { 
+                                day: 'numeric', 
+                                month: 'long', 
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </p>
+                            <p className="text-xs text-muted-foreground font-mono truncate">
+                              {receipt.reference}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 ml-4">
+                            <span className="font-semibold text-nack-red">
+                              {receipt.amount.toLocaleString()} XAF
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => downloadReceipt(receipt)}
+                            >
+                              <Download size={14} className="mr-1" />
+                              Télécharger
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
