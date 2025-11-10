@@ -565,13 +565,45 @@ const StockPage = () => {
     }
   };
 
-  // Fonction pour parser CSV
+  // Fonction pour parser CSV (gère les guillemets et virgules dans les valeurs)
   const parseCSV = (text: string): Array<Partial<Product>> => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length === 0) return [];
     
+    // Fonction pour parser une ligne CSV en tenant compte des guillemets
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            // Guillemet échappé
+            current += '"';
+            i++; // Skip next quote
+          } else {
+            // Toggle quote state
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          // Fin de champ
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      
+      // Ajouter le dernier champ
+      result.push(current.trim());
+      return result;
+    };
+    
     // Détecter l'en-tête (première ligne)
-    const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
     const nameIdx = header.findIndex(h => h.includes('nom') || h.includes('name') || h.includes('produit'));
     const categoryIdx = header.findIndex(h => h.includes('catégorie') || h.includes('category') || h.includes('categorie'));
     const priceIdx = header.findIndex(h => h.includes('prix') || h.includes('price'));
@@ -583,7 +615,7 @@ const StockPage = () => {
     
     // Parser les lignes de données
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+      const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, ''));
       
       if (nameIdx >= 0 && values[nameIdx]) {
         const name = values[nameIdx];
@@ -885,8 +917,16 @@ const StockPage = () => {
                            className="h-14 text-lg"
                          />
                          <p className="text-sm text-muted-foreground mt-2">
-                           Formats supportés: CSV, PDF. Pour CSV, utilisez les colonnes: Nom, Catégorie, Prix, Quantité, Coût (optionnel), Description (optionnel)
+                           Formats supportés: CSV, PDF. Pour CSV, utilisez les colonnes: <strong>Nom</strong>, <strong>Catégorie</strong>, <strong>Prix</strong>, <strong>Quantité</strong>, Coût (optionnel), Description (optionnel)
                          </p>
+                         <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                           <p className="text-xs font-semibold text-blue-900 mb-1">Exemple de format CSV:</p>
+                           <pre className="text-xs text-blue-800 overflow-x-auto">
+{`Nom,Catégorie,Prix,Quantité,Coût,Description
+"Bière 33cl","Boissons",1500,50,1000,"Bière locale
+"Vin rouge","Alcools",5000,20,3500,"Vin importé"`}
+                           </pre>
+                         </div>
                        </div>
                        
                        {importPreview.length > 0 && (
