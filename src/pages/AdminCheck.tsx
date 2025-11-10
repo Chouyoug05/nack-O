@@ -25,7 +25,28 @@ const AdminCheck = () => {
     setChecking(true);
     try {
       const adminSnap = await getDoc(adminDocRef(db, user.uid));
-      setAdminDocExists(adminSnap.exists());
+      const exists = adminSnap.exists();
+      setAdminDocExists(exists);
+      
+      if (exists) {
+        const data = adminSnap.data();
+        console.log('Données du document admin:', data);
+        
+        // Vérifier si updatedAt est incorrect et le corriger
+        if (data && data.updatedAt && data.updatedAt < 10000000000) {
+          // updatedAt semble être un timestamp incorrect (trop petit)
+          console.warn('updatedAt semble incorrect, correction en cours...');
+          try {
+            const { updateDoc } = await import('firebase/firestore');
+            await updateDoc(adminDocRef(db, user.uid), {
+              updatedAt: Date.now(),
+            });
+            console.log('updatedAt corrigé');
+          } catch (updateError) {
+            console.error('Erreur correction updatedAt:', updateError);
+          }
+        }
+      }
     } catch (error) {
       console.error('Erreur vérification admin:', error);
       setAdminDocExists(false);
@@ -137,6 +158,20 @@ const AdminCheck = () => {
             </Button>
           </div>
 
+          {adminDocExists && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800">
+              <strong>✅ Document admin trouvé !</strong>
+              <br />
+              Le document existe dans Firestore. Si vous ne pouvez toujours pas accéder à /admin, essayez :
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Déconnectez-vous et reconnectez-vous</li>
+                <li>Videz le cache du navigateur (Ctrl+Shift+Delete)</li>
+                <li>Attendez quelques secondes pour la synchronisation</li>
+                <li>Vérifiez la console du navigateur (F12) pour les erreurs</li>
+              </ul>
+            </div>
+          )}
+          
           {adminDocExists === false && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
               <strong>Problème détecté :</strong> Le document admin n'existe pas dans Firestore.
@@ -144,6 +179,22 @@ const AdminCheck = () => {
               Collection: <code className="bg-yellow-100 px-1 rounded">admins</code>
               <br />
               Document ID: <code className="bg-yellow-100 px-1 rounded">{user.uid}</code>
+            </div>
+          )}
+          
+          {adminDocExists && !isAdmin && !isAdminLoading && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
+              <strong>⚠️ Problème de synchronisation :</strong>
+              <br />
+              Le document existe mais AuthContext ne détecte pas le statut admin.
+              <br />
+              <Button 
+                size="sm" 
+                className="mt-2" 
+                onClick={() => window.location.reload()}
+              >
+                Recharger la page complètement
+              </Button>
             </div>
           )}
         </CardContent>
