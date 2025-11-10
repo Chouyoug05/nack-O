@@ -469,6 +469,17 @@ const AdminDashboard = () => {
                     <Gift size={16} className="mr-2"/>
                     Prolonger de {extendDays} jour(s)
                   </Button>
+                  <Button 
+                    onClick={() => {
+                      extendSubscriptionByEmail("sericsackerkoumba@gmail.com", 1);
+                    }}
+                    variant="outline"
+                    className="border-green-500 text-green-600 hover:bg-green-50"
+                    title="Ajouter 1 jour à sericsackerkoumba@gmail.com"
+                  >
+                    <Gift size={16} className="mr-2"/>
+                    +1j sericsackerkoumba@gmail.com
+                  </Button>
                 </div>
               </div>
             </div>
