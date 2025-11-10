@@ -36,11 +36,14 @@ import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
 
 function formatCountdown(ms: number) {
-  if (!ms || ms <= 0) return "";
+  if (!ms || ms <= 0) return "0 jour";
   const d = Math.floor(ms / (24*60*60*1000));
-  const h = Math.floor((ms % (24*60*60*1000)) / (60*60*1000));
-  const m = Math.floor((ms % (60*60*1000)) / (60*1000));
-  return `${d}j ${h}h ${m}m`;
+  // Afficher seulement les jours pour plus de clarté
+  if (d === 0) {
+    const h = Math.floor((ms % (24*60*60*1000)) / (60*60*1000));
+    return h > 0 ? `${h} heure${h > 1 ? 's' : ''}` : "Moins d'une heure";
+  }
+  return `${d} jour${d > 1 ? 's' : ''}`;
 }
 
 const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) => {

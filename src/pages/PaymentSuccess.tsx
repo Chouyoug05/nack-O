@@ -110,12 +110,22 @@ const PaymentSuccess = () => {
         }
         
         // Calculer la nouvelle date de fin d'abonnement
-        // Si l'utilisateur a déjà un abonnement actif qui n'a pas expiré, ajouter 30 jours à partir de la fin actuelle
-        // Sinon, ajouter 30 jours à partir de maintenant
+        // CORRECTION: Chaque paiement donne exactement 30 jours à partir de maintenant
+        // Ne pas accumuler les jours pour éviter des abonnements de 357+ jours
         let newSubscriptionEndsAt: number;
         if (profile?.subscriptionEndsAt && profile.subscriptionEndsAt > now) {
-          // Prolonger depuis la fin actuelle
-          newSubscriptionEndsAt = profile.subscriptionEndsAt + thirtyDaysMs;
+          // Si l'abonnement actuel se termine dans plus de 30 jours, c'est anormal
+          // Sinon, on peut prolonger depuis la fin actuelle (mais max 30 jours supplémentaires)
+          const daysRemaining = (profile.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
+          if (daysRemaining > 30) {
+            // Anomalie détectée: abonnement avec plus de 30 jours restants
+            // Réinitialiser à 30 jours à partir de maintenant
+            console.warn(`PaymentSuccess: Abonnement anormal détecté (${Math.floor(daysRemaining)} jours restants). Réinitialisation à 30 jours.`);
+            newSubscriptionEndsAt = now + thirtyDaysMs;
+          } else {
+            // Prolonger depuis la fin actuelle (mais on limite à max 30 jours supplémentaires)
+            newSubscriptionEndsAt = profile.subscriptionEndsAt + thirtyDaysMs;
+          }
         } else {
           // Nouvel abonnement ou renouvellement après expiration
           newSubscriptionEndsAt = now + thirtyDaysMs;

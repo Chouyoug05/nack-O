@@ -16,11 +16,14 @@ const msInDay = 24 * 60 * 60 * 1000;
 const sevenDays = 7 * msInDay;
 
 function formatCountdown(ms: number): string {
-  if (ms <= 0) return "00j 00h 00m";
+  if (ms <= 0) return "0 jour";
   const days = Math.floor(ms / msInDay);
-  const hours = Math.floor((ms % msInDay) / (60 * 60 * 1000));
-  const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
-  return `${String(days).padStart(2, '0')}j ${String(hours).padStart(2, '0')}h ${String(minutes).padStart(2, '0')}m`;
+  // Afficher seulement les jours pour plus de clarté
+  if (days === 0) {
+    const hours = Math.floor((ms % msInDay) / (60 * 60 * 1000));
+    return hours > 0 ? `${hours}h` : "Moins d'1h";
+  }
+  return `${days} jour${days > 1 ? 's' : ''}`;
 }
 
 const SubscriptionGate = ({ children }: Props) => {
