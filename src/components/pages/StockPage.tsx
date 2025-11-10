@@ -980,23 +980,25 @@ const StockPage = () => {
                      Ajouter un produit
                    </Button>
                  </DialogTrigger>
-                 {/* Bouton Import */}
-                 <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-                   <DialogTrigger asChild>
-                     <Button 
-                       variant="outline"
-                       className="w-full sm:w-auto"
-                       onClick={() => {
-                         setImportFile(null);
-                         setImportPreview([]);
-                         setImportType(null);
-                         setIsImportModalOpen(true);
-                       }}
-                     >
-                       <Upload className="mr-2" size={18} />
-                       Importer
-                     </Button>
-                   </DialogTrigger>
+               </Dialog>
+               
+               {/* Bouton Import */}
+               <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+                 <DialogTrigger asChild>
+                   <Button 
+                     variant="outline"
+                     className="w-full sm:w-auto"
+                     onClick={() => {
+                       setImportFile(null);
+                       setImportPreview([]);
+                       setImportType(null);
+                       setIsImportModalOpen(true);
+                     }}
+                   >
+                     <Upload className="mr-2" size={18} />
+                     Importer
+                   </Button>
+                 </DialogTrigger>
                    <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
                      <DialogHeader>
                        <DialogTitle className="text-2xl font-bold">Importer des produits</DialogTitle>
