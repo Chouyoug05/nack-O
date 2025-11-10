@@ -35,7 +35,9 @@ import {
   ShoppingBag,
   Lightbulb,
   Upload,
-  FileText
+  FileText,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -67,6 +69,7 @@ const StockPage = () => {
   const { user, profile, saveProfile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [showZeroStock, setShowZeroStock] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -325,7 +328,8 @@ const StockPage = () => {
     const name = (product.name || "").toLowerCase();
     const matchesSearch = name.includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesStock = showZeroStock || (product.quantity ?? 0) > 0;
+    return matchesSearch && matchesCategory && matchesStock;
   });
 
   const lowStockProducts = products.filter(p => (p.quantity ?? 0) <= 10);
@@ -1419,6 +1423,24 @@ const StockPage = () => {
                 ))}
               </SelectContent>
             </Select>
+            <Button
+              variant={showZeroStock ? "default" : "outline"}
+              onClick={() => setShowZeroStock(!showZeroStock)}
+              className="w-full md:w-auto"
+              title={showZeroStock ? "Masquer les produits avec quantité 0" : "Afficher les produits avec quantité 0"}
+            >
+              {showZeroStock ? (
+                <>
+                  <EyeOff size={16} className="mr-2" />
+                  Masquer stock 0
+                </>
+              ) : (
+                <>
+                  <Eye size={16} className="mr-2" />
+                  Afficher stock 0
+                </>
+              )}
+            </Button>
           </div>
 
           {/* Products List - Card Style */}
