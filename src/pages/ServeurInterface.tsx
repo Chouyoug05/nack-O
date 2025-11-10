@@ -56,6 +56,7 @@ interface FirestoreProductDoc {
 // Offline helpers
 const getProductsCacheKey = (ownerUid: string) => `nack_products_${ownerUid}`;
 const getOrderOutboxKey = (ownerUid: string, agentCode: string) => `nack_order_outbox_${ownerUid}_${agentCode}`;
+const getServeurAuthKey = (agentCode: string) => `nack_serveur_auth_${agentCode}`;
 
 interface OutboxOrder {
   orderNumber: number;
@@ -78,8 +79,38 @@ const ServeurInterface = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState("");
   const [activeView, setActiveView] = useState<'products' | 'pending' | 'sent'>('products');
-  const [agentInfo, setAgentInfo] = useState<{ name: string; code: string; memberId?: string } | null>(null);
-  const [ownerUid, setOwnerUid] = useState<string | null>(null);
+  const [agentInfo, setAgentInfo] = useState<{ name: string; code: string; memberId?: string } | null>(() => {
+    // Restaurer depuis localStorage
+    if (!agentCode) return null;
+    try {
+      const stored = localStorage.getItem(getServeurAuthKey(agentCode));
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+          return { name: data.agentName || 'Agent', code: agentCode, memberId: data.memberId };
+        } else {
+          localStorage.removeItem(getServeurAuthKey(agentCode));
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
+  const [ownerUid, setOwnerUid] = useState<string | null>(() => {
+    // Restaurer depuis localStorage
+    if (!agentCode) return null;
+    try {
+      const stored = localStorage.getItem(getServeurAuthKey(agentCode));
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+          return data.ownerUid || null;
+        } else {
+          localStorage.removeItem(getServeurAuthKey(agentCode));
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
   const [fsProducts, setFsProducts] = useState<Product[] | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
@@ -96,6 +127,14 @@ const ServeurInterface = () => {
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent';
             setAgentInfo({ name, code: agentCode });
+            // Sauvegarder dans localStorage pour persistance
+            try {
+              localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
+                ownerUid: data.ownerUid,
+                agentName: name,
+                timestamp: Date.now(),
+              }));
+            } catch { /* ignore */ }
             return;
           }
         }
@@ -127,6 +166,15 @@ const ServeurInterface = () => {
         if (foundOwner) {
           setOwnerUid(foundOwner);
           setAgentInfo({ name: foundName || 'Agent', code: agentCode, memberId: foundMemberId });
+          // Sauvegarder dans localStorage pour persistance
+          try {
+            localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
+              ownerUid: foundOwner,
+              agentName: foundName || 'Agent',
+              memberId: foundMemberId,
+              timestamp: Date.now(),
+            }));
+          } catch { /* ignore */ }
         }
       } catch { /* ignore permissions */ }
     };

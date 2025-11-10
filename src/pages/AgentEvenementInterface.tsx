@@ -23,11 +23,28 @@ import type { TicketDoc } from "@/types/event";
 
 interface FirestoreTeamMemberDoc { firstName: string; lastName: string; agentToken?: string; agentCode?: string; }
 
+const getAgentEventAuthKey = (agentCode: string, userId?: string) => `nack_agent_event_auth_${agentCode}_${userId || 'anonymous'}`;
+
 const AgentEvenementInterface = () => {
   const { agentCode } = useParams<{ agentCode: string }>();
   const { toast } = useToast();
-  const { user } = useAuth();
-  const [agentName, setAgentName] = useState<string>("");
+  const { user, loading: authLoading } = useAuth();
+  const [agentName, setAgentName] = useState<string>(() => {
+    // Restaurer depuis localStorage
+    if (!agentCode) return "";
+    try {
+      const stored = localStorage.getItem(getAgentEventAuthKey(agentCode, user?.uid));
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+          return data.agentName || "";
+        } else {
+          localStorage.removeItem(getAgentEventAuthKey(agentCode, user?.uid));
+        }
+      }
+    } catch { /* ignore */ }
+    return "";
+  });
   const [selectedEventId, setSelectedEventId] = useState<string>("");
   const [events, setEvents] = useState<Array<{ id: string; title: string }>>([]);
   const [tickets, setTickets] = useState<Array<{ id: string; data: TicketDoc }>>([]);
@@ -35,25 +52,62 @@ const AgentEvenementInterface = () => {
 
   useEffect(() => {
     const validate = async () => {
-      if (!agentCode || !user) return setLoading(false);
+      if (authLoading) return; // Attendre que l'auth soit chargé
+      if (!agentCode) {
+        setLoading(false);
+        return;
+      }
+      
+      // Si on a déjà un agentName depuis localStorage et user existe, on peut continuer
+      if (agentName && user) {
+        setLoading(false);
+        return;
+      }
+      
+      if (!user) {
+        // Si pas de user mais qu'on a un agentName sauvegardé, on peut quand même afficher
+        if (agentName) {
+          setLoading(false);
+          return;
+        }
+        setLoading(false);
+        return;
+      }
+      
       // token first
       const byToken = query(teamColRef(db, user.uid), where('agentToken', '==', agentCode), limit(1));
       const s1 = await getDocs(byToken);
       if (!s1.empty) {
         const d = s1.docs[0].data() as FirestoreTeamMemberDoc;
-        setAgentName(`${d.firstName} ${d.lastName}`);
+        const name = `${d.firstName} ${d.lastName}`;
+        setAgentName(name);
+        // Sauvegarder dans localStorage
+        try {
+          localStorage.setItem(getAgentEventAuthKey(agentCode, user.uid), JSON.stringify({
+            agentName: name,
+            timestamp: Date.now(),
+          }));
+        } catch { /* ignore */ }
       } else {
         const byCode = query(teamColRef(db, user.uid), where('agentCode', '==', agentCode), limit(1));
         const s2 = await getDocs(byCode);
         if (!s2.empty) {
           const d = s2.docs[0].data() as FirestoreTeamMemberDoc;
-          setAgentName(`${d.firstName} ${d.lastName}`);
+          const name = `${d.firstName} ${d.lastName}`;
+          setAgentName(name);
+          // Sauvegarder dans localStorage
+          try {
+            localStorage.setItem(getAgentEventAuthKey(agentCode, user.uid), JSON.stringify({
+              agentName: name,
+              timestamp: Date.now(),
+            }));
+          } catch { /* ignore */ }
         }
       }
       setLoading(false);
     };
     validate();
-  }, [agentCode, user]);
+  }, [agentCode, user, authLoading, agentName]);
 
   useEffect(() => {
     if (!user) return;
@@ -63,7 +117,7 @@ const AgentEvenementInterface = () => {
       if (!selectedEventId && list.length > 0) setSelectedEventId(list[0].id);
     });
     return () => unsub();
-  }, [user]);
+  }, [user, selectedEventId]);
 
   useEffect(() => {
     if (!user || !selectedEventId) { setTickets([]); return; }
@@ -73,7 +127,7 @@ const AgentEvenementInterface = () => {
       setTickets(list);
     });
     return () => unsub();
-  }, [user, selectedEventId]);
+  }, [user, selectedEventId]); // selectedEventId est déjà dans les dépendances
 
   const toggleValidate = async (ticketId: string, validated: boolean) => {
     if (!user || !selectedEventId) return;

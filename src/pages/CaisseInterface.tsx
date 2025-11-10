@@ -14,11 +14,29 @@ import { db } from "@/lib/firebase";
 import { collectionGroup, getDocs, limit, query, where, doc, getDoc } from "firebase/firestore";
 import { agentTokensTopColRef } from "@/lib/collections";
 
+const getAuthStorageKey = (agentCode: string) => `nack_caisse_auth_${agentCode}`;
+
 const CaisseInterfaceContent = () => {
   const { agentCode } = useParams();
   const { toast } = useToast();
   const [agentInfo, setAgentInfo] = useState<{ name: string; code: string } | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    // Restaurer l'état d'authentification depuis localStorage
+    if (!agentCode) return false;
+    try {
+      const stored = localStorage.getItem(getAuthStorageKey(agentCode));
+      if (stored) {
+        const data = JSON.parse(stored);
+        // Vérifier que la session n'est pas trop ancienne (24h max)
+        if (data.timestamp && Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+          return true;
+        } else {
+          localStorage.removeItem(getAuthStorageKey(agentCode));
+        }
+      }
+    } catch { /* ignore */ }
+    return false;
+  });
   const [agentCodeInput, setAgentCodeInput] = useState("");
   const [ownerUid, setOwnerUid] = useState<string | null>(null);
   const [expectedAgentCode, setExpectedAgentCode] = useState<string | null>(null);
@@ -68,11 +86,37 @@ const CaisseInterfaceContent = () => {
         setOwnerUid(foundOwner);
         setAgentInfo({ name: foundName || 'Agent Caissier', code: agentCode });
         if (foundAgentCode) setExpectedAgentCode(foundAgentCode);
+        // Sauvegarder l'authentification dans localStorage
+        try {
+          localStorage.setItem(getAuthStorageKey(agentCode), JSON.stringify({
+            authenticated: true,
+            timestamp: Date.now(),
+            ownerUid: foundOwner,
+            agentName: foundName || 'Agent Caissier',
+          }));
+        } catch { /* ignore */ }
         setIsAuthenticated(true);
       }
     };
     resolveOwner();
   }, [agentCode]);
+
+  // Restaurer les informations depuis localStorage si authentifié
+  useEffect(() => {
+    if (isAuthenticated && agentCode && !ownerUid) {
+      try {
+        const stored = localStorage.getItem(getAuthStorageKey(agentCode));
+        if (stored) {
+          const data = JSON.parse(stored);
+          if (data.ownerUid && data.agentName) {
+            setOwnerUid(data.ownerUid);
+            setAgentInfo({ name: data.agentName, code: agentCode });
+            // Les données sont restaurées, resolveOwner() sera appelé automatiquement par le premier useEffect
+          }
+        }
+      } catch { /* ignore */ }
+    }
+  }, [isAuthenticated, agentCode, ownerUid]);
 
   const handleAgentLogin = async () => {
     if (!agentCode) return;
@@ -83,6 +127,15 @@ const CaisseInterfaceContent = () => {
     const tokenOk = norm(agentCode);
 
     if ((expected && input === expected) || input === tokenOk) {
+      // Sauvegarder l'authentification
+      try {
+        localStorage.setItem(getAuthStorageKey(agentCode), JSON.stringify({
+          authenticated: true,
+          timestamp: Date.now(),
+          ownerUid: ownerUid || '',
+          agentName: agentInfo?.name || 'Agent Caissier',
+        }));
+      } catch { /* ignore */ }
       setIsAuthenticated(true);
       toast({ title: "Connexion réussie", description: `Bienvenue ${agentInfo?.name || ''}` });
       return;
@@ -99,6 +152,15 @@ const CaisseInterfaceContent = () => {
           const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent Caissier';
           setAgentInfo({ name, code: agentCode });
           if (data.agentCode) setExpectedAgentCode(data.agentCode);
+          // Sauvegarder l'authentification
+          try {
+            localStorage.setItem(getAuthStorageKey(agentCode), JSON.stringify({
+              authenticated: true,
+              timestamp: Date.now(),
+              ownerUid: data.ownerUid,
+              agentName: name,
+            }));
+          } catch { /* ignore */ }
           setIsAuthenticated(true);
           toast({ title: "Connexion réussie", description: `Bienvenue ${name}` });
         return;
@@ -172,7 +234,17 @@ const CaisseInterfaceContent = () => {
                         <p className="text-sm text-muted-foreground">Code: {agentInfo?.code}</p>
                   </div>
                 </div>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => setIsAuthenticated(false)}>
+                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => {
+                      // Supprimer l'authentification sauvegardée
+                      if (agentCode) {
+                        try {
+                          localStorage.removeItem(getAuthStorageKey(agentCode));
+                        } catch { /* ignore */ }
+                      }
+                      setIsAuthenticated(false);
+                      setOwnerUid(null);
+                      setAgentInfo(null);
+                    }}>
                     <LogOut size={16} className="mr-2" />
                     <span className="hidden sm:inline">Déconnexion</span>
                   </Button>
