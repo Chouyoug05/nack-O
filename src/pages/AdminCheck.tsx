@@ -7,9 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle, XCircle, AlertCircle, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 const AdminCheck = () => {
   const { user, isAdmin, isAdminLoading } = useAuth();
+  const { toast } = useToast();
   const [adminDocExists, setAdminDocExists] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
   const navigate = useNavigate();
@@ -95,9 +97,27 @@ const AdminCheck = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <span className="font-medium">UID</span>
-              <span className="text-xs font-mono text-muted-foreground">{user.uid}</span>
+            <div className="flex items-center justify-between p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+              <div className="flex-1">
+                <span className="font-semibold text-blue-900 block mb-1">Votre UID (Important !)</span>
+                <span className="text-xs text-blue-700">Copiez cet UID pour créer votre document admin</span>
+              </div>
+              <div className="ml-4">
+                <code className="block bg-blue-100 px-3 py-2 rounded text-xs font-mono text-blue-900 border border-blue-300 break-all max-w-xs">
+                  {user.uid}
+                </code>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 w-full text-xs"
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.uid);
+                    toast({ title: "UID copié !", description: "L'UID a été copié dans le presse-papiers" });
+                  }}
+                >
+                  📋 Copier l'UID
+                </Button>
+              </div>
             </div>
 
             <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
@@ -152,14 +172,46 @@ const AdminCheck = () => {
               </div>
               
               <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="font-semibold text-green-900 mb-2">Méthode 2 : Firebase Console (Manuel)</p>
-                <ol className="list-decimal list-inside space-y-1 text-sm text-green-800">
-                  <li>Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline">Firebase Console</a></li>
-                  <li>Projet : <strong>nack-8c299</strong></li>
-                  <li>Firestore Database → Créez collection <code className="bg-green-100 px-1 rounded">admins</code></li>
-                  <li>Créez document avec ID : <code className="bg-green-100 px-1 rounded">{user.uid}</code></li>
-                  <li>Ajoutez les champs : <code className="bg-green-100 px-1 rounded">role: "admin"</code>, <code className="bg-green-100 px-1 rounded">createdAt</code>, <code className="bg-green-100 px-1 rounded">updatedAt</code></li>
+                <p className="font-semibold text-green-900 mb-2">Méthode 2 : Firebase Console (Manuel - Plus simple)</p>
+                <div className="bg-white border border-green-300 rounded p-3 mb-3">
+                  <p className="text-xs font-semibold text-green-900 mb-2">📍 Votre UID à utiliser :</p>
+                  <code className="block bg-green-50 px-2 py-1 rounded text-xs font-mono text-green-900 border border-green-200 break-all">
+                    {user.uid}
+                  </code>
+                </div>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-green-800">
+                  <li className="mb-2">
+                    Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Firebase Console</a> (ouvre dans un nouvel onglet)
+                  </li>
+                  <li className="mb-2">Sélectionnez le projet : <strong className="bg-green-100 px-2 py-1 rounded">nack-8c299</strong></li>
+                  <li className="mb-2">Dans le menu de gauche, cliquez sur <strong>"Firestore Database"</strong></li>
+                  <li className="mb-2">
+                    Si la collection <code className="bg-green-100 px-1 rounded">admins</code> n'existe pas :
+                    <ul className="list-disc list-inside ml-4 mt-1 text-xs">
+                      <li>Cliquez sur "Créer une collection"</li>
+                      <li>Nom de la collection : <code className="bg-green-100 px-1 rounded">admins</code></li>
+                      <li>Cliquez sur "Suivant" puis "Terminé"</li>
+                    </ul>
+                  </li>
+                  <li className="mb-2">
+                    Cliquez sur "Ajouter un document" dans la collection <code className="bg-green-100 px-1 rounded">admins</code>
+                  </li>
+                  <li className="mb-2">
+                    Dans "ID du document", collez votre UID : <code className="bg-green-100 px-1 rounded break-all text-xs">{user.uid}</code>
+                  </li>
+                  <li className="mb-2">
+                    Ajoutez ces 3 champs (cliquez sur "Ajouter un champ" pour chacun) :
+                    <ul className="list-disc list-inside ml-4 mt-1 text-xs space-y-1">
+                      <li><code className="bg-green-100 px-1 rounded">role</code> (type: string) = <code className="bg-green-100 px-1 rounded">"admin"</code></li>
+                      <li><code className="bg-green-100 px-1 rounded">createdAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
+                      <li><code className="bg-green-100 px-1 rounded">updatedAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
+                    </ul>
+                  </li>
+                  <li className="mb-2">Cliquez sur "Enregistrer"</li>
                 </ol>
+                <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-xs text-green-900">
+                  <strong>💡 Astuce :</strong> Vous pouvez copier votre UID ci-dessus et le coller directement dans Firebase Console.
+                </div>
               </div>
               
               <p className="text-xs text-muted-foreground">
