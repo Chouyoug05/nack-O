@@ -185,10 +185,10 @@ const CaisseInterfaceContent = () => {
   }
 
   return (
-    <div className="relative flex h-full min-h-screen w-full flex-col bg-background">
+    <div className="relative flex h-full min-h-screen w-full flex-col bg-[#f6f8f6]">
       {!isAuthenticated ? (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <Card className="w-full max-w-md shadow-elegant border-0">
+        <div className="min-h-screen bg-[#f6f8f6] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md border border-gray-200 bg-white shadow-sm">
             <CardHeader className="text-center">
               <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
                 <Calculator className="text-white" size={28} />
@@ -231,64 +231,69 @@ const CaisseInterfaceContent = () => {
       ) : (
         <div className="flex flex-col min-h-screen">
           {/* Header */}
-          <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex justify-between items-center h-16">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-                    <Calculator className="text-white" size={20} />
-                  </div>
-                  <div>
-                    <h1 className="text-lg font-semibold">Interface Caisse</h1>
-                        <p className="text-sm text-muted-foreground">Code: {agentInfo?.code}</p>
-                  </div>
-                </div>
-                    <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => {
-                      // Supprimer l'authentification sauvegardée
-                      if (agentCode) {
-                        try {
-                          localStorage.removeItem(getAuthStorageKey(agentCode));
-                        } catch { /* ignore */ }
-                      }
-                      setIsAuthenticated(false);
-                      setOwnerUid(null);
-                      setAgentInfo(null);
-                    }}>
-                    <LogOut size={16} className="mr-2" />
-                    <span className="hidden sm:inline">Déconnexion</span>
-                  </Button>
+          <header className="sticky top-0 z-10 flex items-center justify-between bg-[#f6f8f6]/80 p-4 md:p-6 pb-2 backdrop-blur-sm border-b border-gray-200/50">
+            <div className="flex items-center gap-2 md:gap-3">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-primary rounded-full flex items-center justify-center">
+                <Calculator className="text-white" size={20} />
+              </div>
+              <div>
+                <h1 className="text-lg md:text-xl lg:text-2xl font-bold leading-tight tracking-[-0.015em] text-gray-900">
+                  Interface Caisse
+                </h1>
+                <p className="text-xs md:text-sm text-muted-foreground">Code: {agentInfo?.code}</p>
               </div>
             </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 border-gray-200" 
+              onClick={() => {
+                // Supprimer l'authentification sauvegardée
+                if (agentCode) {
+                  try {
+                    localStorage.removeItem(getAuthStorageKey(agentCode));
+                  } catch { /* ignore */ }
+                }
+                setIsAuthenticated(false);
+                setOwnerUid(null);
+                setAgentInfo(null);
+              }}
+            >
+              <LogOut size={16} className="mr-2" />
+              <span className="hidden sm:inline">Déconnexion</span>
+            </Button>
           </header>
 
           {/* Main Content */}
-          <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Orders from Servers */}
-              <div>
-                <OrderManagement 
-                  title="Commandes à encaisser"
-                  description="Commandes envoyées par les serveurs"
-                      showActions={true}
-                      ownerOverrideUid={ownerUid || undefined}
-                      agentToken={agentInfo?.code}
-                />
-              </div>
+          <main className="flex-1 p-4 md:p-6 lg:p-8">
+            <div className="max-w-7xl mx-auto w-full">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 lg:gap-8">
+                {/* Orders from Servers */}
+                <div>
+                  <OrderManagement 
+                    title="Commandes à encaisser"
+                    description="Commandes envoyées par les serveurs"
+                    showActions={true}
+                    ownerOverrideUid={ownerUid || undefined}
+                    agentToken={agentInfo?.code}
+                  />
+                </div>
 
-                  {/* Payment Panel */}
-              <div className="space-y-6">
-                <Card className="shadow-card border-0">
-                  <CardHeader>
-                    <CardTitle>Mode de paiement</CardTitle>
-                        <CardDescription>Sélectionnez le mode de paiement lors de la validation</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                        <p className="text-sm text-muted-foreground">La validation côté droite déclenche l'encaissement.</p>
-                  </CardContent>
-                </Card>
+                {/* Payment Panel */}
+                <div className="space-y-4 md:space-y-6">
+                  <Card className="border border-gray-200 bg-white shadow-sm">
+                    <CardHeader>
+                      <CardTitle>Mode de paiement</CardTitle>
+                      <CardDescription>Sélectionnez le mode de paiement lors de la validation</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">La validation côté droite déclenche l'encaissement.</p>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </div>
-          </div>
+          </main>
         </div>
       )}
     </div>

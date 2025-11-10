@@ -467,66 +467,28 @@ const ServeurInterface = () => {
   };
 
   return (
-    <div className="relative flex h-full min-h-screen w-full flex-col bg-background">
+    <div className="relative flex h-full min-h-screen w-full flex-col bg-[#f6f8f6]">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-primary rounded-full flex items-center justify-center">
-                <User className="text-white" size={20} />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold">Interface Serveur</h1>
-                <p className="text-sm text-muted-foreground">Code: {agentCode}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Navigation Tabs */}
-              <div className="hidden md:flex gap-2">
-                <Button 
-                  variant={activeView === 'products' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveView('products')}
-                  className={activeView === 'products' ? 'bg-gradient-primary text-white shadow-button' : ''}
-                >
-                  <Package className="mr-2 h-4 w-4" />
-                  Produits
-                </Button>
-                <Button 
-                  variant={activeView === 'pending' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveView('pending')}
-                  className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : ''}
-                >
-                  <Clock className="mr-2 h-4 w-4" />
-                  En attente ({pendingOrders.length})
-                </Button>
-                <Button 
-                  variant={activeView === 'sent' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setActiveView('sent')}
-                  className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : ''}
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Envoyées ({sentOrders.length})
-                </Button>
-              </div>
-              <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                <LogOut size={16} className="mr-2" />
-                <span className="hidden sm:inline">Déconnexion</span>
-              </Button>
-            </div>
+      <header className="sticky top-0 z-10 flex items-center justify-between bg-[#f6f8f6]/80 p-4 md:p-6 pb-2 backdrop-blur-sm border-b border-gray-200/50">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-primary rounded-full flex items-center justify-center">
+            <User className="text-white" size={20} />
+          </div>
+          <div>
+            <h1 className="text-lg md:text-xl lg:text-2xl font-bold leading-tight tracking-[-0.015em] text-gray-900">
+              Interface Serveur
+            </h1>
+            <p className="text-xs md:text-sm text-muted-foreground">Code: {agentCode}</p>
           </div>
         </div>
-        {/* Mobile Navigation Tabs */}
-        <div className="md:hidden border-t bg-white">
-          <div className="flex gap-2 px-4 py-2 overflow-x-auto">
+        <div className="flex items-center gap-2 md:gap-3">
+          {/* Navigation Tabs */}
+          <div className="hidden md:flex gap-2">
             <Button 
               variant={activeView === 'products' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveView('products')}
-              className={activeView === 'products' ? 'bg-gradient-primary text-white shadow-button' : ''}
+              className={activeView === 'products' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
             >
               <Package className="mr-2 h-4 w-4" />
               Produits
@@ -535,7 +497,7 @@ const ServeurInterface = () => {
               variant={activeView === 'pending' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveView('pending')}
-              className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : ''}
+              className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
             >
               <Clock className="mr-2 h-4 w-4" />
               En attente ({pendingOrders.length})
@@ -544,21 +506,62 @@ const ServeurInterface = () => {
               variant={activeView === 'sent' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setActiveView('sent')}
-              className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : ''}
+              className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
             >
               <Send className="mr-2 h-4 w-4" />
               Envoyées ({sentOrders.length})
             </Button>
           </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-red-600 hover:text-red-700 hover:bg-red-50 border-gray-200"
+          >
+            <LogOut size={16} className="mr-2" />
+            <span className="hidden sm:inline">Déconnexion</span>
+          </Button>
         </div>
       </header>
+      {/* Mobile Navigation Tabs */}
+      <div className="md:hidden border-b border-gray-200/50 bg-[#f6f8f6]/80 backdrop-blur-sm">
+        <div className="flex gap-2 px-4 py-2 overflow-x-auto">
+          <Button 
+            variant={activeView === 'products' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveView('products')}
+            className={activeView === 'products' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
+          >
+            <Package className="mr-2 h-4 w-4" />
+            Produits
+          </Button>
+          <Button 
+            variant={activeView === 'pending' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveView('pending')}
+            className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
+          >
+            <Clock className="mr-2 h-4 w-4" />
+            En attente ({pendingOrders.length})
+          </Button>
+          <Button 
+            variant={activeView === 'sent' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setActiveView('sent')}
+            className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
+          >
+            <Send className="mr-2 h-4 w-4" />
+            Envoyées ({sentOrders.length})
+          </Button>
+        </div>
+      </div>
 
       {activeView === 'products' ? (
-        <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Products Grid */}
-            <div className="lg:col-span-2">
-              <Card className="shadow-card border-0">
+        <main className="flex-1 p-4 md:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 lg:gap-8">
+              {/* Products Grid */}
+              <div className="lg:col-span-2">
+                <Card className="border border-gray-200 bg-white shadow-sm">
                 <CardHeader>
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                     <div>
@@ -690,9 +693,9 @@ const ServeurInterface = () => {
               </Card>
             </div>
 
-            {/* Cart */}
-            <div>
-              <Card className="shadow-card border-0">
+              {/* Cart */}
+              <div>
+                <Card className="border border-gray-200 bg-white shadow-sm">
                 <CardHeader>
                   <CardTitle>Commande en cours</CardTitle>
                 </CardHeader>
@@ -818,14 +821,18 @@ const ServeurInterface = () => {
               </div>
             )}
           </div>
-        </div>
+            </div>
+          </div>
+        </main>
       ) : (
-        <div className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
-          <OrderHistory 
-            orders={activeView === 'pending' ? pendingOrders : sentOrders}
-            onUpdateOrderStatus={updateOrderStatus}
-          />
-        </div>
+        <main className="flex-1 p-4 md:p-6 lg:p-8">
+          <div className="max-w-7xl mx-auto w-full">
+            <OrderHistory 
+              orders={activeView === 'pending' ? pendingOrders : sentOrders}
+              onUpdateOrderStatus={updateOrderStatus}
+            />
+          </div>
+        </main>
       )}
     </div>
   );

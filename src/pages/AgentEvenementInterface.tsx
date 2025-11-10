@@ -148,44 +148,57 @@ const AgentEvenementInterface = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background p-4 flex items-center justify-center">
+      <div className="min-h-screen bg-[#f6f8f6] p-4 flex items-center justify-center">
         <NackLogo size="md" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background p-4">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="text-center">
-          <NackLogo size="md" />
-          <div className="mt-4">
-            <h1 className="text-2xl font-bold text-foreground">Interface Agent Événement</h1>
-            <p className="text-muted-foreground">Agent: {agentName || agentCode}</p>
+    <div className="relative flex min-h-screen w-full flex-col bg-[#f6f8f6]">
+      {/* Header */}
+      <header className="sticky top-0 z-10 flex items-center justify-between bg-[#f6f8f6]/80 p-4 md:p-6 pb-2 backdrop-blur-sm border-b border-gray-200/50">
+        <div className="flex items-center gap-2 md:gap-3">
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-primary rounded-full flex items-center justify-center">
+            <Ticket className="text-white" size={20} />
+          </div>
+          <div>
+            <h1 className="text-lg md:text-xl lg:text-2xl font-bold leading-tight tracking-[-0.015em] text-gray-900">
+              Interface Agent Événement
+            </h1>
+            <p className="text-xs md:text-sm text-muted-foreground">Agent: {agentName || agentCode}</p>
           </div>
         </div>
+      </header>
 
-        {/* Event selector */}
-        <Card className="shadow-card border-0">
-          <CardHeader>
-            <CardTitle>Sélection de l'événement</CardTitle>
-            <CardDescription>Choisissez l'événement pour voir les participants</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {events.map(e => (
-                <Button key={e.id} variant={selectedEventId === e.id ? 'default' : 'outline'} onClick={() => setSelectedEventId(e.id)}>
-                  {e.title}
-              </Button>
-              ))}
-              {events.length === 0 && <p className="text-sm text-muted-foreground">Aucun événement</p>}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Content */}
+      <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto w-full space-y-4 md:space-y-6">
+          {/* Event selector */}
+          <Card className="border border-gray-200 bg-white shadow-sm">
+            <CardHeader>
+              <CardTitle>Sélection de l'événement</CardTitle>
+              <CardDescription>Choisissez l'événement pour voir les participants</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {events.map(e => (
+                  <Button 
+                    key={e.id} 
+                    variant={selectedEventId === e.id ? 'default' : 'outline'} 
+                    onClick={() => setSelectedEventId(e.id)}
+                    className={selectedEventId === e.id ? '' : 'border-gray-200'}
+                  >
+                    {e.title}
+                  </Button>
+                ))}
+                {events.length === 0 && <p className="text-sm text-muted-foreground">Aucun événement</p>}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Participants */}
-        <Card className="shadow-card border-0">
+          {/* Participants */}
+          <Card className="border border-gray-200 bg-white shadow-sm">
           <CardHeader>
             <CardTitle>Participants</CardTitle>
             <CardDescription>Validez les billets à l'entrée</CardDescription>
@@ -199,7 +212,7 @@ const AgentEvenementInterface = () => {
             ) : (
               <div className="space-y-3">
                 {tickets.map(t => (
-                  <div key={t.id} className="flex items-center justify-between p-3 bg-card rounded-lg border">
+                  <div key={t.id} className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate">{t.data.customerName} • {t.data.customerPhone}</p>
                       <p className="text-xs text-muted-foreground">
