@@ -885,6 +885,60 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
         {/* Data Tab */}
         <TabsContent value="data">
+          {/* Section UID */}
+          <Card className="shadow-card border-0 mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database size={20} />
+                Votre UID Firebase
+              </CardTitle>
+              <CardDescription>
+                Utilisez cet UID pour créer votre compte admin dans Firebase Console
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-blue-900 mb-2">Votre UID :</p>
+                    <code className="block bg-blue-100 px-3 py-2 rounded text-xs font-mono text-blue-900 border border-blue-300 break-all">
+                      {user?.uid || "Non disponible"}
+                    </code>
+                    <p className="text-xs text-blue-700 mt-2">
+                      Copiez cet UID et utilisez-le comme ID de document dans la collection <code className="bg-blue-200 px-1 rounded">admins</code> de Firestore
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (user?.uid) {
+                        navigator.clipboard.writeText(user.uid);
+                        toast({ 
+                          title: "UID copié !", 
+                          description: "L'UID a été copié dans le presse-papiers" 
+                        });
+                      }
+                    }}
+                    className="shrink-0"
+                  >
+                    📋 Copier
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <p className="text-sm font-semibold text-green-900 mb-2">Instructions rapides :</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs text-green-800">
+                  <li>Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Firebase Console</a></li>
+                  <li>Projet : <strong>nack-8c299</strong></li>
+                  <li>Firestore Database → Collection <code className="bg-green-100 px-1 rounded">admins</code></li>
+                  <li>Créez un document avec ID = votre UID (copié ci-dessus)</li>
+                  <li>Ajoutez : <code className="bg-green-100 px-1 rounded">role: "admin"</code>, <code className="bg-green-100 px-1 rounded">createdAt</code>, <code className="bg-green-100 px-1 rounded">updatedAt</code></li>
+                </ol>
+              </div>
+            </CardContent>
+          </Card>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card className="shadow-card border-0">
               <CardHeader>

@@ -110,6 +110,7 @@ const router = createBrowserRouter([
       { path: "dashboard", element: <RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "team", element: <RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "admin-check", element: <RequireAuth><AdminCheck /></RequireAuth> },
+      { path: "mon-uid", element: <RequireAuth><AdminCheck /></RequireAuth> },
       { path: "admin", element: <RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth> },
       { path: "serveur/:agentCode", element: <ServeurInterface /> },
       { path: "caisse/:agentCode", element: <CaisseInterface /> },
