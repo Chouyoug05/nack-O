@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, addDoc, query, where, getDocs } from "firebase/firestore";
-import { notificationsColRef, paymentsColRef } from "@/lib/collections";
+import { notificationsColRef, paymentsColRef, receiptsColRef } from "@/lib/collections";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
 import type { PaymentTransaction } from "@/types/payment";
@@ -24,6 +24,13 @@ const PaymentSuccess = () => {
         const reference = searchParams.get('reference') || '';
         const transactionId = searchParams.get('transactionId') || '';
         
+        // Vérification de sécurité: s'assurer qu'on a au moins une référence ou un transactionId
+        if (!reference && !transactionId) {
+          console.error('PaymentSuccess: Aucune référence ou transactionId fournie');
+          setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+          return;
+        }
+        
         // Détecter le type d'abonnement depuis la référence ou l'URL
         let subscriptionType: 'transition' | 'transition-pro-max' = 'transition';
         let amount = 2500;
@@ -38,18 +45,67 @@ const PaymentSuccess = () => {
         
         // Chercher la transaction existante si transactionId fourni
         let paymentTransaction: PaymentTransaction | null = null;
+        const paymentsRef = paymentsColRef(db, user.uid);
+        
         if (transactionId) {
           try {
             // Essayer de trouver la transaction dans la collection payments
-            const paymentsRef = paymentsColRef(db, user.uid);
             const q = query(paymentsRef, where('transactionId', '==', transactionId));
             const paymentsSnapshot = await getDocs(q);
             if (!paymentsSnapshot.empty) {
               const paymentDoc = paymentsSnapshot.docs[0];
               paymentTransaction = { id: paymentDoc.id, ...paymentDoc.data() } as PaymentTransaction;
+              
+              // VÉRIFICATION IMPORTANTE: Si la transaction est déjà complétée, ne pas la traiter à nouveau
+              if (paymentTransaction.status === 'completed') {
+                console.warn(`PaymentSuccess: Transaction ${transactionId} déjà complétée. Ignorant le traitement dupliqué.`);
+                // Vérifier si un reçu existe déjà
+                const receiptsRef = receiptsColRef(db, user.uid);
+                const receiptQuery = query(receiptsRef, where('transactionId', '==', transactionId));
+                const receiptSnapshot = await getDocs(receiptQuery);
+                
+                if (receiptSnapshot.empty && profile) {
+                  // Générer le reçu si il n'existe pas encore
+                  try {
+                    await generateSubscriptionReceiptPDF({
+                      establishmentName: profile.establishmentName,
+                      email: profile.email,
+                      phone: profile.phone,
+                      logoUrl: profile.logoUrl,
+                      uid: user.uid,
+                    }, {
+                      amountXaf: paymentTransaction.amount,
+                      paidAt: paymentTransaction.paidAt || now,
+                      paymentMethod: "Airtel Money",
+                      reference: paymentTransaction.reference,
+                    });
+                  } catch (receiptError) {
+                    console.error('Erreur génération reçu (transaction déjà complétée):', receiptError);
+                  }
+                }
+                
+                setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
+                return;
+              }
             }
           } catch (error) {
             console.error('Erreur recherche transaction:', error);
+          }
+        }
+        
+        // Vérification supplémentaire: chercher par référence pour éviter les doublons
+        if (reference && !paymentTransaction) {
+          try {
+            const refQuery = query(paymentsRef, where('reference', '==', reference), where('status', '==', 'completed'));
+            const refSnapshot = await getDocs(refQuery);
+            if (!refSnapshot.empty) {
+              const existingTransaction = { id: refSnapshot.docs[0].id, ...refSnapshot.docs[0].data() } as PaymentTransaction;
+              console.warn(`PaymentSuccess: Une transaction avec la référence ${reference} est déjà complétée. TransactionId: ${existingTransaction.transactionId}`);
+              setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+              return;
+            }
+          } catch (error) {
+            console.error('Erreur vérification doublon par référence:', error);
           }
         }
         
@@ -102,9 +158,8 @@ const PaymentSuccess = () => {
         // devrait automatiquement déclencher le rafraîchissement du profil et activer les fonctionnalités
 
         // Enregistrer ou mettre à jour la transaction de paiement
+        let finalTransactionId = transactionId;
         try {
-          const paymentsRef = paymentsColRef(db, user.uid);
-          
           if (paymentTransaction) {
             // Mettre à jour la transaction existante
             await updateDoc(doc(paymentsRef, paymentTransaction.id), {
@@ -113,10 +168,12 @@ const PaymentSuccess = () => {
               subscriptionEndsAt: newSubscriptionEndsAt,
               updatedAt: now,
             });
+            finalTransactionId = paymentTransaction.transactionId;
+            console.log(`PaymentSuccess: Transaction ${finalTransactionId} mise à jour avec succès`);
           } else {
             // Créer une nouvelle transaction (cas où transactionId manquant)
             const newTransactionId = transactionId || `TXN-${user.uid}-${Date.now()}`;
-            await addDoc(paymentsRef, {
+            const newTransactionRef = await addDoc(paymentsRef, {
               userId: user.uid,
               transactionId: newTransactionId,
               subscriptionType,
@@ -128,10 +185,13 @@ const PaymentSuccess = () => {
               paidAt: now,
               subscriptionEndsAt: newSubscriptionEndsAt,
             } as Omit<PaymentTransaction, 'id'>);
+            finalTransactionId = newTransactionId;
+            console.log(`PaymentSuccess: Nouvelle transaction ${finalTransactionId} créée avec succès`);
           }
         } catch (error) {
           console.error('Erreur enregistrement transaction:', error);
-          // Ne pas bloquer le processus si l'enregistrement échoue
+          // Ne pas bloquer le processus si l'enregistrement échoue, mais logger l'erreur
+          throw new Error(`Échec de l'enregistrement de la transaction: ${error instanceof Error ? error.message : String(error)}`);
         }
 
         // Notification de paiement réussi
@@ -145,9 +205,10 @@ const PaymentSuccess = () => {
           });
         } catch {/* ignore */}
 
-        // Générer le reçu si le profil est disponible
+        // Générer et sauvegarder le reçu si le profil est disponible
         try {
           if (profile) {
+            // Générer le reçu PDF
             await generateSubscriptionReceiptPDF({
               establishmentName: profile.establishmentName,
               email: profile.email,
@@ -160,10 +221,38 @@ const PaymentSuccess = () => {
               paymentMethod: "Airtel Money",
               reference: reference || `abonnement-${subscriptionType}`,
             });
+            
+            // Sauvegarder une référence au reçu dans Firestore
+            try {
+              const receiptsRef = receiptsColRef(db, user.uid);
+              await addDoc(receiptsRef, {
+                transactionId: finalTransactionId,
+                userId: user.uid,
+                subscriptionType,
+                amount,
+                reference: reference || `abonnement-${subscriptionType}`,
+                paymentMethod: 'airtel-money',
+                paidAt: now,
+                createdAt: now,
+                receiptType: 'subscription',
+                establishmentName: profile.establishmentName,
+              });
+              console.log(`PaymentSuccess: Reçu sauvegardé pour la transaction ${finalTransactionId}`);
+            } catch (receiptSaveError) {
+              console.error('Erreur sauvegarde référence reçu:', receiptSaveError);
+              // Ne pas bloquer, le reçu PDF a déjà été généré
+            }
+          } else {
+            console.warn('PaymentSuccess: Profil non disponible, reçu non généré');
           }
-        } catch {/* ignore receipt generation errors */}
+        } catch (receiptError) {
+          console.error('Erreur génération reçu:', receiptError);
+          // Ne pas bloquer le processus, mais logger l'erreur
+        }
       } catch (e) {
-        console.error(e);
+        console.error('PaymentSuccess: Erreur critique:', e);
+        // Afficher un message d'erreur à l'utilisateur
+        alert(`Une erreur est survenue lors du traitement du paiement. Veuillez contacter le support avec votre référence: ${searchParams.get('reference') || searchParams.get('transactionId') || 'N/A'}`);
       } finally {
         setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
       }

@@ -35,4 +35,7 @@ export const notificationsColRef = (db: Firestore, uid: string): CollectionRefer
 export const adminDocRef = (db: Firestore, uid: string) => doc(db, "admins", uid);
 
 export const paymentsColRef = (db: Firestore, uid: string): CollectionReference =>
-  collection(db, "profiles", uid, "payments") as CollectionReference; 
+  collection(db, "profiles", uid, "payments") as CollectionReference;
+
+export const receiptsColRef = (db: Firestore, uid: string): CollectionReference =>
+  collection(db, "profiles", uid, "receipts") as CollectionReference; 
