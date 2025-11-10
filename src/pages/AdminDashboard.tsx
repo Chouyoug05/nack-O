@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { profilesColRef, notificationsColRef } from "@/lib/collections";
-import { addDoc, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
+import { profilesColRef, notificationsColRef, paymentsColRef } from "@/lib/collections";
+import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
+import type { PaymentTransaction } from "@/types/payment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface NotificationForm {
@@ -30,6 +31,8 @@ const AdminDashboard = () => {
   const [notif, setNotif] = useState<NotificationForm>({ title: "", message: "", type: "info", target: "all" });
   const [activationDays, setActivationDays] = useState<number>(30);
   const [isFixingAbnormal, setIsFixingAbnormal] = useState(false);
+  const [allPayments, setAllPayments] = useState<Array<PaymentTransaction & { userEmail?: string; userName?: string }>>([]);
+  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -40,6 +43,48 @@ const AdminDashboard = () => {
     });
     return () => unsub();
   }, [isAdmin]);
+
+  const loadAllPayments = useCallback(async () => {
+    setIsLoadingPayments(true);
+    try {
+      const payments: Array<PaymentTransaction & { userEmail?: string; userName?: string }> = [];
+      
+      // Parcourir tous les profils pour récupérer leurs paiements
+      for (const profile of allProfiles) {
+        try {
+          const paymentsRef = paymentsColRef(db, profile.uid);
+          const paymentsQuery = query(paymentsRef, where('status', '==', 'completed'));
+          const paymentsSnapshot = await getDocs(paymentsQuery);
+          
+          paymentsSnapshot.docs.forEach(doc => {
+            const paymentData = { id: doc.id, ...doc.data() } as PaymentTransaction;
+            payments.push({
+              ...paymentData,
+              userEmail: profile.email,
+              userName: profile.ownerName || profile.establishmentName,
+            });
+          });
+        } catch (error) {
+          console.error(`Erreur chargement paiements pour ${profile.uid}:`, error);
+        }
+      }
+      
+      // Trier par date de paiement (plus récent en premier)
+      payments.sort((a, b) => (b.paidAt || b.createdAt || 0) - (a.paidAt || a.createdAt || 0));
+      setAllPayments(payments);
+    } catch (error) {
+      console.error('Erreur chargement paiements:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les paiements", variant: "destructive" });
+    } finally {
+      setIsLoadingPayments(false);
+    }
+  }, [allProfiles, toast]);
+
+  useEffect(() => {
+    if (isAdmin && allProfiles.length > 0) {
+      loadAllPayments();
+    }
+  }, [isAdmin, allProfiles.length, loadAllPayments]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
@@ -359,6 +404,95 @@ const AdminDashboard = () => {
                 </TableBody>
               </Table>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-0 shadow-card">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <CreditCard size={18}/> Liste des paiements
+                </CardTitle>
+                <CardDescription>Tous les paiements d'abonnement complétés</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={loadAllPayments} disabled={isLoadingPayments}>
+                {isLoadingPayments ? "Chargement..." : "Actualiser"}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {isLoadingPayments ? (
+              <div className="text-center py-8 text-muted-foreground">Chargement des paiements...</div>
+            ) : allPayments.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">Aucun paiement trouvé</div>
+            ) : (
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Utilisateur</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Montant</TableHead>
+                      <TableHead>Méthode</TableHead>
+                      <TableHead>Date de paiement</TableHead>
+                      <TableHead>Transaction ID</TableHead>
+                      <TableHead>Référence</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allPayments.map((payment) => (
+                      <TableRow key={`${payment.userId}-${payment.id}`}>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{payment.userName || payment.userEmail || payment.userId}</span>
+                            {payment.userEmail && payment.userName && (
+                              <span className="text-xs text-muted-foreground">{payment.userEmail}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">
+                            {payment.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold">{payment.amount?.toLocaleString() || 'N/A'} XAF</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {payment.paymentMethod === 'airtel-money' ? 'Airtel Money' : 
+                             payment.paymentMethod === 'moov-money' ? 'Moov Money' : 
+                             payment.paymentMethod || 'Autre'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {payment.paidAt ? new Date(payment.paidAt).toLocaleString('fr-FR') : 
+                           payment.createdAt ? new Date(payment.createdAt).toLocaleString('fr-FR') : 
+                           'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs font-mono text-muted-foreground">
+                            {payment.transactionId || 'N/A'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-xs text-muted-foreground">
+                            {payment.reference || 'N/A'}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            {allPayments.length > 0 && (
+              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
+                <span>Total: {allPayments.length} paiement(s)</span>
+                <span>
+                  Total montant: {allPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} XAF
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

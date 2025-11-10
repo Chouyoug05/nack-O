@@ -110,26 +110,20 @@ const PaymentSuccess = () => {
         }
         
         // Calculer la nouvelle date de fin d'abonnement
-        // CORRECTION: Chaque paiement donne exactement 30 jours à partir de maintenant
-        // Ne pas accumuler les jours pour éviter des abonnements de 357+ jours
-        let newSubscriptionEndsAt: number;
+        // CORRECTION IMPORTANTE: Chaque paiement donne TOUJOURS exactement 30 jours à partir de maintenant
+        // Ne JAMAIS accumuler les jours - même si l'abonnement actuel a encore des jours restants
+        // Un paiement = 30 jours à partir de la date de paiement, point final
+        const newSubscriptionEndsAt: number = now + thirtyDaysMs;
+        
+        // Si l'abonnement actuel a plus de 30 jours, c'est une anomalie - on le corrige
         if (profile?.subscriptionEndsAt && profile.subscriptionEndsAt > now) {
-          // Si l'abonnement actuel se termine dans plus de 30 jours, c'est anormal
-          // Sinon, on peut prolonger depuis la fin actuelle (mais max 30 jours supplémentaires)
           const daysRemaining = (profile.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
           if (daysRemaining > 30) {
-            // Anomalie détectée: abonnement avec plus de 30 jours restants
-            // Réinitialiser à 30 jours à partir de maintenant
-            console.warn(`PaymentSuccess: Abonnement anormal détecté (${Math.floor(daysRemaining)} jours restants). Réinitialisation à 30 jours.`);
-            newSubscriptionEndsAt = now + thirtyDaysMs;
-          } else {
-            // Prolonger depuis la fin actuelle (mais on limite à max 30 jours supplémentaires)
-            newSubscriptionEndsAt = profile.subscriptionEndsAt + thirtyDaysMs;
+            console.warn(`PaymentSuccess: Abonnement anormal détecté (${Math.floor(daysRemaining)} jours restants). Nouveau paiement = 30 jours à partir de maintenant.`);
           }
-        } else {
-          // Nouvel abonnement ou renouvellement après expiration
-          newSubscriptionEndsAt = now + thirtyDaysMs;
         }
+        
+        // TOUJOURS mettre 30 jours à partir de maintenant, jamais accumuler
         
         // Mettre à jour le profil avec le type d'abonnement
         const updateData: {
