@@ -34,9 +34,9 @@ import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
-import { receiptsColRef, paymentsColRef } from "@/lib/collections";
+import { receiptsColRef, paymentsColRef, productsColRef, salesColRef, lossesColRef, eventsColRef, teamColRef, ordersColRef, notificationsColRef } from "@/lib/collections";
 import { db } from "@/lib/firebase";
-import { getDocs, query, orderBy } from "firebase/firestore";
+import { getDocs, query, orderBy, deleteDoc, writeBatch, collection } from "firebase/firestore";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "0 jour";
@@ -92,6 +92,119 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       title: "Sauvegarde créée",
       description: "Une sauvegarde complète de vos données a été créée",
     });
+  };
+
+  const handleResetData = async () => {
+    if (!user) return;
+    
+    const confirmMessage = "⚠️ ATTENTION : Cette action est irréversible !\n\nCela supprimera TOUTES vos données :\n- Tous les produits\n- Toutes les ventes\n- Toute l'équipe\n- Tous les événements\n- Toutes les commandes\n- Toutes les notifications\n- Tous les paiements et reçus\n\nSeuls vos paramètres de base (nom, email, logo) seront conservés.\n\nÊtes-vous ABSOLUMENT sûr de vouloir continuer ?";
+    
+    if (!window.confirm(confirmMessage)) return;
+    
+    // Double confirmation
+    if (!window.confirm("Dernière confirmation : Voulez-vous vraiment supprimer TOUTES vos données ?")) return;
+
+    try {
+      setIsSaving(true);
+      const batch = writeBatch(db);
+      let totalDeleted = 0;
+
+      // Supprimer tous les produits
+      const productsSnapshot = await getDocs(productsColRef(db, user.uid));
+      productsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer toutes les ventes
+      const salesSnapshot = await getDocs(salesColRef(db, user.uid));
+      salesSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer toutes les pertes
+      const lossesSnapshot = await getDocs(lossesColRef(db, user.uid));
+      lossesSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer tous les événements (et leurs tickets)
+      const eventsSnapshot = await getDocs(eventsColRef(db, user.uid));
+      for (const eventDoc of eventsSnapshot.docs) {
+        // Supprimer les tickets de l'événement
+        const ticketsRef = collection(db, "profiles", user.uid, "events", eventDoc.id, "tickets");
+        const ticketsSnapshot = await getDocs(ticketsRef);
+        ticketsSnapshot.forEach((ticketDoc) => {
+          batch.delete(ticketDoc.ref);
+          totalDeleted++;
+        });
+        // Supprimer l'événement
+        batch.delete(eventDoc.ref);
+        totalDeleted++;
+      }
+
+      // Supprimer toute l'équipe
+      const teamSnapshot = await getDocs(teamColRef(db, user.uid));
+      teamSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer toutes les commandes
+      const ordersSnapshot = await getDocs(ordersColRef(db, user.uid));
+      ordersSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer toutes les notifications
+      const notificationsSnapshot = await getDocs(notificationsColRef(db, user.uid));
+      notificationsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer tous les paiements
+      const paymentsSnapshot = await getDocs(paymentsColRef(db, user.uid));
+      paymentsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer tous les reçus
+      const receiptsSnapshot = await getDocs(receiptsColRef(db, user.uid));
+      receiptsSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Supprimer toutes les commandes bar (barOrders)
+      const barOrdersRef = collection(db, "profiles", user.uid, "barOrders");
+      const barOrdersSnapshot = await getDocs(barOrdersRef);
+      barOrdersSnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        totalDeleted++;
+      });
+
+      // Exécuter toutes les suppressions
+      await batch.commit();
+
+      toast({
+        title: "✅ Données réinitialisées",
+        description: `${totalDeleted} élément(s) supprimé(s) avec succès. Vos paramètres de base ont été conservés.`,
+      });
+    } catch (error) {
+      console.error("Erreur lors de la réinitialisation:", error);
+      toast({
+        title: "❌ Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la réinitialisation",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const currentPlan = getCurrentPlan(profile);
@@ -998,8 +1111,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <p className="text-sm text-red-600 mb-3">
                       Supprime toutes les données (ventes, stock, équipe) sauf les paramètres de base.
                     </p>
-                    <Button variant="outline" className="text-red-600 border-red-600 hover:bg-red-50">
-                      Réinitialiser les données
+                    <Button 
+                      variant="outline" 
+                      className="text-red-600 border-red-600 hover:bg-red-50"
+                      onClick={handleResetData}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? "Suppression en cours..." : "Réinitialiser les données"}
                     </Button>
                   </div>
                   
