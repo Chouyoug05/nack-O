@@ -797,9 +797,15 @@ const StockPage = () => {
     
     try {
       for (const product of importPreview) {
-        if (!product.name || !product.category || product.quantity === undefined) {
+        // Accepter les produits même avec quantité 0 (sera modifiable après)
+        if (!product.name || !product.category) {
           errorCount++;
           continue;
+        }
+        
+        // Si quantité n'est pas définie, mettre 0 par défaut
+        if (product.quantity === undefined) {
+          product.quantity = 0;
         }
         
         try {
