@@ -22,8 +22,26 @@ interface NotificationForm {
 }
 
 const AdminDashboard = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isAdminLoading } = useAuth();
   const { toast } = useToast();
+  
+  // Si pas admin, rediriger (sécurité supplémentaire)
+  useEffect(() => {
+    if (!isAdminLoading && !isAdmin) {
+      window.location.href = '/admin-check';
+    }
+  }, [isAdmin, isAdminLoading]);
+  
+  if (isAdminLoading || !isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Vérification des droits d'accès...</p>
+        </div>
+      </div>
+    );
+  }
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "trial" | "active" | "expired">("all");

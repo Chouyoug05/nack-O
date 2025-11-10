@@ -57,7 +57,10 @@ const RequireAdmin = ({ children }: { children: React.ReactNode }) => {
   const { user, isAdmin, isAdminLoading } = useAuth();
   if (isAdminLoading) return <FullscreenLoader/>;
   if (!user) return <Navigate to="/login" replace />;
-  if (!isAdmin) return <Navigate to="/dashboard" replace />;
+  if (!isAdmin) {
+    // Rediriger vers admin-check pour diagnostic au lieu de dashboard
+    return <Navigate to="/admin-check" replace />;
+  }
   return <>{children}</>;
 };
 
