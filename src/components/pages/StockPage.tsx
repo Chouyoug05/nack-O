@@ -1520,19 +1520,24 @@ const StockPage = () => {
           </div>
 
           {/* Sélection multiple - Toujours visible si des produits existent */}
-          {filteredProducts.length > 0 && (
+          {products.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg mb-4 shadow-sm">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <Checkbox
                   id="select-all"
-                  checked={selectedProducts.size > 0 && selectedProducts.size === filteredProducts.filter(p => p.id).length}
+                  checked={filteredProducts.length > 0 && selectedProducts.size > 0 && selectedProducts.size === filteredProducts.filter(p => p.id).length}
                   onCheckedChange={handleSelectAll}
+                  disabled={filteredProducts.length === 0}
                 />
                 <label 
                   htmlFor="select-all" 
-                  className="text-sm font-semibold cursor-pointer flex-1 text-blue-900 whitespace-nowrap"
+                  className="text-sm font-semibold cursor-pointer flex-1 text-blue-900"
                 >
-                  Tout sélectionner ({selectedProducts.size}/{filteredProducts.length} sélectionné{selectedProducts.size > 1 ? 's' : ''})
+                  {filteredProducts.length > 0 ? (
+                    <>Tout sélectionner ({selectedProducts.size}/{filteredProducts.length} sélectionné{selectedProducts.size > 1 ? 's' : ''})</>
+                  ) : (
+                    <>Aucun produit visible avec les filtres actuels</>
+                  )}
                 </label>
               </div>
               {selectedProducts.size > 0 && (
