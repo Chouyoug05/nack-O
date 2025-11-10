@@ -793,9 +793,7 @@ const ServeurInterface = () => {
               </Card>
             </div>
           </div>
-
-            </div>
-            {/* Barre flottante total / actions */}
+          {/* Barre flottante total / actions */}
             <div className="pointer-events-none fixed left-0 right-0 bottom-20 z-20 px-4 md:px-6">
               {cart.length > 0 && (
                 <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl bg-nack-red/95 p-3 text-white shadow-2xl">
