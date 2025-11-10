@@ -30,6 +30,8 @@ const AdminDashboard = () => {
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
   const [notif, setNotif] = useState<NotificationForm>({ title: "", message: "", type: "info", target: "all" });
   const [activationDays, setActivationDays] = useState<number>(30);
+  const [extendEmail, setExtendEmail] = useState<string>("");
+  const [extendDays, setExtendDays] = useState<number>(1);
   const [isFixingAbnormal, setIsFixingAbnormal] = useState(false);
   const [isFixingPastDates, setIsFixingPastDates] = useState(false);
   const [allPayments, setAllPayments] = useState<Array<PaymentTransaction & { userEmail?: string; userName?: string }>>([]);
@@ -156,6 +158,39 @@ const AdminDashboard = () => {
       toast({ title: "Succès", description: `Abonnement activé pour ${days} jours` });
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible d'activer l'abonnement", variant: "destructive" });
+    }
+  };
+
+  const extendSubscriptionByEmail = async (email: string, days: number = 1) => {
+    const profile = allProfiles.find(p => p.email?.toLowerCase() === email.toLowerCase());
+    if (!profile) {
+      toast({ title: "Erreur", description: `Utilisateur non trouvé: ${email}`, variant: "destructive" });
+      return;
+    }
+
+    const now = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const daysToAddMs = days * oneDayMs;
+    
+    // Obtenir la date de fin actuelle ou utiliser maintenant si pas de date
+    let currentEndDate = profile.subscriptionEndsAt || now;
+    
+    // Ajouter les jours
+    const newEndDate = currentEndDate + daysToAddMs;
+    const newDaysRemaining = (newEndDate - now) / oneDayMs;
+
+    try {
+      await updateDoc(doc(db, "profiles", profile.uid), {
+        subscriptionEndsAt: newEndDate,
+        plan: 'active',
+        updatedAt: now,
+      });
+      toast({ 
+        title: "Abonnement prolongé", 
+        description: `${email}: +${days} jour(s) ajouté(s). Nouveaux jours restants: ${Math.floor(newDaysRemaining)}` 
+      });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de prolonger l'abonnement", variant: "destructive" });
     }
   };
 
@@ -399,6 +434,42 @@ const AdminDashboard = () => {
                   const uids = Array.from(selectedUids);
                   for (const uid of uids) await activateForDays(uid, activationDays);
                 }}><Gift size={16} className="mr-2"/>Activer {activationDays} j</Button>
+              </div>
+              
+              {/* Prolonger abonnement par email */}
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <h3 className="text-sm font-semibold text-blue-900 mb-3">Prolonger l'abonnement d'un utilisateur</h3>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    type="email"
+                    placeholder="Email de l'utilisateur"
+                    value={extendEmail}
+                    onChange={(e) => setExtendEmail(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Jours"
+                    value={extendDays}
+                    onChange={(e) => setExtendDays(Number(e.target.value) || 1)}
+                    min={1}
+                    className="w-24"
+                  />
+                  <Button 
+                    onClick={() => {
+                      if (extendEmail.trim()) {
+                        extendSubscriptionByEmail(extendEmail.trim(), extendDays);
+                        setExtendEmail("");
+                      } else {
+                        toast({ title: "Erreur", description: "Veuillez saisir un email", variant: "destructive" });
+                      }
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <Gift size={16} className="mr-2"/>
+                    Prolonger de {extendDays} jour(s)
+                  </Button>
+                </div>
               </div>
             </div>
 
