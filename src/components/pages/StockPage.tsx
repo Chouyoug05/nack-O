@@ -603,39 +603,110 @@ const StockPage = () => {
     };
     
     // Détecter l'en-tête (première ligne)
-    const header = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
-    const nameIdx = header.findIndex(h => h.includes('nom') || h.includes('name') || h.includes('produit'));
-    const categoryIdx = header.findIndex(h => h.includes('catégorie') || h.includes('category') || h.includes('categorie'));
-    const priceIdx = header.findIndex(h => h.includes('prix') || h.includes('price'));
-    const quantityIdx = header.findIndex(h => h.includes('quantité') || h.includes('quantity') || h.includes('quantite') || h.includes('stock'));
-    const costIdx = header.findIndex(h => h.includes('coût') || h.includes('cost') || h.includes('cout'));
-    const descriptionIdx = header.findIndex(h => h.includes('description') || h.includes('desc'));
+    const firstLine = parseCSVLine(lines[0]).map(h => h.trim().replace(/^"|"$/g, ''));
+    const header = firstLine.map(h => h.toLowerCase());
+    
+    // Détection flexible des colonnes avec plusieurs variantes
+    const nameIdx = header.findIndex(h => 
+      h.includes('nom') || h.includes('name') || h.includes('produit') || 
+      h.includes('libellé') || h.includes('libelle') || h.includes('article') ||
+      h === 'nom' || h === 'name' || h === 'produit' || h === 'article'
+    );
+    const categoryIdx = header.findIndex(h => 
+      h.includes('catégorie') || h.includes('category') || h.includes('categorie') ||
+      h.includes('type') || h === 'catégorie' || h === 'category' || h === 'type'
+    );
+    const priceIdx = header.findIndex(h => 
+      h.includes('prix') || h.includes('price') || h.includes('tarif') ||
+      h === 'prix' || h === 'price' || h === 'tarif'
+    );
+    const quantityIdx = header.findIndex(h => 
+      h.includes('quantité') || h.includes('quantity') || h.includes('quantite') || 
+      h.includes('stock') || h.includes('qte') || h.includes('qty') ||
+      h === 'quantité' || h === 'quantity' || h === 'stock' || h === 'qte'
+    );
+    const costIdx = header.findIndex(h => 
+      h.includes('coût') || h.includes('cost') || h.includes('cout') ||
+      h.includes('prix d\'achat') || h.includes('prix achat') ||
+      h === 'coût' || h === 'cost' || h === 'cout'
+    );
+    const descriptionIdx = header.findIndex(h => 
+      h.includes('description') || h.includes('desc') || h.includes('détail') ||
+      h === 'description' || h === 'desc'
+    );
+    
+    // Si pas d'en-tête détecté, essayer un format sans en-tête (colonnes par position)
+    const hasHeader = nameIdx >= 0 || (header.length > 0 && isNaN(parseFloat(header[0])));
+    let startRow = 1;
+    
+    // Si pas de colonne nom trouvée, essayer format sans en-tête
+    if (nameIdx < 0 && lines.length > 1) {
+      // Essayer de détecter si la première ligne est un en-tête ou des données
+      const firstDataLine = parseCSVLine(lines[1] || lines[0]);
+      if (firstDataLine.length >= 2) {
+        // Format sans en-tête: colonne 0 = nom, colonne 1 = catégorie, colonne 2 = prix, colonne 3 = quantité
+        startRow = 0;
+        console.log('Format CSV sans en-tête détecté, utilisation de l\'ordre: Nom, Catégorie, Prix, Quantité');
+      }
+    }
     
     const products: Array<Partial<Product>> = [];
     
     // Parser les lignes de données
-    for (let i = 1; i < lines.length; i++) {
+    for (let i = startRow; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, ''));
       
-      if (nameIdx >= 0 && values[nameIdx]) {
-        const name = values[nameIdx];
-        const category = categoryIdx >= 0 && values[categoryIdx] ? values[categoryIdx] : 'Autres';
-        const price = priceIdx >= 0 ? parseFloat(values[priceIdx] || '0') : 0;
-        const quantity = quantityIdx >= 0 ? parseFloat(values[quantityIdx] || '0') : 0;
-        const cost = costIdx >= 0 ? parseFloat(values[costIdx] || '0') : 0;
-        const description = descriptionIdx >= 0 ? values[descriptionIdx] : undefined;
-        
-        if (name && quantity >= 0) {
-          products.push({
-            name,
-            category,
-            price: isNaN(price) ? 0 : price,
-            quantity: isNaN(quantity) ? 0 : Math.floor(quantity),
-            cost: isNaN(cost) ? 0 : cost,
-            description
-          });
-        }
+      // Si format sans en-tête, utiliser les positions par défaut
+      let name = '';
+      let category = 'Autres';
+      let price = 0;
+      let quantity = 0;
+      let cost = 0;
+      let description: string | undefined = undefined;
+      
+      if (nameIdx >= 0) {
+        // Format avec en-tête
+        name = values[nameIdx] || '';
+        category = (categoryIdx >= 0 && values[categoryIdx]) ? values[categoryIdx] : 'Autres';
+        price = priceIdx >= 0 ? parseFloat(values[priceIdx] || '0') : 0;
+        quantity = quantityIdx >= 0 ? parseFloat(values[quantityIdx] || '0') : 0;
+        cost = costIdx >= 0 ? parseFloat(values[costIdx] || '0') : 0;
+        description = descriptionIdx >= 0 ? values[descriptionIdx] : undefined;
+      } else if (values.length >= 1) {
+        // Format sans en-tête: utiliser l'ordre par défaut
+        name = values[0] || '';
+        category = values[1] || 'Autres';
+        price = values[2] ? parseFloat(values[2]) : 0;
+        quantity = values[3] ? parseFloat(values[3]) : 0;
+        cost = values[4] ? parseFloat(values[4]) : 0;
+        description = values[5];
       }
+      
+      // Nettoyer le nom et vérifier qu'il n'est pas vide
+      name = name.trim();
+      
+      if (name && name.length > 0) {
+        // Si quantité n'est pas spécifiée, mettre 0 (sera modifiable après)
+        const finalQuantity = isNaN(quantity) ? 0 : Math.max(0, Math.floor(quantity));
+        const finalPrice = isNaN(price) ? 0 : Math.max(0, price);
+        const finalCost = isNaN(cost) ? 0 : Math.max(0, cost);
+        
+        products.push({
+          name,
+          category: category.trim() || 'Autres',
+          price: finalPrice,
+          quantity: finalQuantity,
+          cost: finalCost,
+          description: description?.trim()
+        });
+      }
+    }
+    
+    // Debug: afficher les colonnes détectées
+    if (products.length === 0 && lines.length > 0) {
+      console.log('Colonnes détectées:', header);
+      console.log('Indices:', { nameIdx, categoryIdx, priceIdx, quantityIdx, costIdx });
+      console.log('Première ligne de données:', parseCSVLine(lines[startRow] || lines[0]));
     }
     
     return products;
@@ -659,9 +730,28 @@ const StockPage = () => {
     // Détecter le type de fichier
     if (file.name.endsWith('.csv') || file.type === 'text/csv') {
       setImportType('csv');
-      const text = await file.text();
-      const parsed = parseCSV(text);
-      setImportPreview(parsed);
+      try {
+        const text = await file.text();
+        const parsed = parseCSV(text);
+        setImportPreview(parsed);
+        
+        if (parsed.length === 0) {
+          toast({
+            title: "Aucun produit détecté",
+            description: "Vérifiez que votre CSV contient les colonnes: Nom, Catégorie, Prix, Quantité. Consultez la console pour plus de détails.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error('Erreur parsing CSV:', error);
+        toast({
+          title: "Erreur de lecture",
+          description: "Impossible de lire le fichier CSV. Vérifiez le format.",
+          variant: "destructive"
+        });
+        setImportFile(null);
+        setImportType(null);
+      }
     } else if (file.name.endsWith('.pdf') || file.type === 'application/pdf') {
       setImportType('pdf');
       try {
@@ -920,12 +1010,20 @@ const StockPage = () => {
                            Formats supportés: CSV, PDF. Pour CSV, utilisez les colonnes: <strong>Nom</strong>, <strong>Catégorie</strong>, <strong>Prix</strong>, <strong>Quantité</strong>, Coût (optionnel), Description (optionnel)
                          </p>
                          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                           <p className="text-xs font-semibold text-blue-900 mb-1">Exemple de format CSV:</p>
+                           <p className="text-xs font-semibold text-blue-900 mb-1">Exemple de format CSV (avec en-tête):</p>
                            <pre className="text-xs text-blue-800 overflow-x-auto whitespace-pre-wrap">
 {`Nom,Catégorie,Prix,Quantité,Coût,Description
 "Bière 33cl","Boissons",1500,50,1000,"Bière locale"
 "Vin rouge","Alcools",5000,20,3500,"Vin importé"`}
                            </pre>
+                           <p className="text-xs font-semibold text-blue-900 mb-1 mt-3">Ou sans en-tête (ordre: Nom, Catégorie, Prix, Quantité):</p>
+                           <pre className="text-xs text-blue-800 overflow-x-auto whitespace-pre-wrap">
+{`"Bière 33cl","Boissons",1500,50
+"Vin rouge","Alcools",5000,20`}
+                           </pre>
+                           <p className="text-xs text-blue-700 mt-2">
+                             💡 Les noms de colonnes acceptés: Nom/Name/Produit, Catégorie/Category/Type, Prix/Price/Tarif, Quantité/Quantity/Stock/Qte
+                           </p>
                          </div>
                        </div>
                        
