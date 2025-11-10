@@ -37,6 +37,7 @@ if (!targetEmail) {
   process.exit(1);
 }
 
+async function main() {
   console.log(`\n🔍 Recherche de l'utilisateur: ${targetEmail}\n`);
 
   // Chercher par email
