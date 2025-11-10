@@ -1027,6 +1027,19 @@ const StockPage = () => {
                          </div>
                        </div>
                        
+                       {importFile && importPreview.length === 0 && importType === 'csv' && (
+                         <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                           <p className="text-sm font-semibold text-yellow-900 mb-2">⚠️ Aucun produit détecté</p>
+                           <p className="text-xs text-yellow-800 mb-2">
+                             Vérifiez que votre CSV contient au moins une colonne avec le nom du produit.
+                             Ouvrez la console du navigateur (F12) pour voir les détails de détection.
+                           </p>
+                           <p className="text-xs text-yellow-800">
+                             <strong>Format attendu:</strong> Colonne "Nom" ou "Name" ou "Produit" (ou format sans en-tête: première colonne = nom)
+                           </p>
+                         </div>
+                       )}
+                       
                        {importPreview.length > 0 && (
                          <div>
                            <Label className="text-lg font-semibold mb-3 block">
