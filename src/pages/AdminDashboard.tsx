@@ -173,7 +173,7 @@ const AdminDashboard = () => {
     const daysToAddMs = days * oneDayMs;
     
     // Obtenir la date de fin actuelle ou utiliser maintenant si pas de date
-    let currentEndDate = profile.subscriptionEndsAt || now;
+    const currentEndDate = profile.subscriptionEndsAt || now;
     
     // Ajouter les jours
     const newEndDate = currentEndDate + daysToAddMs;
