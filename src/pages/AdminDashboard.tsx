@@ -31,6 +31,7 @@ const AdminDashboard = () => {
   const [notif, setNotif] = useState<NotificationForm>({ title: "", message: "", type: "info", target: "all" });
   const [activationDays, setActivationDays] = useState<number>(30);
   const [isFixingAbnormal, setIsFixingAbnormal] = useState(false);
+  const [isFixingPastDates, setIsFixingPastDates] = useState(false);
   const [allPayments, setAllPayments] = useState<Array<PaymentTransaction & { userEmail?: string; userName?: string }>>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(false);
 
@@ -223,6 +224,48 @@ const AdminDashboard = () => {
     }
   };
 
+  const fixAllPastSubscriptionDates = async () => {
+    setIsFixingPastDates(true);
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const year2025Start = new Date('2025-01-01').getTime();
+    let fixed = 0;
+    let errors = 0;
+    
+    try {
+      for (const profile of allProfiles) {
+        if (!profile.subscriptionEndsAt) continue;
+        
+        // Vérifier si la date est en 2024 ou dans le passé
+        const subscriptionEndsAt = profile.subscriptionEndsAt;
+        const isIn2024 = subscriptionEndsAt < year2025Start;
+        const isExpired = subscriptionEndsAt < now;
+        
+        if (isIn2024 || isExpired) {
+          try {
+            await updateDoc(doc(db, "profiles", profile.uid), {
+              subscriptionEndsAt: now + thirtyDaysMs,
+              plan: 'active',
+              updatedAt: now,
+            });
+            fixed++;
+          } catch {
+            errors++;
+          }
+        }
+      }
+      
+      toast({ 
+        title: "Correction terminée", 
+        description: `${fixed} date(s) d'abonnement corrigée(s) (2024 → 2025)${errors > 0 ? `, ${errors} erreur(s)` : ''}` 
+      });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Erreur lors de la correction", variant: "destructive" });
+    } finally {
+      setIsFixingPastDates(false);
+    }
+  };
+
   return (
     <div className="min-h-screen p-4 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -337,11 +380,20 @@ const AdminDashboard = () => {
                 <Button 
                   variant="destructive" 
                   onClick={fixAllAbnormalSubscriptions}
-                  disabled={isFixingAbnormal}
+                  disabled={isFixingAbnormal || isFixingPastDates}
                   title="Corriger tous les abonnements avec plus de 30 jours"
                 >
                   <Wrench size={16} className="mr-2"/>
                   {isFixingAbnormal ? "Correction..." : "Corriger tous les anormaux"}
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={fixAllPastSubscriptionDates}
+                  disabled={isFixingAbnormal || isFixingPastDates}
+                  title="Corriger toutes les dates d'abonnement en 2024"
+                >
+                  <Wrench size={16} className="mr-2"/>
+                  {isFixingPastDates ? "Correction..." : "Corriger dates 2024"}
                 </Button>
                 <Button variant="outline" onClick={async () => {
                   const uids = Array.from(selectedUids);
