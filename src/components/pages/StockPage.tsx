@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { 
   Package, 
@@ -70,6 +71,7 @@ const StockPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [showZeroStock, setShowZeroStock] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isLossModalOpen, setIsLossModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -79,6 +81,7 @@ const StockPage = () => {
   const [importType, setImportType] = useState<'csv' | 'pdf' | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [importPreview, setImportPreview] = useState<Array<Partial<Product>>>([]);
+  const [isDeletingMultiple, setIsDeletingMultiple] = useState(false);
   
   const [products, setProducts] = useState<Product[]>([]);
 
@@ -463,6 +466,71 @@ const StockPage = () => {
       toast({ title: "Produit supprimé", description: "Le produit a été retiré du stock" });
     } catch (e: unknown) {
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Suppression échouée", variant: "destructive" });
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedProducts(new Set(filteredProducts.map(p => p.id || '').filter(Boolean)));
+    } else {
+      setSelectedProducts(new Set());
+    }
+  };
+
+  const handleToggleProduct = (productId: string) => {
+    setSelectedProducts(prev => {
+      const next = new Set(prev);
+      if (next.has(productId)) {
+        next.delete(productId);
+      } else {
+        next.add(productId);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!user || selectedProducts.size === 0) return;
+    
+    const confirmMessage = `Êtes-vous sûr de vouloir supprimer ${selectedProducts.size} produit(s) ? Cette action est irréversible.`;
+    if (!window.confirm(confirmMessage)) return;
+
+    setIsDeletingMultiple(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const productId of selectedProducts) {
+        try {
+          const ref = fsDoc(productsColRef(db, user.uid), productId);
+          const snap = await getDoc(ref);
+          if (snap.exists()) {
+            const data = snap.data() as ProductDoc;
+            if (data.imageDeleteToken) {
+              try { await deleteImageByToken(data.imageDeleteToken); } catch { /* ignore */ }
+            }
+          }
+          await deleteDoc(ref);
+          successCount++;
+        } catch (e) {
+          console.error('Erreur suppression produit:', productId, e);
+          errorCount++;
+        }
+      }
+      
+      setSelectedProducts(new Set());
+      toast({ 
+        title: "Suppression terminée", 
+        description: `${successCount} produit(s) supprimé(s)${errorCount > 0 ? `. ${errorCount} erreur(s).` : '.'}` 
+      });
+    } catch (e: unknown) {
+      toast({ 
+        title: "Erreur", 
+        description: e instanceof Error ? e.message : "Suppression échouée", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsDeletingMultiple(false);
     }
   };
 
@@ -1451,6 +1519,37 @@ const StockPage = () => {
             </Button>
           </div>
 
+          {/* Sélection multiple */}
+          {filteredProducts.length > 0 && (
+            <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg mb-4">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="select-all"
+                  checked={selectedProducts.size > 0 && selectedProducts.size === filteredProducts.filter(p => p.id).length}
+                  onCheckedChange={handleSelectAll}
+                />
+                <label 
+                  htmlFor="select-all" 
+                  className="text-sm font-medium cursor-pointer"
+                >
+                  Tout sélectionner ({selectedProducts.size} sélectionné{selectedProducts.size > 1 ? 's' : ''})
+                </label>
+              </div>
+              {selectedProducts.size > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteSelected}
+                  disabled={isDeletingMultiple}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  <Trash2 size={16} className="mr-2" />
+                  {isDeletingMultiple ? "Suppression..." : `Supprimer ${selectedProducts.size} produit(s)`}
+                </Button>
+              )}
+            </div>
+          )}
+
           {/* Products List - Card Style */}
           <div className="flex flex-col gap-4">
             {filteredProducts.map((product) => {
@@ -1459,7 +1558,7 @@ const StockPage = () => {
               const isLowStock = product.quantity <= 10;
 
               return (
-                <div key={product.id} className="relative flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-lg border border-gray-200 hover:shadow-2xl transition">
+                <div key={product.id} className={`relative flex flex-col gap-4 rounded-2xl bg-white p-4 shadow-lg border transition ${selectedProducts.has(product.id || '') ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:shadow-2xl'}`}>
                   {(() => {
                     const c = (product.category || '').toLowerCase();
                     const color = c.includes('vin') || c.includes('alcool') ? 'bg-red-500'
@@ -1474,6 +1573,13 @@ const StockPage = () => {
                   })()}
                   {/* Product Header */}
                   <div className="flex items-center gap-4">
+                    {product.id && (
+                      <Checkbox
+                        checked={selectedProducts.has(product.id)}
+                        onCheckedChange={() => handleToggleProduct(product.id)}
+                        className="shrink-0"
+                      />
+                    )}
                     <div
                       className="aspect-square size-20 shrink-0 rounded-xl bg-cover bg-center bg-no-repeat"
                       style={{
