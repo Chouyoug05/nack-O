@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface NotificationForm {
   title: string;
@@ -21,12 +22,14 @@ interface NotificationForm {
 
 const AdminDashboard = () => {
   const { isAdmin } = useAuth();
+  const { toast } = useToast();
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "trial" | "active" | "expired">("all");
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
   const [notif, setNotif] = useState<NotificationForm>({ title: "", message: "", type: "info", target: "all" });
   const [activationDays, setActivationDays] = useState<number>(30);
+  const [isFixingAbnormal, setIsFixingAbnormal] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -104,8 +107,74 @@ const AdminDashboard = () => {
         subscriptionEndsAt: until,
         updatedAt: Date.now(),
       });
-    } catch {
-      // ignore
+      toast({ title: "Succès", description: `Abonnement activé pour ${days} jours` });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible d'activer l'abonnement", variant: "destructive" });
+    }
+  };
+
+  const fixAbnormalSubscription = async (uid: string) => {
+    const profile = allProfiles.find(p => p.uid === uid);
+    if (!profile || profile.plan !== 'active' || !profile.subscriptionEndsAt) return;
+    
+    const now = Date.now();
+    const daysRemaining = (profile.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
+    
+    if (daysRemaining <= 30) {
+      toast({ title: "Info", description: "Cet abonnement est normal (≤ 30 jours)" });
+      return;
+    }
+    
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    const newSubscriptionEndsAt = now + thirtyDaysMs;
+    
+    try {
+      await updateDoc(doc(db, "profiles", uid), {
+        subscriptionEndsAt: newSubscriptionEndsAt,
+        updatedAt: now,
+      });
+      toast({ 
+        title: "Corrigé", 
+        description: `Abonnement corrigé: ${Math.floor(daysRemaining)}j → 30j` 
+      });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Impossible de corriger l'abonnement", variant: "destructive" });
+    }
+  };
+
+  const fixAllAbnormalSubscriptions = async () => {
+    setIsFixingAbnormal(true);
+    const now = Date.now();
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    let fixed = 0;
+    let errors = 0;
+    
+    try {
+      for (const profile of allProfiles) {
+        if (profile.plan !== 'active' || !profile.subscriptionEndsAt) continue;
+        
+        const daysRemaining = (profile.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
+        if (daysRemaining > 30) {
+          try {
+            await updateDoc(doc(db, "profiles", profile.uid), {
+              subscriptionEndsAt: now + thirtyDaysMs,
+              updatedAt: now,
+            });
+            fixed++;
+          } catch {
+            errors++;
+          }
+        }
+      }
+      
+      toast({ 
+        title: "Correction terminée", 
+        description: `${fixed} abonnement(s) corrigé(s)${errors > 0 ? `, ${errors} erreur(s)` : ''}` 
+      });
+    } catch (error) {
+      toast({ title: "Erreur", description: "Erreur lors de la correction", variant: "destructive" });
+    } finally {
+      setIsFixingAbnormal(false);
     }
   };
 
@@ -205,6 +274,15 @@ const AdminDashboard = () => {
               </Select>
               <div className="ml-auto flex items-center gap-2">
                 <Input type="number" className="w-28" min={1} value={activationDays} onChange={e => setActivationDays(Number(e.target.value || 0))} />
+                <Button 
+                  variant="destructive" 
+                  onClick={fixAllAbnormalSubscriptions}
+                  disabled={isFixingAbnormal}
+                  title="Corriger tous les abonnements avec plus de 30 jours"
+                >
+                  <Wrench size={16} className="mr-2"/>
+                  {isFixingAbnormal ? "Correction..." : "Corriger abonnements anormaux"}
+                </Button>
                 <Button variant="outline" onClick={async () => {
                   const uids = Array.from(selectedUids);
                   for (const uid of uids) await activateForDays(uid, activationDays);
@@ -245,11 +323,35 @@ const AdminDashboard = () => {
                           {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
                           {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
                         </TableCell>
-                        <TableCell>{p.subscriptionEndsAt ? new Date(p.subscriptionEndsAt).toLocaleDateString() : "—"}</TableCell>
+                        <TableCell>
+                          {p.subscriptionEndsAt ? (
+                            <div className="flex flex-col">
+                              <span>{new Date(p.subscriptionEndsAt).toLocaleDateString()}</span>
+                              {p.plan === 'active' && p.subscriptionEndsAt > now && (
+                                <span className={`text-xs ${((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
+                                  {Math.floor((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000))} jours restants
+                                </span>
+                              )}
+                            </div>
+                          ) : "—"}
+                        </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays)}>
-                            <Gift size={14} className="mr-2"/> Activer {activationDays} j
-                          </Button>
+                          <div className="flex gap-2 justify-end">
+                            {p.plan === 'active' && p.subscriptionEndsAt && p.subscriptionEndsAt > now && 
+                             ((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 && (
+                              <Button 
+                                size="sm" 
+                                variant="destructive" 
+                                onClick={() => fixAbnormalSubscription(p.uid)}
+                                title="Corriger l'abonnement anormal"
+                              >
+                                <Wrench size={14} className="mr-1"/> Corriger
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays)}>
+                              <Gift size={14} className="mr-2"/> Activer {activationDays} j
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     );
