@@ -1397,6 +1397,9 @@ const StockPage = () => {
                 </DialogContent>
               </Dialog>
 
+      {/* Products List Card */}
+      <Card className="shadow-card border-0">
+        <CardContent>
           {/* Sélection multiple - Toujours visible si des produits existent */}
           {products.length > 0 && (
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-blue-50 border-2 border-blue-300 rounded-lg mb-4 shadow-sm">
