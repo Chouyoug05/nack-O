@@ -95,7 +95,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   };
 
   const handleResetData = async () => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "❌ Erreur",
+        description: "Vous devez être connecté pour réinitialiser les données",
+        variant: "destructive",
+      });
+      return;
+    }
     
     const confirmMessage = "⚠️ ATTENTION : Cette action est irréversible !\n\nCela supprimera TOUTES vos données :\n- Tous les produits\n- Toutes les ventes\n- Toute l'équipe\n- Tous les événements\n- Toutes les commandes\n- Toutes les notifications\n- Tous les paiements et reçus\n\nSeuls vos paramètres de base (nom, email, logo) seront conservés.\n\nÊtes-vous ABSOLUMENT sûr de vouloir continuer ?";
     
@@ -106,90 +113,82 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
     try {
       setIsSaving(true);
-      const batch = writeBatch(db);
       let totalDeleted = 0;
+      const BATCH_LIMIT = 500; // Limite Firestore
+
+      // Fonction pour supprimer une collection avec gestion des batches
+      const deleteCollection = async (colRef: any, collectionName: string) => {
+        let deleted = 0;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const batch = writeBatch(db);
+          let batchCount = 0;
+          
+          const snapshot = await getDocs(colRef);
+          if (snapshot.empty) {
+            hasMore = false;
+            break;
+          }
+          
+          for (const doc of snapshot.docs) {
+            if (batchCount >= BATCH_LIMIT) break;
+            batch.delete(doc.ref);
+            batchCount++;
+            deleted++;
+          }
+          
+          if (batchCount > 0) {
+            await batch.commit();
+            totalDeleted += batchCount;
+          }
+          
+          if (snapshot.docs.length < BATCH_LIMIT) {
+            hasMore = false;
+          }
+        }
+        
+        return deleted;
+      };
 
       // Supprimer tous les produits
-      const productsSnapshot = await getDocs(productsColRef(db, user.uid));
-      productsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(productsColRef(db, user.uid), "produits");
 
       // Supprimer toutes les ventes
-      const salesSnapshot = await getDocs(salesColRef(db, user.uid));
-      salesSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(salesColRef(db, user.uid), "ventes");
 
       // Supprimer toutes les pertes
-      const lossesSnapshot = await getDocs(lossesColRef(db, user.uid));
-      lossesSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(lossesColRef(db, user.uid), "pertes");
 
       // Supprimer tous les événements (et leurs tickets)
       const eventsSnapshot = await getDocs(eventsColRef(db, user.uid));
       for (const eventDoc of eventsSnapshot.docs) {
         // Supprimer les tickets de l'événement
         const ticketsRef = collection(db, "profiles", user.uid, "events", eventDoc.id, "tickets");
-        const ticketsSnapshot = await getDocs(ticketsRef);
-        ticketsSnapshot.forEach((ticketDoc) => {
-          batch.delete(ticketDoc.ref);
-          totalDeleted++;
-        });
+        await deleteCollection(ticketsRef, "tickets");
         // Supprimer l'événement
-        batch.delete(eventDoc.ref);
+        await deleteDoc(eventDoc.ref);
         totalDeleted++;
       }
 
       // Supprimer toute l'équipe
-      const teamSnapshot = await getDocs(teamColRef(db, user.uid));
-      teamSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(teamColRef(db, user.uid), "équipe");
 
       // Supprimer toutes les commandes
-      const ordersSnapshot = await getDocs(ordersColRef(db, user.uid));
-      ordersSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(ordersColRef(db, user.uid), "commandes");
 
       // Supprimer toutes les notifications
-      const notificationsSnapshot = await getDocs(notificationsColRef(db, user.uid));
-      notificationsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(notificationsColRef(db, user.uid), "notifications");
 
       // Supprimer tous les paiements
-      const paymentsSnapshot = await getDocs(paymentsColRef(db, user.uid));
-      paymentsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(paymentsColRef(db, user.uid), "paiements");
 
       // Supprimer tous les reçus
-      const receiptsSnapshot = await getDocs(receiptsColRef(db, user.uid));
-      receiptsSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
+      await deleteCollection(receiptsColRef(db, user.uid), "reçus");
 
       // Supprimer toutes les commandes bar (barOrders)
       const barOrdersRef = collection(db, "profiles", user.uid, "barOrders");
-      const barOrdersSnapshot = await getDocs(barOrdersRef);
-      barOrdersSnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        totalDeleted++;
-      });
-
-      // Exécuter toutes les suppressions
-      await batch.commit();
+      await deleteCollection(barOrdersRef, "commandes bar");
 
       toast({
         title: "✅ Données réinitialisées",
