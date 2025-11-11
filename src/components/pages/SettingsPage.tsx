@@ -36,7 +36,7 @@ import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
 import { receiptsColRef, paymentsColRef, productsColRef, salesColRef, lossesColRef, eventsColRef, teamColRef, ordersColRef, notificationsColRef } from "@/lib/collections";
 import { db } from "@/lib/firebase";
-import { getDocs, query, orderBy, deleteDoc, writeBatch, collection } from "firebase/firestore";
+import { getDocs, query, orderBy, deleteDoc, writeBatch, collection, type CollectionReference } from "firebase/firestore";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "0 jour";
@@ -117,7 +117,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       const BATCH_LIMIT = 500; // Limite Firestore
 
       // Fonction pour supprimer une collection avec gestion des batches
-      const deleteCollection = async (colRef: any, collectionName: string) => {
+      const deleteCollection = async (colRef: CollectionReference, collectionName: string) => {
         let deleted = 0;
         let hasMore = true;
         
