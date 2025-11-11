@@ -1180,6 +1180,45 @@ const StockPage = () => {
                  >
                    Sécurité
                  </Button>
+                    </div>
+             </div>
+           </CardHeader>
+           <CardContent>
+             <div className="flex flex-col md:flex-row gap-4 mb-4">
+               <div className="relative flex-1">
+                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
+                 <Input
+                   placeholder="Rechercher un produit..."
+                   value={searchTerm}
+                   onChange={(e) => setSearchTerm(e.target.value)}
+                   className="pl-10"
+                 />
+               </div>
+               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                 <SelectTrigger className="w-full md:w-[200px]">
+                   <SelectValue placeholder="Catégorie" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="all">Toutes les catégories</SelectItem>
+                   {categories.map(cat => (
+                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
+               <div className="flex items-center gap-2">
+                 <Label htmlFor="showZero" className="text-sm whitespace-nowrap">Afficher stock 0</Label>
+                 <Switch
+                   id="showZero"
+                   checked={showZeroStock}
+                   onCheckedChange={setShowZeroStock}
+                 />
+               </div>
+             </div>
+           </CardContent>
+         </Card>
+
+         {/* Dialog pour Ajouter/Modifier produit */}
+         <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
                  <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" onOpenAutoFocus={() => setFormStep(1)}>
                   <DialogHeader className="pb-4">
                     <DialogTitle className="text-2xl font-bold text-center">{editingProduct ? "Modifier le produit" : "Ajouter un produit"}</DialogTitle>
@@ -1276,8 +1315,6 @@ const StockPage = () => {
                         <h3 className="text-2xl font-bold text-center">Prix et Quantité</h3>
                         <p className="text-center text-lg"><strong>{newProduct.name}</strong></p>
 
-                        {/* Hint volontairement retiré pour éviter la confusion. Le prix peut rester vide. */}
-
                         <div>
                           <Label htmlFor="quantity" className="text-xl font-semibold mb-3 block text-center">Combien vous en avez ?</Label>
                           <Input
@@ -1359,165 +1396,6 @@ const StockPage = () => {
                   </div>
                 </DialogContent>
               </Dialog>
-              
-               <Dialog open={isLossModalOpen} onOpenChange={setIsLossModalOpen}>
-                 <DialogTrigger asChild>
-                   <Button 
-                     variant="outline" 
-                     className="w-full sm:w-auto border-red-200 text-red-600 hover:bg-red-50"
-                     onClick={() => {
-                       setIsLossModalOpen(true);
-                     }}
-                   >
-                     <TrendingDown className="mr-2" size={18} />
-                     Perte
-                   </Button>
-                 </DialogTrigger>
-                 <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-                   <DialogHeader className="pb-4">
-                     <DialogTitle className="text-xl font-bold">Enregistrer une perte</DialogTitle>
-                     <DialogDescription className="text-base">
-                       Sélectionnez le produit et la quantité perdue pour mettre à jour le stock.
-                     </DialogDescription>
-                   </DialogHeader>
-                   <div className="space-y-6 py-4">
-                     <div>
-                       <Label htmlFor="product" className="text-sm font-medium mb-2 block">Produit concerné *</Label>
-                       <Select
-                         value={lossData.productId}
-                         onValueChange={(value) => setLossData({...lossData, productId: value})}
-                       >
-                         <SelectTrigger className="w-full h-11 text-base bg-background">
-                           <SelectValue placeholder="Sélectionner un produit" />
-                         </SelectTrigger>
-                         <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
-                           {products.map(product => (
-                             <SelectItem key={product.id} value={product.id} className="text-base py-3 cursor-pointer hover:bg-muted">
-                               <div className="flex flex-col items-start">
-                                 <span className="font-medium">{product.name}</span>
-                                 <span className="text-sm text-muted-foreground">Stock disponible: {product.quantity}</span>
-                               </div>
-                             </SelectItem>
-                           ))}
-                         </SelectContent>
-                       </Select>
-                     </div>
-
-                     <div>
-                       <Label htmlFor="lossQuantity" className="text-sm font-medium mb-2 block">Quantité perdue *</Label>
-                       <Input
-                         id="lossQuantity"
-                         type="number"
-                         value={lossData.quantity}
-                         onChange={(e) => setLossData({...lossData, quantity: e.target.value})}
-                         className="w-full h-11 text-base"
-                         placeholder="Nombre d'unités perdues"
-                         min="1"
-                       />
-                     </div>
-
-                     <div>
-                       <Label htmlFor="reason" className="text-sm font-medium mb-2 block">Raison de la perte *</Label>
-                       <Select
-                         value={lossData.reason}
-                         onValueChange={(value) => setLossData({...lossData, reason: value})}
-                       >
-                         <SelectTrigger className="w-full h-11 text-base bg-background">
-                           <SelectValue placeholder="Sélectionner une raison" />
-                         </SelectTrigger>
-                         <SelectContent className="bg-background border shadow-lg z-50">
-                           <SelectItem value="expired" className="text-base py-2 cursor-pointer hover:bg-muted">
-                             Produit expiré
-                           </SelectItem>
-                           <SelectItem value="damaged" className="text-base py-2 cursor-pointer hover:bg-muted">
-                             Produit endommagé
-                           </SelectItem>
-                           <SelectItem value="theft" className="text-base py-2 cursor-pointer hover:bg-muted">
-                             Vol
-                           </SelectItem>
-                           <SelectItem value="error" className="text-base py-2 cursor-pointer hover:bg-muted">
-                             Erreur d'inventaire
-                           </SelectItem>
-                           <SelectItem value="other" className="text-base py-2 cursor-pointer hover:bg-muted">
-                             Autre
-                           </SelectItem>
-                         </SelectContent>
-                       </Select>
-                     </div>
-
-                     <div>
-                       <Label htmlFor="date" className="text-sm font-medium mb-2 block">Date de la perte</Label>
-                       <Input
-                         id="date"
-                         type="date"
-                         value={lossData.date}
-                         onChange={(e) => setLossData({...lossData, date: e.target.value})}
-                         className="w-full h-11 text-base"
-                       />
-                     </div>
-                   </div>
-                   <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
-                     <Button 
-                       variant="outline" 
-                       onClick={() => setIsLossModalOpen(false)}
-                       className="h-11 px-6 text-base"
-                     >
-                       Annuler
-                     </Button>
-                     <Button 
-                       onClick={handleRecordLoss} 
-                       variant="destructive"
-                       className="h-11 px-6 text-base font-medium"
-                     >
-                       Enregistrer la perte
-                     </Button>
-                   </div>
-                 </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col md:flex-row gap-4 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
-              <Input
-                placeholder="Rechercher un produit..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-              <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Catégorie" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Toutes les catégories</SelectItem>
-                {categories.map(cat => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              variant={showZeroStock ? "default" : "outline"}
-              onClick={() => setShowZeroStock(!showZeroStock)}
-              className="w-full md:w-auto"
-              title={showZeroStock ? "Masquer les produits avec quantité 0" : "Afficher les produits avec quantité 0"}
-            >
-              {showZeroStock ? (
-                <>
-                  <EyeOff size={16} className="mr-2" />
-                  Masquer stock 0
-                </>
-              ) : (
-                <>
-                  <Eye size={16} className="mr-2" />
-                  Afficher stock 0
-                </>
-              )}
-            </Button>
-          </div>
 
           {/* Sélection multiple - Toujours visible si des produits existent */}
           {products.length > 0 && (
@@ -1679,6 +1557,123 @@ const StockPage = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Dialog pour Perte */}
+      <Dialog open={isLossModalOpen} onOpenChange={setIsLossModalOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            variant="outline" 
+            className="w-full sm:w-auto border-red-200 text-red-600 hover:bg-red-50 hidden"
+            onClick={() => {
+              setIsLossModalOpen(true);
+            }}
+          >
+            <TrendingDown className="mr-2" size={18} />
+            Perte
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-xl font-bold">Enregistrer une perte</DialogTitle>
+            <DialogDescription className="text-base">
+              Sélectionnez le produit et la quantité perdue pour mettre à jour le stock.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div>
+              <Label htmlFor="product" className="text-sm font-medium mb-2 block">Produit concerné *</Label>
+              <Select
+                value={lossData.productId}
+                onValueChange={(value) => setLossData({...lossData, productId: value})}
+              >
+                <SelectTrigger className="w-full h-11 text-base bg-background">
+                  <SelectValue placeholder="Sélectionner un produit" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
+                  {products.map(product => (
+                    <SelectItem key={product.id} value={product.id} className="text-base py-3 cursor-pointer hover:bg-muted">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{product.name}</span>
+                        <span className="text-sm text-muted-foreground">Stock disponible: {product.quantity}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="lossQuantity" className="text-sm font-medium mb-2 block">Quantité perdue *</Label>
+              <Input
+                id="lossQuantity"
+                type="number"
+                value={lossData.quantity}
+                onChange={(e) => setLossData({...lossData, quantity: e.target.value})}
+                className="w-full h-11 text-base"
+                placeholder="Nombre d'unités perdues"
+                min="1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="reason" className="text-sm font-medium mb-2 block">Raison de la perte *</Label>
+              <Select
+                value={lossData.reason}
+                onValueChange={(value) => setLossData({...lossData, reason: value})}
+              >
+                <SelectTrigger className="w-full h-11 text-base bg-background">
+                  <SelectValue placeholder="Sélectionner une raison" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50">
+                  <SelectItem value="expired" className="text-base py-2 cursor-pointer hover:bg-muted">
+                    Produit expiré
+                  </SelectItem>
+                  <SelectItem value="damaged" className="text-base py-2 cursor-pointer hover:bg-muted">
+                    Produit endommagé
+                  </SelectItem>
+                  <SelectItem value="theft" className="text-base py-2 cursor-pointer hover:bg-muted">
+                    Vol
+                  </SelectItem>
+                  <SelectItem value="error" className="text-base py-2 cursor-pointer hover:bg-muted">
+                    Erreur d'inventaire
+                  </SelectItem>
+                  <SelectItem value="other" className="text-base py-2 cursor-pointer hover:bg-muted">
+                    Autre
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="date" className="text-sm font-medium mb-2 block">Date de la perte</Label>
+              <Input
+                id="date"
+                type="date"
+                value={lossData.date}
+                onChange={(e) => setLossData({...lossData, date: e.target.value})}
+                className="w-full h-11 text-base"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsLossModalOpen(false)}
+              className="h-11 px-6 text-base"
+            >
+              Annuler
+            </Button>
+            <Button 
+              onClick={handleRecordLoss} 
+              variant="destructive"
+              className="h-11 px-6 text-base font-medium"
+            >
+              Enregistrer la perte
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Manager Auth Dialog (Optionnel) */}
       <Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen}>
         <DialogContent className="sm:max-w-[420px]">
