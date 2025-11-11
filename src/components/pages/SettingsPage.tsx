@@ -36,7 +36,8 @@ import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
 import { receiptsColRef, paymentsColRef, productsColRef, salesColRef, lossesColRef, eventsColRef, teamColRef, ordersColRef, notificationsColRef } from "@/lib/collections";
 import { db } from "@/lib/firebase";
-import { getDocs, query, orderBy, deleteDoc, writeBatch, collection, type CollectionReference } from "firebase/firestore";
+import { getDocs, query, orderBy, deleteDoc, writeBatch, collection } from "firebase/firestore";
+import type { CollectionReference } from "firebase/firestore";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "0 jour";
