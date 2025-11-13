@@ -1536,24 +1536,22 @@ const StockPage = () => {
                       </p>
                     </div>
 
-                    {/* Afficher le bouton + uniquement si un code gérant est configuré */}
-                    {profile?.managerPinHash && (
-                      <button
-                        onClick={() => {
-                          requireManagerAuth(() => {
-                            if (user) {
-                              updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
-                                quantity: product.quantity + 1,
-                              });
-                            }
-                          });
-                        }}
-                        className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full text-3xl font-light text-white transition-transform active:scale-95 shadow"
-                        style={{ backgroundColor: stockColor }}
-                      >
-                        +
-                      </button>
-                    )}
+                    {/* Bouton + pour ajouter le nombre d'articles sur un produit */}
+                    <button
+                      onClick={() => {
+                        requireManagerAuth(() => {
+                          if (user) {
+                            updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
+                              quantity: product.quantity + 1,
+                            });
+                          }
+                        });
+                      }}
+                      className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full text-3xl font-light text-white transition-transform active:scale-95 shadow"
+                      style={{ backgroundColor: stockColor }}
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               );
