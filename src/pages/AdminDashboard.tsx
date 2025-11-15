@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { profilesColRef, notificationsColRef, paymentsColRef } from "@/lib/collections";
-import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
+import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef } from "@/lib/collections";
+import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import type { PaymentTransaction } from "@/types/payment";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface NotificationForm {
@@ -36,6 +36,16 @@ const AdminDashboard = () => {
   const [isFixingPastDates, setIsFixingPastDates] = useState(false);
   const [allPayments, setAllPayments] = useState<Array<PaymentTransaction & { userEmail?: string; userName?: string }>>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(false);
+  const [globalStats, setGlobalStats] = useState({
+    totalProducts: 0,
+    totalOrders: 0,
+    totalBarOrders: 0,
+    totalEvents: 0,
+    totalTeamMembers: 0,
+    totalRatings: 0,
+    avgRating: 0,
+  });
+  const [isLoadingGlobalStats, setIsLoadingGlobalStats] = useState(false);
 
   // Si pas admin, rediriger (sécurité supplémentaire)
   useEffect(() => {
@@ -93,8 +103,79 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (isAdmin && allProfiles.length > 0) {
       loadAllPayments();
+      loadGlobalStats();
     }
-  }, [isAdmin, allProfiles.length, loadAllPayments]);
+  }, [isAdmin, allProfiles.length, loadAllPayments, loadGlobalStats]);
+
+  const loadGlobalStats = useCallback(async () => {
+    setIsLoadingGlobalStats(true);
+    try {
+      let totalProducts = 0;
+      let totalOrders = 0;
+      let totalBarOrders = 0;
+      let totalEvents = 0;
+      let totalTeamMembers = 0;
+      let totalRatings = 0;
+      let sumRatings = 0;
+
+      // Parcourir tous les profils pour agréger les statistiques
+      for (const profile of allProfiles) {
+        try {
+          // Produits
+          const productsRef = productsColRef(db, profile.uid);
+          const productsSnap = await getDocs(productsRef);
+          totalProducts += productsSnap.size;
+          
+          // Compter les ratings
+          productsSnap.forEach(doc => {
+            const data = doc.data();
+            if (data.ratingCount) {
+              totalRatings += data.ratingCount;
+              if (data.rating) {
+                sumRatings += data.rating * data.ratingCount;
+              }
+            }
+          });
+
+          // Commandes normales
+          const ordersRef = ordersColRef(db, profile.uid);
+          const ordersSnap = await getDocs(ordersRef);
+          totalOrders += ordersSnap.size;
+
+          // Commandes Bar Connectée
+          const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
+          const barOrdersSnap = await getDocs(barOrdersRef);
+          totalBarOrders += barOrdersSnap.size;
+
+          // Événements
+          const eventsRef = eventsColRef(db, profile.uid);
+          const eventsSnap = await getDocs(eventsRef);
+          totalEvents += eventsSnap.size;
+
+          // Membres d'équipe
+          const teamRef = teamColRef(db, profile.uid);
+          const teamSnap = await getDocs(teamRef);
+          totalTeamMembers += teamSnap.size;
+        } catch (error) {
+          console.error(`Erreur chargement stats pour ${profile.uid}:`, error);
+        }
+      }
+
+      setGlobalStats({
+        totalProducts,
+        totalOrders,
+        totalBarOrders,
+        totalEvents,
+        totalTeamMembers,
+        totalRatings,
+        avgRating: totalRatings > 0 ? sumRatings / totalRatings : 0,
+      });
+    } catch (error) {
+      console.error('Erreur chargement stats globales:', error);
+    } finally {
+      setIsLoadingGlobalStats(false);
+    }
+  }, [allProfiles]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
@@ -346,6 +427,67 @@ const AdminDashboard = () => {
           <Card className="border-0 shadow-card">
             <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertCircle size={16} className="text-red-600"/> Expirés</CardTitle><CardDescription>Abonnements expirés</CardDescription></CardHeader>
             <CardContent><div className="text-2xl font-bold">{stats.expired}</div></CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="border-0 shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Package size={16} className="text-blue-600"/> Produits
+              </CardTitle>
+              <CardDescription>Total produits</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {isLoadingGlobalStats ? "..." : globalStats.totalProducts.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <ShoppingCart size={16} className="text-purple-600"/> Commandes
+              </CardTitle>
+              <CardDescription>Total commandes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {isLoadingGlobalStats ? "..." : (globalStats.totalOrders + globalStats.totalBarOrders).toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {globalStats.totalOrders} normales + {globalStats.totalBarOrders} QR
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Calendar size={16} className="text-orange-600"/> Événements
+              </CardTitle>
+              <CardDescription>Total événements</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {isLoadingGlobalStats ? "..." : globalStats.totalEvents.toLocaleString()}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Star size={16} className="text-yellow-600"/> Appréciations
+              </CardTitle>
+              <CardDescription>Notes moyennes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {isLoadingGlobalStats ? "..." : globalStats.avgRating > 0 ? globalStats.avgRating.toFixed(1) : "0.0"}
+              </div>
+              <div className="text-xs text-muted-foreground mt-1">
+                {globalStats.totalRatings} avis
+              </div>
+            </CardContent>
           </Card>
         </div>
 
