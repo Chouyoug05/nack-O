@@ -347,6 +347,11 @@ const StockPage = () => {
     return Number(value) || 0;
   }, [products]);
 
+  // Calcul explicite du nombre de produits pour forcer l'affichage dans Chrome
+  const productsCount = useMemo(() => {
+    return Number(products.length || 0);
+  }, [products]);
+
   const handleAddProduct = async () => {
     if (!user) return;
     if (!newProduct.name || !newProduct.category || newProduct.quantity === "") {
@@ -977,8 +982,8 @@ const StockPage = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total Produits</p>
-                <p className="text-2xl font-bold" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
-                  {Number(products.length || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                <p className="text-2xl font-bold force-display">
+                  {String(productsCount.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }))}
                 </p>
               </div>
               <div className="w-12 h-12 bg-gradient-secondary rounded-lg flex items-center justify-center">

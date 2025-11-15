@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, updateDoc, QuerySnapshot, DocumentData, getDocs } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download } from "lucide-react";
+import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Star, Grid3x3, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket, downloadThermalTicket } from "@/utils/ticketThermal";
@@ -21,6 +22,8 @@ interface Product {
   available?: boolean;
   quantity?: number;
   stock?: number;
+  rating?: number; // Note moyenne (0-5)
+  ratingCount?: number; // Nombre d'avis
 }
 
 interface TableZone {
@@ -61,6 +64,8 @@ const PublicOrderingPage = () => {
   const [orderNumber, setOrderNumber] = useState<string>("");
   const [receiptQR, setReceiptQR] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState("");
 
   // 3. useRef
   const isMountedRef = useRef<boolean>(true);
@@ -143,19 +148,21 @@ const PublicOrderingPage = () => {
     const productsRef = collection(db, `profiles/${establishmentId}/products`);
     
     // Fonction pour traiter les produits
-    const handleProductsSnapshot = (snapshot: any) => {
+    const handleProductsSnapshot = (snapshot: QuerySnapshot<DocumentData>) => {
       if (!isMountedRef.current) return;
       
-      const productsData = snapshot.docs.map((doc: any) => {
-        const data = doc.data();
+      const productsData = snapshot.docs.map((docItem) => {
+        const data = docItem.data();
         return {
-          id: doc.id,
+          id: docItem.id,
           name: data.name || '',
           price: data.price || 0,
           category: data.category || '',
           available: data.available !== false,
           quantity: data.quantity || data.stock || 0,
           stock: data.quantity || data.stock || 0,
+          rating: data.rating || 0,
+          ratingCount: data.ratingCount || 0,
           // S'assurer que imageUrl est bien récupéré
           imageUrl: (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') 
             ? data.imageUrl.trim() 
@@ -245,7 +252,7 @@ const PublicOrderingPage = () => {
           ...doc.data()
         })) as TableZone[];
         
-        const filteredTables = tablesData.filter(t => !(t as any).deleted);
+        const filteredTables = tablesData.filter(t => !('deleted' in t && t.deleted));
         setTables(filteredTables);
         setIsLoading(false);
       },
@@ -302,6 +309,87 @@ const PublicOrderingPage = () => {
         return prev.filter(item => item.productId !== productId);
       }
     });
+  };
+
+  // Calculer les catégories disponibles
+  const availableCategories = useMemo(() => {
+    return [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+  }, [products]);
+
+  // Filtrer les produits par catégorie et recherche
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = activeCategoryTab === "all" || product.category === activeCategoryTab;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, activeCategoryTab]);
+
+  // Fonction pour noter un produit
+  const rateProduct = async (productId: string, rating: number) => {
+    if (!establishmentId || rating < 1 || rating > 5) return;
+    
+    try {
+      const ratingsRef = collection(db, `profiles/${establishmentId}/products/${productId}/ratings`);
+      await addDoc(ratingsRef, {
+        rating,
+        createdAt: Date.now()
+      });
+
+      // Recalculer la note moyenne
+      const ratingsQuery = query(ratingsRef, orderBy('createdAt'));
+      const ratingsSnapshot = await getDocs(ratingsQuery);
+      const ratings = ratingsSnapshot.docs.map(d => d.data().rating as number);
+      
+      if (ratings.length > 0) {
+        const avgRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
+        
+        // Mettre à jour le produit avec la nouvelle note moyenne
+        await updateDoc(doc(db, `profiles/${establishmentId}/products/${productId}`), {
+          rating: avgRating,
+          ratingCount: ratings.length
+        });
+      }
+    } catch (error) {
+      console.error('Erreur lors de la notation:', error);
+    }
+  };
+
+  // Composant d'étoiles
+  const StarRating = ({ product }: { product: Product }) => {
+    const [hoverRating, setHoverRating] = useState(0);
+    const rating = product.rating || 0;
+    const ratingCount = product.ratingCount || 0;
+
+    return (
+      <div className="flex items-center gap-2">
+        <div className="flex items-center">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button
+              key={star}
+              type="button"
+              onClick={() => rateProduct(product.id, star)}
+              onMouseEnter={() => setHoverRating(star)}
+              onMouseLeave={() => setHoverRating(0)}
+              className="focus:outline-none"
+            >
+              <Star
+                className={`w-4 h-4 ${
+                  star <= (hoverRating || rating)
+                    ? 'fill-yellow-400 text-yellow-400'
+                    : 'text-gray-300'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+        {rating > 0 && (
+          <span className="text-xs text-gray-600">
+            {rating.toFixed(1)} ({ratingCount})
+          </span>
+        )}
+      </div>
+    );
   };
 
   const placeOrder = async () => {
@@ -496,8 +584,45 @@ const PublicOrderingPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        {/* Filtres et recherche */}
+        <div className="mb-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Recherche */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
+              <Input
+                placeholder="Rechercher un produit..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            {/* Filtre par catégorie */}
+            <Select value={activeCategoryTab} onValueChange={setActiveCategoryTab}>
+              <SelectTrigger className="w-full sm:w-[250px]">
+                <SelectValue>
+                  {activeCategoryTab === "all" ? "Toutes les catégories" : activeCategoryTab}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">
+                  <div className="flex items-center gap-2">
+                    <Grid3x3 className="h-4 w-4" />
+                    <span>Toutes les catégories</span>
+                  </div>
+                </SelectItem>
+                {availableCategories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {products.map((product) => {
+          {filteredProducts.map((product) => {
             const priceValue = typeof product.price === 'number' 
               ? product.price 
               : parseFloat(String(product.price)) || 0;
@@ -530,6 +655,10 @@ const PublicOrderingPage = () => {
                 )}
                 <CardContent className="p-4">
                   <h3 className="font-bold text-lg mb-2">{product.name}</h3>
+                  {/* Appréciations avec étoiles */}
+                  <div className="mb-3">
+                    <StarRating product={product} />
+                  </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xl font-bold text-primary">
                       {priceValue.toLocaleString('fr-FR')} XAF
@@ -549,9 +678,13 @@ const PublicOrderingPage = () => {
           })}
         </div>
 
-        {products.length === 0 && (
+        {filteredProducts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-600">Aucun produit disponible pour le moment.</p>
+            <p className="text-gray-600">
+              {searchTerm || activeCategoryTab !== "all" 
+                ? "Aucun produit ne correspond à votre recherche." 
+                : "Aucun produit disponible pour le moment."}
+            </p>
           </div>
         )}
       </main>
