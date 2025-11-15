@@ -100,13 +100,6 @@ const AdminDashboard = () => {
     }
   }, [allProfiles, toast]);
 
-  useEffect(() => {
-    if (isAdmin && allProfiles.length > 0) {
-      loadAllPayments();
-      loadGlobalStats();
-    }
-  }, [isAdmin, allProfiles.length, loadAllPayments, loadGlobalStats]);
-
   const loadGlobalStats = useCallback(async () => {
     setIsLoadingGlobalStats(true);
     try {
@@ -176,6 +169,13 @@ const AdminDashboard = () => {
       setIsLoadingGlobalStats(false);
     }
   }, [allProfiles]);
+
+  useEffect(() => {
+    if (isAdmin && allProfiles.length > 0) {
+      loadAllPayments();
+      loadGlobalStats();
+    }
+  }, [isAdmin, allProfiles.length, loadAllPayments, loadGlobalStats]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
