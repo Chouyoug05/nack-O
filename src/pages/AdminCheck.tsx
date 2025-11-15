@@ -198,74 +198,76 @@ const AdminCheck = () => {
             )}
           </div>
 
-          <div className="pt-4 border-t space-y-2">
-            <h3 className="font-semibold">Instructions pour devenir admin :</h3>
-            <div className="space-y-3">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                <p className="font-semibold text-blue-900 mb-2">Méthode 1 : Script (Recommandé)</p>
-                <p className="text-sm text-blue-800 mb-2">Exécutez cette commande dans le terminal :</p>
-                <code className="block bg-blue-100 p-2 rounded text-xs break-all">
-                  node scripts/promoteAdmin.mjs {user.uid}
-                </code>
-                <p className="text-xs text-blue-700 mt-2">
-                  ⚠️ Assurez-vous d'avoir configuré FIREBASE_PROJECT_ID et SERVICE_ACCOUNT_JSON
+          {user && (
+            <div className="pt-4 border-t space-y-2">
+              <h3 className="font-semibold">Instructions pour devenir admin :</h3>
+              <div className="space-y-3">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p className="font-semibold text-blue-900 mb-2">Méthode 1 : Script (Recommandé)</p>
+                  <p className="text-sm text-blue-800 mb-2">Exécutez cette commande dans le terminal :</p>
+                  <code className="block bg-blue-100 p-2 rounded text-xs break-all">
+                    node scripts/promoteAdmin.mjs {user.uid}
+                  </code>
+                  <p className="text-xs text-blue-700 mt-2">
+                    ⚠️ Assurez-vous d'avoir configuré FIREBASE_PROJECT_ID et SERVICE_ACCOUNT_JSON
+                  </p>
+                </div>
+                
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="font-semibold text-green-900 mb-2">Méthode 2 : Firebase Console (Manuel - Plus simple)</p>
+                  <div className="bg-white border border-green-300 rounded p-3 mb-3">
+                    <p className="text-xs font-semibold text-green-900 mb-2">📍 Votre UID à utiliser :</p>
+                    <code className="block bg-green-50 px-2 py-1 rounded text-xs font-mono text-green-900 border border-green-200 break-all">
+                      {user.uid}
+                    </code>
+                  </div>
+                  <ol className="list-decimal list-inside space-y-2 text-sm text-green-800">
+                    <li className="mb-2">
+                      Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Firebase Console</a> (ouvre dans un nouvel onglet)
+                    </li>
+                    <li className="mb-2">Sélectionnez le projet : <strong className="bg-green-100 px-2 py-1 rounded">nack-8c299</strong></li>
+                    <li className="mb-2">Dans le menu de gauche, cliquez sur <strong>"Firestore Database"</strong></li>
+                    <li className="mb-2">
+                      Si la collection <code className="bg-green-100 px-1 rounded">admins</code> n'existe pas :
+                      <ul className="list-disc list-inside ml-4 mt-1 text-xs">
+                        <li>Cliquez sur "Créer une collection"</li>
+                        <li>Nom de la collection : <code className="bg-green-100 px-1 rounded">admins</code></li>
+                        <li>Cliquez sur "Suivant" puis "Terminé"</li>
+                      </ul>
+                    </li>
+                    <li className="mb-2">
+                      Cliquez sur "Ajouter un document" dans la collection <code className="bg-green-100 px-1 rounded">admins</code>
+                    </li>
+                    <li className="mb-2">
+                      Dans "ID du document", collez votre UID : <code className="bg-green-100 px-1 rounded break-all text-xs">{user.uid}</code>
+                    </li>
+                    <li className="mb-2">
+                      Ajoutez ces 3 champs (cliquez sur "Ajouter un champ" pour chacun) :
+                      <ul className="list-disc list-inside ml-4 mt-1 text-xs space-y-1">
+                        <li><code className="bg-green-100 px-1 rounded">role</code> (type: string) = <code className="bg-green-100 px-1 rounded">"admin"</code></li>
+                        <li><code className="bg-green-100 px-1 rounded">createdAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
+                        <li><code className="bg-green-100 px-1 rounded">updatedAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
+                      </ul>
+                    </li>
+                    <li className="mb-2">Cliquez sur "Enregistrer"</li>
+                  </ol>
+                  <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-xs text-green-900">
+                    <strong>💡 Astuce :</strong> Vous pouvez copier votre UID ci-dessus et le coller directement dans Firebase Console.
+                  </div>
+                </div>
+                
+                <p className="text-xs text-muted-foreground">
+                  Après avoir créé le document admin, rechargez cette page.
                 </p>
               </div>
-              
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                <p className="font-semibold text-green-900 mb-2">Méthode 2 : Firebase Console (Manuel - Plus simple)</p>
-                <div className="bg-white border border-green-300 rounded p-3 mb-3">
-                  <p className="text-xs font-semibold text-green-900 mb-2">📍 Votre UID à utiliser :</p>
-                  <code className="block bg-green-50 px-2 py-1 rounded text-xs font-mono text-green-900 border border-green-200 break-all">
-                    {user.uid}
-                  </code>
-                </div>
-                <ol className="list-decimal list-inside space-y-2 text-sm text-green-800">
-                  <li className="mb-2">
-                    Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Firebase Console</a> (ouvre dans un nouvel onglet)
-                  </li>
-                  <li className="mb-2">Sélectionnez le projet : <strong className="bg-green-100 px-2 py-1 rounded">nack-8c299</strong></li>
-                  <li className="mb-2">Dans le menu de gauche, cliquez sur <strong>"Firestore Database"</strong></li>
-                  <li className="mb-2">
-                    Si la collection <code className="bg-green-100 px-1 rounded">admins</code> n'existe pas :
-                    <ul className="list-disc list-inside ml-4 mt-1 text-xs">
-                      <li>Cliquez sur "Créer une collection"</li>
-                      <li>Nom de la collection : <code className="bg-green-100 px-1 rounded">admins</code></li>
-                      <li>Cliquez sur "Suivant" puis "Terminé"</li>
-                    </ul>
-                  </li>
-                  <li className="mb-2">
-                    Cliquez sur "Ajouter un document" dans la collection <code className="bg-green-100 px-1 rounded">admins</code>
-                  </li>
-                  <li className="mb-2">
-                    Dans "ID du document", collez votre UID : <code className="bg-green-100 px-1 rounded break-all text-xs">{user.uid}</code>
-                  </li>
-                  <li className="mb-2">
-                    Ajoutez ces 3 champs (cliquez sur "Ajouter un champ" pour chacun) :
-                    <ul className="list-disc list-inside ml-4 mt-1 text-xs space-y-1">
-                      <li><code className="bg-green-100 px-1 rounded">role</code> (type: string) = <code className="bg-green-100 px-1 rounded">"admin"</code></li>
-                      <li><code className="bg-green-100 px-1 rounded">createdAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
-                      <li><code className="bg-green-100 px-1 rounded">updatedAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
-                    </ul>
-                  </li>
-                  <li className="mb-2">Cliquez sur "Enregistrer"</li>
-                </ol>
-                <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-xs text-green-900">
-                  <strong>💡 Astuce :</strong> Vous pouvez copier votre UID ci-dessus et le coller directement dans Firebase Console.
-                </div>
-              </div>
-              
-              <p className="text-xs text-muted-foreground">
-                Après avoir créé le document admin, rechargez cette page.
-              </p>
             </div>
-          </div>
+          )}
 
           <div className="flex gap-2 pt-4">
-            <Button onClick={checkAdminDoc} disabled={checking}>
+            <Button onClick={checkAdminDoc} disabled={checking || !user}>
               {checking ? "Vérification..." : "Vérifier à nouveau"}
             </Button>
-            <Button variant="outline" onClick={() => navigate('/admin')}>
+            <Button variant="outline" onClick={() => navigate('/admin')} disabled={!user}>
               Essayer d'accéder à /admin
             </Button>
             <Button variant="outline" onClick={() => navigate('/dashboard')}>
@@ -287,7 +289,7 @@ const AdminCheck = () => {
             </div>
           )}
           
-          {adminDocExists === false && (
+          {adminDocExists === false && user && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 space-y-3">
               <div>
                 <strong>Problème détecté :</strong> Le document admin n'existe pas dans Firestore.
