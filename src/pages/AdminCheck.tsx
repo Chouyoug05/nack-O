@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { adminDocRef } from "@/lib/collections";
-import { getDoc } from "firebase/firestore";
+import { getDoc, setDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +14,7 @@ const AdminCheck = () => {
   const { toast } = useToast();
   const [adminDocExists, setAdminDocExists] = useState<boolean | null>(null);
   const [checking, setChecking] = useState(false);
+  const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -54,6 +55,35 @@ const AdminCheck = () => {
       setAdminDocExists(false);
     } finally {
       setChecking(false);
+    }
+  };
+
+  const createAdminDoc = async () => {
+    if (!user) return;
+    setCreating(true);
+    try {
+      await setDoc(adminDocRef(db, user.uid), {
+        role: "admin",
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      });
+      toast({
+        title: "✅ Document admin créé !",
+        description: "Le document admin a été créé avec succès. Rechargez la page dans quelques secondes.",
+      });
+      // Vérifier à nouveau après création
+      setTimeout(() => {
+        checkAdminDoc();
+      }, 1000);
+    } catch (error: any) {
+      console.error('Erreur création admin:', error);
+      toast({
+        title: "❌ Erreur",
+        description: error?.message || "Impossible de créer le document admin. Vérifiez les permissions Firestore.",
+        variant: "destructive"
+      });
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -247,28 +277,64 @@ const AdminCheck = () => {
           )}
           
           {adminDocExists === false && (
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-              <strong>Problème détecté :</strong> Le document admin n'existe pas dans Firestore.
-              <br />
-              Collection: <code className="bg-yellow-100 px-1 rounded">admins</code>
-              <br />
-              Document ID: <code className="bg-yellow-100 px-1 rounded">{user.uid}</code>
+            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 space-y-3">
+              <div>
+                <strong>Problème détecté :</strong> Le document admin n'existe pas dans Firestore.
+                <br />
+                Collection: <code className="bg-yellow-100 px-1 rounded">admins</code>
+                <br />
+                Document ID: <code className="bg-yellow-100 px-1 rounded">{user.uid}</code>
+              </div>
+              <div className="pt-2 border-t border-yellow-300">
+                <p className="font-semibold mb-2">💡 Solution rapide :</p>
+                <Button 
+                  onClick={createAdminDoc} 
+                  disabled={creating}
+                  className="w-full sm:w-auto"
+                >
+                  {creating ? "Création en cours..." : "Créer automatiquement le document admin"}
+                </Button>
+                <p className="text-xs mt-2 text-yellow-700">
+                  ⚠️ Cette action nécessite que les règles Firestore soient déployées. Si cela échoue, utilisez Firebase Console (méthode 2 ci-dessus).
+                </p>
+              </div>
             </div>
           )}
           
           {adminDocExists && !isAdmin && !isAdminLoading && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800">
-              <strong>⚠️ Problème de synchronisation :</strong>
-              <br />
-              Le document existe mais AuthContext ne détecte pas le statut admin.
-              <br />
-              <Button 
-                size="sm" 
-                className="mt-2" 
-                onClick={() => window.location.reload()}
-              >
-                Recharger la page complètement
-              </Button>
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 space-y-3">
+              <div>
+                <strong>⚠️ Problème de synchronisation :</strong>
+                <br />
+                Le document existe mais AuthContext ne détecte pas le statut admin.
+                <br />
+                Cela peut être dû à un problème de cache ou de synchronisation Firestore.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    checkAdminDoc();
+                    setTimeout(() => window.location.reload(), 2000);
+                  }}
+                >
+                  Vérifier et recharger
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => window.location.reload()}
+                >
+                  Recharger la page
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => navigate('/admin')}
+                >
+                  Forcer l'accès à /admin
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

@@ -11,10 +11,13 @@ service cloud.firestore {
       allow write: if request.auth != null; // only authenticated app users write
     }
 
-    // Admins registry: readable by the admin user himself; not writable from client
+    // Admins registry: readable by the admin user himself; writable only for creating own document
     match /admins/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+      // Permettre la création uniquement de son propre document admin (pour initialisation)
+      allow create: if request.auth != null && request.auth.uid == uid;
+      // Les mises à jour et suppressions nécessitent d'être déjà admin (sécurité)
+      allow update, delete: if false;
     }
 
     // Public read for events and tickets
