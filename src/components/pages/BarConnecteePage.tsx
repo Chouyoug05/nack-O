@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   QrCode, 
   Plus, 
@@ -641,16 +640,45 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 gap-2">
-          <TabsTrigger value="qr-code" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">QR Code</TabsTrigger>
-          <TabsTrigger value="tables" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">Tables & Zones</TabsTrigger>
-          <TabsTrigger value="orders" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">Commandes</TabsTrigger>
-          <TabsTrigger value="scanner" className="text-xs sm:text-sm px-2 sm:px-4 py-2 whitespace-nowrap">Scanner</TabsTrigger>
-        </TabsList>
+      {/* Navigation avec boutons */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <Button
+          variant={activeTab === "qr-code" ? "default" : "outline"}
+          onClick={() => handleTabChange("qr-code")}
+          className={activeTab === "qr-code" ? "bg-gradient-primary text-white shadow-button" : ""}
+        >
+          <QrCode className="w-4 h-4 mr-2" />
+          QR Code
+        </Button>
+        <Button
+          variant={activeTab === "tables" ? "default" : "outline"}
+          onClick={() => handleTabChange("tables")}
+          className={activeTab === "tables" ? "bg-gradient-primary text-white shadow-button" : ""}
+        >
+          <Table className="w-4 h-4 mr-2" />
+          Tables & Zones
+        </Button>
+        <Button
+          variant={activeTab === "orders" ? "default" : "outline"}
+          onClick={() => handleTabChange("orders")}
+          className={activeTab === "orders" ? "bg-gradient-primary text-white shadow-button" : ""}
+        >
+          <ShoppingCart className="w-4 h-4 mr-2" />
+          Commandes
+        </Button>
+        <Button
+          variant={activeTab === "scanner" ? "default" : "outline"}
+          onClick={() => handleTabChange("scanner")}
+          className={activeTab === "scanner" ? "bg-gradient-primary text-white shadow-button" : ""}
+        >
+          <QrCode className="w-4 h-4 mr-2" />
+          Scanner
+        </Button>
+      </div>
 
-        {/* QR Code Tab */}
-        <TabsContent value="qr-code" className="space-y-6">
+      {/* Sections conditionnelles */}
+      {activeTab === "qr-code" && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -793,10 +821,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Tables & Zones Tab */}
-        <TabsContent value="tables" className="space-y-6">
+      {activeTab === "tables" && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -892,10 +921,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Orders Tab */}
-        <TabsContent value="orders" className="space-y-6">
+      {activeTab === "orders" && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -974,10 +1004,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* Scanner Tab */}
-        <TabsContent value="scanner" className="space-y-6">
+      {activeTab === "scanner" && (
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -992,8 +1023,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               <QRScanner />
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 };

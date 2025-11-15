@@ -75,42 +75,75 @@ const QRScanner: React.FC = () => {
   }
 
   const startScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.clear();
+    // Vérifier que l'élément DOM existe
+    const scannerElement = document.getElementById("qr-scanner");
+    if (!scannerElement) {
+      toast({
+        title: "Erreur",
+        description: "L'élément scanner n'est pas disponible. Veuillez réessayer.",
+        variant: "destructive"
+      });
+      return;
     }
 
-    const config = {
-      fps: 10,
-      qrbox: { width: 250, height: 250 },
-      aspectRatio: 1.0,
-      supportedScanTypes: [Html5QrcodeSupportedFormats.QR_CODE]
-    };
-
-    scannerRef.current = new Html5QrcodeScanner(
-      "qr-scanner",
-      config,
-      false
-    );
-
-    scannerRef.current.render(
-      (decodedText) => {
-        console.log('QR Code scanné:', decodedText);
-        handleScannedCode(decodedText);
-      },
-      (error) => {
-        // Ignorer les erreurs de scan continu
-        if (error && !error.includes('No QR code found')) {
-          console.log('Erreur de scan:', error);
-        }
+    // Nettoyer le scanner précédent s'il existe
+    if (scannerRef.current) {
+      try {
+        scannerRef.current.clear().catch(() => {});
+      } catch (e) {
+        // Ignorer les erreurs de nettoyage
       }
-    );
+      scannerRef.current = null;
+    }
 
-    setIsScanning(true);
+    // Attendre un peu pour s'assurer que le DOM est prêt
+    setTimeout(() => {
+      try {
+        const config = {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          supportedScanTypes: [Html5QrcodeSupportedFormats.QR_CODE]
+        };
+
+        scannerRef.current = new Html5QrcodeScanner(
+          "qr-scanner",
+          config,
+          false
+        );
+
+        scannerRef.current.render(
+          (decodedText) => {
+            console.log('QR Code scanné:', decodedText);
+            handleScannedCode(decodedText);
+          },
+          (error) => {
+            // Ignorer les erreurs de scan continu
+            if (error && !error.includes('No QR code found')) {
+              console.log('Erreur de scan:', error);
+            }
+          }
+        );
+
+        setIsScanning(true);
+      } catch (error) {
+        console.error('Erreur lors de l\'initialisation du scanner:', error);
+        toast({
+          title: "Erreur",
+          description: "Impossible de démarrer le scanner. Vérifiez que votre caméra est accessible.",
+          variant: "destructive"
+        });
+      }
+    }, 100);
   };
 
   const stopScanner = () => {
     if (scannerRef.current) {
-      scannerRef.current.clear();
+      try {
+        scannerRef.current.clear().catch(() => {});
+      } catch (e) {
+        // Ignorer les erreurs de nettoyage
+      }
       scannerRef.current = null;
     }
     setIsScanning(false);
@@ -276,7 +309,12 @@ const QRScanner: React.FC = () => {
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.clear();
+        try {
+          scannerRef.current.clear().catch(() => {});
+        } catch (e) {
+          // Ignorer les erreurs de nettoyage
+        }
+        scannerRef.current = null;
       }
     };
   }, []);
@@ -308,7 +346,7 @@ const QRScanner: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <div id="qr-scanner" className="w-full"></div>
+              <div id="qr-scanner" className="w-full min-h-[300px]"></div>
               <Button onClick={stopScanner} variant="outline" className="w-full">
                 <X className="w-4 h-4 mr-2" />
                 Arrêter le scanner
