@@ -172,16 +172,16 @@ const SalesPage = () => {
     }
   }, []);
 
-  // Produits vendables (avec prix et stock)
+  // Produits vendables (avec prix - le stock n'est pas requis pour les menus/plats)
   const sellableProducts = products
-    // Exclure les produits sans prix de vente (ce sont des affaires/équipements de l'entreprise)
+    // Inclure uniquement les produits avec prix de vente (ce sont des produits vendables)
+    // Pour les menus/plats de restaurant, le stock n'est pas requis (quantité peut être 0)
     .filter(product => {
       const hasPrice = product.price > 0;
       const hasFormulaPrice = product.formula && product.formula.price > 0;
       return hasPrice || hasFormulaPrice;
-    })
-    // Exclure les produits sans stock
-    .filter(product => (product.stock || 0) > 0);
+    });
+    // Note: On n'exclut plus les produits sans stock car les menus peuvent être vendus sans quantité
 
   // Calculer les catégories disponibles dynamiquement
   const availableCategories = [...new Set(sellableProducts.map(p => p.category).filter(Boolean))].sort();
@@ -239,8 +239,9 @@ const SalesPage = () => {
         const maxStock = isFormula && product.formula 
           ? Math.floor((product.stock || 0) / ((product.formula.units || 1)))
           : (product.stock || 0);
-          
-        if (newQuantity <= maxStock) {
+        
+        // Permettre l'ajout si stock = 0 (menus) ou si quantité <= stock
+        if (maxStock === 0 || newQuantity <= maxStock) {
           setCart(cart.map(item =>
             item.id === product.id && item.isFormula === isFormula
               ? { ...item, quantity: newQuantity }
@@ -552,7 +553,10 @@ const SalesPage = () => {
                       />
                       <div className="mt-2 space-y-0.5">
                         <h3 className="font-semibold text-base truncate">{product.name}</h3>
-                        <p className="text-xs text-muted-foreground">Stock: {Number(product.stock || 0)}</p>
+                        {/* Afficher le stock uniquement s'il est > 0 (pas pour les menus/plats sans quantité) */}
+                        {(product.stock || 0) > 0 && (
+                          <p className="text-xs text-muted-foreground">Stock: {Number(product.stock || 0)}</p>
+                        )}
                         <p className="text-xl md:text-2xl font-extrabold text-nack-red" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
                           {(() => {
                             const price = Number(product.price || 0);
@@ -565,11 +569,7 @@ const SalesPage = () => {
                           })()}
                         </p>
                       </div>
-                      {(product.stock || 0) === 0 && (
-                        <div className="absolute top-1 right-1 flex h-8 min-w-[2rem] items-center justify-center rounded-full bg-white/95 backdrop-blur px-2 text-[11px] font-bold text-red-600 shadow">
-                          Rupture
-                        </div>
-                      )}
+                      {/* Ne pas afficher "Rupture" pour les produits sans stock (menus/plats) */}
                       <div className="absolute bottom-2 right-2 flex h-12 w-12 items-center justify-center rounded-full bg-nack-red text-white shadow-xl">
                         <Plus className="h-7 w-7" />
                       </div>
@@ -679,7 +679,7 @@ const SalesPage = () => {
                            variant="outline"
                            size="sm"
                            onClick={() => updateQuantity(item.id, item.quantity + 1, item.isFormula)}
-                           disabled={item.quantity >= item.stock}
+                           disabled={item.stock > 0 && item.quantity >= item.stock}
                          >
                            <Plus size={16} />
                          </Button>
