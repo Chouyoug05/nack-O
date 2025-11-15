@@ -245,7 +245,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           console.log('Tous les produits chargés:', allProducts.length);
           console.log('Détails des produits:', allProducts);
           
-          // Filtrer les produits en stock côté client et avec prix > 0
+          // Filtrer les produits avec prix > 0 (le stock n'est pas requis pour les menus/plats)
           const productsInStock = allProducts.filter(product => {
             const stock = product.quantity || product.stock || 0; // Utiliser quantity comme dans StockPage
             // Vérifier le prix de manière très stricte (gérer string, number, null, undefined, NaN, chaînes vides)
@@ -256,8 +256,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               const parsed = parseFloat(product.price.trim());
               priceValue = isNaN(parsed) ? 0 : parsed;
             }
-            // Exclusion stricte : prix doit être un nombre > 0
-            const isValid = stock > 0 && priceValue > 0;
+            // Inclure les produits avec prix > 0 (stock peut être 0 pour les menus/plats)
+            const isValid = priceValue > 0;
             if (!isValid) {
               console.log(`❌ Produit "${product.name}" exclu: stock=${stock}, price=${priceValue} (original: ${product.price}, type: ${typeof product.price})`);
             }
