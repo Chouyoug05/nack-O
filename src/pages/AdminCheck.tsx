@@ -17,6 +17,12 @@ const AdminCheck = () => {
   const [creating, setCreating] = useState(false);
   const navigate = useNavigate();
 
+  // Log pour débogage - s'assurer que le composant se monte
+  useEffect(() => {
+    console.log('🔍 AdminCheck monté - URL:', window.location.pathname);
+    console.log('🔍 AdminCheck - user:', user?.uid, 'isAdmin:', isAdmin, 'isAdminLoading:', isAdminLoading);
+  }, [user, isAdmin, isAdminLoading]);
+
   useEffect(() => {
     if (user && !isAdminLoading) {
       checkAdminDoc();

@@ -85,7 +85,10 @@ const HomeRedirect = () => {
 
 const RootLayout = () => {
   const location = useLocation();
-  const isPublicPage = location.pathname.startsWith('/event/') || location.pathname.startsWith('/commande/');
+  const isPublicPage = location.pathname.startsWith('/event/') || 
+                       location.pathname.startsWith('/commande/') ||
+                       location.pathname === '/admin-check' ||
+                       location.pathname === '/mon-uid';
   return (
     <>
       <Outlet />
