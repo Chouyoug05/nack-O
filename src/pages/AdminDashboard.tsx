@@ -937,7 +937,7 @@ const AdminDashboard = () => {
             <AlertDialogAction
               onClick={confirmDeleteClient}
               className="bg-red-600 hover:bg-red-700"
-              disabled={isDeleting}
+              disabled={deletingUid !== null}
             >
               {deletingUid ? "Suppression..." : "Supprimer définitivement"}
             </AlertDialogAction>
