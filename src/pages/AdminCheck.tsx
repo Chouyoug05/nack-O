@@ -93,21 +93,8 @@ const AdminCheck = () => {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle>Vérification Admin</CardTitle>
-            <CardDescription>Vous devez être connecté</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => navigate('/login')}>Se connecter</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Afficher la page même sans utilisateur connecté pour permettre le diagnostic
+  // L'utilisateur pourra se connecter depuis cette page si nécessaire
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -133,64 +120,82 @@ const AdminCheck = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
-              <div className="flex-1">
-                <span className="font-semibold text-blue-900 block mb-1">Votre UID (Important !)</span>
-                <span className="text-xs text-blue-700">Copiez cet UID pour créer votre document admin</span>
+            {user && (
+              <div className="flex items-center justify-between p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+                <div className="flex-1">
+                  <span className="font-semibold text-blue-900 block mb-1">Votre UID (Important !)</span>
+                  <span className="text-xs text-blue-700">Copiez cet UID pour créer votre document admin</span>
+                </div>
+                <div className="ml-4">
+                  <code className="block bg-blue-100 px-3 py-2 rounded text-xs font-mono text-blue-900 border border-blue-300 break-all max-w-xs">
+                    {user.uid}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="mt-2 w-full text-xs"
+                    onClick={() => {
+                      navigator.clipboard.writeText(user.uid);
+                      toast({ title: "UID copié !", description: "L'UID a été copié dans le presse-papiers" });
+                    }}
+                  >
+                    📋 Copier l'UID
+                  </Button>
+                </div>
               </div>
-              <div className="ml-4">
-                <code className="block bg-blue-100 px-3 py-2 rounded text-xs font-mono text-blue-900 border border-blue-300 break-all max-w-xs">
-                  {user.uid}
-                </code>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="mt-2 w-full text-xs"
-                  onClick={() => {
-                    navigator.clipboard.writeText(user.uid);
-                    toast({ title: "UID copié !", description: "L'UID a été copié dans le presse-papiers" });
-                  }}
-                >
-                  📋 Copier l'UID
+            )}
+            
+            {!user && (
+              <div className="p-4 bg-yellow-50 border-2 border-yellow-200 rounded-lg">
+                <p className="font-semibold text-yellow-900 mb-2">⚠️ Vous n'êtes pas connecté</p>
+                <p className="text-sm text-yellow-800 mb-3">
+                  Pour créer un compte admin, vous devez d'abord vous connecter pour obtenir votre UID.
+                </p>
+                <Button onClick={() => navigate('/login')} className="w-full">
+                  Se connecter
                 </Button>
               </div>
-            </div>
+            )}
 
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <span className="font-medium">Statut Admin (AuthContext)</span>
-              {isAdminLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : isAdmin ? (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Oui</span>
+            {user && (
+              <>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="font-medium">Statut Admin (AuthContext)</span>
+                  {isAdminLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isAdmin ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Oui</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-red-600">
+                      <XCircle className="w-4 h-4" />
+                      <span>Non</span>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 text-red-600">
-                  <XCircle className="w-4 h-4" />
-                  <span>Non</span>
-                </div>
-              )}
-            </div>
 
-            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-              <span className="font-medium">Document Admin (Firestore)</span>
-              {checking ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : adminDocExists === null ? (
-                <span className="text-muted-foreground">Non vérifié</span>
-              ) : adminDocExists ? (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Existe</span>
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <span className="font-medium">Document Admin (Firestore)</span>
+                  {checking ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : adminDocExists === null ? (
+                    <span className="text-muted-foreground">Non vérifié</span>
+                  ) : adminDocExists ? (
+                    <div className="flex items-center gap-2 text-green-600">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>Existe</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-red-600">
+                      <XCircle className="w-4 h-4" />
+                      <span>N'existe pas</span>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="flex items-center gap-2 text-red-600">
-                  <XCircle className="w-4 h-4" />
-                  <span>N'existe pas</span>
-                </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           <div className="pt-4 border-t space-y-2">
