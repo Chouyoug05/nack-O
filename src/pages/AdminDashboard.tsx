@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef } from "@/lib/collections";
-import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup } from "firebase/firestore";
+import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup, deleteDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import type { PaymentTransaction } from "@/types/payment";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,17 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface NotificationForm {
@@ -24,6 +35,7 @@ interface NotificationForm {
 const AdminDashboard = () => {
   const { isAdmin, isAdminLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "trial" | "active" | "expired">("all");
@@ -46,6 +58,9 @@ const AdminDashboard = () => {
     avgRating: 0,
   });
   const [isLoadingGlobalStats, setIsLoadingGlobalStats] = useState(false);
+  const [deletingUid, setDeletingUid] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<{ uid: string; name: string } | null>(null);
 
   // Si pas admin, rediriger (sécurité supplémentaire)
   useEffect(() => {
@@ -215,23 +230,58 @@ const AdminDashboard = () => {
   };
 
   const sendNotifications = async () => {
+    if (!notif.title || !notif.message) {
+      toast({ 
+        title: "Erreur", 
+        description: "Veuillez remplir le titre et le message", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     const uids = getTargetUids();
-    if (uids.length === 0) return;
+    if (uids.length === 0) {
+      toast({ 
+        title: "Erreur", 
+        description: "Aucun utilisateur ciblé. Sélectionnez des utilisateurs ou utilisez 'Tous'", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
     const createdAt = Date.now();
+    let successCount = 0;
+    let errorCount = 0;
+
     for (const uid of uids) {
       try {
         await addDoc(notificationsColRef(db, uid), {
-          title: notif.title || "Annonce",
-          message: notif.message || "",
+          title: notif.title,
+          message: notif.message,
           type: notif.type,
           createdAt,
           read: false,
         });
-      } catch {
-        // ignore individual failure
+        successCount++;
+      } catch (error) {
+        console.error(`Erreur envoi notification à ${uid}:`, error);
+        errorCount++;
       }
     }
+
+    if (successCount > 0) {
+      toast({ 
+        title: "Notifications envoyées", 
+        description: `${successCount} notification${successCount > 1 ? 's' : ''} envoyée${successCount > 1 ? 's' : ''}${errorCount > 0 ? `, ${errorCount} erreur${errorCount > 1 ? 's' : ''}` : ''}` 
+      });
     setNotif(prev => ({ ...prev, title: "", message: "" }));
+    } else {
+      toast({ 
+        title: "Erreur", 
+        description: "Aucune notification n'a pu être envoyée", 
+        variant: "destructive" 
+      });
+    }
   };
 
   const activateForDays = async (uid: string, days: number) => {
@@ -386,6 +436,35 @@ const AdminDashboard = () => {
       toast({ title: "Erreur", description: "Erreur lors de la correction", variant: "destructive" });
     } finally {
       setIsFixingPastDates(false);
+    }
+  };
+
+  const handleDeleteClient = (uid: string, clientName: string) => {
+    setClientToDelete({ uid, name: clientName });
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteClient = async () => {
+    if (!clientToDelete) return;
+    
+    setDeletingUid(clientToDelete.uid);
+    try {
+      await deleteDoc(doc(db, "profiles", clientToDelete.uid));
+      toast({ 
+        title: "Client supprimé", 
+        description: `Le client "${clientToDelete.name}" a été supprimé avec succès` 
+      });
+      setShowDeleteDialog(false);
+      setClientToDelete(null);
+    } catch (error) {
+      console.error('Erreur suppression:', error);
+      toast({ 
+        title: "Erreur", 
+        description: "Impossible de supprimer le client", 
+        variant: "destructive" 
+      });
+    } finally {
+      setDeletingUid(null);
     }
   };
 
@@ -698,7 +777,7 @@ const AdminDashboard = () => {
                           ) : "—"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
+                          <div className="flex gap-2 justify-end flex-wrap">
                             {p.plan === 'active' && p.subscriptionEndsAt && p.subscriptionEndsAt > now && 
                              ((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 && (
                               <Button 
@@ -712,6 +791,29 @@ const AdminDashboard = () => {
                             )}
                             <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays)}>
                               <Gift size={14} className="mr-2"/> Activer {activationDays} j
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => navigate(`/admin/client/${p.uid}`)}
+                              title="Voir les détails du client"
+                            >
+                              <Eye size={14} className="mr-2"/> Voir
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              onClick={() => handleDeleteClient(p.uid, p.establishmentName || p.ownerName || p.email || 'Client')}
+                              disabled={deletingUid === p.uid}
+                              title="Supprimer le client"
+                            >
+                              {deletingUid === p.uid ? (
+                                <>...</>
+                              ) : (
+                                <>
+                                  <Trash2 size={14} className="mr-2"/> Supprimer
+                                </>
+                              )}
                             </Button>
                           </div>
                         </TableCell>
@@ -813,6 +915,35 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog de confirmation de suppression */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer le client ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Toutes les données du client ({clientToDelete?.name}) seront supprimées définitivement.
+              <br /><br />
+              <strong>Attention :</strong> Cette action supprimera également tous les produits, commandes, ventes et autres données associées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setShowDeleteDialog(false);
+              setClientToDelete(null);
+            }}>
+              Annuler
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteClient}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isDeleting}
+            >
+              {deletingUid ? "Suppression..." : "Supprimer définitivement"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

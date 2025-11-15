@@ -27,6 +27,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentError from "./pages/PaymentError";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCheck from "./pages/AdminCheck";
+import ClientDetailsPage from "./pages/ClientDetailsPage";
 import TeamPage from "@/components/pages/TeamPage";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import PublicOrderingPage from "./pages/PublicOrderingPage";
@@ -115,6 +116,7 @@ const router = createBrowserRouter([
       { path: "admin-check", element: <AdminCheck /> },
       { path: "mon-uid", element: <AdminCheck /> },
       { path: "admin", element: <RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth> },
+      { path: "admin/client/:uid", element: <RequireAuth><RequireAdmin><ClientDetailsPage /></RequireAdmin></RequireAuth> },
       { path: "serveur/:agentCode", element: <ServeurInterface /> },
       { path: "caisse/:agentCode", element: <CaisseInterface /> },
       { path: "agent-evenement/:agentCode", element: <AgentEvenementInterface /> },
