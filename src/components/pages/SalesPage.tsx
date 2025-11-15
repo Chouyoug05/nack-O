@@ -218,25 +218,35 @@ const SalesPage = () => {
     const priceToUse = isFormula && product.formula ? product.formula.price : product.price;
     const quantityToAdd = isFormula && product.formula ? product.formula.units : 1;
     const existingItem = cart.find(item => item.id === product.id && item.isFormula === isFormula);
+    const isPlat = product.category?.toLowerCase() === 'plats';
     
     if (existingItem) {
       const newQuantity = existingItem.quantity + quantityToAdd;
-      const maxStock = isFormula && product.formula 
-        ? Math.floor((product.stock || 0) / ((product.formula.units || 1)))
-        : (product.stock || 0);
-        
-      if (newQuantity <= maxStock) {
+      // Pour les plats, ignorer la vérification de stock
+      if (isPlat) {
         setCart(cart.map(item =>
           item.id === product.id && item.isFormula === isFormula
             ? { ...item, quantity: newQuantity }
             : item
         ));
       } else {
-        toast({
-          title: "Stock insuffisant",
-          description: `Il ne reste que ${maxStock} ${isFormula ? 'formules' : 'unités'} en stock`,
-          variant: "destructive"
-        });
+        const maxStock = isFormula && product.formula 
+          ? Math.floor((product.stock || 0) / ((product.formula.units || 1)))
+          : (product.stock || 0);
+          
+        if (newQuantity <= maxStock) {
+          setCart(cart.map(item =>
+            item.id === product.id && item.isFormula === isFormula
+              ? { ...item, quantity: newQuantity }
+              : item
+          ));
+        } else {
+          toast({
+            title: "Stock insuffisant",
+            description: `Il ne reste que ${maxStock} ${isFormula ? 'formules' : 'unités'} en stock`,
+            variant: "destructive"
+          });
+        }
       }
     } else {
       setCart([...cart, { 

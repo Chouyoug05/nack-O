@@ -1512,47 +1512,57 @@ const StockPage = () => {
                     </div>
                   </div>
 
-                  {/* Stock Controls */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-1 flex-col gap-2">
-                      {/* Progress Bar */}
-                      <div className="h-2 rounded-full bg-[#e6dfdb]">
-                        <div
-                          className="h-2 rounded-full transition-all"
+                  {/* Stock Controls - Masqué pour les plats (nourriture) */}
+                  {product.category?.toLowerCase() !== 'plats' && (
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-1 flex-col gap-2">
+                        {/* Progress Bar */}
+                        <div className="h-2 rounded-full bg-[#e6dfdb]">
+                          <div
+                            className="h-2 rounded-full transition-all"
+                            style={{
+                              width: `${stockPercentage}%`,
+                              backgroundColor: stockColor,
+                            }}
+                          />
+                        </div>
+                        {/* Quantity */}
+                        <p
+                          className="text-right text-lg font-bold"
                           style={{
-                            width: `${stockPercentage}%`,
-                            backgroundColor: stockColor,
+                            color: isLowStock ? stockColor : "#181411",
                           }}
-                        />
+                        >
+                          {product.quantity}
+                        </p>
                       </div>
-                      {/* Quantity */}
-                      <p
-                        className="text-right text-lg font-bold"
-                        style={{
-                          color: isLowStock ? stockColor : "#181411",
-                        }}
-                      >
-                        {product.quantity}
-                      </p>
-                    </div>
 
-                    {/* Bouton + pour ajouter le nombre d'articles sur un produit */}
-                    <button
-                      onClick={() => {
-                        requireManagerAuth(() => {
-                          if (user) {
-                            updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
-                              quantity: product.quantity + 1,
-                            });
-                          }
-                        });
-                      }}
-                      className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full text-3xl font-light text-white transition-transform active:scale-95 shadow"
-                      style={{ backgroundColor: stockColor }}
-                    >
-                      +
-                    </button>
-                  </div>
+                      {/* Bouton + pour ajouter le nombre d'articles sur un produit */}
+                      <button
+                        onClick={() => {
+                          requireManagerAuth(() => {
+                            if (user) {
+                              updateDoc(fsDoc(productsColRef(db, user.uid), product.id), {
+                                quantity: product.quantity + 1,
+                              });
+                            }
+                          });
+                        }}
+                        className="flex h-12 w-12 cursor-pointer items-center justify-center rounded-full text-3xl font-light text-white transition-transform active:scale-95 shadow"
+                        style={{ backgroundColor: stockColor }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                  {/* Pour les plats, afficher simplement "Disponible" */}
+                  {product.category?.toLowerCase() === 'plats' && (
+                    <div className="flex items-center justify-end">
+                      <Badge className="bg-green-500 text-white px-3 py-1">
+                        Disponible
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               );
             })}

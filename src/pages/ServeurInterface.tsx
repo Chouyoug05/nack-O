@@ -352,9 +352,11 @@ const ServeurInterface = () => {
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find(item => item.id === product.id);
+    const isPlat = product.category?.toLowerCase() === 'plats';
     
     if (existingItem) {
-      if (existingItem.quantity < product.stock) {
+      // Pour les plats, ignorer la vérification de stock
+      if (isPlat || existingItem.quantity < product.stock) {
         updateQuantity(product.id, existingItem.quantity + 1);
       } else {
         toast({

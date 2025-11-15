@@ -34,9 +34,11 @@ const ProductGrid = ({ cart, onAddToCart, onUpdateQuantity, productsOverride }: 
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find(item => item.id === product.id);
+    const isPlat = product.category?.toLowerCase() === 'plats';
     
     if (existingItem) {
-      if (existingItem.quantity < product.stock) {
+      // Pour les plats, ignorer la vérification de stock
+      if (isPlat || existingItem.quantity < product.stock) {
         onUpdateQuantity(product.id, existingItem.quantity + 1);
       } else {
         toast({
@@ -125,10 +127,12 @@ const ProductGrid = ({ cart, onAddToCart, onUpdateQuantity, productsOverride }: 
                   <h3 className="font-semibold text-sm mb-1">{product.name}</h3>
                   <div className="text-xs text-muted-foreground mb-1">{product.category}</div>
                   <p className="text-lg font-bold text-nack-red mb-1">{Number(product.price || 0).toLocaleString()} XAF</p>
-                <p className="text-xs text-muted-foreground mb-2">Stock: {product.stock}</p>
+                {product.category?.toLowerCase() !== 'plats' && (
+                  <p className="text-xs text-muted-foreground mb-2">Stock: {product.stock}</p>
+                )}
                 <Button 
                   className="w-full bg-gradient-primary text-white shadow-button text-xs h-8"
-                  disabled={product.stock === 0}
+                  disabled={product.category?.toLowerCase() !== 'plats' && product.stock === 0}
                   onClick={(e) => {
                     e.stopPropagation();
                     addToCart(product);
