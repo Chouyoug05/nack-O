@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import OrderManagement from "@/components/OrderManagement";
 import { 
@@ -198,6 +199,11 @@ const SalesPage = () => {
     if (cat.includes('équipement') || cat.includes('equipement')) return Settings;
     if (cat.includes('fourniture')) return Box;
     return Package;
+  };
+
+  // Fonction pour obtenir le texte d'affichage de la catégorie
+  const getCategoryDisplayText = (category: string) => {
+    return category === "all" ? "Toutes les catégories" : category;
   };
 
   // Réinitialiser l'onglet actif si la catégorie n'existe plus
@@ -468,45 +474,46 @@ const SalesPage = () => {
                   </div>
                 </div>
               </div>
-                {/* Onglets Catégories dynamiques */}
-                <div className="w-full border-b border-[#e6dfdb]">
-                  <div className="flex overflow-x-auto scrollbar-hide">
-                    {/* Onglet "Tout" */}
-                    <button
-                      key="all"
-                      type="button"
-                      onClick={() => setActiveCategoryTab("all")}
-                      className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
-                        activeCategoryTab === "all" ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
-                      }`}
-                      aria-pressed={activeCategoryTab === "all"}
-                    >
-                      <Grid3x3 className="h-6 w-6 flex-shrink-0" />
-                      <span className="hidden sm:inline font-semibold whitespace-nowrap">Tout</span>
-                    </button>
-                    {/* Onglets pour chaque catégorie disponible */}
-                    {availableCategories.length > 0 ? (
-                      availableCategories.map((category) => {
-                        const Icon = getCategoryIcon(category);
-                        return (
-                          <button
-                            key={category}
-                            type="button"
-                            onClick={() => setActiveCategoryTab(category)}
-                            className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
-                              activeCategoryTab === category ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
-                            }`}
-                            aria-pressed={activeCategoryTab === category}
-                          >
-                            <Icon className="h-6 w-6 flex-shrink-0" />
-                            <span className="hidden sm:inline font-semibold whitespace-nowrap">{category}</span>
-                          </button>
-                        );
-                      })
-                    ) : (
-                      <div className="flex items-center justify-center px-3 py-3 text-sm text-muted-foreground">
-                        Aucune catégorie disponible
-                      </div>
+                {/* Sélecteur de Catégorie - Menu déroulant compact */}
+                <div className="w-full border-b border-[#e6dfdb] pb-3">
+                  <div className="flex items-center gap-3">
+                    <Grid3x3 className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                    <Select value={activeCategoryTab} onValueChange={setActiveCategoryTab}>
+                      <SelectTrigger className="w-full sm:w-[250px] border-[#e6dfdb] focus:ring-nack-red">
+                        <SelectValue placeholder="Sélectionner une catégorie">
+                          {activeCategoryTab === "all" ? "Toutes les catégories" : activeCategoryTab}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">
+                          <div className="flex items-center gap-2">
+                            <Grid3x3 className="h-4 w-4" />
+                            <span>Toutes les catégories</span>
+                          </div>
+                        </SelectItem>
+                        {availableCategories.length > 0 ? (
+                          availableCategories.map((category) => {
+                            const Icon = getCategoryIcon(category);
+                            return (
+                              <SelectItem key={category} value={category}>
+                                <div className="flex items-center gap-2">
+                                  <Icon className="h-4 w-4" />
+                                  <span>{category}</span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })
+                        ) : (
+                          <SelectItem value="none" disabled>
+                            Aucune catégorie disponible
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {activeCategoryTab !== "all" && (
+                      <Badge variant="outline" className="bg-nack-red/10 text-nack-red border-nack-red/20">
+                        {filteredProducts.length} produit{filteredProducts.length > 1 ? 's' : ''}
+                      </Badge>
                     )}
                   </div>
                 </div>
