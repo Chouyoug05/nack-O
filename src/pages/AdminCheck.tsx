@@ -134,28 +134,28 @@ const AdminCheck = () => {
             </div>
 
             {user && (
-              <div className="flex items-center justify-between p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
-                <div className="flex-1">
-                  <span className="font-semibold text-blue-900 block mb-1">Votre UID (Important !)</span>
-                  <span className="text-xs text-blue-700">Copiez cet UID pour créer votre document admin</span>
-                </div>
-                <div className="ml-4">
-                  <code className="block bg-blue-100 px-3 py-2 rounded text-xs font-mono text-blue-900 border border-blue-300 break-all max-w-xs">
-                    {user.uid}
-                  </code>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="mt-2 w-full text-xs"
-                    onClick={() => {
-                      navigator.clipboard.writeText(user.uid);
-                      toast({ title: "UID copié !", description: "L'UID a été copié dans le presse-papiers" });
-                    }}
-                  >
-                    📋 Copier l'UID
-                  </Button>
-                </div>
+            <div className="flex items-center justify-between p-3 bg-blue-50 border-2 border-blue-200 rounded-lg">
+              <div className="flex-1">
+                <span className="font-semibold text-blue-900 block mb-1">Votre UID (Important !)</span>
+                <span className="text-xs text-blue-700">Copiez cet UID pour créer votre document admin</span>
               </div>
+              <div className="ml-4">
+                <code className="block bg-blue-100 px-3 py-2 rounded text-xs font-mono text-blue-900 border border-blue-300 break-all max-w-xs">
+                  {user.uid}
+                </code>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 w-full text-xs"
+                  onClick={() => {
+                    navigator.clipboard.writeText(user.uid);
+                    toast({ title: "UID copié !", description: "L'UID a été copié dans le presse-papiers" });
+                  }}
+                >
+                  📋 Copier l'UID
+                </Button>
+              </div>
+            </div>
             )}
             
             {!user && (
@@ -329,108 +329,108 @@ const AdminCheck = () => {
 
             {user && (
               <>
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="font-medium">Statut Admin (AuthContext)</span>
-                  {isAdminLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : isAdmin ? (
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Oui</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-red-600">
-                      <XCircle className="w-4 h-4" />
-                      <span>Non</span>
-                    </div>
-                  )}
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <span className="font-medium">Statut Admin (AuthContext)</span>
+              {isAdminLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : isAdmin ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Oui</span>
                 </div>
+              ) : (
+                <div className="flex items-center gap-2 text-red-600">
+                  <XCircle className="w-4 h-4" />
+                  <span>Non</span>
+                </div>
+              )}
+            </div>
 
-                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="font-medium">Document Admin (Firestore)</span>
-                  {checking ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : adminDocExists === null ? (
-                    <span className="text-muted-foreground">Non vérifié</span>
-                  ) : adminDocExists ? (
-                    <div className="flex items-center gap-2 text-green-600">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>Existe</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 text-red-600">
-                      <XCircle className="w-4 h-4" />
-                      <span>N'existe pas</span>
-                    </div>
-                  )}
+            <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+              <span className="font-medium">Document Admin (Firestore)</span>
+              {checking ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : adminDocExists === null ? (
+                <span className="text-muted-foreground">Non vérifié</span>
+              ) : adminDocExists ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Existe</span>
                 </div>
+              ) : (
+                <div className="flex items-center gap-2 text-red-600">
+                  <XCircle className="w-4 h-4" />
+                  <span>N'existe pas</span>
+                </div>
+              )}
+            </div>
               </>
             )}
           </div>
 
           {user && (
-            <div className="pt-4 border-t space-y-2">
-              <h3 className="font-semibold">Instructions pour devenir admin :</h3>
-              <div className="space-y-3">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <p className="font-semibold text-blue-900 mb-2">Méthode 1 : Script (Recommandé)</p>
-                  <p className="text-sm text-blue-800 mb-2">Exécutez cette commande dans le terminal :</p>
-                  <code className="block bg-blue-100 p-2 rounded text-xs break-all">
-                    node scripts/promoteAdmin.mjs {user.uid}
-                  </code>
-                  <p className="text-xs text-blue-700 mt-2">
-                    ⚠️ Assurez-vous d'avoir configuré FIREBASE_PROJECT_ID et SERVICE_ACCOUNT_JSON
-                  </p>
-                </div>
-                
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <p className="font-semibold text-green-900 mb-2">Méthode 2 : Firebase Console (Manuel - Plus simple)</p>
-                  <div className="bg-white border border-green-300 rounded p-3 mb-3">
-                    <p className="text-xs font-semibold text-green-900 mb-2">📍 Votre UID à utiliser :</p>
-                    <code className="block bg-green-50 px-2 py-1 rounded text-xs font-mono text-green-900 border border-green-200 break-all">
-                      {user.uid}
-                    </code>
-                  </div>
-                  <ol className="list-decimal list-inside space-y-2 text-sm text-green-800">
-                    <li className="mb-2">
-                      Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Firebase Console</a> (ouvre dans un nouvel onglet)
-                    </li>
-                    <li className="mb-2">Sélectionnez le projet : <strong className="bg-green-100 px-2 py-1 rounded">nack-8c299</strong></li>
-                    <li className="mb-2">Dans le menu de gauche, cliquez sur <strong>"Firestore Database"</strong></li>
-                    <li className="mb-2">
-                      Si la collection <code className="bg-green-100 px-1 rounded">admins</code> n'existe pas :
-                      <ul className="list-disc list-inside ml-4 mt-1 text-xs">
-                        <li>Cliquez sur "Créer une collection"</li>
-                        <li>Nom de la collection : <code className="bg-green-100 px-1 rounded">admins</code></li>
-                        <li>Cliquez sur "Suivant" puis "Terminé"</li>
-                      </ul>
-                    </li>
-                    <li className="mb-2">
-                      Cliquez sur "Ajouter un document" dans la collection <code className="bg-green-100 px-1 rounded">admins</code>
-                    </li>
-                    <li className="mb-2">
-                      Dans "ID du document", collez votre UID : <code className="bg-green-100 px-1 rounded break-all text-xs">{user.uid}</code>
-                    </li>
-                    <li className="mb-2">
-                      Ajoutez ces 3 champs (cliquez sur "Ajouter un champ" pour chacun) :
-                      <ul className="list-disc list-inside ml-4 mt-1 text-xs space-y-1">
-                        <li><code className="bg-green-100 px-1 rounded">role</code> (type: string) = <code className="bg-green-100 px-1 rounded">"admin"</code></li>
-                        <li><code className="bg-green-100 px-1 rounded">createdAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
-                        <li><code className="bg-green-100 px-1 rounded">updatedAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
-                      </ul>
-                    </li>
-                    <li className="mb-2">Cliquez sur "Enregistrer"</li>
-                  </ol>
-                  <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-xs text-green-900">
-                    <strong>💡 Astuce :</strong> Vous pouvez copier votre UID ci-dessus et le coller directement dans Firebase Console.
-                  </div>
-                </div>
-                
-                <p className="text-xs text-muted-foreground">
-                  Après avoir créé le document admin, rechargez cette page.
+          <div className="pt-4 border-t space-y-2">
+            <h3 className="font-semibold">Instructions pour devenir admin :</h3>
+            <div className="space-y-3">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="font-semibold text-blue-900 mb-2">Méthode 1 : Script (Recommandé)</p>
+                <p className="text-sm text-blue-800 mb-2">Exécutez cette commande dans le terminal :</p>
+                <code className="block bg-blue-100 p-2 rounded text-xs break-all">
+                  node scripts/promoteAdmin.mjs {user.uid}
+                </code>
+                <p className="text-xs text-blue-700 mt-2">
+                  ⚠️ Assurez-vous d'avoir configuré FIREBASE_PROJECT_ID et SERVICE_ACCOUNT_JSON
                 </p>
               </div>
+              
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="font-semibold text-green-900 mb-2">Méthode 2 : Firebase Console (Manuel - Plus simple)</p>
+                <div className="bg-white border border-green-300 rounded p-3 mb-3">
+                  <p className="text-xs font-semibold text-green-900 mb-2">📍 Votre UID à utiliser :</p>
+                  <code className="block bg-green-50 px-2 py-1 rounded text-xs font-mono text-green-900 border border-green-200 break-all">
+                    {user.uid}
+                  </code>
+                </div>
+                <ol className="list-decimal list-inside space-y-2 text-sm text-green-800">
+                  <li className="mb-2">
+                    Allez sur <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="underline font-semibold">Firebase Console</a> (ouvre dans un nouvel onglet)
+                  </li>
+                    <li className="mb-2">Sélectionnez votre projet Firebase</li>
+                  <li className="mb-2">Dans le menu de gauche, cliquez sur <strong>"Firestore Database"</strong></li>
+                  <li className="mb-2">
+                    Si la collection <code className="bg-green-100 px-1 rounded">admins</code> n'existe pas :
+                    <ul className="list-disc list-inside ml-4 mt-1 text-xs">
+                      <li>Cliquez sur "Créer une collection"</li>
+                      <li>Nom de la collection : <code className="bg-green-100 px-1 rounded">admins</code></li>
+                      <li>Cliquez sur "Suivant" puis "Terminé"</li>
+                    </ul>
+                  </li>
+                  <li className="mb-2">
+                    Cliquez sur "Ajouter un document" dans la collection <code className="bg-green-100 px-1 rounded">admins</code>
+                  </li>
+                  <li className="mb-2">
+                    Dans "ID du document", collez votre UID : <code className="bg-green-100 px-1 rounded break-all text-xs">{user.uid}</code>
+                  </li>
+                  <li className="mb-2">
+                    Ajoutez ces 3 champs (cliquez sur "Ajouter un champ" pour chacun) :
+                    <ul className="list-disc list-inside ml-4 mt-1 text-xs space-y-1">
+                      <li><code className="bg-green-100 px-1 rounded">role</code> (type: string) = <code className="bg-green-100 px-1 rounded">"admin"</code></li>
+                      <li><code className="bg-green-100 px-1 rounded">createdAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
+                      <li><code className="bg-green-100 px-1 rounded">updatedAt</code> (type: number) = <code className="bg-green-100 px-1 rounded">{Date.now()}</code></li>
+                    </ul>
+                  </li>
+                  <li className="mb-2">Cliquez sur "Enregistrer"</li>
+                </ol>
+                <div className="mt-3 p-2 bg-green-100 border border-green-300 rounded text-xs text-green-900">
+                  <strong>💡 Astuce :</strong> Vous pouvez copier votre UID ci-dessus et le coller directement dans Firebase Console.
+                </div>
+              </div>
+              
+              <p className="text-xs text-muted-foreground">
+                Après avoir créé le document admin, rechargez cette page.
+              </p>
             </div>
+          </div>
           )}
 
           <div className="flex gap-2 pt-4">
@@ -463,7 +463,7 @@ const AdminCheck = () => {
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 space-y-3">
               <div>
                 <strong>⚠️ Problème détecté :</strong> Le document admin n'existe pas dans Firestore.
-                <br />
+              <br />
                 <div className="mt-2 space-y-1">
                   <div>
                     <strong>Collection:</strong> <code className="bg-yellow-100 px-1 rounded">admins</code>
@@ -508,10 +508,10 @@ const AdminCheck = () => {
           {adminDocExists && !isAdmin && !isAdminLoading && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 space-y-3">
               <div>
-                <strong>⚠️ Problème de synchronisation :</strong>
-                <br />
-                Le document existe mais AuthContext ne détecte pas le statut admin.
-                <br />
+              <strong>⚠️ Problème de synchronisation :</strong>
+              <br />
+              Le document existe mais AuthContext ne détecte pas le statut admin.
+              <br />
                 Cela peut être dû à un problème de cache ou de synchronisation Firestore.
               </div>
               <div className="flex flex-wrap gap-2">
@@ -524,11 +524,11 @@ const AdminCheck = () => {
                 >
                   Vérifier et recharger
                 </Button>
-                <Button 
-                  size="sm" 
+              <Button 
+                size="sm" 
                   variant="outline"
-                  onClick={() => window.location.reload()}
-                >
+                onClick={() => window.location.reload()}
+              >
                   Recharger la page
                 </Button>
                 <Button 
@@ -537,7 +537,7 @@ const AdminCheck = () => {
                   onClick={() => navigate('/admin')}
                 >
                   Forcer l'accès à /admin
-                </Button>
+              </Button>
               </div>
             </div>
           )}
