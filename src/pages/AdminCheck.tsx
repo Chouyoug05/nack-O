@@ -462,11 +462,32 @@ const AdminCheck = () => {
           {adminDocExists === false && user && (
             <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800 space-y-3">
               <div>
-                <strong>Problème détecté :</strong> Le document admin n'existe pas dans Firestore.
+                <strong>⚠️ Problème détecté :</strong> Le document admin n'existe pas dans Firestore.
                 <br />
-                Collection: <code className="bg-yellow-100 px-1 rounded">admins</code>
-                <br />
-                Document ID: <code className="bg-yellow-100 px-1 rounded">{user.uid}</code>
+                <div className="mt-2 space-y-1">
+                  <div>
+                    <strong>Collection:</strong> <code className="bg-yellow-100 px-1 rounded">admins</code>
+                  </div>
+                  <div>
+                    <strong>Document ID (votre UID):</strong>
+                    <div className="mt-1">
+                      <code className="bg-yellow-100 px-2 py-1 rounded text-xs font-mono break-all block">
+                        {user.uid}
+                      </code>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-1 text-xs"
+                        onClick={() => {
+                          navigator.clipboard.writeText(user.uid);
+                          toast({ title: "UID copié !", description: "L'UID a été copié dans le presse-papiers" });
+                        }}
+                      >
+                        📋 Copier l'UID
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="pt-2 border-t border-yellow-300">
                 <p className="font-semibold mb-2">💡 Solution rapide :</p>
