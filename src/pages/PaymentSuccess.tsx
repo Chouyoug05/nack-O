@@ -23,12 +23,113 @@ const PaymentSuccess = () => {
         // Récupérer les paramètres de l'URL
         const reference = searchParams.get('reference') || '';
         const transactionId = searchParams.get('transactionId') || '';
+        const paymentType = searchParams.get('type') || 'subscription';
         
         // Vérification de sécurité: s'assurer qu'on a au moins une référence ou un transactionId
         if (!reference && !transactionId) {
           console.error('PaymentSuccess: Aucune référence ou transactionId fournie');
           setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
           return;
+        }
+        
+        // Gérer le paiement d'événement supplémentaire
+        if (paymentType === 'event') {
+          // Récupérer les données de l'événement depuis sessionStorage
+          const pendingEventDataStr = sessionStorage.getItem('pendingEventData');
+          if (!pendingEventDataStr) {
+            console.error('PaymentSuccess: Données d\'événement non trouvées');
+            setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+            return;
+          }
+          
+          try {
+            const eventData = JSON.parse(pendingEventDataStr);
+            
+            // Chercher la transaction pour obtenir le montant
+            let amount = 0;
+            const paymentsRef = paymentsColRef(db, user.uid);
+            if (transactionId) {
+              const q = query(paymentsRef, where('transactionId', '==', transactionId));
+              const paymentsSnapshot = await getDocs(q);
+              if (!paymentsSnapshot.empty) {
+                const paymentDoc = paymentsSnapshot.docs[0];
+                const paymentData = paymentDoc.data() as PaymentTransaction;
+                amount = paymentData.amount || 0;
+                
+                // Mettre à jour la transaction
+                await updateDoc(doc(paymentsRef, paymentDoc.id), {
+                  status: 'completed',
+                  paidAt: now,
+                  updatedAt: now,
+                });
+              }
+            }
+            
+            // Créer l'événement après paiement réussi
+            const { useEvents } = await import('@/contexts/EventContext');
+            // Note: On ne peut pas utiliser useEvents ici car c'est un hook
+            // On va créer l'événement directement via Firestore
+            const { eventsColRef } = await import('@/lib/collections');
+            const { addDoc } = await import('firebase/firestore');
+            
+            // Uploader l'image si elle existe
+            let finalImageUrl = eventData.imageUrl;
+            if (eventData.selectedImageBase64) {
+              try {
+                // Convertir base64 en File
+                const response = await fetch(eventData.selectedImageBase64);
+                const blob = await response.blob();
+                const file = new File([blob], 'event-image.jpg', { type: 'image/jpeg' });
+                const { uploadImageToCloudinary } = await import('@/lib/cloudinary');
+                finalImageUrl = await uploadImageToCloudinary(file, "events");
+              } catch (imageError) {
+                console.error('Erreur upload image événement:', imageError);
+              }
+            }
+            
+            // Créer l'événement
+            const eventPayload = {
+              title: eventData.title,
+              description: eventData.description,
+              date: eventData.date,
+              time: eventData.time,
+              location: eventData.location || "Restaurant NACK",
+              maxCapacity: eventData.maxCapacity || 50,
+              ticketPrice: eventData.ticketPrice,
+              currency: eventData.currency || "XAF",
+              isActive: true,
+              imageUrl: finalImageUrl || undefined,
+              organizerWhatsapp: eventData.organizerWhatsapp || undefined,
+            };
+            
+            await addDoc(eventsColRef(db, user.uid), {
+              ...eventPayload,
+              ticketsSold: 0,
+              createdAt: now,
+              updatedAt: now,
+            });
+            
+            // Nettoyer sessionStorage
+            sessionStorage.removeItem('pendingEventData');
+            
+            // Notification de succès
+            try {
+              await addDoc(notificationsColRef(db, user.uid), {
+                title: "Événement créé",
+                message: `Votre événement "${eventData.title}" a été créé avec succès après le paiement de ${amount.toLocaleString()} XAF.`,
+                type: "success",
+                createdAt: now,
+                read: false,
+              });
+            } catch {/* ignore */}
+            
+            setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+            return;
+          } catch (error) {
+            console.error('Erreur création événement après paiement:', error);
+            setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+            return;
+          }
         }
         
         // Détecter le type d'abonnement depuis la référence ou l'URL

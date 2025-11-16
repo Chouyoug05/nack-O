@@ -33,6 +33,7 @@ import { onSnapshot, orderBy, query, addDoc, doc, updateDoc } from "firebase/fir
 import type { TicketDoc } from "@/types/event";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { generateEventTicket } from "@/utils/ticketGenerator";
+import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 
 type NewEventPayload = {
   title: string;
@@ -145,8 +146,109 @@ const EventsPage = () => {
         );
         if (!confirm) return;
         
-        // TODO: Ici, on devrait créer un lien de paiement pour l'événement supplémentaire
-        // Pour l'instant, on continue avec la création
+        // Créer un lien de paiement pour l'événement supplémentaire
+        try {
+          if (!user) {
+            toast({ title: "Erreur", description: "Vous devez être connecté", variant: "destructive" });
+            return;
+          }
+
+          // Sauvegarder les données de l'événement dans sessionStorage pour les récupérer après paiement
+          const eventData = {
+            title: newEvent.title,
+            description: newEvent.description,
+            date: newEvent.date,
+            time: newEvent.time,
+            location: newEvent.location || "Restaurant NACK",
+            maxCapacity: Number(newEvent.maxCapacity) || 50,
+            ticketPrice: Number(newEvent.ticketPrice),
+            currency: newEvent.currency,
+            imageUrl: newEvent.imageUrl,
+            organizerWhatsapp: newEvent.organizerWhatsapp,
+            selectedImageBase64: imagePreview, // Sauvegarder l'image en base64 temporairement
+          };
+          sessionStorage.setItem('pendingEventData', JSON.stringify(eventData));
+
+          // Créer un ID unique pour cette transaction
+          const transactionId = `EVT-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          const now = Date.now();
+          
+          const base = (
+            (import.meta.env.VITE_PUBLIC_BASE_URL as string)
+            || window.location.origin
+          ).replace(/\/+$/, '');
+          
+          const reference = 'evenement-supplementaire';
+          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&type=event`;
+          const redirectError = `${base}/payment/error?transactionId=${transactionId}&type=event`;
+          const logoURL = `${base}/favicon.png`;
+          
+          // Enregistrer la transaction en attente
+          try {
+            const { paymentsColRef } = await import('@/lib/collections');
+            const { db } = await import('@/lib/firebase');
+            const { addDoc } = await import('firebase/firestore');
+            const paymentsRef = paymentsColRef(db, user.uid);
+            
+            await addDoc(paymentsRef, {
+              userId: user.uid,
+              transactionId,
+              subscriptionType: 'event-extra',
+              amount: eventCheck.extraPrice,
+              status: 'pending',
+              paymentMethod: 'airtel-money',
+              reference,
+              paymentLink: '', // Sera rempli après génération
+              redirectSuccess,
+              redirectError,
+              createdAt: now,
+            });
+          } catch (error) {
+            console.error('Erreur enregistrement transaction pending:', error);
+          }
+          
+          // Générer le lien de paiement
+          const link = await createSubscriptionPaymentLink({
+            amount: eventCheck.extraPrice,
+            reference: `${reference}-${transactionId.substring(0, 8)}`,
+            redirectSuccess,
+            redirectError,
+            logoURL,
+            isTransfer: false,
+          });
+          
+          // Mettre à jour la transaction avec le lien généré
+          try {
+            const { paymentsColRef } = await import('@/lib/collections');
+            const { db } = await import('@/lib/firebase');
+            const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
+            const paymentsRef = paymentsColRef(db, user.uid);
+            const q = query(paymentsRef, where('transactionId', '==', transactionId));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+              await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
+            }
+          } catch (error) {
+            console.error('Erreur mise à jour lien paiement:', error);
+          }
+          
+          toast({ 
+            title: "Redirection vers le paiement", 
+            description: "Vous allez être redirigé pour effectuer le paiement" 
+          });
+          
+          // Rediriger vers le paiement
+          window.location.href = link;
+          return; // Ne pas continuer avec la création de l'événement
+        } catch (error) {
+          console.error('Erreur création lien paiement:', error);
+          toast({ 
+            title: "Paiement indisponible", 
+            description: "Impossible de créer le lien de paiement. Réessayez dans quelques instants.", 
+            variant: "destructive" 
+          });
+          return;
+        }
       }
     }
 

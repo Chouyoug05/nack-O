@@ -1519,28 +1519,28 @@ const StockPage = () => {
 
                   {/* Stock Controls - Masqué pour les plats (nourriture) */}
                   {product.category?.toLowerCase() !== 'plats' && (
-                    <div className="flex items-center gap-4">
-                      <div className="flex flex-1 flex-col gap-2">
-                        {/* Progress Bar */}
-                        <div className="h-2 rounded-full bg-[#e6dfdb]">
-                          <div
-                            className="h-2 rounded-full transition-all"
-                            style={{
-                              width: `${stockPercentage}%`,
-                              backgroundColor: stockColor,
-                            }}
-                          />
-                        </div>
-                        {/* Quantity */}
-                        <p
-                          className="text-right text-lg font-bold"
+                  <div className="flex items-center gap-4">
+                    <div className="flex flex-1 flex-col gap-2">
+                      {/* Progress Bar */}
+                      <div className="h-2 rounded-full bg-[#e6dfdb]">
+                        <div
+                          className="h-2 rounded-full transition-all"
                           style={{
-                            color: isLowStock ? stockColor : "#181411",
+                            width: `${stockPercentage}%`,
+                            backgroundColor: stockColor,
                           }}
-                        >
-                          {product.quantity}
-                        </p>
+                        />
                       </div>
+                      {/* Quantity */}
+                      <p
+                        className="text-right text-lg font-bold"
+                        style={{
+                          color: isLowStock ? stockColor : "#181411",
+                        }}
+                      >
+                        {product.quantity}
+                      </p>
+                    </div>
 
                       {/* Bouton + pour ajouter le nombre d'articles sur un produit */}
                       <button
@@ -1566,7 +1566,7 @@ const StockPage = () => {
                       <Badge className="bg-green-500 text-white px-3 py-1">
                         Disponible
                       </Badge>
-                    </div>
+                  </div>
                   )}
                 </div>
               );

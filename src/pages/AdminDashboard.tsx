@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef } from "@/lib/collections";
@@ -22,8 +22,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2 } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { SUBSCRIPTION_PLANS, type SubscriptionFeatures } from "@/utils/subscription";
 
 interface NotificationForm {
   title: string;
@@ -36,6 +40,7 @@ const AdminDashboard = () => {
   const { isAdmin, isAdminLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [allProfiles, setAllProfiles] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "trial" | "active" | "expired">("all");
@@ -61,6 +66,33 @@ const AdminDashboard = () => {
   const [deletingUid, setDeletingUid] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<{ uid: string; name: string } | null>(null);
+  
+  // Initialiser activeView depuis l'URL ou par défaut "menu"
+  const viewParam = searchParams.get('view');
+  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications'].includes(viewParam)) 
+    ? viewParam as typeof activeView 
+    : 'menu';
+  const [activeView, setActiveView] = useState<"menu" | "users" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications">(initialView);
+  const [isSendingNotifications, setIsSendingNotifications] = useState(false);
+  const [subscriptionPlans, setSubscriptionPlans] = useState(SUBSCRIPTION_PLANS);
+  const [editingPlan, setEditingPlan] = useState<"transition" | "transition-pro-max" | null>(null);
+  const [planFeatures, setPlanFeatures] = useState<SubscriptionFeatures>({
+    products: true,
+    sales: true,
+    stock: true,
+    reports: true,
+    team: false,
+    barConnectee: false,
+    events: false,
+  });
+
+  // Mettre à jour activeView quand l'URL change
+  useEffect(() => {
+    const viewParam = searchParams.get('view');
+    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications'].includes(viewParam)) {
+      setActiveView(viewParam as typeof activeView);
+    }
+  }, [searchParams]);
 
   // Si pas admin, rediriger (sécurité supplémentaire)
   useEffect(() => {
@@ -207,13 +239,36 @@ const AdminDashboard = () => {
 
   const stats = useMemo(() => {
     const total = allProfiles.length;
-    const active = allProfiles.filter(p => (p.plan === "active") && (typeof p.subscriptionEndsAt === 'number' ? p.subscriptionEndsAt > now : true)).length;
+    const active = allProfiles.filter(p => {
+      if (p.plan !== "active") return false;
+      if (typeof p.subscriptionEndsAt === 'number' && p.subscriptionEndsAt <= now) return false;
+      // Seulement compter les abonnements de 30 jours pour les revenus
+      if (p.subscriptionEndsAt && typeof p.subscriptionEndsAt === 'number') {
+        const daysRemaining = (p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
+        // Compter seulement si c'est exactement 30 jours (ou proche, avec une marge de 1 jour)
+        return daysRemaining >= 29 && daysRemaining <= 31;
+      }
+      return true;
+    }).length;
     const trial = allProfiles.filter(p => (p.plan || "trial") === "trial").length;
     const expired = total - active - trial;
-    const price = Number(import.meta.env.VITE_SUB_PRICE_XAF || 5000);
-    const monthly = active * price;
-    return { total, active, trial, expired, price, monthly };
-  }, [allProfiles, now]);
+    
+    // Calculer les revenus basés sur les abonnements actifs de 30 jours
+    let monthlyRevenue = 0;
+    allProfiles.forEach(p => {
+      if (p.plan === "active" && p.subscriptionEndsAt && typeof p.subscriptionEndsAt === 'number' && p.subscriptionEndsAt > now) {
+        const daysRemaining = (p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
+        // Seulement si c'est un abonnement de 30 jours
+        if (daysRemaining >= 29 && daysRemaining <= 31) {
+          const planType = p.subscriptionType || 'transition';
+          const planPrice = subscriptionPlans[planType]?.price || 2500;
+          monthlyRevenue += planPrice;
+        }
+      }
+    });
+    
+    return { total, active, trial, expired, monthly: monthlyRevenue };
+  }, [allProfiles, now, subscriptionPlans]);
 
   const toggleSelect = (uid: string) => {
     setSelectedUids(prev => {
@@ -249,52 +304,84 @@ const AdminDashboard = () => {
       return;
     }
 
+    setIsSendingNotifications(true);
     const createdAt = Date.now();
     let successCount = 0;
     let errorCount = 0;
+    const errors: string[] = [];
 
-    for (const uid of uids) {
-      try {
-        await addDoc(notificationsColRef(db, uid), {
-          title: notif.title,
-          message: notif.message,
-          type: notif.type,
-          createdAt,
-          read: false,
-        });
-        successCount++;
-      } catch (error) {
-        console.error(`Erreur envoi notification à ${uid}:`, error);
-        errorCount++;
+    try {
+      for (const uid of uids) {
+        try {
+          const notificationRef = notificationsColRef(db, uid);
+          await addDoc(notificationRef, {
+            title: notif.title.trim(),
+            message: notif.message.trim(),
+            type: notif.type,
+            createdAt,
+            read: false,
+          });
+          successCount++;
+        } catch (error: unknown) {
+          console.error(`Erreur envoi notification à ${uid}:`, error);
+          errorCount++;
+          const message = error instanceof Error ? error.message : 'Erreur inconnue';
+          errors.push(`UID ${uid}: ${message}`);
+        }
       }
-    }
 
-    if (successCount > 0) {
-      toast({ 
-        title: "Notifications envoyées", 
-        description: `${successCount} notification${successCount > 1 ? 's' : ''} envoyée${successCount > 1 ? 's' : ''}${errorCount > 0 ? `, ${errorCount} erreur${errorCount > 1 ? 's' : ''}` : ''}` 
-      });
-    setNotif(prev => ({ ...prev, title: "", message: "" }));
-    } else {
+      if (successCount > 0) {
+        toast({ 
+          title: "Notifications envoyées", 
+          description: `${successCount} notification${successCount > 1 ? 's' : ''} envoyée${successCount > 1 ? 's' : ''}${errorCount > 0 ? `, ${errorCount} erreur${errorCount > 1 ? 's' : ''}` : ''}` 
+        });
+        setNotif(prev => ({ ...prev, title: "", message: "" }));
+      } else {
+        toast({ 
+          title: "Erreur", 
+          description: `Aucune notification n'a pu être envoyée. Erreurs: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`, 
+          variant: "destructive" 
+        });
+      }
+    } catch (error: unknown) {
+      console.error('Erreur générale envoi notifications:', error);
+      const message = error instanceof Error ? error.message : 'Erreur inconnue';
       toast({ 
         title: "Erreur", 
-        description: "Aucune notification n'a pu être envoyée", 
+        description: `Erreur lors de l'envoi: ${message}`, 
         variant: "destructive" 
       });
+    } finally {
+      setIsSendingNotifications(false);
     }
   };
 
-  const activateForDays = async (uid: string, days: number) => {
+  const activateForDays = async (uid: string, days: number, subscriptionType: 'transition' | 'transition-pro-max' = 'transition') => {
     const ms = Math.max(1, days) * 24 * 60 * 60 * 1000;
     const until = Date.now() + ms;
     try {
-      await updateDoc(doc(db, "profiles", uid), {
+      const updateData: {
+        plan: 'active';
+        subscriptionEndsAt: number;
+        subscriptionType: 'transition' | 'transition-pro-max';
+        updatedAt: number;
+        lastPaymentAt?: number;
+      } = {
         plan: 'active',
         subscriptionEndsAt: until,
+        subscriptionType,
         updatedAt: Date.now(),
-      });
-      toast({ title: "Succès", description: `Abonnement activé pour ${days} jours` });
+      };
+      
+      // Si c'est un abonnement de 30 jours, enregistrer le paiement pour les revenus
+      if (days === 30) {
+        updateData.lastPaymentAt = Date.now();
+      }
+      
+      await updateDoc(doc(db, "profiles", uid), updateData);
+      toast({ title: "Succès", description: `Abonnement ${subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'} activé pour ${days} jours` });
     } catch (error) {
+      console.error('Erreur activation abonnement:', error);
       toast({ title: "Erreur", description: "Impossible d'activer l'abonnement", variant: "destructive" });
     }
   };
@@ -318,16 +405,29 @@ const AdminDashboard = () => {
     const newDaysRemaining = (newEndDate - now) / oneDayMs;
 
     try {
-      await updateDoc(doc(db, "profiles", profile.uid), {
+      const updateData: {
+        subscriptionEndsAt: number;
+        plan: 'active';
+        updatedAt: number;
+        lastPaymentAt?: number;
+      } = {
         subscriptionEndsAt: newEndDate,
         plan: 'active',
         updatedAt: now,
-      });
+      };
+      
+      // Si on ajoute exactement 30 jours et que le total fait 30 jours, enregistrer le paiement
+      if (days === 30 && newDaysRemaining >= 29 && newDaysRemaining <= 31) {
+        updateData.lastPaymentAt = now;
+      }
+      
+      await updateDoc(doc(db, "profiles", profile.uid), updateData);
       toast({ 
         title: "Abonnement prolongé", 
         description: `${email}: +${days} jour(s) ajouté(s). Nouveaux jours restants: ${Math.floor(newDaysRemaining)}` 
       });
     } catch (error) {
+      console.error('Erreur prolongation abonnement:', error);
       toast({ title: "Erreur", description: "Impossible de prolonger l'abonnement", variant: "destructive" });
     }
   };
@@ -468,6 +568,31 @@ const AdminDashboard = () => {
     }
   };
 
+  const saveSubscriptionPlan = () => {
+    if (!editingPlan) return;
+    
+    const updatedPlans = { ...subscriptionPlans };
+    if (editingPlan === 'transition') {
+      updatedPlans.transition = {
+        ...updatedPlans.transition,
+        features: { ...planFeatures },
+      };
+    } else if (editingPlan === 'transition-pro-max') {
+      updatedPlans['transition-pro-max'] = {
+        ...updatedPlans['transition-pro-max'],
+        features: { ...planFeatures },
+      };
+    }
+    setSubscriptionPlans(updatedPlans);
+    setEditingPlan(null);
+    toast({ title: "Succès", description: `Plan ${editingPlan} mis à jour` });
+  };
+
+  const openEditPlan = (planKey: "transition" | "transition-pro-max") => {
+    setEditingPlan(planKey);
+    setPlanFeatures({ ...subscriptionPlans[planKey].features });
+  };
+
   // Afficher un loader si en cours de vérification ou pas admin
   if (isAdminLoading || !isAdmin) {
     return (
@@ -480,441 +605,497 @@ const AdminDashboard = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen p-4 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Administration</h1>
-            <p className="text-sm text-muted-foreground">Gestion des utilisateurs, abonnements, notifications et promotions</p>
-          </div>
-        </div>
+  // Vue Menu Principal avec de gros boutons
+  const renderMenuView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold mb-2">Administration Nack</h1>
+        <p className="text-muted-foreground">Gestion complète de la plateforme</p>
+      </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Users size={16}/> Utilisateurs</CardTitle><CardDescription>Total inscrits</CardDescription></CardHeader>
-            <CardContent><div className="text-2xl font-bold">{stats.total}</div></CardContent>
-          </Card>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><CheckCircle size={16} className="text-green-600"/> Actifs</CardTitle><CardDescription>Abonnés en cours</CardDescription></CardHeader>
-            <CardContent><div className="text-2xl font-bold">{stats.active}</div></CardContent>
-          </Card>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><Clock size={16} className="text-amber-600"/> Essai</CardTitle><CardDescription>En période d'essai</CardDescription></CardHeader>
-            <CardContent><div className="text-2xl font-bold">{stats.trial}</div></CardContent>
-          </Card>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2"><CardTitle className="text-sm flex items-center gap-2"><AlertCircle size={16} className="text-red-600"/> Expirés</CardTitle><CardDescription>Abonnements expirés</CardDescription></CardHeader>
-            <CardContent><div className="text-2xl font-bold">{stats.expired}</div></CardContent>
-          </Card>
-        </div>
-
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Package size={16} className="text-blue-600"/> Produits
-              </CardTitle>
-              <CardDescription>Total produits</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoadingGlobalStats ? "..." : globalStats.totalProducts.toLocaleString()}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <ShoppingCart size={16} className="text-purple-600"/> Commandes
-              </CardTitle>
-              <CardDescription>Total commandes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoadingGlobalStats ? "..." : (globalStats.totalOrders + globalStats.totalBarOrders).toLocaleString()}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {globalStats.totalOrders} normales + {globalStats.totalBarOrders} QR
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Calendar size={16} className="text-orange-600"/> Événements
-              </CardTitle>
-              <CardDescription>Total événements</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoadingGlobalStats ? "..." : globalStats.totalEvents.toLocaleString()}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-0 shadow-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Star size={16} className="text-yellow-600"/> Appréciations
-              </CardTitle>
-              <CardDescription>Notes moyennes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoadingGlobalStats ? "..." : globalStats.avgRating > 0 ? globalStats.avgRating.toFixed(1) : "0.0"}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                {globalStats.totalRatings} avis
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+      {/* Statistiques principales */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Revenus estimés</CardTitle>
-            <CardDescription>Basé sur les abonnements actifs × prix mensuel</CardDescription>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users size={16} className="text-blue-600"/> Utilisateurs
+            </CardTitle>
+            <CardDescription>Total inscrits</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <Badge variant="secondary">Prix: {stats.price.toLocaleString()} XAF</Badge>
-              <Badge variant="default">Actifs: {stats.active}</Badge>
-              <div className="text-xl font-semibold ml-auto">≈ {stats.monthly.toLocaleString()} XAF/mois</div>
+            <div className="text-3xl font-bold">{stats.total}</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {stats.active} actifs • {stats.trial} essais • {stats.expired} expirés
             </div>
           </CardContent>
         </Card>
-
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2"><Bell size={18}/> Notifications</CardTitle>
-            <CardDescription>Envoyer un message à tous, aux filtrés ou aux sélectionnés</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-              <Input placeholder="Titre" value={notif.title} onChange={e => setNotif({ ...notif, title: e.target.value })} />
-              <Select value={notif.type} onValueChange={(v) => setNotif({ ...notif, type: v as NotificationForm["type"] })}>
-                <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="info">Info</SelectItem>
-                  <SelectItem value="success">Succès</SelectItem>
-                  <SelectItem value="warning">Avertissement</SelectItem>
-                  <SelectItem value="error">Erreur</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={notif.target} onValueChange={(v) => setNotif({ ...notif, target: v as NotificationForm["target"] })}>
-                <SelectTrigger><SelectValue placeholder="Cible" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  <SelectItem value="filtered">Filtrés</SelectItem>
-                  <SelectItem value="selected">Sélectionnés</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button onClick={sendNotifications} className="w-full">Envoyer</Button>
-            </div>
-            <Input placeholder="Message" value={notif.message} onChange={e => setNotif({ ...notif, message: e.target.value })} />
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-card">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg">Utilisateurs</CardTitle>
-            <CardDescription>Rechercher, filtrer, sélectionner et activer gratuitement</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-2 items-center">
-              <div className="relative">
-                <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input className="pl-7 w-64" placeholder="Rechercher (nom, email, établissement)" value={search} onChange={(e) => setSearch(e.target.value)} />
-              </div>
-              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
-                <SelectTrigger className="w-40"><SelectValue placeholder="Statut" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous</SelectItem>
-                  <SelectItem value="active">Actifs</SelectItem>
-                  <SelectItem value="trial">Essai</SelectItem>
-                  <SelectItem value="expired">Expirés</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="ml-auto flex items-center gap-2 flex-wrap">
-                <Input 
-                  type="text" 
-                  className="w-48" 
-                  placeholder="Rechercher par email..." 
-                  onChange={e => {
-                    const email = e.target.value.trim();
-                    if (email) {
-                      const found = allProfiles.find(p => p.email?.toLowerCase() === email.toLowerCase());
-                      if (found) {
-                        setSearch(found.email || found.ownerName || '');
-                        setStatusFilter('all');
-                      }
-                    }
-                  }}
-                />
-                <Input type="number" className="w-28" min={1} value={activationDays} onChange={e => setActivationDays(Number(e.target.value || 0))} />
-                <Button 
-                  variant="destructive" 
-                  onClick={fixAllAbnormalSubscriptions}
-                  disabled={isFixingAbnormal || isFixingPastDates}
-                  title="Corriger tous les abonnements avec plus de 30 jours"
-                >
-                  <Wrench size={16} className="mr-2"/>
-                  {isFixingAbnormal ? "Correction..." : "Corriger tous les anormaux"}
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  onClick={fixAllPastSubscriptionDates}
-                  disabled={isFixingAbnormal || isFixingPastDates}
-                  title="Corriger toutes les dates d'abonnement en 2024"
-                >
-                  <Wrench size={16} className="mr-2"/>
-                  {isFixingPastDates ? "Correction..." : "Corriger dates 2024"}
-                </Button>
-                <Button variant="outline" onClick={async () => {
-                  const uids = Array.from(selectedUids);
-                  for (const uid of uids) await activateForDays(uid, activationDays);
-                }}><Gift size={16} className="mr-2"/>Activer {activationDays} j</Button>
-              </div>
-              
-              {/* Prolonger abonnement par email */}
-              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h3 className="text-sm font-semibold text-blue-900 mb-3">Prolonger l'abonnement d'un utilisateur</h3>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Input
-                    type="email"
-                    placeholder="Email de l'utilisateur"
-                    value={extendEmail}
-                    onChange={(e) => setExtendEmail(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Jours"
-                    value={extendDays}
-                    onChange={(e) => setExtendDays(Number(e.target.value) || 1)}
-                    min={1}
-                    className="w-24"
-                  />
-                  <Button 
-                    onClick={() => {
-                      if (extendEmail.trim()) {
-                        extendSubscriptionByEmail(extendEmail.trim(), extendDays);
-                        setExtendEmail("");
-                      } else {
-                        toast({ title: "Erreur", description: "Veuillez saisir un email", variant: "destructive" });
-                      }
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    <Gift size={16} className="mr-2"/>
-                    Prolonger de {extendDays} jour(s)
-                  </Button>
-                  <Button 
-                    onClick={async () => {
-                      try {
-                        await extendSubscriptionByEmail("sericsackerkoumba@gmail.com", 1);
-                      } catch (error) {
-                        console.error('Erreur:', error);
-                      }
-                    }}
-                    variant="outline"
-                    className="border-green-500 text-green-600 hover:bg-green-50"
-                    title="Ajouter 1 jour à sericsackerkoumba@gmail.com"
-                  >
-                    <Gift size={16} className="mr-2"/>
-                    +1j sericsackerkoumba@gmail.com
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            <div className="border rounded-md overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead>Utilisateur</TableHead>
-                    <TableHead>Établissement</TableHead>
-                    <TableHead>Plan</TableHead>
-                    <TableHead>Fin d'abonnement</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((p) => {
-                    const isExpired = (p.plan === 'expired') || (typeof p.subscriptionEndsAt === 'number' ? p.subscriptionEndsAt < now : false);
-                    const status = p.plan === 'active' && !isExpired ? 'active' : p.plan === 'trial' ? 'trial' : 'expired';
-                    return (
-                      <TableRow key={p.uid}>
-                        <TableCell>
-                          <input type="checkbox" checked={selectedUids.has(p.uid)} onChange={() => toggleSelect(p.uid)} />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{p.ownerName || p.email}</span>
-                            <span className="text-xs text-muted-foreground">{p.email}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>{p.establishmentName || "—"}</TableCell>
-                        <TableCell>
-                          {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
-                          {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
-                          {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
-                        </TableCell>
-                        <TableCell>
-                          {p.subscriptionEndsAt ? (
-                            <div className="flex flex-col">
-                              <span>{new Date(p.subscriptionEndsAt).toLocaleDateString()}</span>
-                              {p.plan === 'active' && p.subscriptionEndsAt > now && (
-                                <span className={`text-xs ${((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>
-                                  {Math.floor((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000))} jours restants
-                                  {((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 && (
-                                    <span className="ml-1 text-red-500">⚠️ Anormal</span>
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          ) : "—"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end flex-wrap">
-                            {p.plan === 'active' && p.subscriptionEndsAt && p.subscriptionEndsAt > now && 
-                             ((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000)) > 30 && (
-                              <Button 
-                                size="sm" 
-                                variant="destructive" 
-                                onClick={() => fixAbnormalSubscription(p.uid)}
-                                title="Corriger l'abonnement anormal"
-                              >
-                                <Wrench size={14} className="mr-1"/> Corriger
-                              </Button>
-                            )}
-                            <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays)}>
-                              <Gift size={14} className="mr-2"/> Activer {activationDays} j
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => navigate(`/admin/client/${p.uid}`)}
-                              title="Voir les détails du client"
-                            >
-                              <Eye size={14} className="mr-2"/> Voir
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
-                              onClick={() => handleDeleteClient(p.uid, p.establishmentName || p.ownerName || p.email || 'Client')}
-                              disabled={deletingUid === p.uid}
-                              title="Supprimer le client"
-                            >
-                              {deletingUid === p.uid ? (
-                                <>...</>
-                              ) : (
-                                <>
-                                  <Trash2 size={14} className="mr-2"/> Supprimer
-                                </>
-                              )}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-card">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <CreditCard size={18}/> Liste des paiements
-                </CardTitle>
-                <CardDescription>Tous les paiements d'abonnement complétés</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={loadAllPayments} disabled={isLoadingPayments}>
-                {isLoadingPayments ? "Chargement..." : "Actualiser"}
-              </Button>
-            </div>
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Package size={16} className="text-purple-600"/> Produits
+            </CardTitle>
+            <CardDescription>Total produits</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoadingPayments ? (
-              <div className="text-center py-8 text-muted-foreground">Chargement des paiements...</div>
-            ) : allPayments.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">Aucun paiement trouvé</div>
-            ) : (
-              <div className="border rounded-md overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Utilisateur</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Montant</TableHead>
-                      <TableHead>Méthode</TableHead>
-                      <TableHead>Date de paiement</TableHead>
-                      <TableHead>Transaction ID</TableHead>
-                      <TableHead>Référence</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {allPayments.map((payment) => (
-                      <TableRow key={`${payment.userId}-${payment.id}`}>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{payment.userName || payment.userEmail || payment.userId}</span>
-                            {payment.userEmail && payment.userName && (
-                              <span className="text-xs text-muted-foreground">{payment.userEmail}</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">
-                            {payment.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-semibold">{payment.amount?.toLocaleString() || 'N/A'} XAF</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {payment.paymentMethod === 'airtel-money' ? 'Airtel Money' : 
-                             payment.paymentMethod === 'moov-money' ? 'Moov Money' : 
-                             payment.paymentMethod || 'Autre'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {payment.paidAt ? new Date(payment.paidAt).toLocaleString('fr-FR') : 
-                           payment.createdAt ? new Date(payment.createdAt).toLocaleString('fr-FR') : 
-                           'N/A'}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {payment.transactionId || 'N/A'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-xs text-muted-foreground">
-                            {payment.reference || 'N/A'}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-            {allPayments.length > 0 && (
-              <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-                <span>Total: {allPayments.length} paiement(s)</span>
-                <span>
-                  Total montant: {allPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} XAF
-                </span>
-              </div>
-            )}
+            <div className="text-3xl font-bold">
+              {isLoadingGlobalStats ? "..." : globalStats.totalProducts.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <ShoppingCart size={16} className="text-green-600"/> Commandes
+            </CardTitle>
+            <CardDescription>Total commandes</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {isLoadingGlobalStats ? "..." : (globalStats.totalOrders + globalStats.totalBarOrders).toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Star size={16} className="text-yellow-600"/> Appréciations
+            </CardTitle>
+            <CardDescription>Note moyenne</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {isLoadingGlobalStats ? "..." : globalStats.avgRating > 0 ? globalStats.avgRating.toFixed(1) : "0.0"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {globalStats.totalRatings} avis
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Boutons principaux */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
+        <button
+          onClick={() => navigate('/admin?view=users')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Users size={48} className="text-blue-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Utilisateurs</h2>
+          <p className="text-sm text-muted-foreground">{stats.total} total</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=products')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Package size={48} className="text-purple-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Produits</h2>
+          <p className="text-sm text-muted-foreground">{globalStats.totalProducts} total</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=orders')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <ShoppingCart size={48} className="text-green-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Commandes</h2>
+          <p className="text-sm text-muted-foreground">{(globalStats.totalOrders + globalStats.totalBarOrders).toLocaleString()} total</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=events')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Calendar size={48} className="text-orange-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Événements</h2>
+          <p className="text-sm text-muted-foreground">{globalStats.totalEvents} total</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=ratings')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Star size={48} className="text-yellow-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Appréciations</h2>
+          <p className="text-sm text-muted-foreground">{globalStats.totalRatings} avis</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=subscriptions')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <CreditCard size={48} className="text-indigo-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Abonnements</h2>
+          <p className="text-sm text-muted-foreground">2 plans</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=notifications')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Bell size={48} className="text-red-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
+          <p className="text-sm text-muted-foreground">Envoyer</p>
+        </button>
+      </div>
+
+      {/* Revenus estimés */}
+      <Card className="border-0 shadow-card mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp size={20} className="text-green-600"/> Revenus estimés
+          </CardTitle>
+          <CardDescription>Basé sur les abonnements actifs de 30 jours</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-3xl font-bold text-green-600">
+            ≈ {stats.monthly.toLocaleString()} XAF/mois
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Vue Utilisateurs
+  const renderUsersView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Utilisateurs</h1>
+          <p className="text-sm text-muted-foreground">Gérer les utilisateurs et leurs abonnements</p>
+        </div>
+      </div>
+      
+      <Card className="border-0 shadow-card">
+        <CardHeader>
+          <CardTitle>Utilisateurs</CardTitle>
+          <CardDescription>Rechercher, filtrer, sélectionner et activer gratuitement</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="relative">
+              <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <Input className="pl-7 w-64" placeholder="Rechercher (nom, email, établissement)" value={search} onChange={(e) => setSearch(e.target.value)} />
+            </div>
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as typeof statusFilter)}>
+              <SelectTrigger className="w-40"><SelectValue placeholder="Statut" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous</SelectItem>
+                <SelectItem value="active">Actifs</SelectItem>
+                <SelectItem value="trial">Essai</SelectItem>
+                <SelectItem value="expired">Expirés</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="ml-auto flex items-center gap-2 flex-wrap">
+              <Input type="number" className="w-28" min={1} value={activationDays} onChange={e => setActivationDays(Number(e.target.value || 0))} />
+              <Button variant="outline" onClick={async () => {
+                const uids = Array.from(selectedUids);
+                for (const uid of uids) await activateForDays(uid, activationDays);
+              }}><Gift size={16} className="mr-2"/>Activer {activationDays} j</Button>
+            </div>
+          </div>
+
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead>Utilisateur</TableHead>
+                  <TableHead>Établissement</TableHead>
+                  <TableHead>Plan</TableHead>
+                  <TableHead>Fin d'abonnement</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((p) => {
+                  const isExpired = (p.plan === 'expired') || (typeof p.subscriptionEndsAt === 'number' ? p.subscriptionEndsAt < now : false);
+                  const status = p.plan === 'active' && !isExpired ? 'active' : p.plan === 'trial' ? 'trial' : 'expired';
+                  return (
+                    <TableRow key={p.uid}>
+                      <TableCell>
+                        <input type="checkbox" checked={selectedUids.has(p.uid)} onChange={() => toggleSelect(p.uid)} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{p.ownerName || p.email}</span>
+                          <span className="text-xs text-muted-foreground">{p.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{p.establishmentName || "—"}</TableCell>
+                      <TableCell>
+                        {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
+                        {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
+                        {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
+                      </TableCell>
+                      <TableCell>
+                        {p.subscriptionEndsAt ? (
+                          <div className="flex flex-col">
+                            <span>{new Date(p.subscriptionEndsAt).toLocaleDateString()}</span>
+                            {p.plan === 'active' && p.subscriptionEndsAt > now && (
+                              <span className="text-xs text-muted-foreground">
+                                {Math.floor((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000))} jours restants
+                              </span>
+                            )}
+                          </div>
+                        ) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end flex-wrap">
+                          <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays)}>
+                            <Gift size={14} className="mr-2"/> Activer {activationDays} j
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => navigate(`/admin/client/${p.uid}`)}
+                            title="Voir les détails du client"
+                          >
+                            <Eye size={14} className="mr-2"/> Voir
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={() => handleDeleteClient(p.uid, p.establishmentName || p.ownerName || p.email || 'Client')}
+                            disabled={deletingUid === p.uid}
+                            title="Supprimer le client"
+                          >
+                            {deletingUid === p.uid ? (
+                              <>...</>
+                            ) : (
+                              <>
+                                <Trash2 size={14} className="mr-2"/> Supprimer
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Vue Produits
+  const renderProductsView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Produits</h1>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des produits de tous les utilisateurs</p>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardContent className="p-8 text-center text-muted-foreground">
+          <Package size={48} className="mx-auto mb-4 opacity-50" />
+          <p>Vue des produits en cours de développement</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Vue Commandes
+  const renderOrdersView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Commandes</h1>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des commandes de tous les utilisateurs</p>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardContent className="p-8 text-center text-muted-foreground">
+          <ShoppingCart size={48} className="mx-auto mb-4 opacity-50" />
+          <p>Vue des commandes en cours de développement</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Vue Événements
+  const renderEventsView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Événements</h1>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des événements de tous les utilisateurs</p>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardContent className="p-8 text-center text-muted-foreground">
+          <Calendar size={48} className="mx-auto mb-4 opacity-50" />
+          <p>Vue des événements en cours de développement</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Vue Appréciations
+  const renderRatingsView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Appréciations</h1>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des appréciations de tous les utilisateurs</p>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardContent className="p-8 text-center text-muted-foreground">
+          <Star size={48} className="mx-auto mb-4 opacity-50" />
+          <p>Vue des appréciations en cours de développement</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Vue Abonnements
+  const renderSubscriptionsView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Abonnements</h1>
+          <p className="text-sm text-muted-foreground">Gérer les plans d'abonnement</p>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardHeader>
+          <CardTitle>Plans d'abonnement</CardTitle>
+          <CardDescription>Modifier les fonctionnalités des plans</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {Object.entries(subscriptionPlans).map(([key, plan]) => (
+            <Card key={key} className="border">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle>{plan.name}</CardTitle>
+                  <Badge>{plan.price.toLocaleString()} XAF/mois</Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {Object.entries(plan.features).map(([feature, enabled]) => (
+                    <div key={feature} className="flex items-center gap-2">
+                      <Checkbox checked={enabled} disabled />
+                      <Label>{feature}</Label>
+                    </div>
+                  ))}
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => openEditPlan(key as "transition" | "transition-pro-max")}
+                >
+                  <Settings size={16} className="mr-2" />
+                  Modifier
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </CardContent>
+      </Card>
+
+      {editingPlan && (
+        <Card className="border-0 shadow-card mt-4">
+          <CardHeader>
+            <CardTitle>Modifier {subscriptionPlans[editingPlan].name}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {Object.entries(planFeatures).map(([feature, enabled]) => (
+              <div key={feature} className="flex items-center gap-2">
+                <Checkbox 
+                  checked={enabled} 
+                  onCheckedChange={(checked) => 
+                    setPlanFeatures({ ...planFeatures, [feature]: checked as boolean })
+                  }
+                />
+                <Label>{feature}</Label>
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <Button onClick={saveSubscriptionPlan}>Enregistrer</Button>
+              <Button variant="outline" onClick={() => setEditingPlan(null)}>Annuler</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+
+  // Vue Notifications
+  const renderNotificationsView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Notifications</h1>
+          <p className="text-sm text-muted-foreground">Envoyer des notifications aux utilisateurs</p>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardHeader>
+          <CardTitle>Envoyer une notification</CardTitle>
+          <CardDescription>Envoyer un message à tous, aux filtrés ou aux sélectionnés</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+            <Input placeholder="Titre" value={notif.title} onChange={e => setNotif({ ...notif, title: e.target.value })} />
+            <Select value={notif.type} onValueChange={(v) => setNotif({ ...notif, type: v as NotificationForm["type"] })}>
+              <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="info">Info</SelectItem>
+                <SelectItem value="success">Succès</SelectItem>
+                <SelectItem value="warning">Avertissement</SelectItem>
+                <SelectItem value="error">Erreur</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={notif.target} onValueChange={(v) => setNotif({ ...notif, target: v as NotificationForm["target"] })}>
+              <SelectTrigger><SelectValue placeholder="Cible" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous</SelectItem>
+                <SelectItem value="filtered">Filtrés</SelectItem>
+                <SelectItem value="selected">Sélectionnés</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={sendNotifications} disabled={isSendingNotifications} className="w-full">
+              {isSendingNotifications ? "Envoi..." : "Envoyer"}
+            </Button>
+          </div>
+          <Input placeholder="Message" value={notif.message} onChange={e => setNotif({ ...notif, message: e.target.value })} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Rendu principal
+  return (
+    <div className="min-h-screen bg-gradient-secondary">
+      {activeView === "menu" && renderMenuView()}
+      {activeView === "users" && renderUsersView()}
+      {activeView === "products" && renderProductsView()}
+      {activeView === "orders" && renderOrdersView()}
+      {activeView === "events" && renderEventsView()}
+      {activeView === "ratings" && renderRatingsView()}
+      {activeView === "subscriptions" && renderSubscriptionsView()}
+      {activeView === "notifications" && renderNotificationsView()}
 
       {/* Dialog de confirmation de suppression */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
