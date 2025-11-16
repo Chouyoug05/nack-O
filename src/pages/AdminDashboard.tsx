@@ -67,6 +67,16 @@ const AdminDashboard = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<{ uid: string; name: string } | null>(null);
   
+  // États pour les données détaillées
+  const [allProducts, setAllProducts] = useState<Array<{ id: string; name: string; category: string; price: number; quantity: number; userId: string; userName?: string; establishmentName?: string }>>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [allOrders, setAllOrders] = useState<Array<{ id: string; orderNumber: number; tableNumber: string; total: number; status: string; createdAt: number; userId: string; userName?: string; establishmentName?: string }>>([]);
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [allEvents, setAllEvents] = useState<Array<{ id: string; title: string; date: string; time: string; location: string; maxCapacity: number; ticketPrice: number; ticketsSold: number; userId: string; userName?: string; establishmentName?: string }>>([]);
+  const [isLoadingEvents, setIsLoadingEvents] = useState(false);
+  const [allRatings, setAllRatings] = useState<Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }>>([]);
+  const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+  
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
   const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications'].includes(viewParam)) 
@@ -217,12 +227,199 @@ const AdminDashboard = () => {
     }
   }, [allProfiles]);
 
+  const loadAllProducts = useCallback(async () => {
+    setIsLoadingProducts(true);
+    try {
+      const products: Array<{ id: string; name: string; category: string; price: number; quantity: number; userId: string; userName?: string; establishmentName?: string }> = [];
+      
+      for (const profile of allProfiles) {
+        try {
+          const productsRef = productsColRef(db, profile.uid);
+          const productsSnap = await getDocs(productsRef);
+          
+          productsSnap.forEach(doc => {
+            const data = doc.data();
+            products.push({
+              id: doc.id,
+              name: data.name || '',
+              category: data.category || '',
+              price: Number(data.price || 0),
+              quantity: Number(data.quantity || 0),
+              userId: profile.uid,
+              userName: profile.ownerName,
+              establishmentName: profile.establishmentName,
+            });
+          });
+        } catch (error) {
+          console.error(`Erreur chargement produits pour ${profile.uid}:`, error);
+        }
+      }
+      
+      setAllProducts(products);
+    } catch (error) {
+      console.error('Erreur chargement produits:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les produits", variant: "destructive" });
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, [allProfiles, toast]);
+
+  const loadAllOrders = useCallback(async () => {
+    setIsLoadingOrders(true);
+    try {
+      const orders: Array<{ id: string; orderNumber: number; tableNumber: string; total: number; status: string; createdAt: number; userId: string; userName?: string; establishmentName?: string }> = [];
+      
+      for (const profile of allProfiles) {
+        try {
+          // Commandes normales
+          const ordersRef = ordersColRef(db, profile.uid);
+          const ordersSnap = await getDocs(ordersRef);
+          
+          ordersSnap.forEach(doc => {
+            const data = doc.data();
+            orders.push({
+              id: doc.id,
+              orderNumber: data.orderNumber || 0,
+              tableNumber: data.tableNumber || '',
+              total: Number(data.total || 0),
+              status: data.status || 'pending',
+              createdAt: data.createdAt || Date.now(),
+              userId: profile.uid,
+              userName: profile.ownerName,
+              establishmentName: profile.establishmentName,
+            });
+          });
+
+          // Commandes Bar Connectée
+          const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
+          const barOrdersSnap = await getDocs(barOrdersRef);
+          
+          barOrdersSnap.forEach(doc => {
+            const data = doc.data();
+            orders.push({
+              id: doc.id,
+              orderNumber: data.orderNumber || 0,
+              tableNumber: data.tableNumber || data.tableName || '',
+              total: Number(data.total || 0),
+              status: data.status || 'pending',
+              createdAt: data.createdAt || Date.now(),
+              userId: profile.uid,
+              userName: profile.ownerName,
+              establishmentName: profile.establishmentName,
+            });
+          });
+        } catch (error) {
+          console.error(`Erreur chargement commandes pour ${profile.uid}:`, error);
+        }
+      }
+      
+      // Trier par date (plus récent en premier)
+      orders.sort((a, b) => b.createdAt - a.createdAt);
+      setAllOrders(orders);
+    } catch (error) {
+      console.error('Erreur chargement commandes:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les commandes", variant: "destructive" });
+    } finally {
+      setIsLoadingOrders(false);
+    }
+  }, [allProfiles, toast]);
+
+  const loadAllEvents = useCallback(async () => {
+    setIsLoadingEvents(true);
+    try {
+      const events: Array<{ id: string; title: string; date: string; time: string; location: string; maxCapacity: number; ticketPrice: number; ticketsSold: number; userId: string; userName?: string; establishmentName?: string }> = [];
+      
+      for (const profile of allProfiles) {
+        try {
+          const eventsRef = eventsColRef(db, profile.uid);
+          const eventsSnap = await getDocs(eventsRef);
+          
+          eventsSnap.forEach(doc => {
+            const data = doc.data();
+            events.push({
+              id: doc.id,
+              title: data.title || '',
+              date: data.date || '',
+              time: data.time || '',
+              location: data.location || '',
+              maxCapacity: Number(data.maxCapacity || 0),
+              ticketPrice: Number(data.ticketPrice || 0),
+              ticketsSold: Number(data.ticketsSold || 0),
+              userId: profile.uid,
+              userName: profile.ownerName,
+              establishmentName: profile.establishmentName,
+            });
+          });
+        } catch (error) {
+          console.error(`Erreur chargement événements pour ${profile.uid}:`, error);
+        }
+      }
+      
+      // Trier par date (plus récent en premier)
+      events.sort((a, b) => {
+        const dateA = new Date(a.date + ' ' + a.time).getTime();
+        const dateB = new Date(b.date + ' ' + b.time).getTime();
+        return dateB - dateA;
+      });
+      setAllEvents(events);
+    } catch (error) {
+      console.error('Erreur chargement événements:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les événements", variant: "destructive" });
+    } finally {
+      setIsLoadingEvents(false);
+    }
+  }, [allProfiles, toast]);
+
+  const loadAllRatings = useCallback(async () => {
+    setIsLoadingRatings(true);
+    try {
+      const ratings: Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }> = [];
+      
+      for (const profile of allProfiles) {
+        try {
+          const productsRef = productsColRef(db, profile.uid);
+          const productsSnap = await getDocs(productsRef);
+          
+          productsSnap.forEach(doc => {
+            const data = doc.data();
+            if (data.ratingCount && data.ratingCount > 0) {
+              ratings.push({
+                productId: doc.id,
+                productName: data.name || '',
+                rating: Number(data.rating || 0),
+                ratingCount: Number(data.ratingCount || 0),
+                userId: profile.uid,
+                userName: profile.ownerName,
+                establishmentName: profile.establishmentName,
+              });
+            }
+          });
+        } catch (error) {
+          console.error(`Erreur chargement appréciations pour ${profile.uid}:`, error);
+        }
+      }
+      
+      // Trier par nombre d'avis (plus d'avis en premier)
+      ratings.sort((a, b) => b.ratingCount - a.ratingCount);
+      setAllRatings(ratings);
+    } catch (error) {
+      console.error('Erreur chargement appréciations:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les appréciations", variant: "destructive" });
+    } finally {
+      setIsLoadingRatings(false);
+    }
+  }, [allProfiles, toast]);
+
   useEffect(() => {
     if (isAdmin && allProfiles.length > 0) {
       loadAllPayments();
       loadGlobalStats();
+      loadAllProducts();
+      loadAllOrders();
+      loadAllEvents();
+      loadAllRatings();
     }
-  }, [isAdmin, allProfiles.length, loadAllPayments, loadGlobalStats]);
+  }, [isAdmin, allProfiles.length, loadAllPayments, loadGlobalStats, loadAllProducts, loadAllOrders, loadAllEvents, loadAllRatings]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
@@ -887,13 +1084,53 @@ const AdminDashboard = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Produits</h1>
-          <p className="text-sm text-muted-foreground">Vue d'ensemble des produits de tous les utilisateurs</p>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des produits de tous les utilisateurs ({allProducts.length} total)</p>
+        </div>
+        <div className="ml-auto">
+          <Button variant="outline" size="sm" onClick={loadAllProducts} disabled={isLoadingProducts}>
+            {isLoadingProducts ? "Chargement..." : "Actualiser"}
+          </Button>
         </div>
       </div>
       <Card className="border-0 shadow-card">
-        <CardContent className="p-8 text-center text-muted-foreground">
-          <Package size={48} className="mx-auto mb-4 opacity-50" />
-          <p>Vue des produits en cours de développement</p>
+        <CardContent>
+          {isLoadingProducts ? (
+            <div className="text-center py-8 text-muted-foreground">Chargement des produits...</div>
+          ) : allProducts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Aucun produit trouvé</div>
+          ) : (
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produit</TableHead>
+                    <TableHead>Catégorie</TableHead>
+                    <TableHead>Prix</TableHead>
+                    <TableHead>Quantité</TableHead>
+                    <TableHead>Établissement</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allProducts.map((product) => (
+                    <TableRow key={`${product.userId}-${product.id}`}>
+                      <TableCell className="font-medium">{product.name}</TableCell>
+                      <TableCell><Badge variant="secondary">{product.category}</Badge></TableCell>
+                      <TableCell>{product.price.toLocaleString()} XAF</TableCell>
+                      <TableCell>{product.quantity}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{product.establishmentName || product.userName || 'N/A'}</span>
+                          {product.userName && product.establishmentName && (
+                            <span className="text-xs text-muted-foreground">{product.userName}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -908,13 +1145,60 @@ const AdminDashboard = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Commandes</h1>
-          <p className="text-sm text-muted-foreground">Vue d'ensemble des commandes de tous les utilisateurs</p>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des commandes de tous les utilisateurs ({allOrders.length} total)</p>
+        </div>
+        <div className="ml-auto">
+          <Button variant="outline" size="sm" onClick={loadAllOrders} disabled={isLoadingOrders}>
+            {isLoadingOrders ? "Chargement..." : "Actualiser"}
+          </Button>
         </div>
       </div>
       <Card className="border-0 shadow-card">
-        <CardContent className="p-8 text-center text-muted-foreground">
-          <ShoppingCart size={48} className="mx-auto mb-4 opacity-50" />
-          <p>Vue des commandes en cours de développement</p>
+        <CardContent>
+          {isLoadingOrders ? (
+            <div className="text-center py-8 text-muted-foreground">Chargement des commandes...</div>
+          ) : allOrders.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Aucune commande trouvée</div>
+          ) : (
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>N° Commande</TableHead>
+                    <TableHead>Table</TableHead>
+                    <TableHead>Montant</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Établissement</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allOrders.map((order) => (
+                    <TableRow key={`${order.userId}-${order.id}`}>
+                      <TableCell className="font-medium">#{order.orderNumber}</TableCell>
+                      <TableCell>{order.tableNumber}</TableCell>
+                      <TableCell className="font-semibold">{order.total.toLocaleString()} XAF</TableCell>
+                      <TableCell>
+                        {order.status === 'pending' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">En attente</Badge>}
+                        {order.status === 'sent' && <Badge className="bg-green-100 text-green-700" variant="secondary">Envoyée</Badge>}
+                        {order.status === 'cancelled' && <Badge className="bg-red-100 text-red-700" variant="secondary">Annulée</Badge>}
+                        {!['pending', 'sent', 'cancelled'].includes(order.status) && <Badge variant="secondary">{order.status}</Badge>}
+                      </TableCell>
+                      <TableCell>{new Date(order.createdAt).toLocaleString('fr-FR')}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{order.establishmentName || order.userName || 'N/A'}</span>
+                          {order.userName && order.establishmentName && (
+                            <span className="text-xs text-muted-foreground">{order.userName}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -929,13 +1213,63 @@ const AdminDashboard = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Événements</h1>
-          <p className="text-sm text-muted-foreground">Vue d'ensemble des événements de tous les utilisateurs</p>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des événements de tous les utilisateurs ({allEvents.length} total)</p>
+        </div>
+        <div className="ml-auto">
+          <Button variant="outline" size="sm" onClick={loadAllEvents} disabled={isLoadingEvents}>
+            {isLoadingEvents ? "Chargement..." : "Actualiser"}
+          </Button>
         </div>
       </div>
       <Card className="border-0 shadow-card">
-        <CardContent className="p-8 text-center text-muted-foreground">
-          <Calendar size={48} className="mx-auto mb-4 opacity-50" />
-          <p>Vue des événements en cours de développement</p>
+        <CardContent>
+          {isLoadingEvents ? (
+            <div className="text-center py-8 text-muted-foreground">Chargement des événements...</div>
+          ) : allEvents.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Aucun événement trouvé</div>
+          ) : (
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Titre</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Heure</TableHead>
+                    <TableHead>Lieu</TableHead>
+                    <TableHead>Capacité</TableHead>
+                    <TableHead>Billets vendus</TableHead>
+                    <TableHead>Prix billet</TableHead>
+                    <TableHead>Établissement</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allEvents.map((event) => (
+                    <TableRow key={`${event.userId}-${event.id}`}>
+                      <TableCell className="font-medium">{event.title}</TableCell>
+                      <TableCell>{new Date(event.date).toLocaleDateString('fr-FR')}</TableCell>
+                      <TableCell>{event.time}</TableCell>
+                      <TableCell>{event.location}</TableCell>
+                      <TableCell>{event.maxCapacity}</TableCell>
+                      <TableCell>
+                        <Badge variant={event.ticketsSold >= event.maxCapacity ? "destructive" : "secondary"}>
+                          {event.ticketsSold}/{event.maxCapacity}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{event.ticketPrice.toLocaleString()} XAF</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{event.establishmentName || event.userName || 'N/A'}</span>
+                          {event.userName && event.establishmentName && (
+                            <span className="text-xs text-muted-foreground">{event.userName}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -950,13 +1284,58 @@ const AdminDashboard = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Appréciations</h1>
-          <p className="text-sm text-muted-foreground">Vue d'ensemble des appréciations de tous les utilisateurs</p>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des appréciations de tous les utilisateurs ({allRatings.length} produits notés)</p>
+        </div>
+        <div className="ml-auto">
+          <Button variant="outline" size="sm" onClick={loadAllRatings} disabled={isLoadingRatings}>
+            {isLoadingRatings ? "Chargement..." : "Actualiser"}
+          </Button>
         </div>
       </div>
       <Card className="border-0 shadow-card">
-        <CardContent className="p-8 text-center text-muted-foreground">
-          <Star size={48} className="mx-auto mb-4 opacity-50" />
-          <p>Vue des appréciations en cours de développement</p>
+        <CardContent>
+          {isLoadingRatings ? (
+            <div className="text-center py-8 text-muted-foreground">Chargement des appréciations...</div>
+          ) : allRatings.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Aucune appréciation trouvée</div>
+          ) : (
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produit</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead>Nombre d'avis</TableHead>
+                    <TableHead>Établissement</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allRatings.map((rating) => (
+                    <TableRow key={`${rating.userId}-${rating.productId}`}>
+                      <TableCell className="font-medium">{rating.productName}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                          <span className="font-semibold">{rating.rating.toFixed(1)}/5</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{rating.ratingCount} avis</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{rating.establishmentName || rating.userName || 'N/A'}</span>
+                          {rating.userName && rating.establishmentName && (
+                            <span className="text-xs text-muted-foreground">{rating.userName}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

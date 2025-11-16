@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { adminDocRef } from "@/lib/collections";
-import { setDoc } from "firebase/firestore";
+import { adminDocRef, profilesColRef, productsColRef, ordersColRef, eventsColRef } from "@/lib/collections";
+import { setDoc, getDocs, collection, query, orderBy, onSnapshot } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Mail, Loader2, Shield, Plus, Users, Package, ShoppingCart, Calendar, Star, CreditCard, Bell, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import NackLogo from "@/components/NackLogo";
+import type { UserProfile } from "@/types/profile";
 
 const AdminCheck = () => {
   const { user, isAdmin, isAdminLoading, signInWithEmail, signInWithGoogle } = useAuth();
@@ -19,13 +20,63 @@ const AdminCheck = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [adminStats, setAdminStats] = useState({
+    totalUsers: 0,
+    totalProducts: 0,
+    totalOrders: 0,
+  });
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-  // Ne pas rediriger automatiquement, afficher le menu si admin
-  // useEffect(() => {
-  //   if (user && !isAdminLoading && isAdmin) {
-  //     navigate('/admin', { replace: true });
-  //   }
-  // }, [user, isAdmin, isAdminLoading, navigate]);
+  // Charger les statistiques pour le tableau de bord admin
+  const loadAdminStats = useCallback(async () => {
+    if (!isAdmin) return;
+    setIsLoadingStats(true);
+    try {
+      let totalUsers = 0;
+      let totalProducts = 0;
+      let totalOrders = 0;
+
+      // Compter les utilisateurs
+      const profilesQuery = query(profilesColRef(db), orderBy("createdAt", "desc"));
+      const profilesSnap = await getDocs(profilesQuery);
+      totalUsers = profilesSnap.size;
+
+      // Parcourir tous les profils pour compter produits et commandes
+      for (const profileDoc of profilesSnap.docs) {
+        const profile = profileDoc.data() as UserProfile;
+        try {
+          // Produits
+          const productsRef = productsColRef(db, profile.uid);
+          const productsSnap = await getDocs(productsRef);
+          totalProducts += productsSnap.size;
+
+          // Commandes normales
+          const ordersRef = ordersColRef(db, profile.uid);
+          const ordersSnap = await getDocs(ordersRef);
+          totalOrders += ordersSnap.size;
+
+          // Commandes Bar Connectée
+          const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
+          const barOrdersSnap = await getDocs(barOrdersRef);
+          totalOrders += barOrdersSnap.size;
+        } catch (error) {
+          console.error(`Erreur stats pour ${profile.uid}:`, error);
+        }
+      }
+
+      setAdminStats({ totalUsers, totalProducts, totalOrders });
+    } catch (error) {
+      console.error('Erreur chargement stats admin:', error);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadAdminStats();
+    }
+  }, [isAdmin, loadAdminStats]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,15 +163,21 @@ const AdminCheck = () => {
             <div className="grid grid-cols-3 gap-4 md:gap-6 lg:gap-8 max-w-7xl mx-auto">
               <div className="flex flex-col items-center justify-center rounded-xl md:rounded-2xl border border-gray-200 bg-white p-3 md:p-4 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
                 <p className="text-xs md:text-sm lg:text-base font-medium text-gray-500 mb-1 md:mb-2">Utilisateurs</p>
-                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">—</p>
+                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? "..." : adminStats.totalUsers.toLocaleString()}
+                </p>
               </div>
               <div className="flex flex-col items-center justify-center rounded-xl md:rounded-2xl border border-gray-200 bg-white p-3 md:p-4 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
                 <p className="text-xs md:text-sm lg:text-base font-medium text-gray-500 mb-1 md:mb-2">Produits</p>
-                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">—</p>
+                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? "..." : adminStats.totalProducts.toLocaleString()}
+                </p>
               </div>
               <div className="flex flex-col items-center justify-center rounded-xl md:rounded-2xl border border-gray-200 bg-white p-3 md:p-4 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
                 <p className="text-xs md:text-sm lg:text-base font-medium text-gray-500 mb-1 md:mb-2">Commandes</p>
-                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">—</p>
+                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">
+                  {isLoadingStats ? "..." : adminStats.totalOrders.toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
