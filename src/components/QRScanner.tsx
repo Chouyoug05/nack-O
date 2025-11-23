@@ -75,17 +75,6 @@ const QRScanner: React.FC = () => {
   }
 
   const startScanner = () => {
-    // Vérifier que l'élément DOM existe
-    const scannerElement = document.getElementById("qr-scanner");
-    if (!scannerElement) {
-      toast({
-        title: "Erreur",
-        description: "L'élément scanner n'est pas disponible. Veuillez réessayer.",
-        variant: "destructive"
-      });
-      return;
-    }
-
     // Nettoyer le scanner précédent s'il existe
     if (scannerRef.current) {
       try {
@@ -96,14 +85,30 @@ const QRScanner: React.FC = () => {
       scannerRef.current = null;
     }
 
-    // Attendre un peu pour s'assurer que le DOM est prêt
+    // D'abord, activer le mode scanning pour que l'élément DOM soit rendu
+    setIsScanning(true);
+
+    // Attendre que le DOM soit prêt avant d'initialiser le scanner
     setTimeout(() => {
+      const scannerElement = document.getElementById("qr-scanner");
+      if (!scannerElement) {
+        setIsScanning(false);
+        toast({
+          title: "Erreur",
+          description: "L'élément scanner n'est pas disponible. Veuillez réessayer.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       try {
         const config = {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
-          supportedScanTypes: [Html5QrcodeSupportedFormats.QR_CODE]
+          supportedScanTypes: [Html5QrcodeSupportedFormats.QR_CODE],
+          showTorchButtonIfSupported: true,
+          showZoomSliderIfSupported: true
         };
 
         scannerRef.current = new Html5QrcodeScanner(
@@ -124,17 +129,28 @@ const QRScanner: React.FC = () => {
             }
           }
         );
-
-        setIsScanning(true);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Erreur lors de l\'initialisation du scanner:', error);
+        setIsScanning(false);
+        
+        let errorMessage = "Impossible de démarrer le scanner.";
+        if (error?.message) {
+          if (error.message.includes('camera') || error.message.includes('permission')) {
+            errorMessage = "Accès à la caméra refusé. Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur.";
+          } else if (error.message.includes('not found') || error.message.includes('not available')) {
+            errorMessage = "Aucune caméra détectée. Veuillez connecter une caméra et réessayer.";
+          } else {
+            errorMessage = `Erreur: ${error.message}`;
+          }
+        }
+        
         toast({
-          title: "Erreur",
-          description: "Impossible de démarrer le scanner. Vérifiez que votre caméra est accessible.",
+          title: "Erreur de scanner",
+          description: errorMessage,
           variant: "destructive"
         });
       }
-    }, 100);
+    }, 300);
   };
 
   const stopScanner = () => {
