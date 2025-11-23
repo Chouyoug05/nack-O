@@ -260,11 +260,12 @@ const ServeurInterface = () => {
   }, [ownerUid, agentCode]);
 
   const products = fsProducts ?? [];
-  // Filtrer les produits avec stock > 0 ET prix > 0
+  // Filtrer les produits vendables : tous les produits avec prix > 0
+  // Les serveurs peuvent vendre tous les produits avec un prix, même si le stock est à 0
+  // (les plats peuvent être préparés à la demande, et les autres produits peuvent être réapprovisionnés)
   const sellableProducts = products.filter(product => {
-    const stock = (product.stock || 0) > 0;
     const price = Number(product.price || 0) > 0;
-    return stock && price;
+    return price; // Afficher tous les produits avec un prix > 0
   });
   const availableCategories = [...new Set(sellableProducts.map(p => p.category).filter(Boolean))].sort();
 
@@ -352,11 +353,17 @@ const ServeurInterface = () => {
 
   const addToCart = (product: Product) => {
     const existingItem = cart.find(item => item.id === product.id);
-    const isPlat = product.category?.toLowerCase() === 'plats';
+    // Catégories alimentaires qui peuvent être préparées à la demande (pas de limite de stock)
+    const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
+    const isFoodCategory = foodCategories.some(cat => 
+      product.category?.toLowerCase().includes(cat.toLowerCase().split(' / ')[0]) ||
+      product.category?.toLowerCase().includes(cat.toLowerCase()) ||
+      product.category?.toLowerCase() === 'plats'
+    );
     
     if (existingItem) {
-      // Pour les plats, ignorer la vérification de stock
-      if (isPlat || existingItem.quantity < product.stock) {
+      // Pour les catégories alimentaires, ignorer la vérification de stock
+      if (isFoodCategory || existingItem.quantity < (product.stock || 0)) {
         updateQuantity(product.id, existingItem.quantity + 1);
       } else {
         toast({
@@ -582,34 +589,55 @@ const ServeurInterface = () => {
                       </div>
                     </div>
                   </div>
-                  {/* Onglets Catégories dynamiques */}
+                  {/* Onglets Catégories dynamiques - Version améliorée */}
                   <div className="w-full border-b border-[#e6dfdb] mt-4">
-                    <div className="flex overflow-x-auto scrollbar-hide">
+                    <div className="flex overflow-x-auto scrollbar-hide gap-1">
                       <button
                         key="all"
                         type="button"
                         onClick={() => setActiveCategoryTab("all")}
-                        className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
-                          activeCategoryTab === "all" ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
+                        className={`flex items-center justify-center gap-1.5 pb-3 pt-3 border-b-[3px] text-sm min-w-[60px] px-2.5 transition-all ${
+                          activeCategoryTab === "all" 
+                            ? 'border-b-nack-red text-nack-red font-bold' 
+                            : 'border-b-transparent text-muted-foreground hover:text-gray-700'
                         }`}
                       >
-                        <Grid3x3 className="h-6 w-6 flex-shrink-0" />
-                        <span className="hidden sm:inline font-semibold whitespace-nowrap">Tout</span>
+                        <Grid3x3 className="h-5 w-5 flex-shrink-0" />
+                        <span className="font-semibold whitespace-nowrap text-xs sm:text-sm">Tout</span>
                       </button>
                       {availableCategories.length > 0 ? (
                         availableCategories.map((category) => {
                           const Icon = getCategoryIcon(category);
+                          // Raccourcir les noms de catégories pour plus de lisibilité
+                          const getShortCategoryName = (cat: string): string => {
+                            const catLower = cat.toLowerCase();
+                            if (catLower.includes('boisson alcoolisée')) return 'Alcool';
+                            if (catLower.includes('boisson non alcoolisée')) return 'Boisson';
+                            if (catLower.includes('plat') || catLower.includes('repas')) return 'Plat';
+                            if (catLower.includes('snack')) return 'Snack';
+                            if (catLower.includes('dessert')) return 'Dessert';
+                            if (catLower.includes('entrée')) return 'Entrée';
+                            if (catLower.includes('autre')) return 'Autre';
+                            // Si le nom est court, le garder tel quel
+                            if (cat.length <= 12) return cat;
+                            // Sinon, prendre les premiers mots
+                            return cat.split(' ').slice(0, 2).join(' ');
+                          };
+                          const shortName = getShortCategoryName(category);
                           return (
                             <button
                               key={category}
                               type="button"
                               onClick={() => setActiveCategoryTab(category)}
-                              className={`flex items-center justify-center gap-2 pb-3 pt-3 border-b-[4px] text-base min-w-[80px] px-3 ${
-                                activeCategoryTab === category ? 'border-b-nack-red text-nack-red' : 'border-b-transparent text-muted-foreground'
+                              className={`flex items-center justify-center gap-1.5 pb-3 pt-3 border-b-[3px] text-sm min-w-[60px] px-2.5 transition-all ${
+                                activeCategoryTab === category 
+                                  ? 'border-b-nack-red text-nack-red font-bold' 
+                                  : 'border-b-transparent text-muted-foreground hover:text-gray-700'
                               }`}
+                              title={category} // Tooltip avec le nom complet
                             >
-                              <Icon className="h-6 w-6 flex-shrink-0" />
-                              <span className="hidden sm:inline font-semibold whitespace-nowrap">{category}</span>
+                              <Icon className="h-5 w-5 flex-shrink-0" />
+                              <span className="font-semibold whitespace-nowrap text-xs sm:text-sm">{shortName}</span>
                             </button>
                           );
                         })
@@ -674,16 +702,40 @@ const ServeurInterface = () => {
                           )}
                           <div className="mt-2 space-y-0.5">
                             <h3 className="font-semibold text-base truncate">{product.name}</h3>
-                            <p className="text-xs text-muted-foreground">Stock: {Number(product.stock || 0)}</p>
+                            {(() => {
+                              const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
+                              const isFoodCategory = foodCategories.some(cat => 
+                                product.category?.toLowerCase().includes(cat.toLowerCase().split(' / ')[0]) ||
+                                product.category?.toLowerCase().includes(cat.toLowerCase()) ||
+                                product.category?.toLowerCase() === 'plats'
+                              );
+                              // Afficher le stock uniquement si ce n'est pas une catégorie alimentaire
+                              if (!isFoodCategory) {
+                                return <p className="text-xs text-muted-foreground">Stock: {Number(product.stock || 0)}</p>;
+                              }
+                              return null;
+                            })()}
                             <p className="text-xl md:text-2xl font-extrabold text-nack-red" style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
                               {Number(product.price || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
                             </p>
                           </div>
-                          {(product.stock || 0) === 0 && (
-                            <div className="absolute top-1 right-1 flex h-8 min-w-[2rem] items-center justify-center rounded-full bg-white/95 backdrop-blur px-2 text-[11px] font-bold text-red-600 shadow">
-                              Rupture
-                            </div>
-                          )}
+                          {(() => {
+                            const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
+                            const isFoodCategory = foodCategories.some(cat => 
+                              product.category?.toLowerCase().includes(cat.toLowerCase().split(' / ')[0]) ||
+                              product.category?.toLowerCase().includes(cat.toLowerCase()) ||
+                              product.category?.toLowerCase() === 'plats'
+                            );
+                            // Afficher "Rupture" uniquement pour les produits non alimentaires avec stock 0
+                            if (!isFoodCategory && (product.stock || 0) === 0) {
+                              return (
+                                <div className="absolute top-1 right-1 flex h-8 min-w-[2rem] items-center justify-center rounded-full bg-white/95 backdrop-blur px-2 text-[11px] font-bold text-red-600 shadow">
+                                  Rupture
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
                           <div className="absolute bottom-2 right-2 flex h-12 w-12 items-center justify-center rounded-full bg-nack-red text-white shadow-xl">
                             <Plus className="h-7 w-7" />
                           </div>
@@ -741,7 +793,17 @@ const ServeurInterface = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                              disabled={item.quantity >= item.stock}
+                              disabled={(() => {
+                                // Pour les catégories alimentaires, ne pas désactiver le bouton
+                                const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
+                                const isFoodCategory = foodCategories.some(cat => 
+                                  item.category?.toLowerCase().includes(cat.toLowerCase().split(' / ')[0]) ||
+                                  item.category?.toLowerCase().includes(cat.toLowerCase()) ||
+                                  item.category?.toLowerCase() === 'plats'
+                                );
+                                if (isFoodCategory) return false;
+                                return item.quantity >= (item.stock || 0);
+                              })()}
                             >
                               <Plus size={16} />
                             </Button>
