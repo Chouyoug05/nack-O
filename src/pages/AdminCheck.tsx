@@ -1,17 +1,16 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { adminDocRef, profilesColRef, productsColRef, ordersColRef, eventsColRef } from "@/lib/collections";
-import { setDoc, getDocs, collection, query, orderBy, onSnapshot } from "firebase/firestore";
+import { adminDocRef } from "@/lib/collections";
+import { setDoc } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Mail, Loader2, Shield, Plus, Users, Package, ShoppingCart, Calendar, Star, CreditCard, Bell, TrendingUp } from "lucide-react";
+import { Eye, EyeOff, Mail, Loader2, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import NackLogo from "@/components/NackLogo";
-import type { UserProfile } from "@/types/profile";
 
 const AdminCheck = () => {
   const { user, isAdmin, isAdminLoading, signInWithEmail, signInWithGoogle } = useAuth();
@@ -20,63 +19,13 @@ const AdminCheck = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [adminStats, setAdminStats] = useState({
-    totalUsers: 0,
-    totalProducts: 0,
-    totalOrders: 0,
-  });
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
-  // Charger les statistiques pour le tableau de bord admin
-  const loadAdminStats = useCallback(async () => {
-    if (!isAdmin) return;
-    setIsLoadingStats(true);
-    try {
-      let totalUsers = 0;
-      let totalProducts = 0;
-      let totalOrders = 0;
-
-      // Compter les utilisateurs
-      const profilesQuery = query(profilesColRef(db), orderBy("createdAt", "desc"));
-      const profilesSnap = await getDocs(profilesQuery);
-      totalUsers = profilesSnap.size;
-
-      // Parcourir tous les profils pour compter produits et commandes
-      for (const profileDoc of profilesSnap.docs) {
-        const profile = profileDoc.data() as UserProfile;
-        try {
-          // Produits
-          const productsRef = productsColRef(db, profile.uid);
-          const productsSnap = await getDocs(productsRef);
-          totalProducts += productsSnap.size;
-
-          // Commandes normales
-          const ordersRef = ordersColRef(db, profile.uid);
-          const ordersSnap = await getDocs(ordersRef);
-          totalOrders += ordersSnap.size;
-
-          // Commandes Bar Connectée
-          const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
-          const barOrdersSnap = await getDocs(barOrdersRef);
-          totalOrders += barOrdersSnap.size;
-        } catch (error) {
-          console.error(`Erreur stats pour ${profile.uid}:`, error);
-        }
-      }
-
-      setAdminStats({ totalUsers, totalProducts, totalOrders });
-    } catch (error) {
-      console.error('Erreur chargement stats admin:', error);
-    } finally {
-      setIsLoadingStats(false);
-    }
-  }, [isAdmin]);
-
+  // Si connecté et admin, rediriger vers le tableau de bord admin
   useEffect(() => {
-    if (isAdmin) {
-      loadAdminStats();
+    if (user && !isAdminLoading && isAdmin) {
+      navigate('/admin', { replace: true });
     }
-  }, [isAdmin, loadAdminStats]);
+  }, [user, isAdmin, isAdminLoading, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,157 +81,12 @@ const AdminCheck = () => {
     );
   }
 
-  // Si connecté et admin, afficher le tableau de bord admin
-  if (user && isAdmin) {
-    return (
-      <div className="relative flex min-h-screen w-full flex-col bg-[#f6f8f6]">
-        {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between bg-[#f6f8f6]/80 p-4 md:p-6 pb-2 backdrop-blur-sm border-b border-gray-200/50">
-          <div className="w-8 md:w-12"></div>
-          <div className="flex items-center gap-2 md:gap-3">
-            <NackLogo size="sm" />
-            <span className="text-sm md:text-base lg:text-lg font-semibold text-gray-900">
-              Administration Nack
-            </span>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate('/dashboard')}
-              className="text-xs md:text-sm"
-            >
-              Dashboard Gérant
-            </Button>
-          </div>
-        </div>
-
-        {/* Stats Section */}
-        <section className="p-4 md:p-6 lg:p-8 pt-4 md:pt-6 lg:pt-8">
-          <div className="w-full">
-            <div className="grid grid-cols-3 gap-4 md:gap-6 lg:gap-8 max-w-7xl mx-auto">
-              <div className="flex flex-col items-center justify-center rounded-xl md:rounded-2xl border border-gray-200 bg-white p-3 md:p-4 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
-                <p className="text-xs md:text-sm lg:text-base font-medium text-gray-500 mb-1 md:mb-2">Utilisateurs</p>
-                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">
-                  {isLoadingStats ? "..." : adminStats.totalUsers.toLocaleString()}
-                </p>
-              </div>
-              <div className="flex flex-col items-center justify-center rounded-xl md:rounded-2xl border border-gray-200 bg-white p-3 md:p-4 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
-                <p className="text-xs md:text-sm lg:text-base font-medium text-gray-500 mb-1 md:mb-2">Produits</p>
-                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">
-                  {isLoadingStats ? "..." : adminStats.totalProducts.toLocaleString()}
-                </p>
-              </div>
-              <div className="flex flex-col items-center justify-center rounded-xl md:rounded-2xl border border-gray-200 bg-white p-3 md:p-4 lg:p-6 shadow-sm hover:shadow-md transition-shadow">
-                <p className="text-xs md:text-sm lg:text-base font-medium text-gray-500 mb-1 md:mb-2">Commandes</p>
-                <p className="text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-gray-900">
-                  {isLoadingStats ? "..." : adminStats.totalOrders.toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Main Actions - Gros boutons */}
-        <main className="p-4 md:p-6 lg:p-8 pt-2 md:pt-4 lg:pt-6 flex-1">
-          <div className="w-full">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6 lg:gap-8 max-w-7xl mx-auto">
-              <button
-                type="button"
-                onClick={() => navigate('/admin?view=users')}
-                className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-              >
-                <Users size={40} className="md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 text-blue-600 transition-transform group-hover:scale-110" />
-                <div className="flex flex-col text-center">
-                  <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                    Utilisateurs
-                  </h2>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/admin?view=products')}
-                className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-              >
-                <Package size={40} className="md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 text-purple-600 transition-transform group-hover:scale-110" />
-                <div className="flex flex-col text-center">
-                  <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                    Produits
-                  </h2>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/admin?view=orders')}
-                className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-              >
-                <ShoppingCart size={40} className="md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 text-green-600 transition-transform group-hover:scale-110" />
-                <div className="flex flex-col text-center">
-                  <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                    Commandes
-                  </h2>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/admin?view=events')}
-                className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-              >
-                <Calendar size={40} className="md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 text-orange-600 transition-transform group-hover:scale-110" />
-                <div className="flex flex-col text-center">
-                  <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                    Événements
-                  </h2>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/admin?view=ratings')}
-                className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-              >
-                <Star size={40} className="md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 text-yellow-600 transition-transform group-hover:scale-110" />
-                <div className="flex flex-col text-center">
-                  <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                    Appréciations
-                  </h2>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/admin?view=subscriptions')}
-                className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-              >
-                <CreditCard size={40} className="md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 text-indigo-600 transition-transform group-hover:scale-110" />
-                <div className="flex flex-col text-center">
-                  <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                    Abonnements
-                  </h2>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => navigate('/admin?view=notifications')}
-                className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-              >
-                <Bell size={40} className="md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 text-red-600 transition-transform group-hover:scale-110" />
-                <div className="flex flex-col text-center">
-                  <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                    Notifications
-                  </h2>
-                </div>
-              </button>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Si connecté et admin, rediriger vers le tableau de bord admin
+  useEffect(() => {
+    if (user && !isAdminLoading && isAdmin) {
+      navigate('/admin', { replace: true });
+    }
+  }, [user, isAdmin, isAdminLoading, navigate]);
 
   // Si connecté mais pas admin, afficher un message
   if (user && !isAdmin) {

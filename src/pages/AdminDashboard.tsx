@@ -47,6 +47,7 @@ const AdminDashboard = () => {
   const [selectedUids, setSelectedUids] = useState<Set<string>>(new Set());
   const [notif, setNotif] = useState<NotificationForm>({ title: "", message: "", type: "info", target: "all" });
   const [activationDays, setActivationDays] = useState<number>(30);
+  const [activationType, setActivationType] = useState<'transition' | 'transition-pro-max'>('transition');
   const [extendEmail, setExtendEmail] = useState<string>("");
   const [extendDays, setExtendDays] = useState<number>(1);
   const [isFixingAbnormal, setIsFixingAbnormal] = useState(false);
@@ -66,6 +67,9 @@ const AdminDashboard = () => {
   const [deletingUid, setDeletingUid] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<{ uid: string; name: string } | null>(null);
+  const [showChangeSubscriptionDialog, setShowChangeSubscriptionDialog] = useState(false);
+  const [userToChangeSubscription, setUserToChangeSubscription] = useState<{ uid: string; name: string; currentType?: 'transition' | 'transition-pro-max' } | null>(null);
+  const [newSubscriptionType, setNewSubscriptionType] = useState<'transition' | 'transition-pro-max'>('transition-pro-max');
   
   // États pour les données détaillées
   const [allProducts, setAllProducts] = useState<Array<{ id: string; name: string; category: string; price: number; quantity: number; userId: string; userName?: string; establishmentName?: string }>>([]);
@@ -583,6 +587,75 @@ const AdminDashboard = () => {
     }
   };
 
+  const changeSubscriptionType = async (uid: string, newType: 'transition' | 'transition-pro-max') => {
+    try {
+      const profile = allProfiles.find(p => p.uid === uid);
+      if (!profile) {
+        toast({ title: "Erreur", description: "Utilisateur non trouvé", variant: "destructive" });
+        return;
+      }
+
+      // Si l'utilisateur n'a pas d'abonnement actif, on ne peut pas changer le type
+      if (profile.plan !== 'active' || !profile.subscriptionEndsAt || profile.subscriptionEndsAt < Date.now()) {
+        toast({ 
+          title: "Erreur", 
+          description: "L'utilisateur doit avoir un abonnement actif pour changer de type", 
+          variant: "destructive" 
+        });
+        return;
+      }
+
+      const updateData: {
+        subscriptionType: 'transition' | 'transition-pro-max';
+        updatedAt: number;
+        eventsResetAt?: number;
+        eventsCount?: number;
+      } = {
+        subscriptionType: newType,
+        updatedAt: Date.now(),
+      };
+
+      // Si on passe à Pro Max, réinitialiser le compteur d'événements si nécessaire
+      if (newType === 'transition-pro-max' && profile.subscriptionEndsAt) {
+        const now = Date.now();
+        const eventsResetAt = profile.eventsResetAt ?? profile.subscriptionEndsAt;
+        if (!eventsResetAt || now > eventsResetAt) {
+          // Réinitialiser le compteur d'événements
+          updateData.eventsResetAt = profile.subscriptionEndsAt;
+          updateData.eventsCount = 0;
+        }
+      }
+
+      await updateDoc(doc(db, "profiles", uid), updateData);
+      toast({ 
+        title: "Succès", 
+        description: `Type d'abonnement changé vers ${newType === 'transition-pro-max' ? 'Transition Pro Max' : 'Transition'}. L'utilisateur a maintenant accès à toutes les fonctionnalités de ce plan.` 
+      });
+      setShowChangeSubscriptionDialog(false);
+      setUserToChangeSubscription(null);
+    } catch (error) {
+      console.error('Erreur changement type abonnement:', error);
+      toast({ title: "Erreur", description: "Impossible de changer le type d'abonnement", variant: "destructive" });
+    }
+  };
+
+  const openChangeSubscriptionDialog = (profile: UserProfile) => {
+    if (profile.plan !== 'active' || !profile.subscriptionEndsAt || profile.subscriptionEndsAt < Date.now()) {
+      toast({ 
+        title: "Information", 
+        description: "L'utilisateur doit avoir un abonnement actif pour changer de type" 
+      });
+      return;
+    }
+    setUserToChangeSubscription({
+      uid: profile.uid,
+      name: profile.ownerName || profile.establishmentName || profile.email,
+      currentType: profile.subscriptionType || 'transition',
+    });
+    setNewSubscriptionType(profile.subscriptionType || 'transition');
+    setShowChangeSubscriptionDialog(true);
+  };
+
   const extendSubscriptionByEmail = async (email: string, days: number = 1) => {
     const profile = allProfiles.find(p => p.email?.toLowerCase() === email.toLowerCase());
     if (!profile) {
@@ -982,9 +1055,18 @@ const AdminDashboard = () => {
             </Select>
             <div className="ml-auto flex items-center gap-2 flex-wrap">
               <Input type="number" className="w-28" min={1} value={activationDays} onChange={e => setActivationDays(Number(e.target.value || 0))} />
+              <Select value={activationType} onValueChange={(v) => setActivationType(v as 'transition' | 'transition-pro-max')}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="transition">Transition (2500 XAF)</SelectItem>
+                  <SelectItem value="transition-pro-max">Pro Max (7500 XAF)</SelectItem>
+                </SelectContent>
+              </Select>
               <Button variant="outline" onClick={async () => {
                 const uids = Array.from(selectedUids);
-                for (const uid of uids) await activateForDays(uid, activationDays);
+                for (const uid of uids) await activateForDays(uid, activationDays, activationType);
               }}><Gift size={16} className="mr-2"/>Activer {activationDays} j</Button>
             </div>
           </div>
@@ -1018,9 +1100,16 @@ const AdminDashboard = () => {
                       </TableCell>
                       <TableCell>{p.establishmentName || "—"}</TableCell>
                       <TableCell>
-                        {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
-                        {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
-                        {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
+                        <div className="flex flex-col gap-1">
+                          {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
+                          {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
+                          {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
+                          {status === 'active' && p.subscriptionType && (
+                            <Badge className="bg-blue-100 text-blue-700 text-xs" variant="secondary">
+                              {p.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         {p.subscriptionEndsAt ? (
@@ -1036,8 +1125,18 @@ const AdminDashboard = () => {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end flex-wrap">
-                          <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays)}>
-                            <Gift size={14} className="mr-2"/> Activer {activationDays} j
+                          {status === 'active' && p.subscriptionType && (
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => openChangeSubscriptionDialog(p)}
+                              title="Changer le type d'abonnement"
+                            >
+                              <Settings size={14} className="mr-2"/> Changer plan
+                            </Button>
+                          )}
+                          <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays, activationType)}>
+                            <Gift size={14} className="mr-2"/> Activer {activationDays} j ({activationType === 'transition' ? '2500 XAF' : '7500 XAF'})
                           </Button>
                           <Button 
                             size="sm" 
@@ -1475,6 +1574,87 @@ const AdminDashboard = () => {
       {activeView === "ratings" && renderRatingsView()}
       {activeView === "subscriptions" && renderSubscriptionsView()}
       {activeView === "notifications" && renderNotificationsView()}
+
+      {/* Dialog de changement de type d'abonnement */}
+      <Dialog open={showChangeSubscriptionDialog} onOpenChange={setShowChangeSubscriptionDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Changer le type d'abonnement</DialogTitle>
+            <DialogDescription>
+              Changer le type d'abonnement pour {userToChangeSubscription?.name}
+              <br />
+              <span className="text-xs text-muted-foreground">
+                Type actuel: <strong>{userToChangeSubscription?.currentType === 'transition-pro-max' ? 'Transition Pro Max' : 'Transition'}</strong>
+              </span>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Nouveau type d'abonnement</Label>
+              <Select value={newSubscriptionType} onValueChange={(v) => setNewSubscriptionType(v as 'transition' | 'transition-pro-max')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="transition">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Transition (2500 XAF)</span>
+                      <span className="text-xs text-muted-foreground">Produits, Ventes, Stock, Rapports</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="transition-pro-max">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Transition Pro Max (7500 XAF)</span>
+                      <span className="text-xs text-muted-foreground">Toutes les fonctionnalités : Équipe, Bar Connectée, Événements</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {newSubscriptionType === 'transition-pro-max' && (
+              <div className="rounded-lg bg-green-50 p-3 border border-green-200">
+                <p className="text-sm font-medium text-green-900 mb-1">✓ Accès à toutes les fonctionnalités</p>
+                <ul className="text-xs text-green-800 space-y-1 list-disc list-inside">
+                  <li>Gestion des équipiers</li>
+                  <li>Bar Connectée</li>
+                  <li>Création d'événements (5 inclus par période)</li>
+                </ul>
+              </div>
+            )}
+            {newSubscriptionType === 'transition' && (
+              <div className="rounded-lg bg-amber-50 p-3 border border-amber-200">
+                <p className="text-sm font-medium text-amber-900 mb-1">⚠ Fonctionnalités limitées</p>
+                <ul className="text-xs text-amber-800 space-y-1 list-disc list-inside">
+                  <li>Pas d'accès à la gestion des équipiers</li>
+                  <li>Pas d'accès à la Bar Connectée</li>
+                  <li>Pas de création d'événements</li>
+                </ul>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              La date d'expiration de l'abonnement restera inchangée. Seul le type d'abonnement sera modifié.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowChangeSubscriptionDialog(false);
+              setUserToChangeSubscription(null);
+            }}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={() => {
+                if (userToChangeSubscription) {
+                  changeSubscriptionType(userToChangeSubscription.uid, newSubscriptionType);
+                }
+              }}
+              disabled={newSubscriptionType === userToChangeSubscription?.currentType}
+            >
+              Confirmer le changement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Dialog de confirmation de suppression */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
