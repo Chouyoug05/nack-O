@@ -388,9 +388,32 @@ const ServeurInterface = () => {
   };
 
   const createOrder = async (status: OrderStatus) => {
-    if (cart.length === 0 || !tableNumber.trim()) return;
+    if (cart.length === 0 || !tableNumber.trim()) {
+      toast({
+        title: "Erreur",
+        description: "Le panier est vide ou le numéro de table est manquant",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!ownerUid) {
+      toast({
+        title: "Erreur de connexion",
+        description: "Impossible de déterminer l'établissement. La commande sera enregistrée localement et synchronisée dès que possible.",
+        variant: "destructive"
+      });
+      // Même sans ownerUid, on peut quand même ajouter la commande au contexte local
+      const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      addOrder({ orderNumber: orderCounter, tableNumber: tableNumber.trim(), items: [...cart], total, status, agentCode: agentCode! });
+      setCart([]);
+      setTableNumber("");
+      return;
+    }
 
     const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Ajouter la commande au contexte local immédiatement
     addOrder({ orderNumber: orderCounter, tableNumber: tableNumber.trim(), items: [...cart], total, status, agentCode: agentCode! });
     
     const orderPayload: OutboxOrder = {
@@ -400,18 +423,21 @@ const ServeurInterface = () => {
       total,
       status,
       createdAt: Date.now(),
-      agentCode: agentInfo?.code ?? agentCode,
+      agentCode: agentInfo?.code ?? agentCode!,
       agentMemberId: agentInfo?.memberId,
       agentName: agentInfo?.name,
       agentToken: agentCode,
     };
 
     let queued = false;
-    if (!ownerUid || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+    let success = false;
+    
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
       queued = true;
     } else {
       try {
         await addDoc(ordersColRef(db, ownerUid), orderPayload);
+        success = true;
         try {
           await addDoc(notificationsColRef(db, ownerUid), {
             title: "Nouvelle commande",
@@ -422,30 +448,43 @@ const ServeurInterface = () => {
           });
         } catch { /* ignore notifications permission errors */ }
       } catch (e) {
+        console.error('Erreur lors de l\'envoi de la commande:', e);
         queued = true;
       }
     }
 
     if (queued && ownerUid) {
       try {
-        const key = getOrderOutboxKey(ownerUid, agentCode);
+        const key = getOrderOutboxKey(ownerUid, agentCode!);
         const raw = localStorage.getItem(key);
         const list: OutboxOrder[] = raw ? JSON.parse(raw) : [];
         list.push(orderPayload);
         localStorage.setItem(key, JSON.stringify(list));
-        toast({ title: "Commande enregistrée hors-ligne", description: "Elle sera synchronisée automatiquement.", });
-      } catch (e) { /* ignore quota errors */ }
+        toast({ 
+          title: "Commande enregistrée hors-ligne", 
+          description: "Elle sera synchronisée automatiquement dès que la connexion sera rétablie.", 
+        });
+      } catch (e) { 
+        console.error('Erreur lors de l\'enregistrement hors-ligne:', e);
+        toast({
+          title: "Erreur",
+          description: "Impossible d'enregistrer la commande. Veuillez réessayer.",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     setCart([]);
     setTableNumber("");
-    setIsCheckoutOpen(false);
 
     const statusText = status === 'pending' ? 'mise en attente' : 'envoyée à la caisse';
-    toast({
-      title: `Commande ${statusText}`,
-      description: `Commande #${orderCounter} ${statusText}`,
-    });
+    if (success) {
+      toast({
+        title: `Commande ${statusText}`,
+        description: `Commande #${orderCounter} ${statusText} avec succès`,
+      });
+    }
   };
 
   const clearCart = () => {
@@ -472,7 +511,16 @@ const ServeurInterface = () => {
       });
       return;
     }
-    setIsCheckoutOpen(true);
+    if (!ownerUid) {
+      toast({
+        title: "Erreur de connexion",
+        description: "Impossible de déterminer l'établissement. Veuillez réessayer dans quelques instants.",
+        variant: "destructive"
+      });
+      return;
+    }
+    // Envoyer directement la commande avec le statut 'sent'
+    createOrder('sent');
   };
 
   return (
