@@ -42,6 +42,13 @@ interface CartItem {
 interface Establishment {
   establishmentName: string;
   logoUrl?: string;
+  companyName?: string;
+  fullAddress?: string;
+  businessPhone?: string;
+  rcsNumber?: string;
+  nifNumber?: string;
+  legalMentions?: string;
+  customMessage?: string;
 }
 
 const PublicOrderingPage = () => {
@@ -135,7 +142,14 @@ const PublicOrderingPage = () => {
           const profileData = profileDoc.data();
           setEstablishment({
             establishmentName: profileData.establishmentName || 'Établissement',
-            logoUrl: profileData.logoUrl
+            logoUrl: profileData.logoUrl,
+            companyName: profileData.companyName,
+            fullAddress: profileData.fullAddress,
+            businessPhone: profileData.businessPhone,
+            rcsNumber: profileData.rcsNumber,
+            nifNumber: profileData.nifNumber,
+            legalMentions: profileData.legalMentions,
+            customMessage: profileData.customMessage,
           });
         }
       })
@@ -463,7 +477,14 @@ const PublicOrderingPage = () => {
           orderId: orderNumber,
           establishmentId: establishmentId || '',
           timestamp: Date.now()
-        }
+        },
+        companyName: establishment.companyName,
+        fullAddress: establishment.fullAddress,
+        businessPhone: establishment.businessPhone,
+        rcsNumber: establishment.rcsNumber,
+        nifNumber: establishment.nifNumber,
+        legalMentions: establishment.legalMentions,
+        customMessage: establishment.customMessage,
       };
 
       await generateTicketPDF(ticketData);

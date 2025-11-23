@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +62,15 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     email: profile?.email || "",
     whatsapp: profile?.whatsapp || "",
     logoUrl: profile?.logoUrl || "",
+  });
+  const [ticketCustomization, setTicketCustomization] = useState({
+    companyName: profile?.companyName || "",
+    rcsNumber: profile?.rcsNumber || "",
+    nifNumber: profile?.nifNumber || "",
+    businessPhone: profile?.businessPhone || "",
+    fullAddress: profile?.fullAddress || "",
+    customMessage: profile?.customMessage || "",
+    legalMentions: profile?.legalMentions || "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -298,6 +308,28 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   };
 
   useEffect(() => {
+    if (profile) {
+      setEstablishmentInfo({
+        name: profile.establishmentName || "Mon Établissement",
+        address: profile.address || "",
+        phone: profile.phone || "",
+        email: profile.email || "",
+        whatsapp: profile.whatsapp || "",
+        logoUrl: profile.logoUrl || "",
+      });
+      setTicketCustomization({
+        companyName: profile.companyName || "",
+        rcsNumber: profile.rcsNumber || "",
+        nifNumber: profile.nifNumber || "",
+        businessPhone: profile.businessPhone || "",
+        fullAddress: profile.fullAddress || "",
+        customMessage: profile.customMessage || "",
+        legalMentions: profile.legalMentions || "",
+      });
+    }
+  }, [profile]);
+
+  useEffect(() => {
     const loadReceipts = async () => {
       if (!user) return;
       setIsLoadingReceipts(true);
@@ -330,6 +362,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         phone: profile.phone,
         logoUrl: profile.logoUrl,
         uid: user.uid,
+        companyName: profile.companyName,
+        fullAddress: profile.fullAddress,
+        businessPhone: profile.businessPhone,
+        rcsNumber: profile.rcsNumber,
+        nifNumber: profile.nifNumber,
+        legalMentions: profile.legalMentions,
+        customMessage: profile.customMessage,
       }, {
         amountXaf: receipt.amount,
         paidAt: receipt.paidAt,
@@ -358,6 +397,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
           phone: profile.phone,
           logoUrl: profile.logoUrl,
           uid: user.uid,
+          companyName: profile.companyName,
+          fullAddress: profile.fullAddress,
+          businessPhone: profile.businessPhone,
+          rcsNumber: profile.rcsNumber,
+          nifNumber: profile.nifNumber,
+          legalMentions: profile.legalMentions,
+          customMessage: profile.customMessage,
         }, {
           amountXaf: lastPayment.amount || SUBSCRIPTION_PLANS[profile.subscriptionType || 'transition'].price,
           paidAt: lastPayment.paidAt || profile.lastPaymentAt,
@@ -372,6 +418,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
           phone: profile.phone,
           logoUrl: profile.logoUrl,
           uid: user.uid,
+          companyName: profile.companyName,
+          fullAddress: profile.fullAddress,
+          businessPhone: profile.businessPhone,
+          rcsNumber: profile.rcsNumber,
+          nifNumber: profile.nifNumber,
+          legalMentions: profile.legalMentions,
+          customMessage: profile.customMessage,
         }, {
           amountXaf: SUBSCRIPTION_PLANS[profile.subscriptionType || 'transition'].price,
           paidAt: profile.lastPaymentAt,
@@ -783,6 +836,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         phone: establishmentInfo.phone,
                         whatsapp: establishmentInfo.whatsapp,
                         logoUrl: establishmentInfo.logoUrl || undefined,
+                        companyName: ticketCustomization.companyName || undefined,
+                        rcsNumber: ticketCustomization.rcsNumber || undefined,
+                        nifNumber: ticketCustomization.nifNumber || undefined,
+                        businessPhone: ticketCustomization.businessPhone || undefined,
+                        fullAddress: ticketCustomization.fullAddress || undefined,
+                        customMessage: ticketCustomization.customMessage || undefined,
+                        legalMentions: ticketCustomization.legalMentions || undefined,
                       });
                       toast({ title: "Informations sauvegardées", description: "Profil mis à jour" });
                     } catch {
@@ -792,6 +852,118 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     }
                   }} className="w-full bg-gradient-primary text-white" disabled={isSaving}>
                     {isSaving ? 'Sauvegarde...' : 'Sauvegarder les informations'}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Section Personnalisation des tickets */}
+            <Card className="shadow-card border-0">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Paintbrush size={20} />
+                  Personnalisation des tickets
+                </CardTitle>
+                <CardDescription>
+                  Personnalisez les informations affichées sur vos tickets de paiement
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="company-name">Nom de la structure / Entreprise</Label>
+                    <Input
+                      id="company-name"
+                      value={ticketCustomization.companyName}
+                      onChange={(e) => setTicketCustomization({...ticketCustomization, companyName: e.target.value})}
+                      placeholder="Ex: Restaurant NACK SARL"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="rcs-number">Numéro RCS</Label>
+                      <Input
+                        id="rcs-number"
+                        value={ticketCustomization.rcsNumber}
+                        onChange={(e) => setTicketCustomization({...ticketCustomization, rcsNumber: e.target.value})}
+                        placeholder="Ex: RCS-LB-2024-A-1234"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nif-number">Numéro NIF</Label>
+                      <Input
+                        id="nif-number"
+                        value={ticketCustomization.nifNumber}
+                        onChange={(e) => setTicketCustomization({...ticketCustomization, nifNumber: e.target.value})}
+                        placeholder="Ex: 1234567890"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="business-phone">Numéro de téléphone professionnel</Label>
+                    <Input
+                      id="business-phone"
+                      type="tel"
+                      value={ticketCustomization.businessPhone}
+                      onChange={(e) => setTicketCustomization({...ticketCustomization, businessPhone: e.target.value})}
+                      placeholder="+241 XX XX XX XX"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="full-address">Adresse complète</Label>
+                    <Input
+                      id="full-address"
+                      value={ticketCustomization.fullAddress}
+                      onChange={(e) => setTicketCustomization({...ticketCustomization, fullAddress: e.target.value})}
+                      placeholder="Ex: Avenue Léon Mba, Libreville, Gabon"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-message">Message personnalisé</Label>
+                    <Input
+                      id="custom-message"
+                      value={ticketCustomization.customMessage}
+                      onChange={(e) => setTicketCustomization({...ticketCustomization, customMessage: e.target.value})}
+                      placeholder="Ex: Merci pour votre confiance ❤️"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="legal-mentions">Mentions légales</Label>
+                    <Textarea
+                      id="legal-mentions"
+                      value={ticketCustomization.legalMentions}
+                      onChange={(e) => setTicketCustomization({...ticketCustomization, legalMentions: e.target.value})}
+                      placeholder="Ex: SIRET: 12345678901234 - TVA: FR12345678901"
+                      rows={3}
+                    />
+                  </div>
+                  <Button onClick={async () => {
+                    try {
+                      setIsSaving(true);
+                      await saveProfile({
+                        establishmentName: establishmentInfo.name,
+                        establishmentType: profile?.establishmentType || "",
+                        ownerName: profile?.ownerName || "",
+                        email: establishmentInfo.email,
+                        phone: establishmentInfo.phone,
+                        whatsapp: establishmentInfo.whatsapp,
+                        logoUrl: establishmentInfo.logoUrl || undefined,
+                        companyName: ticketCustomization.companyName || undefined,
+                        rcsNumber: ticketCustomization.rcsNumber || undefined,
+                        nifNumber: ticketCustomization.nifNumber || undefined,
+                        businessPhone: ticketCustomization.businessPhone || undefined,
+                        fullAddress: ticketCustomization.fullAddress || undefined,
+                        customMessage: ticketCustomization.customMessage || undefined,
+                        legalMentions: ticketCustomization.legalMentions || undefined,
+                      });
+                      toast({ title: "Personnalisation sauvegardée", description: "Les informations des tickets ont été mises à jour" });
+                    } catch {
+                      toast({ title: "Erreur", description: "Impossible d'enregistrer pour le moment.", variant: "destructive" });
+                    } finally {
+                      setIsSaving(false);
+                    }
+                  }} className="w-full bg-gradient-primary text-white" disabled={isSaving}>
+                    {isSaving ? 'Sauvegarde...' : 'Sauvegarder la personnalisation'}
                   </Button>
                 </div>
               </CardContent>

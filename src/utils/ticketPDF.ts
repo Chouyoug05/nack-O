@@ -18,6 +18,14 @@ interface TicketData {
     establishmentId: string;
     timestamp: number;
   };
+  // Informations personnalisées pour les tickets
+  companyName?: string;
+  fullAddress?: string;
+  businessPhone?: string;
+  rcsNumber?: string;
+  nifNumber?: string;
+  legalMentions?: string;
+  customMessage?: string;
 }
 
 // Couleurs modernes
@@ -103,9 +111,62 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
     }
   }
 
-  // Nom établissement avec style
-  text(ticketData.establishmentName.toUpperCase(), pageWidth / 2, y, 11, true, DARK_TEXT, 'center');
+  // Nom du bar (ou nom de la structure si défini)
+  const displayName = ticketData.companyName || ticketData.establishmentName;
+  text(displayName.toUpperCase(), pageWidth / 2, y, 11, true, DARK_TEXT, 'center');
   y += 6;
+  
+  // Adresse (si renseignée)
+  if (ticketData.fullAddress) {
+    text(ticketData.fullAddress, pageWidth / 2, y, 7, false, LIGHT_TEXT, 'center');
+    y += 4;
+  }
+  
+  // Téléphone professionnel (ou téléphone par défaut)
+  const displayPhone = ticketData.businessPhone || '';
+  if (displayPhone) {
+    text(displayPhone, pageWidth / 2, y, 7, false, LIGHT_TEXT, 'center');
+    y += 4;
+  }
+  
+  // Numéro RCS (si renseigné)
+  if (ticketData.rcsNumber) {
+    text(`RCS: ${ticketData.rcsNumber}`, pageWidth / 2, y, 6, false, LIGHT_TEXT, 'center');
+    y += 3.5;
+  }
+  
+  // Numéro NIF (si renseigné)
+  if (ticketData.nifNumber) {
+    text(`NIF: ${ticketData.nifNumber}`, pageWidth / 2, y, 6, false, LIGHT_TEXT, 'center');
+    y += 3.5;
+  }
+  
+  // Mentions légales (si renseignées)
+  if (ticketData.legalMentions) {
+    y += 2;
+    line(y, [240, 240, 240], 0.2);
+    y += 3;
+    // Diviser les mentions légales en plusieurs lignes si nécessaire
+    const maxWidth = contentWidth - 4;
+    const words = ticketData.legalMentions.split(' ');
+    let currentLine = '';
+    words.forEach((word) => {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const testWidth = doc.getTextWidth(testLine);
+      if (testWidth > maxWidth && currentLine) {
+        text(currentLine, pageWidth / 2, y, 5, false, LIGHT_TEXT, 'center');
+        y += 3;
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    });
+    if (currentLine) {
+      text(currentLine, pageWidth / 2, y, 5, false, LIGHT_TEXT, 'center');
+      y += 3;
+    }
+  }
+  
   line(y, [240, 240, 240], 0.3);
   y += 6;
 
@@ -245,7 +306,10 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   y += 2;
   line(y, [240, 240, 240], 0.2);
   y += 4;
-  text('Merci pour votre confiance !', pageWidth / 2, y, 7, true, PRIMARY_COLOR, 'center');
+  
+  // Message personnalisé (si renseigné) ou message par défaut
+  const footerMessage = ticketData.customMessage || 'Merci pour votre confiance !';
+  text(footerMessage, pageWidth / 2, y, 7, true, PRIMARY_COLOR, 'center');
   y += 3;
   text('NACK.PRO', pageWidth / 2, y, 6, false, LIGHT_TEXT, 'center');
   

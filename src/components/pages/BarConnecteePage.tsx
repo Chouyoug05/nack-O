@@ -611,7 +611,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           orderId: order.id,
           establishmentId: user.uid,
           timestamp: order.createdAt
-        }
+        },
+        companyName: profile.companyName,
+        fullAddress: profile.fullAddress,
+        businessPhone: profile.businessPhone,
+        rcsNumber: profile.rcsNumber,
+        nifNumber: profile.nifNumber,
+        legalMentions: profile.legalMentions,
+        customMessage: profile.customMessage,
       };
 
       await generateTicketPDF(ticketData);
