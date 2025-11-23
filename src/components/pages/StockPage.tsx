@@ -45,7 +45,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { lossesColRef, productsColRef } from "@/lib/collections";
 import { addDoc, deleteDoc, doc as fsDoc, getDoc, onSnapshot, runTransaction, updateDoc } from "firebase/firestore";
-import type { ProductDoc, LossDoc } from "@/types/inventory";
+import type { ProductDoc, LossDoc, FoodCost } from "@/types/inventory";
 import type { UserProfile } from "@/types/profile";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
@@ -63,6 +63,10 @@ interface Product {
   formula?: {
     units: number;
     price: number;
+  };
+  foodCost?: {
+    rawMaterials: Array<{ name: string; unitCost: number }>;
+    productionCosts: Array<{ type: string; amount: number }>;
   };
 }
 
@@ -111,6 +115,7 @@ const StockPage = () => {
         const cost = Number((raw.cost as number | string | undefined) ?? 0) || 0;
         const formulaUnits = raw.formula && typeof raw.formula.units !== 'undefined' ? Number(raw.formula.units) || 0 : undefined;
         const formulaPrice = raw.formula && typeof raw.formula.price !== 'undefined' ? Number(raw.formula.price) || 0 : undefined;
+        const foodCost = raw.foodCost as { rawMaterials?: Array<{ name: string; unitCost: number }>; productionCosts?: Array<{ type: string; amount: number }> } | undefined;
         return {
           id: d.id,
           name: (raw.name as string) || "",
@@ -122,6 +127,10 @@ const StockPage = () => {
           icon: (raw.icon as string) || undefined,
           imageUrl: (raw.imageUrl as string) || undefined,
           formula: formulaUnits !== undefined && formulaPrice !== undefined ? { units: formulaUnits, price: formulaPrice } : undefined,
+          foodCost: foodCost && (foodCost.rawMaterials || foodCost.productionCosts) ? {
+            rawMaterials: foodCost.rawMaterials || [],
+            productionCosts: foodCost.productionCosts || []
+          } : undefined,
         } as Product;
       });
       
@@ -178,7 +187,9 @@ const StockPage = () => {
     icon: "",
     imageUrl: "",
     formulaUnits: "",
-    formulaPrice: ""
+    formulaPrice: "",
+    rawMaterials: [] as Array<{ name: string; unitCost: string }>,
+    productionCosts: [] as Array<{ type: string; amount: string }>
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -299,7 +310,12 @@ const StockPage = () => {
     }
   };
 
-  const categories = ["Boissons", "Plats", "Alcools", "Snacks", "Desserts", "Ustensiles", "Équipements", "Fournitures", "Autres"];
+  const categories = ["Boisson alcoolisée", "Boisson non alcoolisée", "Plat / Repas", "Snack", "Dessert", "Entrée", "Autre"];
+  
+  // Catégories alimentaires qui nécessitent le module Food Cost
+  const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
+  
+  const isFoodCategory = (category: string) => foodCategories.includes(category);
   
   const availableIcons = [
     { name: "Beer", icon: Beer, label: "Bière" },
@@ -388,6 +404,31 @@ const StockPage = () => {
       }
     }
 
+    // Préparer les données Food Cost si catégorie alimentaire
+    let foodCostData: FoodCost | undefined = undefined;
+    if (isFoodCategory(newProduct.category)) {
+      const rawMaterials = newProduct.rawMaterials
+        .filter(m => m.name.trim() && m.unitCost)
+        .map(m => ({
+          name: m.name.trim(),
+          unitCost: Number(m.unitCost) || 0
+        }));
+      
+      const productionCosts = newProduct.productionCosts
+        .filter(c => c.type.trim() && c.amount)
+        .map(c => ({
+          type: c.type.trim(),
+          amount: Number(c.amount) || 0
+        }));
+      
+      if (rawMaterials.length > 0 || productionCosts.length > 0) {
+        foodCostData = {
+          rawMaterials,
+          productionCosts
+        };
+      }
+    }
+
     const payload: ProductDoc = {
       name: newProduct.name,
       category: newProduct.category,
@@ -404,6 +445,7 @@ const StockPage = () => {
         price: Number(newProduct.formulaPrice)
           }
         } : {}),
+        ...(foodCostData ? { foodCost: foodCostData } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -420,7 +462,9 @@ const StockPage = () => {
       icon: "",
       imageUrl: "",
       formulaUnits: "",
-      formulaPrice: ""
+      formulaPrice: "",
+      rawMaterials: [],
+      productionCosts: []
     });
     setImageFile(null);
     setIsAddModalOpen(false);
@@ -449,6 +493,8 @@ const StockPage = () => {
       imageUrl: product.imageUrl || "",
       formulaUnits: product.formula?.units ? String(product.formula.units) : "",
       formulaPrice: product.formula?.price ? String(product.formula.price) : "",
+      rawMaterials: product.foodCost?.rawMaterials.map(m => ({ name: m.name, unitCost: String(m.unitCost) })) || [],
+      productionCosts: product.foodCost?.productionCosts.map(c => ({ type: c.type, amount: String(c.amount) })) || [],
     });
     setIsAddModalOpen(true);
   };
@@ -601,6 +647,31 @@ const StockPage = () => {
         }
       }
       
+      // Préparer les données Food Cost si catégorie alimentaire
+      let foodCostData: FoodCost | undefined = undefined;
+      if (isFoodCategory(newProduct.category)) {
+        const rawMaterials = newProduct.rawMaterials
+          .filter(m => m.name.trim() && m.unitCost)
+          .map(m => ({
+            name: m.name.trim(),
+            unitCost: Number(m.unitCost) || 0
+          }));
+        
+        const productionCosts = newProduct.productionCosts
+          .filter(c => c.type.trim() && c.amount)
+          .map(c => ({
+            type: c.type.trim(),
+            amount: Number(c.amount) || 0
+          }));
+        
+        if (rawMaterials.length > 0 || productionCosts.length > 0) {
+          foodCostData = {
+            rawMaterials,
+            productionCosts
+          };
+        }
+      }
+
       const payload: Partial<ProductDoc> = {
         name: newProduct.name,
         category: newProduct.category,
@@ -617,6 +688,7 @@ const StockPage = () => {
             price: Number(newProduct.formulaPrice)
           }
         } : {}),
+        ...(foodCostData ? { foodCost: foodCostData } : {}),
         updatedAt: Date.now(),
       };
       await updateDoc(productRef, payload);
@@ -634,7 +706,9 @@ const StockPage = () => {
         icon: "",
         imageUrl: "",
         formulaUnits: "",
-        formulaPrice: ""
+        formulaPrice: "",
+        rawMaterials: [],
+        productionCosts: []
       });
       toast({ title: "Produit modifié", description: "Le produit a été mis à jour" });
     } catch (e: unknown) {
@@ -1044,7 +1118,8 @@ const StockPage = () => {
                          setEditingProduct(null);
                          setNewProduct({
                            name: "", category: "", price: "", quantity: "", cost: "",
-                           description: "", icon: "", imageUrl: "", formulaUnits: "", formulaPrice: ""
+                           description: "", icon: "", imageUrl: "", formulaUnits: "", formulaPrice: "",
+                           rawMaterials: [], productionCosts: []
                          });
                          setIsAddModalOpen(true);
                        });
@@ -1246,15 +1321,13 @@ const StockPage = () => {
                         <p className="text-center text-muted-foreground text-lg">Choisissez le type de produit</p>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           {[
-                            { cat: "Boissons", icon: GlassWater, color: "bg-blue-50 border-blue-200 hover:bg-blue-100" },
-                            { cat: "Plats", icon: Pizza, color: "bg-orange-50 border-orange-200 hover:bg-orange-100" },
-                            { cat: "Alcools", icon: Wine, color: "bg-purple-50 border-purple-200 hover:bg-purple-100" },
-                            { cat: "Snacks", icon: Cookie, color: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" },
-                            { cat: "Desserts", icon: IceCream, color: "bg-pink-50 border-pink-200 hover:bg-pink-100" },
-                            { cat: "Ustensiles", icon: Utensils, color: "bg-gray-50 border-gray-200 hover:bg-gray-100" },
-                            { cat: "Équipements", icon: Settings, color: "bg-green-50 border-green-200 hover:bg-green-100" },
-                            { cat: "Fournitures", icon: Box, color: "bg-teal-50 border-teal-200 hover:bg-teal-100" },
-                            { cat: "Autres", icon: Package, color: "bg-slate-50 border-slate-200 hover:bg-slate-100" }
+                            { cat: "Boisson alcoolisée", icon: Wine, color: "bg-purple-50 border-purple-200 hover:bg-purple-100" },
+                            { cat: "Boisson non alcoolisée", icon: GlassWater, color: "bg-blue-50 border-blue-200 hover:bg-blue-100" },
+                            { cat: "Plat / Repas", icon: Pizza, color: "bg-orange-50 border-orange-200 hover:bg-orange-100" },
+                            { cat: "Snack", icon: Cookie, color: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" },
+                            { cat: "Dessert", icon: IceCream, color: "bg-pink-50 border-pink-200 hover:bg-pink-100" },
+                            { cat: "Entrée", icon: Utensils, color: "bg-green-50 border-green-200 hover:bg-green-100" },
+                            { cat: "Autre", icon: Package, color: "bg-slate-50 border-slate-200 hover:bg-slate-100" }
                           ].map(({ cat, icon: Icon, color }) => (
                             <button
                               key={cat}
@@ -1348,18 +1421,206 @@ const StockPage = () => {
                           <p className="text-center text-sm text-muted-foreground mt-2">Laisser vide si non vendu.</p>
                         </div>
 
-                        <div>
-                          <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
-                          <Input
-                            id="cost"
-                            type="number"
-                            value={newProduct.cost}
-                            onChange={(e) => setNewProduct({...newProduct, cost: e.target.value})}
-                            className="w-full h-16 text-2xl text-center font-semibold"
-                            placeholder=""
-                            min="0"
-                          />
-                        </div>
+                        {!isFoodCategory(newProduct.category) && (
+                          <div>
+                            <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
+                            <Input
+                              id="cost"
+                              type="number"
+                              value={newProduct.cost}
+                              onChange={(e) => setNewProduct({...newProduct, cost: e.target.value})}
+                              className="w-full h-16 text-2xl text-center font-semibold"
+                              placeholder=""
+                              min="0"
+                            />
+                          </div>
+                        )}
+
+                        {/* Module Food Cost - Affiché uniquement pour les catégories alimentaires */}
+                        {isFoodCategory(newProduct.category) && (
+                          <div className="space-y-6 border-t pt-6">
+                            <h4 className="text-xl font-bold text-center">Food Cost / Coût de Production</h4>
+                            
+                            {/* Matières premières */}
+                            <div className="space-y-3">
+                              <Label className="text-lg font-semibold">A. Matières premières</Label>
+                              {newProduct.rawMaterials.map((material, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Label className="text-sm">Nom de l'ingrédient</Label>
+                                    <Input
+                                      value={material.name}
+                                      onChange={(e) => {
+                                        const updated = [...newProduct.rawMaterials];
+                                        updated[index] = { ...updated[index], name: e.target.value };
+                                        setNewProduct({...newProduct, rawMaterials: updated});
+                                      }}
+                                      placeholder="Ex: Riz, Poulet, etc."
+                                    />
+                                  </div>
+                                  <div className="w-32">
+                                    <Label className="text-sm">Coût unitaire</Label>
+                                    <Input
+                                      type="number"
+                                      value={material.unitCost}
+                                      onChange={(e) => {
+                                        const updated = [...newProduct.rawMaterials];
+                                        updated[index] = { ...updated[index], unitCost: e.target.value };
+                                        setNewProduct({...newProduct, rawMaterials: updated});
+                                      }}
+                                      placeholder="XAF"
+                                      min="0"
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const updated = newProduct.rawMaterials.filter((_, i) => i !== index);
+                                      setNewProduct({...newProduct, rawMaterials: updated});
+                                    }}
+                                    className="mb-0"
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  setNewProduct({
+                                    ...newProduct,
+                                    rawMaterials: [...newProduct.rawMaterials, { name: "", unitCost: "" }]
+                                  });
+                                }}
+                                className="w-full"
+                              >
+                                <Plus size={16} className="mr-2" />
+                                Ajouter une ligne
+                              </Button>
+                            </div>
+
+                            {/* Coûts de production */}
+                            <div className="space-y-3">
+                              <Label className="text-lg font-semibold">B. Coûts de production</Label>
+                              {newProduct.productionCosts.map((cost, index) => (
+                                <div key={index} className="flex gap-2 items-end">
+                                  <div className="flex-1">
+                                    <Label className="text-sm">Type de coût</Label>
+                                    <Input
+                                      value={cost.type}
+                                      onChange={(e) => {
+                                        const updated = [...newProduct.productionCosts];
+                                        updated[index] = { ...updated[index], type: e.target.value };
+                                        setNewProduct({...newProduct, productionCosts: updated});
+                                      }}
+                                      placeholder="Ex: Main d'œuvre, Gaz, Eau, Condiments, etc."
+                                    />
+                                  </div>
+                                  <div className="w-32">
+                                    <Label className="text-sm">Montant</Label>
+                                    <Input
+                                      type="number"
+                                      value={cost.amount}
+                                      onChange={(e) => {
+                                        const updated = [...newProduct.productionCosts];
+                                        updated[index] = { ...updated[index], amount: e.target.value };
+                                        setNewProduct({...newProduct, productionCosts: updated});
+                                      }}
+                                      placeholder="XAF"
+                                      min="0"
+                                    />
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const updated = newProduct.productionCosts.filter((_, i) => i !== index);
+                                      setNewProduct({...newProduct, productionCosts: updated});
+                                    }}
+                                    className="mb-0"
+                                  >
+                                    <Trash2 size={16} />
+                                  </Button>
+                                </div>
+                              ))}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => {
+                                  setNewProduct({
+                                    ...newProduct,
+                                    productionCosts: [...newProduct.productionCosts, { type: "", amount: "" }]
+                                  });
+                                }}
+                                className="w-full"
+                              >
+                                <Plus size={16} className="mr-2" />
+                                Ajouter une ligne
+                              </Button>
+                            </div>
+
+                            {/* Résumé des coûts - Calculs automatiques */}
+                            {(() => {
+                              const rawMaterialsTotal = newProduct.rawMaterials.reduce((sum, m) => {
+                                const cost = Number(m.unitCost) || 0;
+                                return sum + cost;
+                              }, 0);
+                              
+                              const productionCostsTotal = newProduct.productionCosts.reduce((sum, c) => {
+                                const amount = Number(c.amount) || 0;
+                                return sum + amount;
+                              }, 0);
+                              
+                              const totalCost = rawMaterialsTotal + productionCostsTotal;
+                              const sellingPrice = Number(newProduct.price) || 0;
+                              const grossMargin = sellingPrice - totalCost;
+                              const foodCostPercent = sellingPrice > 0 ? (totalCost / sellingPrice) * 100 : 0;
+                              const marginPercent = sellingPrice > 0 ? (grossMargin / sellingPrice) * 100 : 0;
+                              
+                              return (
+                                <div className="space-y-3 border-t pt-4 bg-gray-50 p-4 rounded-lg">
+                                  <h5 className="text-lg font-bold">Résumé des coûts</h5>
+                                  <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                      <span className="text-muted-foreground">Coût des matières premières:</span>
+                                      <p className="font-semibold">{rawMaterialsTotal.toLocaleString()} XAF</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Coût de production:</span>
+                                      <p className="font-semibold">{productionCostsTotal.toLocaleString()} XAF</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Coût réel total:</span>
+                                      <p className="font-semibold text-blue-600">{totalCost.toLocaleString()} XAF</p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Marge brute:</span>
+                                      <p className={`font-semibold ${grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {grossMargin.toLocaleString()} XAF
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Food cost (%):</span>
+                                      <p className={`font-semibold ${foodCostPercent <= 30 ? 'text-green-600' : foodCostPercent <= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                        {foodCostPercent.toFixed(1)}%
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted-foreground">Taux de marge (%):</span>
+                                      <p className={`font-semibold ${marginPercent >= 30 ? 'text-green-600' : marginPercent >= 20 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                        {marginPercent.toFixed(1)}%
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1514,6 +1775,34 @@ const StockPage = () => {
                           Formule: {product.formula.units} unités à <span className="force-display-inline">{String(Number(product.formula.price || 0).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }))}</span> XAF
                         </p>
                       )}
+                      {/* Résumé Food Cost */}
+                      {product.foodCost && (() => {
+                        const rawMaterialsTotal = product.foodCost.rawMaterials.reduce((sum, m) => sum + m.unitCost, 0);
+                        const productionCostsTotal = product.foodCost.productionCosts.reduce((sum, c) => sum + c.amount, 0);
+                        const totalCost = rawMaterialsTotal + productionCostsTotal;
+                        const sellingPrice = product.price || 0;
+                        const grossMargin = sellingPrice - totalCost;
+                        const foodCostPercent = sellingPrice > 0 ? (totalCost / sellingPrice) * 100 : 0;
+                        const marginPercent = sellingPrice > 0 ? (grossMargin / sellingPrice) * 100 : 0;
+                        
+                        return (
+                          <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
+                            <p className="text-xs font-semibold text-gray-700 mb-1">Résumé des coûts</p>
+                            <div className="grid grid-cols-2 gap-1 text-xs">
+                              <span className="text-gray-600">Coût total:</span>
+                              <span className="font-semibold">{totalCost.toLocaleString()} XAF</span>
+                              <span className="text-gray-600">Food cost:</span>
+                              <span className={`font-semibold ${foodCostPercent <= 30 ? 'text-green-600' : foodCostPercent <= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {foodCostPercent.toFixed(1)}%
+                              </span>
+                              <span className="text-gray-600">Marge:</span>
+                              <span className={`font-semibold ${grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {grossMargin.toLocaleString()} XAF ({marginPercent.toFixed(1)}%)
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

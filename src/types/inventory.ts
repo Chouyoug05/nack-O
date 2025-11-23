@@ -1,3 +1,18 @@
+export interface RawMaterial {
+  name: string;
+  unitCost: number;
+}
+
+export interface ProductionCost {
+  type: string; // main d'œuvre, gaz, eau, condiments, etc.
+  amount: number;
+}
+
+export interface FoodCost {
+  rawMaterials: RawMaterial[];
+  productionCosts: ProductionCost[];
+}
+
 export interface ProductDoc {
   name: string;
   category: string;
@@ -13,6 +28,7 @@ export interface ProductDoc {
     units: number;
     price: number;
   };
+  foodCost?: FoodCost; // Module Food Cost pour produits alimentaires
   createdAt: number;
   updatedAt: number;
 }

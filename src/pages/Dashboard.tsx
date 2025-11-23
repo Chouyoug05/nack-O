@@ -27,6 +27,9 @@ import TeamPage from "@/components/pages/TeamPage";
 import { db } from "@/lib/firebase";
 import { productsColRef, salesColRef, teamColRef } from "@/lib/collections";
 import { onSnapshot, orderBy, query, where, collection } from "firebase/firestore";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -154,6 +157,16 @@ const Dashboard = () => {
     teamCount: 0,
   });
   const [barPendingCount, setBarPendingCount] = useState<number>(0);
+  const [foodProducts, setFoodProducts] = useState<Array<{
+    id: string;
+    name: string;
+    category: string;
+    price: number;
+    foodCost?: {
+      rawMaterials: Array<{ name: string; unitCost: number }>;
+      productionCosts: Array<{ type: string; amount: number }>;
+    };
+  }>>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -202,6 +215,34 @@ const Dashboard = () => {
     } catch {
       setBarPendingCount(0);
     }
+
+    // Food products with Food Cost
+    const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
+    unsubs.push(onSnapshot(
+      productsColRef(db, user.uid),
+      (snap) => {
+        const foodItems = snap.docs
+          .map(d => {
+            const data = d.data();
+            const category = data.category || "";
+            if (foodCategories.includes(category) && data.foodCost) {
+              return {
+                id: d.id,
+                name: data.name || "",
+                category,
+                price: Number(data.price || 0),
+                foodCost: data.foodCost as {
+                  rawMaterials: Array<{ name: string; unitCost: number }>;
+                  productionCosts: Array<{ type: string; amount: number }>;
+                }
+              };
+            }
+            return null;
+          })
+          .filter((item): item is NonNullable<typeof item> => item !== null);
+        setFoodProducts(foodItems);
+      }
+    ));
 
     return () => {
       unsubs.forEach((u) => u());
@@ -387,6 +428,71 @@ const Dashboard = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* Rentabilité des plats */}
+      {activeAction === "menu" && foodProducts.length > 0 && (
+        <section className="p-4 md:p-6 lg:p-8 pt-2 md:pt-4 lg:pt-6">
+          <div className="w-full max-w-7xl mx-auto">
+            <Card className="shadow-card border-0">
+              <CardHeader>
+                <CardTitle>Rentabilité des plats</CardTitle>
+                <CardDescription>Analyse des coûts et marges des produits alimentaires</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nom du plat</TableHead>
+                        <TableHead>Coût total</TableHead>
+                        <TableHead>Prix de vente</TableHead>
+                        <TableHead>Food cost %</TableHead>
+                        <TableHead>Marge</TableHead>
+                        <TableHead>Statut</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {foodProducts.map((product) => {
+                        const rawMaterialsTotal = product.foodCost?.rawMaterials.reduce((sum, m) => sum + m.unitCost, 0) || 0;
+                        const productionCostsTotal = product.foodCost?.productionCosts.reduce((sum, c) => sum + c.amount, 0) || 0;
+                        const totalCost = rawMaterialsTotal + productionCostsTotal;
+                        const sellingPrice = product.price || 0;
+                        const grossMargin = sellingPrice - totalCost;
+                        const foodCostPercent = sellingPrice > 0 ? (totalCost / sellingPrice) * 100 : 0;
+                        const marginPercent = sellingPrice > 0 ? (grossMargin / sellingPrice) * 100 : 0;
+                        const isProfitable = grossMargin > 0 && foodCostPercent <= 40;
+                        
+                        return (
+                          <TableRow key={product.id}>
+                            <TableCell className="font-medium">{product.name}</TableCell>
+                            <TableCell>{totalCost.toLocaleString()} XAF</TableCell>
+                            <TableCell>{sellingPrice.toLocaleString()} XAF</TableCell>
+                            <TableCell>
+                              <span className={foodCostPercent <= 30 ? 'text-green-600 font-semibold' : foodCostPercent <= 40 ? 'text-yellow-600 font-semibold' : 'text-red-600 font-semibold'}>
+                                {foodCostPercent.toFixed(1)}%
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <span className={grossMargin >= 0 ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                                {grossMargin.toLocaleString()} XAF ({marginPercent.toFixed(1)}%)
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={isProfitable ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}>
+                                {isProfitable ? 'Rentable' : 'Non rentable'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
       )}
