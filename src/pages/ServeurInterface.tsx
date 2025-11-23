@@ -485,9 +485,11 @@ const ServeurInterface = () => {
           </div>
           <div>
             <h1 className="text-lg md:text-xl lg:text-2xl font-bold leading-tight tracking-[-0.015em] text-gray-900">
-              Interface Serveur
+              {agentInfo?.name || 'Serveur'}
             </h1>
-            <p className="text-xs md:text-sm text-muted-foreground">Code: {agentCode}</p>
+            <p className="text-xs md:text-sm text-muted-foreground">
+              {agentInfo?.name ? `Code: ${agentCode?.substring(0, 8)}...` : `Code: ${agentCode}`}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-3">
@@ -589,55 +591,74 @@ const ServeurInterface = () => {
                       </div>
                     </div>
                   </div>
-                  {/* Onglets Catégories dynamiques - Version améliorée */}
+                  {/* Onglets Catégories - Design professionnel épuré */}
                   <div className="w-full border-b border-[#e6dfdb] mt-4">
-                    <div className="flex overflow-x-auto scrollbar-hide gap-1">
+                    <div className="flex overflow-x-auto scrollbar-hide gap-0.5 pb-1">
                       <button
                         key="all"
                         type="button"
                         onClick={() => setActiveCategoryTab("all")}
-                        className={`flex items-center justify-center gap-1.5 pb-3 pt-3 border-b-[3px] text-sm min-w-[60px] px-2.5 transition-all ${
+                        className={`flex flex-col items-center justify-center gap-1 pb-2.5 pt-2.5 px-3 min-w-[70px] transition-all rounded-t-lg ${
                           activeCategoryTab === "all" 
-                            ? 'border-b-nack-red text-nack-red font-bold' 
-                            : 'border-b-transparent text-muted-foreground hover:text-gray-700'
+                            ? 'bg-nack-red/10 border-b-[3px] border-b-nack-red' 
+                            : 'hover:bg-gray-50 border-b-[3px] border-b-transparent'
                         }`}
                       >
-                        <Grid3x3 className="h-5 w-5 flex-shrink-0" />
-                        <span className="font-semibold whitespace-nowrap text-xs sm:text-sm">Tout</span>
+                        <Grid3x3 className={`h-5 w-5 flex-shrink-0 ${activeCategoryTab === "all" ? 'text-nack-red' : 'text-gray-500'}`} />
+                        <span className={`font-semibold whitespace-nowrap text-[10px] sm:text-xs ${activeCategoryTab === "all" ? 'text-nack-red' : 'text-gray-600'}`}>
+                          Tout
+                        </span>
                       </button>
                       {availableCategories.length > 0 ? (
                         availableCategories.map((category) => {
                           const Icon = getCategoryIcon(category);
-                          // Raccourcir les noms de catégories pour plus de lisibilité
+                          // Fonction améliorée pour raccourcir les noms de catégories
                           const getShortCategoryName = (cat: string): string => {
                             const catLower = cat.toLowerCase();
-                            if (catLower.includes('boisson alcoolisée')) return 'Alcool';
-                            if (catLower.includes('boisson non alcoolisée')) return 'Boisson';
+                            // Mappings spécifiques pour les catégories courantes
+                            if (catLower.includes('boisson alcoolisée') || catLower.includes('alcool')) return 'Alcool';
+                            if (catLower.includes('boisson non alcoolisée') || catLower.includes('boisson')) return 'Boisson';
                             if (catLower.includes('plat') || catLower.includes('repas')) return 'Plat';
-                            if (catLower.includes('snack')) return 'Snack';
+                            if (catLower.includes('snack') || catLower.includes('collation')) return 'Snack';
                             if (catLower.includes('dessert')) return 'Dessert';
-                            if (catLower.includes('entrée')) return 'Entrée';
+                            if (catLower.includes('entrée') || catLower.includes('apéritif')) return 'Entrée';
+                            if (catLower.includes('pizza')) return 'Pizza';
+                            if (catLower.includes('gril') || catLower.includes('grill')) return 'Gril';
+                            if (catLower.includes('p\'tit déj') || catLower.includes('petit déjeuner') || catLower.includes('déjeuner')) return 'Déj';
+                            if (catLower.includes('soda')) return 'Soda';
+                            if (catLower.includes('accompagnement')) return 'Accomp.';
                             if (catLower.includes('autre')) return 'Autre';
-                            // Si le nom est court, le garder tel quel
-                            if (cat.length <= 12) return cat;
-                            // Sinon, prendre les premiers mots
-                            return cat.split(' ').slice(0, 2).join(' ');
+                            // Si le nom est court (≤ 10 caractères), le garder tel quel
+                            if (cat.length <= 10) return cat;
+                            // Prendre les 2 premiers mots maximum
+                            const words = cat.split(' ');
+                            if (words.length > 2) {
+                              return words.slice(0, 2).join(' ');
+                            }
+                            // Si un seul mot mais trop long, tronquer
+                            if (words.length === 1 && cat.length > 10) {
+                              return cat.substring(0, 10) + '...';
+                            }
+                            return cat;
                           };
                           const shortName = getShortCategoryName(category);
+                          const isActive = activeCategoryTab === category;
                           return (
                             <button
                               key={category}
                               type="button"
                               onClick={() => setActiveCategoryTab(category)}
-                              className={`flex items-center justify-center gap-1.5 pb-3 pt-3 border-b-[3px] text-sm min-w-[60px] px-2.5 transition-all ${
-                                activeCategoryTab === category 
-                                  ? 'border-b-nack-red text-nack-red font-bold' 
-                                  : 'border-b-transparent text-muted-foreground hover:text-gray-700'
+                              className={`flex flex-col items-center justify-center gap-1 pb-2.5 pt-2.5 px-3 min-w-[70px] transition-all rounded-t-lg ${
+                                isActive
+                                  ? 'bg-nack-red/10 border-b-[3px] border-b-nack-red' 
+                                  : 'hover:bg-gray-50 border-b-[3px] border-b-transparent'
                               }`}
-                              title={category} // Tooltip avec le nom complet
+                              title={category} // Tooltip avec le nom complet au survol
                             >
-                              <Icon className="h-5 w-5 flex-shrink-0" />
-                              <span className="font-semibold whitespace-nowrap text-xs sm:text-sm">{shortName}</span>
+                              <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-nack-red' : 'text-gray-500'}`} />
+                              <span className={`font-semibold whitespace-nowrap text-[10px] sm:text-xs text-center leading-tight ${isActive ? 'text-nack-red' : 'text-gray-600'}`}>
+                                {shortName}
+                              </span>
                             </button>
                           );
                         })
