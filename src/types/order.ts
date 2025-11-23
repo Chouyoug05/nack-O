@@ -13,6 +13,7 @@ export interface CartItem extends Product {
 }
 
 export type OrderStatus = 'pending' | 'sent' | 'cancelled';
+export type KitchenStatus = 'en-attente' | 'en-preparation' | 'pret' | 'termine';
 
 export interface Order {
   id: string;

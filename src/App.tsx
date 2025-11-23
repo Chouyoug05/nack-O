@@ -17,6 +17,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Dashboard from "./pages/Dashboard";
 import ServeurInterface from "./pages/ServeurInterface";
 import CaisseInterface from "./pages/CaisseInterface";
+import CuisineInterface from "./pages/CuisineInterface";
 import EventPublicPage from "./pages/EventPublicPage";
 import AgentEvenementInterface from "./pages/AgentEvenementInterface";
 import NotFound from "./pages/NotFound";
@@ -119,6 +120,7 @@ const router = createBrowserRouter([
       { path: "admin/client/:uid", element: <RequireAuth><RequireAdmin><ClientDetailsPage /></RequireAdmin></RequireAuth> },
       { path: "serveur/:agentCode", element: <ServeurInterface /> },
       { path: "caisse/:agentCode", element: <CaisseInterface /> },
+      { path: "cuisine/:agentCode", element: <CuisineInterface /> },
       { path: "agent-evenement/:agentCode", element: <AgentEvenementInterface /> },
       { path: "event/:eventId", element: <EventPublicPage /> },
       { path: "commande/:establishmentId", element: <PublicOrderingPage /> },

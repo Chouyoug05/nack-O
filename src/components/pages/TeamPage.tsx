@@ -36,7 +36,7 @@ interface TeamMember {
   lastName: string;
   email: string;
   phone: string;
-  role: 'serveur' | 'caissier' | 'agent-evenement';
+  role: 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
   status: 'active' | 'inactive';
   agentCode?: string;
   dashboardLink?: string;
@@ -50,7 +50,7 @@ const TeamPage = () => {
   const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isRoleSelectionOpen, setIsRoleSelectionOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'serveur' | 'caissier' | 'agent-evenement' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier' | null>(null);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
@@ -133,6 +133,7 @@ const TeamPage = () => {
   const generateDashboardLink = (role: TeamRole, token: string) => {
     if (role === 'serveur') return `/serveur/${token}`;
     if (role === 'caissier') return `/caisse/${token}`;
+    if (role === 'cuisinier') return `/cuisine/${token}`;
     return `/agent-evenement/${token}`;
   };
 
@@ -141,6 +142,7 @@ const TeamPage = () => {
       case 'serveur': return UtensilsCrossed;
       case 'caissier': return Wallet;
       case 'agent-evenement': return QrCode;
+      case 'cuisinier': return UtensilsCrossed;
       default: return UserCheck;
     }
   };
@@ -150,6 +152,7 @@ const TeamPage = () => {
       case 'serveur': return 'Serveur';
       case 'caissier': return 'Caissier';
       case 'agent-evenement': return 'Agent Événement';
+      case 'cuisinier': return 'Cuisinier';
       default: return role;
     }
   };
@@ -268,7 +271,7 @@ const TeamPage = () => {
     }
   };
 
-  const openAddModal = (role: 'serveur' | 'caissier' | 'agent-evenement') => {
+  const openAddModal = (role: 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier') => {
     // Fonctionnalités débloquées : tous les rôles sont disponibles
     setSelectedRole(role);
     setIsAddModalOpen(true);
@@ -457,6 +460,19 @@ const TeamPage = () => {
             </Button>
             <Button
               variant="outline"
+              onClick={() => openAddModal('cuisinier')}
+              className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
+            >
+              <div className="flex items-center gap-2">
+                <UtensilsCrossed className="w-6 h-6" />
+                <span className="font-semibold text-lg">Cuisinier</span>
+              </div>
+              <span className="text-sm text-muted-foreground">
+                Gérer les commandes de nourriture et leur préparation
+              </span>
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => openAddModal('agent-evenement')}
               className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
             >
@@ -550,11 +566,12 @@ const TeamPage = () => {
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Ajouter un {selectedRole === 'serveur' ? 'Serveur' : selectedRole === 'caissier' ? 'Caissier' : 'Agent Événement'}
+              Ajouter un {selectedRole === 'serveur' ? 'Serveur' : selectedRole === 'caissier' ? 'Caissier' : selectedRole === 'cuisinier' ? 'Cuisinier' : 'Agent Événement'}
             </DialogTitle>
             <DialogDescription>
               Remplissez les informations du nouvel agent. Un code d'agent et un lien d'accès personnalisé seront générés automatiquement.
               {selectedRole === 'agent-evenement' && ' Cet agent aura accès uniquement au scanner QR pour valider les billets d\'événements.'}
+              {selectedRole === 'cuisinier' && ' Cet agent aura accès uniquement aux commandes contenant de la nourriture pour gérer leur préparation.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
@@ -615,6 +632,7 @@ const TeamPage = () => {
                  <p className="text-xs text-blue-800 font-medium mb-1">
                    {selectedRole === 'serveur' ? '🛎️ Interface Serveur' : 
                     selectedRole === 'caissier' ? '💰 Interface Caisse' : 
+                    selectedRole === 'cuisinier' ? '👨‍🍳 Interface Cuisine' :
                     '📱 Interface Agent Événement'}
                  </p>
                  <p className="text-xs text-blue-700">
@@ -622,6 +640,8 @@ const TeamPage = () => {
                      ? 'L\'agent aura accès aux produits et pourra prendre les commandes'
                      : selectedRole === 'caissier'
                      ? 'L\'agent aura accès à la feuille de caisse pour enregistrer les paiements'
+                     : selectedRole === 'cuisinier'
+                     ? 'L\'agent aura accès uniquement aux commandes contenant de la nourriture pour gérer leur préparation'
                      : 'L\'agent aura accès uniquement au scanner QR pour valider les billets d\'événements'
                    }
                  </p>

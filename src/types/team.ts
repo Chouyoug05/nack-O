@@ -1,4 +1,4 @@
-export type TeamRole = 'serveur' | 'caissier' | 'agent-evenement';
+export type TeamRole = 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
 export type TeamStatus = 'active' | 'inactive';
 
 export interface TeamMemberDoc {

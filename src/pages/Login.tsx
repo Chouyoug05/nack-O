@@ -14,7 +14,7 @@ import { agentTokensTopColRef } from "@/lib/collections";
 import { getDoc, doc, collectionGroup, query, where, limit, getDocs } from "firebase/firestore";
 
 type LoginType = 'manager' | 'team';
-type TeamRole = 'serveur' | 'caissier' | 'agent-evenement';
+type TeamRole = 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
 
 const Login = () => {
   const [loginType, setLoginType] = useState<LoginType>('manager');
@@ -149,6 +149,8 @@ const Login = () => {
         navigate(`/serveur/${foundToken}`);
       } else if (teamFormData.role === 'caissier') {
         navigate(`/caisse/${foundToken}`);
+      } else if (teamFormData.role === 'cuisinier') {
+        navigate(`/cuisine/${foundToken}`);
       } else if (teamFormData.role === 'agent-evenement') {
         navigate(`/agent-evenement/${foundToken}`);
       }
@@ -294,6 +296,12 @@ const Login = () => {
                         <div className="flex items-center gap-2">
                           <Wallet size={16} />
                           <span>Caissier</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="cuisinier">
+                        <div className="flex items-center gap-2">
+                          <UtensilsCrossed size={16} />
+                          <span>Cuisinier</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="agent-evenement">

@@ -1101,9 +1101,9 @@ const AdminDashboard = () => {
                       <TableCell>{p.establishmentName || "—"}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
-                          {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
-                          {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
+                        {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
+                        {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
+                        {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
                           {status === 'active' && p.subscriptionType && (
                             <Badge className="bg-blue-100 text-blue-700 text-xs" variant="secondary">
                               {p.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'}
@@ -1184,15 +1184,15 @@ const AdminDashboard = () => {
         <div>
           <h1 className="text-2xl font-bold">Produits</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des produits de tous les utilisateurs ({allProducts.length} total)</p>
-        </div>
+              </div>
         <div className="ml-auto">
           <Button variant="outline" size="sm" onClick={loadAllProducts} disabled={isLoadingProducts}>
             {isLoadingProducts ? "Chargement..." : "Actualiser"}
           </Button>
-        </div>
-      </div>
-      <Card className="border-0 shadow-card">
-        <CardContent>
+              </div>
+              </div>
+          <Card className="border-0 shadow-card">
+            <CardContent>
           {isLoadingProducts ? (
             <div className="text-center py-8 text-muted-foreground">Chargement des produits...</div>
           ) : allProducts.length === 0 ? (
@@ -1222,17 +1222,17 @@ const AdminDashboard = () => {
                           {product.userName && product.establishmentName && (
                             <span className="text-xs text-muted-foreground">{product.userName}</span>
                           )}
-                        </div>
+              </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            </div>
+              </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+            </CardContent>
+          </Card>
+        </div>
   );
 
   // Vue Commandes
@@ -1252,8 +1252,8 @@ const AdminDashboard = () => {
           </Button>
         </div>
       </div>
-      <Card className="border-0 shadow-card">
-        <CardContent>
+        <Card className="border-0 shadow-card">
+          <CardContent>
           {isLoadingOrders ? (
             <div className="text-center py-8 text-muted-foreground">Chargement des commandes...</div>
           ) : allOrders.length === 0 ? (
@@ -1290,7 +1290,7 @@ const AdminDashboard = () => {
                           {order.userName && order.establishmentName && (
                             <span className="text-xs text-muted-foreground">{order.userName}</span>
                           )}
-                        </div>
+            </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1298,9 +1298,9 @@ const AdminDashboard = () => {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+              </div>
   );
 
   // Vue Événements
@@ -1309,17 +1309,17 @@ const AdminDashboard = () => {
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
-        </Button>
+                </Button>
         <div>
           <h1 className="text-2xl font-bold">Événements</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des événements de tous les utilisateurs ({allEvents.length} total)</p>
-        </div>
+              </div>
         <div className="ml-auto">
           <Button variant="outline" size="sm" onClick={loadAllEvents} disabled={isLoadingEvents}>
             {isLoadingEvents ? "Chargement..." : "Actualiser"}
-          </Button>
-        </div>
-      </div>
+                  </Button>
+                </div>
+              </div>
       <Card className="border-0 shadow-card">
         <CardContent>
           {isLoadingEvents ? (
@@ -1349,28 +1349,28 @@ const AdminDashboard = () => {
                       <TableCell>{event.time}</TableCell>
                       <TableCell>{event.location}</TableCell>
                       <TableCell>{event.maxCapacity}</TableCell>
-                      <TableCell>
+                        <TableCell>
                         <Badge variant={event.ticketsSold >= event.maxCapacity ? "destructive" : "secondary"}>
                           {event.ticketsSold}/{event.maxCapacity}
                         </Badge>
-                      </TableCell>
+                        </TableCell>
                       <TableCell>{event.ticketPrice.toLocaleString()} XAF</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
+                        <TableCell>
+                          <div className="flex flex-col">
                           <span className="font-medium">{event.establishmentName || event.userName || 'N/A'}</span>
                           {event.userName && event.establishmentName && (
                             <span className="text-xs text-muted-foreground">{event.userName}</span>
                           )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
     </div>
   );
 
@@ -1381,63 +1381,63 @@ const AdminDashboard = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
         </Button>
-        <div>
+              <div>
           <h1 className="text-2xl font-bold">Appréciations</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des appréciations de tous les utilisateurs ({allRatings.length} produits notés)</p>
-        </div>
+              </div>
         <div className="ml-auto">
           <Button variant="outline" size="sm" onClick={loadAllRatings} disabled={isLoadingRatings}>
             {isLoadingRatings ? "Chargement..." : "Actualiser"}
-          </Button>
-        </div>
+              </Button>
+            </div>
       </div>
       <Card className="border-0 shadow-card">
-        <CardContent>
+          <CardContent>
           {isLoadingRatings ? (
             <div className="text-center py-8 text-muted-foreground">Chargement des appréciations...</div>
           ) : allRatings.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucune appréciation trouvée</div>
-          ) : (
-            <div className="border rounded-md overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
+            ) : (
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
                     <TableHead>Produit</TableHead>
                     <TableHead>Note</TableHead>
                     <TableHead>Nombre d'avis</TableHead>
                     <TableHead>Établissement</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {allRatings.map((rating) => (
                     <TableRow key={`${rating.userId}-${rating.productId}`}>
                       <TableCell className="font-medium">{rating.productName}</TableCell>
-                      <TableCell>
+                        <TableCell>
                         <div className="flex items-center gap-2">
                           <Star size={16} className="text-yellow-500 fill-yellow-500" />
                           <span className="font-semibold">{rating.rating.toFixed(1)}/5</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
+                          </div>
+                        </TableCell>
+                        <TableCell>
                         <Badge variant="secondary">{rating.ratingCount} avis</Badge>
-                      </TableCell>
-                      <TableCell>
+                        </TableCell>
+                        <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{rating.establishmentName || rating.userName || 'N/A'}</span>
                           {rating.userName && rating.establishmentName && (
                             <span className="text-xs text-muted-foreground">{rating.userName}</span>
                           )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
         </CardContent>
       </Card>
-    </div>
+              </div>
   );
 
   // Vue Abonnements
@@ -1558,9 +1558,9 @@ const AdminDashboard = () => {
             </Button>
           </div>
           <Input placeholder="Message" value={notif.message} onChange={e => setNotif({ ...notif, message: e.target.value })} />
-        </CardContent>
-      </Card>
-    </div>
+          </CardContent>
+        </Card>
+      </div>
   );
 
   // Rendu principal
