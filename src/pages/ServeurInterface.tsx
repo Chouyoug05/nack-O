@@ -34,8 +34,12 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { ordersColRef, productsColRef, teamColRef, notificationsColRef, agentTokensTopColRef } from "@/lib/collections";
-import { addDoc, getDocs, limit, onSnapshot, query, where, collectionGroup, doc, getDoc } from "firebase/firestore";
+import { ordersColRef, productsColRef, teamColRef, notificationsColRef, agentTokensTopColRef, customersColRef } from "@/lib/collections";
+import { addDoc, getDocs, limit, onSnapshot, query, where, collectionGroup, doc, getDoc, updateDoc, runTransaction, orderBy } from "firebase/firestore";
+import type { Customer, CustomerDoc, Reward } from "@/types/customer";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Heart, X, Star, Crown } from "lucide-react";
 
 interface FirestoreTeamMemberDoc {
   firstName: string;
@@ -69,6 +73,7 @@ interface OutboxOrder {
   agentMemberId?: string;
   agentName?: string;
   agentToken?: string;
+  customerId?: string; // ID du client favori associé
 }
 
 const ServeurInterface = () => {
@@ -115,6 +120,10 @@ const ServeurInterface = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [availableCustomers, setAvailableCustomers] = useState<Customer[]>([]);
 
   useEffect(() => {
     const resolveOwner = async () => {
@@ -217,6 +226,41 @@ const ServeurInterface = () => {
         }
         return prev;
       });
+    });
+    return () => unsub();
+  }, [ownerUid]);
+
+  // Charger les clients favoris
+  useEffect(() => {
+    if (!ownerUid) { setAvailableCustomers([]); return; }
+    const q = query(customersColRef(db, ownerUid), orderBy("firstName", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const list: Customer[] = snap.docs.map((d) => {
+        const data = d.data() as CustomerDoc;
+        return {
+          id: d.id,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          email: data.email,
+          photoUrl: data.photoUrl,
+          customerId: data.customerId,
+          loyaltyType: data.loyaltyType,
+          status: data.status,
+          points: data.points || 0,
+          totalPointsEarned: data.totalPointsEarned || 0,
+          totalAmountSpent: data.totalAmountSpent || 0,
+          totalOrders: data.totalOrders || 0,
+          lastVisit: data.lastVisit ? new Date(data.lastVisit) : undefined,
+          availableRewards: data.availableRewards || [],
+          notes: data.notes,
+          allergies: data.allergies,
+          preferences: data.preferences,
+          createdAt: new Date(data.createdAt),
+          updatedAt: new Date(data.updatedAt),
+        };
+      });
+      setAvailableCustomers(list);
     });
     return () => unsub();
   }, [ownerUid]);
@@ -387,6 +431,82 @@ const ServeurInterface = () => {
     }
   };
 
+  // Mettre à jour les points/montants du client après une commande
+  const updateCustomerLoyalty = async (customerId: string, orderTotal: number, orderId: string) => {
+    if (!ownerUid) return;
+    
+    try {
+      const customerRef = doc(customersColRef(db, ownerUid), customerId);
+      const customerSnap = await getDoc(customerRef);
+      
+      if (!customerSnap.exists()) return;
+      
+      const customerData = customerSnap.data() as CustomerDoc;
+      
+      await runTransaction(db, async (transaction) => {
+        const customerDoc = await transaction.get(customerRef);
+        if (!customerDoc.exists()) return;
+        
+        const data = customerDoc.data() as CustomerDoc;
+        const updates: Partial<CustomerDoc> = {
+          totalAmountSpent: (data.totalAmountSpent || 0) + orderTotal,
+          totalOrders: (data.totalOrders || 0) + 1,
+          lastVisit: Date.now(),
+          updatedAt: Date.now(),
+        };
+
+        // Calculer les points si mode points
+        if (data.loyaltyType === 'points' && data.pointsConfig) {
+          const pointsEarned = Math.floor((orderTotal / 1000) * (data.pointsConfig.pointsPer1000XAF || 10));
+          const newPoints = (data.points || 0) + pointsEarned;
+          const totalPointsEarned = (data.totalPointsEarned || 0) + pointsEarned;
+          
+          updates.points = newPoints;
+          updates.totalPointsEarned = totalPointsEarned;
+
+          // Vérifier si le seuil de bonus est atteint
+          if (newPoints >= (data.pointsConfig.bonusThreshold || 100)) {
+            const reward: Reward = {
+              id: `REW-${Date.now()}`,
+              type: 'drink',
+              title: 'Boisson offerte',
+              description: `Récompense pour ${data.pointsConfig.bonusThreshold} points`,
+              pointsRequired: data.pointsConfig.bonusThreshold,
+              used: false,
+              createdAt: Date.now(),
+            };
+            
+            const currentRewards = data.availableRewards || [];
+            updates.availableRewards = [...currentRewards, reward];
+            
+            // Réinitialiser les points si autoReset activé
+            if (data.pointsConfig.autoReset) {
+              updates.points = 0;
+            }
+          }
+        }
+
+        // Vérifier le passage VIP si mode montant
+        if (data.loyaltyType === 'amount' || data.loyaltyType === 'vip') {
+          const newTotal = (data.totalAmountSpent || 0) + orderTotal;
+          updates.totalAmountSpent = newTotal;
+          
+          // Passage automatique en VIP si seuil atteint (ex: 100000 XAF)
+          if (data.status !== 'vip' && newTotal >= 100000) {
+            updates.status = 'vip';
+            updates.vipSince = Date.now();
+          } else if (data.status !== 'fidel' && newTotal >= 50000) {
+            updates.status = 'fidel';
+          }
+        }
+
+        transaction.update(customerRef, updates);
+      });
+    } catch (error) {
+      console.error('Erreur mise à jour fidélité client:', error);
+    }
+  };
+
   const createOrder = async (status: OrderStatus) => {
     if (cart.length === 0 || !tableNumber.trim()) {
       toast({
@@ -427,21 +547,30 @@ const ServeurInterface = () => {
       agentMemberId: agentInfo?.memberId,
       agentName: agentInfo?.name,
       agentToken: agentCode,
+      customerId: selectedCustomer?.id,
     };
 
     let queued = false;
     let success = false;
+    let orderDocId: string | null = null;
     
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       queued = true;
     } else {
       try {
-        await addDoc(ordersColRef(db, ownerUid), orderPayload);
+        const docRef = await addDoc(ordersColRef(db, ownerUid), orderPayload);
+        orderDocId = docRef.id;
         success = true;
+        
+        // Mettre à jour la fidélité du client si un client est associé
+        if (selectedCustomer && selectedCustomer.id) {
+          await updateCustomerLoyalty(selectedCustomer.id, total, orderDocId);
+        }
+        
         try {
           await addDoc(notificationsColRef(db, ownerUid), {
             title: "Nouvelle commande",
-            message: `Table ${tableNumber.trim()} • Total ${total.toLocaleString()} XAF`,
+            message: `Table ${tableNumber.trim()} • Total ${total.toLocaleString()} XAF${selectedCustomer ? ` • Client: ${selectedCustomer.firstName} ${selectedCustomer.lastName}` : ''}`,
             type: "info",
             createdAt: Date.now(),
             read: false,
@@ -477,12 +606,22 @@ const ServeurInterface = () => {
 
     setCart([]);
     setTableNumber("");
+    setSelectedCustomer(null);
 
     const statusText = status === 'pending' ? 'mise en attente' : 'envoyée à la caisse';
     if (success) {
+      let description = `Commande #${orderCounter} ${statusText} avec succès`;
+      if (selectedCustomer) {
+        if (selectedCustomer.loyaltyType === 'points') {
+          const pointsEarned = Math.floor((total / 1000) * 10); // 10 points par 1000 XAF par défaut
+          description += `. ${pointsEarned} points ajoutés au client`;
+        } else {
+          description += `. Montant ajouté au client`;
+        }
+      }
       toast({
         title: `Commande ${statusText}`,
-        description: `Commande #${orderCounter} ${statusText} avec succès`,
+        description,
       });
     }
   };
@@ -836,6 +975,47 @@ const ServeurInterface = () => {
                     />
                   </div>
 
+                  {/* Client Favori */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      Client favori (optionnel)
+                    </Label>
+                    {selectedCustomer ? (
+                      <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={selectedCustomer.photoUrl} />
+                            <AvatarFallback>
+                              {selectedCustomer.firstName[0]}{selectedCustomer.lastName[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium text-sm">
+                              {selectedCustomer.firstName} {selectedCustomer.lastName}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{selectedCustomer.phone}</p>
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedCustomer(null)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => setIsCustomerDialogOpen(true)}
+                      >
+                        <Heart className="w-4 h-4 mr-2" />
+                        Associer un client favori
+                      </Button>
+                    )}
+                  </div>
+
                   {/* Cart Items */}
                   {cart.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">
@@ -965,6 +1145,91 @@ const ServeurInterface = () => {
           </div>
         </main>
       )}
+
+      {/* Dialog de sélection de client */}
+      <Dialog open={isCustomerDialogOpen} onOpenChange={setIsCustomerDialogOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Associer un client favori</DialogTitle>
+            <DialogDescription>
+              Recherchez et sélectionnez un client régulier
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Rechercher par nom ou téléphone..."
+                value={customerSearchQuery}
+                onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="space-y-2 max-h-[400px] overflow-y-auto">
+              {availableCustomers
+                .filter(customer => {
+                  const query = customerSearchQuery.toLowerCase();
+                  return (
+                    customer.firstName.toLowerCase().includes(query) ||
+                    customer.lastName.toLowerCase().includes(query) ||
+                    customer.phone.includes(query) ||
+                    customer.customerId.toLowerCase().includes(query)
+                  );
+                })
+                .map((customer) => (
+                  <div
+                    key={customer.id}
+                    className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted cursor-pointer"
+                    onClick={() => {
+                      setSelectedCustomer(customer);
+                      setIsCustomerDialogOpen(false);
+                      setCustomerSearchQuery("");
+                    }}
+                  >
+                    <Avatar>
+                      <AvatarImage src={customer.photoUrl} />
+                      <AvatarFallback>
+                        {customer.firstName[0]}{customer.lastName[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">
+                          {customer.firstName} {customer.lastName}
+                        </p>
+                        {customer.status === 'vip' && (
+                          <Crown className="w-4 h-4 text-yellow-500" />
+                        )}
+                        {customer.status === 'fidel' && (
+                          <Star className="w-4 h-4 text-blue-500" />
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{customer.phone}</p>
+                      {customer.loyaltyType === 'points' && customer.points > 0 && (
+                        <p className="text-xs text-yellow-600 mt-1">
+                          {customer.points} points
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              {availableCustomers.filter(customer => {
+                const query = customerSearchQuery.toLowerCase();
+                return (
+                  customer.firstName.toLowerCase().includes(query) ||
+                  customer.lastName.toLowerCase().includes(query) ||
+                  customer.phone.includes(query) ||
+                  customer.customerId.toLowerCase().includes(query)
+                );
+              }).length === 0 && (
+                <p className="text-center text-muted-foreground py-8">
+                  {customerSearchQuery ? "Aucun client trouvé" : "Aucun client favori enregistré"}
+                </p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
