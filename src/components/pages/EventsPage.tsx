@@ -68,6 +68,7 @@ const EventsPage = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [isEditingEvent, setIsEditingEvent] = useState(false);
+  const [activeTab, setActiveTab] = useState<'participants' | 'finance'>('participants');
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
 
@@ -472,7 +473,10 @@ const EventsPage = () => {
               <div className="p-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="gap-2 grid-cols-[repeat(auto-fit,_minmax(80px,_1fr))] grid">
                   <button
-                    onClick={() => setSelectedEvent(event)}
+                    onClick={() => {
+                      setSelectedEvent(event);
+                      setActiveTab('participants');
+                    }}
                     className="flex flex-col items-center gap-2 py-2.5 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                     title="Voir les participants et billets"
                   >
@@ -482,7 +486,10 @@ const EventsPage = () => {
                     <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Participants</p>
                   </button>
                   <button
-                    onClick={() => setSelectedEvent(event)}
+                    onClick={() => {
+                      setSelectedEvent(event);
+                      setActiveTab('finance');
+                    }}
                     className="flex flex-col items-center gap-2 py-2.5 text-center hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                     title="Voir les finances et revenus"
                   >
@@ -519,6 +526,53 @@ const EventsPage = () => {
             </div>
                     <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Modifier</p>
                   </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`Êtes-vous sûr de vouloir supprimer l'événement "${event.title}" ?\n\nCette action est irréversible.`)) {
+                        handleDeleteEvent(event.id);
+                      }
+                    }}
+                    className="flex flex-col items-center gap-2 py-2.5 text-center hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                    title="Supprimer l'événement"
+                  >
+                    <div className="flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50 p-2.5">
+                      <Trash2 className="text-xl text-red-600 dark:text-red-400" size={20} />
+              </div>
+                    <p className="text-sm font-medium leading-normal text-red-600 dark:text-red-400">Supprimer</p>
+                  </button>
+              </div>
+              
+              {/* Lien de partage */}
+              <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Label className="text-xs text-muted-foreground mb-1 block">Lien de partage :</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={event.shareableLink || `${window.location.origin}/event/${event.id}`}
+                        readOnly
+                        className="text-xs font-mono flex-1 min-w-0 truncate"
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleCopyLink(event.shareableLink || `${window.location.origin}/event/${event.id}`)}
+                        className="shrink-0"
+                      >
+                        <Copy size={14} className="mr-1" />
+                        Copier
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => window.open(event.shareableLink || `${window.location.origin}/event/${event.id}`, '_blank')}
+                        className="shrink-0"
+                      >
+                        <ExternalLink size={14} />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
               </div>
             </div>
@@ -708,76 +762,188 @@ const EventsPage = () => {
             </Dialog>
           </div>
 
-      {/* Tickets Modal */}
+      {/* Participants & Finance Modal with Tabs */}
       {selectedEvent && (
-        <Dialog open={!!selectedEvent} onOpenChange={() => setSelectedEvent(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Billets vendus - {selectedEvent.title}</DialogTitle>
-              <DialogDescription>
-                Gérez les billets vendus pour cet événement
+        <Dialog open={!!selectedEvent} onOpenChange={() => {
+          setSelectedEvent(null);
+          setActiveTab('participants');
+        }}>
+          <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
+            <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
+              <DialogTitle className="text-lg sm:text-xl">{selectedEvent.title}</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">
+                Gérez les participants et les finances de cet événement
               </DialogDescription>
             </DialogHeader>
             
+            {/* Tabs */}
+            <div className="flex border-b border-border px-4 sm:px-6">
+              <button
+                onClick={() => setActiveTab('participants')}
+                className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${
+                  activeTab === 'participants'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <Users size={16} className="sm:size-5" />
+                  <span>Participants</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('finance')}
+                className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${
+                  activeTab === 'finance'
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <div className="flex items-center justify-center gap-2">
+                  <DollarSign size={16} className="sm:size-5" />
+                  <span>Finances</span>
+                </div>
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
+              {activeTab === 'participants' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-nack-red">{selectedEvent.ticketsSold}</p>
-                    <p className="text-sm text-muted-foreground">Billets vendus</p>
+                      <CardContent className="p-3 sm:p-4 text-center">
+                        <p className="text-xl sm:text-2xl font-bold text-nack-red">{selectedEvent.ticketsSold}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Billets vendus</p>
                   </CardContent>
                 </Card>
                 <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-green-600">{selectedEvent.maxCapacity - selectedEvent.ticketsSold}</p>
-                    <p className="text-sm text-muted-foreground">Places restantes</p>
+                      <CardContent className="p-3 sm:p-4 text-center">
+                        <p className="text-xl sm:text-2xl font-bold text-green-600">{selectedEvent.maxCapacity - selectedEvent.ticketsSold}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Places restantes</p>
                   </CardContent>
                 </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold">{(selectedEvent.ticketsSold * selectedEvent.ticketPrice).toLocaleString()} XAF</p>
-                    <p className="text-sm text-muted-foreground">Revenus</p>
+                    <Card className="col-span-2 sm:col-span-1">
+                      <CardContent className="p-3 sm:p-4 text-center">
+                        <p className="text-xl sm:text-2xl font-bold">{(selectedEvent.ticketsSold * selectedEvent.ticketPrice).toLocaleString()} XAF</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Revenus totaux</p>
                   </CardContent>
                 </Card>
               </div>
 
               <div className="rounded-lg border border-border overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                      <table className="w-full min-w-[600px]">
                     <thead className="bg-muted">
                       <tr>
-                        <th className="text-left p-4 font-semibold">Client</th>
-                        <th className="text-left p-4 font-semibold">Email</th>
-                        <th className="text-left p-4 font-semibold">Quantité</th>
-                        <th className="text-left p-4 font-semibold">Montant</th>
-                        <th className="text-left p-4 font-semibold">Date</th>
-                        <th className="text-left p-4 font-semibold">Statut</th>
+                            <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Client</th>
+                            <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold hidden sm:table-cell">Email</th>
+                            <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Qté</th>
+                            <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Montant</th>
+                            <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Date</th>
+                            <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Statut</th>
                       </tr>
                     </thead>
                     <tbody>
                       {getEventTickets(selectedEvent.id).map((ticket) => (
                         <tr key={ticket.id} className="border-t border-border hover:bg-muted/50">
-                          <td className="p-4 font-medium">{ticket.customerName}</td>
-                          <td className="p-4 text-muted-foreground">{ticket.customerEmail}</td>
-                          <td className="p-4">{ticket.quantity}</td>
-                          <td className="p-4 font-semibold">{ticket.totalAmount.toLocaleString()} XAF</td>
-                          <td className="p-4">{ticket.purchaseDate.toLocaleDateString('fr-FR')}</td>
-                          <td className="p-4">
-                            <Badge variant={ticket.status === 'paid' ? 'default' : ticket.status === 'pending' ? 'secondary' : 'destructive'}>
+                              <td className="p-2 sm:p-4 font-medium text-xs sm:text-sm">
+                                <div>{ticket.customerName}</div>
+                                <div className="text-muted-foreground sm:hidden text-xs mt-1">{ticket.customerEmail}</div>
+                              </td>
+                              <td className="p-2 sm:p-4 text-muted-foreground text-xs sm:text-sm hidden sm:table-cell">{ticket.customerEmail}</td>
+                              <td className="p-2 sm:p-4 text-xs sm:text-sm">{ticket.quantity}</td>
+                              <td className="p-2 sm:p-4 font-semibold text-xs sm:text-sm">{ticket.totalAmount.toLocaleString()} XAF</td>
+                              <td className="p-2 sm:p-4 text-xs sm:text-sm hidden md:table-cell">{ticket.purchaseDate.toLocaleDateString('fr-FR')}</td>
+                              <td className="p-2 sm:p-4">
+                                <Badge variant={ticket.status === 'paid' ? 'default' : ticket.status === 'pending' ? 'secondary' : 'destructive'} className="text-xs">
                               {ticket.status === 'paid' ? 'Payé' : ticket.status === 'pending' ? 'En attente' : 'Annulé'}
                             </Badge>
                           </td>
                         </tr>
                       ))}
-                      {tickets.length === 0 && (
+                          {getEventTickets(selectedEvent.id).length === 0 && (
                         <tr>
-                          <td colSpan={6} className="p-4 text-center text-muted-foreground">Aucun billet pour le moment</td>
+                              <td colSpan={6} className="p-4 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
+                                Aucun billet pour le moment
+                              </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
               </div>
+                </div>
+              )}
+
+              {activeTab === 'finance' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl sm:text-3xl font-bold text-nack-red">{selectedEvent.ticketsSold}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Billets vendus</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                          {(selectedEvent.ticketsSold * selectedEvent.ticketPrice).toLocaleString()} XAF
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Revenus totaux</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl sm:text-3xl font-bold text-blue-600">
+                          {selectedEvent.ticketPrice.toLocaleString()} XAF
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Prix unitaire</p>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardContent className="p-4 text-center">
+                        <p className="text-2xl sm:text-3xl font-bold text-orange-600">
+                          {selectedEvent.maxCapacity - selectedEvent.ticketsSold}
+                        </p>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Places restantes</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Détails financiers</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between items-center py-2 border-b">
+                        <span className="text-sm sm:text-base">Capacité maximale</span>
+                        <span className="font-semibold text-sm sm:text-base">{selectedEvent.maxCapacity} places</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b">
+                        <span className="text-sm sm:text-base">Taux d'occupation</span>
+                        <span className="font-semibold text-sm sm:text-base">
+                          {selectedEvent.maxCapacity > 0 
+                            ? ((selectedEvent.ticketsSold / selectedEvent.maxCapacity) * 100).toFixed(1)
+                            : 0}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b">
+                        <span className="text-sm sm:text-base">Revenu potentiel maximum</span>
+                        <span className="font-semibold text-sm sm:text-base">
+                          {(selectedEvent.maxCapacity * selectedEvent.ticketPrice).toLocaleString()} XAF
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-2">
+                        <span className="text-sm sm:text-base font-bold">Revenu actuel</span>
+                        <span className="font-bold text-lg sm:text-xl text-green-600">
+                          {(selectedEvent.ticketsSold * selectedEvent.ticketPrice).toLocaleString()} XAF
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>
@@ -786,32 +952,67 @@ const EventsPage = () => {
       {/* Réservation (gérant) */}
       {reserveDialogEvent && (
         <Dialog open={!!reserveDialogEvent} onOpenChange={() => setReserveDialogEvent(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle>Nouvelle réservation - {reserveDialogEvent.title}</DialogTitle>
-              <DialogDescription>Enregistrez un participant et générez son ticket</DialogDescription>
+              <DialogTitle className="text-base sm:text-lg">Nouvelle réservation - {reserveDialogEvent.title}</DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm">Enregistrez un participant et générez son ticket</DialogDescription>
             </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="resv-name">Nom complet *</Label>
-                <Input id="resv-name" value={reserveForm.name} onChange={(e) => setReserveForm({ ...reserveForm, name: e.target.value })} />
+            <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="resv-name" className="text-sm sm:text-base">Nom complet *</Label>
+                <Input 
+                  id="resv-name" 
+                  value={reserveForm.name} 
+                  onChange={(e) => setReserveForm({ ...reserveForm, name: e.target.value })}
+                  className="text-sm sm:text-base"
+                />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="resv-email">Email *</Label>
-                <Input id="resv-email" value={reserveForm.email} onChange={(e) => setReserveForm({ ...reserveForm, email: e.target.value })} />
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="resv-email" className="text-sm sm:text-base">Email *</Label>
+                <Input 
+                  id="resv-email" 
+                  type="email"
+                  value={reserveForm.email} 
+                  onChange={(e) => setReserveForm({ ...reserveForm, email: e.target.value })}
+                  className="text-sm sm:text-base"
+                />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="resv-phone">WhatsApp *</Label>
-                <Input id="resv-phone" value={reserveForm.phone} onChange={(e) => setReserveForm({ ...reserveForm, phone: e.target.value })} />
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="resv-phone" className="text-sm sm:text-base">WhatsApp *</Label>
+                <Input 
+                  id="resv-phone" 
+                  type="tel"
+                  value={reserveForm.phone} 
+                  onChange={(e) => setReserveForm({ ...reserveForm, phone: e.target.value })}
+                  className="text-sm sm:text-base"
+                />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="resv-qty">Quantité</Label>
-                <Input id="resv-qty" type="number" min="1" value={reserveForm.quantity} onChange={(e) => setReserveForm({ ...reserveForm, quantity: Number(e.target.value) })} />
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="resv-qty" className="text-sm sm:text-base">Quantité</Label>
+                <Input 
+                  id="resv-qty" 
+                  type="number" 
+                  min="1" 
+                  value={reserveForm.quantity} 
+                  onChange={(e) => setReserveForm({ ...reserveForm, quantity: Number(e.target.value) })}
+                  className="text-sm sm:text-base"
+                />
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setReserveDialogEvent(null)}>Annuler</Button>
-              <Button onClick={saveReservationAndGenerate} className="bg-gradient-primary text-white">Enregistrer et générer</Button>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4 sm:mt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => setReserveDialogEvent(null)}
+                className="w-full sm:w-auto text-sm sm:text-base"
+              >
+                Annuler
+              </Button>
+              <Button 
+                onClick={saveReservationAndGenerate} 
+                className="bg-gradient-primary text-white w-full sm:w-auto text-sm sm:text-base"
+              >
+                Enregistrer et générer
+              </Button>
             </div>
           </DialogContent>
         </Dialog>

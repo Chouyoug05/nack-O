@@ -671,7 +671,7 @@ const StockPage = () => {
           };
         }
       }
-
+      
       const payload: Partial<ProductDoc> = {
         name: newProduct.name,
         category: newProduct.category,
@@ -1422,18 +1422,18 @@ const StockPage = () => {
                         </div>
 
                         {!isFoodCategory(newProduct.category) && (
-                          <div>
-                            <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
-                            <Input
-                              id="cost"
-                              type="number"
-                              value={newProduct.cost}
-                              onChange={(e) => setNewProduct({...newProduct, cost: e.target.value})}
-                              className="w-full h-16 text-2xl text-center font-semibold"
-                              placeholder=""
-                              min="0"
-                            />
-                          </div>
+                        <div>
+                          <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
+                          <Input
+                            id="cost"
+                            type="number"
+                            value={newProduct.cost}
+                            onChange={(e) => setNewProduct({...newProduct, cost: e.target.value})}
+                            className="w-full h-16 text-2xl text-center font-semibold"
+                            placeholder=""
+                            min="0"
+                          />
+                        </div>
                         )}
 
                         {/* Module Food Cost - Affiché uniquement pour les catégories alimentaires */}
