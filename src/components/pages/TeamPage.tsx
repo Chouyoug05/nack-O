@@ -424,14 +424,14 @@ const TeamPage = () => {
 
       {/* Role Selection Dialog */}
       <Dialog open={isRoleSelectionOpen} onOpenChange={setIsRoleSelectionOpen}>
-        <DialogContent className="max-w-[90vw] sm:max-w-md">
+        <DialogContent className="max-w-[90vw] sm:max-w-md max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Ajouter un membre d'équipe</DialogTitle>
             <DialogDescription>
               Sélectionnez le type d'agent à ajouter
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-3 py-4">
+          <div className="grid grid-cols-1 gap-3 py-4 overflow-y-auto flex-1 min-h-0">
             <Button
               variant="outline"
               onClick={() => openAddModal('serveur')}
@@ -485,7 +485,7 @@ const TeamPage = () => {
               </span>
             </Button>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end pt-2 border-t">
             <Button variant="outline" onClick={() => setIsRoleSelectionOpen(false)}>
               Annuler
             </Button>

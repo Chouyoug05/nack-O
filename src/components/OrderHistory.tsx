@@ -124,6 +124,18 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
                   </Button>
                 </div>
               )}
+              {order.status === 'sent' && (
+                <div className="flex gap-2">
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleCancelOrder(order)}
+                    className="flex-1"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Annuler la commande
+                  </Button>
+                </div>
+              )}
             </div>
           ))
         )}

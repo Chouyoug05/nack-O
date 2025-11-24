@@ -253,16 +253,16 @@ const OrderManagement = ({
             const establishmentName = profileSnap.exists() ? (profileSnap.data() as { establishmentName?: string }).establishmentName || 'Établissement' : 'Établissement';
             
             const thermalData = {
-              orderNumber: order.orderNumber || `C-${Date.now()}`,
+              orderNumber: String(order.orderNumber || `C-${Date.now()}`),
               establishmentName,
-              tableZone: order.tableNumber || order.tableZone || 'Table',
+              tableZone: order.tableNumber || 'Table',
               items: order.items.map(item => ({
                 name: item.name,
                 quantity: item.quantity,
                 price: item.price
               })),
               total: order.total,
-              createdAt: order.createdAt || Date.now()
+              createdAt: order.createdAt instanceof Date ? order.createdAt.getTime() : (order.createdAt || Date.now())
             };
 
             const { printThermalTicket } = await import('@/utils/ticketThermal');
@@ -396,7 +396,7 @@ const OrderManagement = ({
 
               {showActions && (
                 <div className="flex gap-2">
-                  {isOwnerAuthed && (
+                  {isOwnerAuthed && order.status === 'pending' && (
                     <select
                       className="border rounded px-2 text-sm h-9"
                       value={paymentMethodByOrder[order.id] || 'cash'}
@@ -407,24 +407,29 @@ const OrderManagement = ({
                       <option value="card">Carte</option>
                     </select>
                   )}
-                  <Button
-                    onClick={() => handleProcessOrder(order)}
-                    className="flex-1 bg-gradient-primary text-white shadow-button"
-                    disabled={processingIds.has(order.id)}
-                    type="button"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    {isOwnerAuthed ? 'Valider et encaisser' : 'Valider la commande'}
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={() => handleCancelOrder(order)}
-                    disabled={processingIds.has(order.id)}
-                    type="button"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Annuler
-                  </Button>
+                  {order.status === 'pending' && (
+                    <Button
+                      onClick={() => handleProcessOrder(order)}
+                      className="flex-1 bg-gradient-primary text-white shadow-button"
+                      disabled={processingIds.has(order.id)}
+                      type="button"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      {isOwnerAuthed ? 'Valider et encaisser' : 'Valider la commande'}
+                    </Button>
+                  )}
+                  {(order.status === 'pending' || order.status === 'sent') && (
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleCancelOrder(order)}
+                      disabled={processingIds.has(order.id)}
+                      type="button"
+                      className={order.status === 'sent' ? 'flex-1' : ''}
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      Annuler
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
