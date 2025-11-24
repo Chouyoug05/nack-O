@@ -52,6 +52,18 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
   };
 
   const handleCancelOrder = (order: Order) => {
+    // Demander confirmation pour les commandes 'sent' (possiblement payées)
+    if (order.status === 'sent') {
+      const confirmed = window.confirm(
+        `⚠️ ATTENTION : Cette commande a été envoyée à la caisse.\n\n` +
+        `Il est possible que l'argent ait déjà été reçu.\n\n` +
+        `Voulez-vous vraiment annuler cette commande ?`
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+    
     onUpdateOrderStatus(order.id, 'cancelled');
     toast({
       title: "Commande annulée",

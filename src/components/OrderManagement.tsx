@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
-import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc } from "firebase/firestore";
+import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc, getDocs } from "firebase/firestore";
 import type { SaleDoc, SaleItem, PaymentMethod } from "@/types/inventory";
 
 interface FirestoreOrderItem {
@@ -295,7 +295,67 @@ const OrderManagement = ({
     }
   };
 
-  const handleCancelOrder = (order: Order) => {
+  const handleCancelOrder = async (order: Order) => {
+    // Vérifier si une vente existe pour cette commande (argent déjà reçu)
+    if (order.status === 'sent' && uidToUse) {
+      try {
+        // Vérifier si une vente correspondante existe
+        const salesQuery = query(
+          salesColRef(db, uidToUse),
+          orderBy("createdAt", "desc")
+        );
+        const salesSnapshot = await getDocs(salesQuery);
+        
+        const orderCreatedAt = order.createdAt instanceof Date 
+          ? order.createdAt.getTime() 
+          : (typeof order.createdAt === 'number' ? order.createdAt : Date.now());
+        
+        // Chercher une vente créée après la commande avec le même total
+        const matchingSale = salesSnapshot.docs.find(doc => {
+          const sale = doc.data() as SaleDoc;
+          const saleCreatedAt = sale.createdAt;
+          // Vente créée dans les 30 minutes après la commande et avec le même total
+          return saleCreatedAt >= orderCreatedAt 
+            && saleCreatedAt <= orderCreatedAt + (30 * 60 * 1000)
+            && Math.abs(sale.total - order.total) < 1; // Tolérance de 1 XAF pour les arrondis
+        });
+
+        if (matchingSale) {
+          const confirmed = window.confirm(
+            `⚠️ ATTENTION : Cette commande a déjà été payée (${order.total.toLocaleString()} XAF).\n\n` +
+            `L'annulation de cette commande nécessitera un remboursement au client.\n\n` +
+            `Voulez-vous vraiment annuler cette commande ?`
+          );
+          if (!confirmed) {
+            return;
+          }
+        } else if (order.status === 'sent') {
+          // Même si pas de vente trouvée, demander confirmation pour les commandes 'sent'
+          const confirmed = window.confirm(
+            `⚠️ ATTENTION : Cette commande a été envoyée à la caisse.\n\n` +
+            `Il est possible que l'argent ait déjà été reçu.\n\n` +
+            `Voulez-vous vraiment annuler cette commande ?`
+          );
+          if (!confirmed) {
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification des ventes:', error);
+        // En cas d'erreur, demander quand même confirmation pour les commandes 'sent'
+        if (order.status === 'sent') {
+          const confirmed = window.confirm(
+            `⚠️ ATTENTION : Cette commande a été envoyée à la caisse.\n\n` +
+            `Il est possible que l'argent ait déjà été reçu.\n\n` +
+            `Voulez-vous vraiment annuler cette commande ?`
+          );
+          if (!confirmed) {
+            return;
+          }
+        }
+      }
+    }
+
     if (uidToUse && (typeof navigator === 'undefined' || navigator.onLine)) {
       const updatePayload: { status: 'cancelled'; agentToken?: string } = { status: 'cancelled' };
       if (agentToken && !isOwnerAuthed) {
@@ -408,27 +468,27 @@ const OrderManagement = ({
                     </select>
                   )}
                   {order.status === 'pending' && (
-                    <Button
-                      onClick={() => handleProcessOrder(order)}
-                      className="flex-1 bg-gradient-primary text-white shadow-button"
-                      disabled={processingIds.has(order.id)}
-                      type="button"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      {isOwnerAuthed ? 'Valider et encaisser' : 'Valider la commande'}
-                    </Button>
+                  <Button
+                    onClick={() => handleProcessOrder(order)}
+                    className="flex-1 bg-gradient-primary text-white shadow-button"
+                    disabled={processingIds.has(order.id)}
+                    type="button"
+                  >
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {isOwnerAuthed ? 'Valider et encaisser' : 'Valider la commande'}
+                  </Button>
                   )}
                   {(order.status === 'pending' || order.status === 'sent') && (
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleCancelOrder(order)}
-                      disabled={processingIds.has(order.id)}
-                      type="button"
+                  <Button
+                    variant="destructive"
+                    onClick={() => handleCancelOrder(order)}
+                    disabled={processingIds.has(order.id)}
+                    type="button"
                       className={order.status === 'sent' ? 'flex-1' : ''}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Annuler
-                    </Button>
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Annuler
+                  </Button>
                   )}
                 </div>
               )}
