@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,11 +46,11 @@ import { uploadImageToCloudinary } from "@/lib/cloudinary";
 const CustomersPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -248,8 +249,7 @@ const CustomersPage = () => {
   };
 
   const openViewModal = (customer: Customer) => {
-    setSelectedCustomer(customer);
-    setIsViewModalOpen(true);
+    navigate(`/customer/${customer.id}`);
   };
 
   const getStatusBadge = (status: CustomerStatus) => {
@@ -608,191 +608,6 @@ const CustomersPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* View Details Modal */}
-      {selectedCustomer && (
-        <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
-          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Détails du client</DialogTitle>
-              <DialogDescription>
-                Informations complètes et historique
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-6">
-              {/* Header */}
-              <div className="flex items-start gap-4">
-                <Avatar className="w-20 h-20">
-                  <AvatarImage src={selectedCustomer.photoUrl} />
-                  <AvatarFallback className="text-2xl">
-                    {selectedCustomer.firstName[0]}{selectedCustomer.lastName[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h2 className="text-2xl font-bold">
-                      {selectedCustomer.firstName} {selectedCustomer.lastName}
-                    </h2>
-                    {getStatusBadge(selectedCustomer.status)}
-                  </div>
-                  <p className="text-sm text-muted-foreground mb-1">ID: {selectedCustomer.customerId}</p>
-                  <div className="flex flex-wrap gap-4 mt-3 text-sm">
-                    <div className="flex items-center gap-1">
-                      <Phone className="w-4 h-4" />
-                      <span>{selectedCustomer.phone}</span>
-                    </div>
-                    {selectedCustomer.email && (
-                      <div className="flex items-center gap-1">
-                        <Mail className="w-4 h-4" />
-                        <span>{selectedCustomer.email}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-nack-red">{selectedCustomer.totalOrders}</p>
-                    <p className="text-xs text-muted-foreground">Commandes</p>
-                  </CardContent>
-                </Card>
-                {selectedCustomer.loyaltyType === "points" && (
-                  <Card>
-                    <CardContent className="p-4 text-center">
-                      <p className="text-2xl font-bold text-yellow-500">{selectedCustomer.points}</p>
-                      <p className="text-xs text-muted-foreground">Points actuels</p>
-                    </CardContent>
-                  </Card>
-                )}
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-2xl font-bold text-green-500">
-                      {selectedCustomer.totalAmountSpent.toLocaleString()}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Total dépensé</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 text-center">
-                    <p className="text-sm font-bold">
-                      {selectedCustomer.lastVisit
-                        ? selectedCustomer.lastVisit.toLocaleDateString("fr-FR")
-                        : "Jamais"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Dernière visite</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Loyalty Info */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Système de fidélité</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Type:</span>
-                      <span className="font-medium">{getLoyaltyTypeLabel(selectedCustomer.loyaltyType)}</span>
-                    </div>
-                    {selectedCustomer.loyaltyType === "points" && (
-                      <div className="flex justify-between">
-                        <span className="text-sm">Points totaux gagnés:</span>
-                        <span className="font-medium">{selectedCustomer.totalPointsEarned}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Notes */}
-              {(selectedCustomer.notes || selectedCustomer.allergies?.length || selectedCustomer.preferences?.length) && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">Notes et préférences</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {selectedCustomer.notes && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Notes:</Label>
-                        <p className="text-sm mt-1">{selectedCustomer.notes}</p>
-                      </div>
-                    )}
-                    {selectedCustomer.allergies && selectedCustomer.allergies.length > 0 && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Allergies:</Label>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedCustomer.allergies.map((allergy, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
-                              {allergy}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {selectedCustomer.preferences && selectedCustomer.preferences.length > 0 && (
-                      <div>
-                        <Label className="text-xs text-muted-foreground">Préférences:</Label>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedCustomer.preferences.map((pref, idx) => (
-                            <Badge key={idx} variant="secondary" className="text-xs">
-                              {pref}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Rewards */}
-              {selectedCustomer.availableRewards && selectedCustomer.availableRewards.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Gift className="w-4 h-4" />
-                      Récompenses disponibles
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {selectedCustomer.availableRewards
-                        .filter(r => !r.used)
-                        .map((reward) => (
-                          <div key={reward.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                            <div>
-                              <p className="font-medium">{reward.title}</p>
-                              <p className="text-xs text-muted-foreground">{reward.description}</p>
-                            </div>
-                            <Badge variant="default">Disponible</Badge>
-                          </div>
-                        ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setIsViewModalOpen(false)}>
-                Fermer
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsViewModalOpen(false);
-                  openEditModal(selectedCustomer);
-                }}
-                className="bg-gradient-primary text-white"
-              >
-                <Edit className="w-4 h-4 mr-2" />
-                Modifier
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 };

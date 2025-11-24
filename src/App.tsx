@@ -30,6 +30,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminCheck from "./pages/AdminCheck";
 import ClientDetailsPage from "./pages/ClientDetailsPage";
 import TeamPage from "@/components/pages/TeamPage";
+import CustomerDetailsPage from "@/components/pages/CustomerDetailsPage";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import PublicOrderingPage from "./pages/PublicOrderingPage";
 
@@ -114,6 +115,7 @@ const router = createBrowserRouter([
       { path: "complete-profile", element: <RequireAuth><CompleteProfile /></RequireAuth> },
       { path: "dashboard", element: <RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "team", element: <RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth> },
+      { path: "customer/:customerId", element: <RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "admin-check", element: <AdminCheck /> },
       { path: "mon-uid", element: <AdminCheck /> },
       { path: "admin", element: <RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth> },
