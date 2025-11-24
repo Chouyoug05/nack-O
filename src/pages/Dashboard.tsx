@@ -11,6 +11,7 @@ import {
   Bell,
   QrCode,
   Calendar,
+  Heart,
 } from "lucide-react";
 import { Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +22,7 @@ import SettingsPage from "@/components/pages/SettingsPage";
 import OrderManagement from "@/components/OrderManagement";
 import BarConnecteePage from "@/components/pages/BarConnecteePage";
 import EventsPage from "@/components/pages/EventsPage";
+import CustomersPage from "@/components/pages/CustomersPage";
 import NotificationPanel from "@/components/NotificationPanel";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import TeamPage from "@/components/pages/TeamPage";
@@ -60,7 +62,7 @@ const fallbackStats: StatCard[] = [
   },
 ];
 
-type ActionKey = "sales" | "stock" | "reports" | "profile" | "team" | "bar-connectee" | "events";
+type ActionKey = "sales" | "stock" | "reports" | "profile" | "team" | "bar-connectee" | "events" | "customers";
 
 type MenuCard = {
   key: ActionKey | "logout";
@@ -126,6 +128,15 @@ const menuCards: MenuCard[] = [
     hint: "",
     accentBg: "",
     accentColor: "text-[#E91E63]",
+  },
+  {
+    key: "customers",
+    title: "Clients",
+    description: "Favoris & Fidélité",
+    icon: Heart,
+    hint: "",
+    accentBg: "",
+    accentColor: "text-[#FF6B9D]",
   },
   {
     key: "profile",
@@ -314,6 +325,8 @@ const Dashboard = () => {
             <EventsPage />
           </FeatureGate>
         );
+      case "customers":
+        return <CustomersPage />;
       case "profile":
         return <SettingsPage />;
       default:
