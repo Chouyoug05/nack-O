@@ -290,6 +290,7 @@ const AdminDashboard = () => {
   }, [allProfiles]);
 
   const loadAllProducts = useCallback(async () => {
+    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
     setIsLoadingProducts(true);
     try {
       const products: Array<{ id: string; name: string; category: string; price: number; quantity: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -327,6 +328,7 @@ const AdminDashboard = () => {
   }, [allProfiles, toast]);
 
   const loadAllOrders = useCallback(async () => {
+    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
     setIsLoadingOrders(true);
     try {
       const orders: Array<{ id: string; orderNumber: number; tableNumber: string; total: number; status: string; createdAt: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -387,6 +389,7 @@ const AdminDashboard = () => {
   }, [allProfiles, toast]);
 
   const loadAllEvents = useCallback(async () => {
+    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
     setIsLoadingEvents(true);
     try {
       const events: Array<{ id: string; title: string; date: string; time: string; location: string; maxCapacity: number; ticketPrice: number; ticketsSold: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -433,6 +436,7 @@ const AdminDashboard = () => {
   }, [allProfiles, toast]);
 
   const loadAllRatings = useCallback(async () => {
+    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
     setIsLoadingRatings(true);
     try {
       const ratings: Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -472,25 +476,37 @@ const AdminDashboard = () => {
     }
   }, [allProfiles, toast]);
 
+  // Charger les données seulement quand on change de vue active
   useEffect(() => {
-    if (isAdmin && allProfiles.length > 0) {
-      // Charger les statistiques globales en premier
+    if (!isAdmin || allProfiles.length === 0) return;
+    
+    // Toujours charger les stats globales pour le menu
+    if (activeView === 'menu') {
       loadGlobalStats();
-      // Charger les autres données
       loadAllPayments();
-      loadAllProducts();
-      loadAllOrders();
-      loadAllEvents();
-      loadAllRatings();
+      return;
     }
-  }, [isAdmin, allProfiles.length, loadAllPayments, loadGlobalStats, loadAllProducts, loadAllOrders, loadAllEvents, loadAllRatings]);
-
-  // Recharger les statistiques globales quand on change de vue
-  useEffect(() => {
-    if (isAdmin && allProfiles.length > 0 && activeView === 'menu') {
-      loadGlobalStats();
+    
+    // Charger les données spécifiques selon la vue
+    switch (activeView) {
+      case 'products':
+        loadAllProducts();
+        break;
+      case 'orders':
+        loadAllOrders();
+        break;
+      case 'events':
+        loadAllEvents();
+        break;
+      case 'ratings':
+        loadAllRatings();
+        break;
+      case 'users':
+        // Les utilisateurs sont déjà chargés via onSnapshot
+        break;
     }
-  }, [isAdmin, allProfiles.length, activeView, loadGlobalStats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, allProfiles.length, activeView]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
