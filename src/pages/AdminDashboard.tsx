@@ -416,14 +416,23 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (isAdmin && allProfiles.length > 0) {
-      loadAllPayments();
+      // Charger les statistiques globales en premier
       loadGlobalStats();
+      // Charger les autres données
+      loadAllPayments();
       loadAllProducts();
       loadAllOrders();
       loadAllEvents();
       loadAllRatings();
     }
   }, [isAdmin, allProfiles.length, loadAllPayments, loadGlobalStats, loadAllProducts, loadAllOrders, loadAllEvents, loadAllRatings]);
+
+  // Recharger les statistiques globales quand on change de vue
+  useEffect(() => {
+    if (isAdmin && allProfiles.length > 0 && activeView === 'menu') {
+      loadGlobalStats();
+    }
+  }, [isAdmin, allProfiles.length, activeView, loadGlobalStats]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
@@ -878,12 +887,39 @@ const AdminDashboard = () => {
   // Vue Menu Principal avec de gros boutons
   const renderMenuView = () => (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Administration Nack</h1>
-        <p className="text-muted-foreground">Gestion complète de la plateforme</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Administration Nack</h1>
+          <p className="text-muted-foreground">Gestion complète de la plateforme</p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={loadGlobalStats} 
+          disabled={isLoadingGlobalStats}
+          className="flex items-center gap-2"
+        >
+          {isLoadingGlobalStats ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900"></div>
+              Chargement...
+            </>
+          ) : (
+            <>
+              <TrendingUp size={16} />
+              Actualiser les stats
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Statistiques principales */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold">Statistiques globales</h2>
+        <Button variant="outline" size="sm" onClick={loadGlobalStats} disabled={isLoadingGlobalStats}>
+          {isLoadingGlobalStats ? "Chargement..." : "Actualiser"}
+        </Button>
+      </div>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
