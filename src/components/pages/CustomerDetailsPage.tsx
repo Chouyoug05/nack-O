@@ -33,7 +33,9 @@ import {
   where, 
   orderBy, 
   getDocs,
-  onSnapshot
+  onSnapshot,
+  updateDoc,
+  runTransaction
 } from "firebase/firestore";
 import type { Customer, CustomerDoc, Reward } from "@/types/customer";
 import type { Order } from "@/types/order";
@@ -189,6 +191,71 @@ const CustomerDetailsPage = () => {
         return "VIP";
       default:
         return type;
+    }
+  };
+
+  const handleUseReward = async (rewardId: string) => {
+    if (!user || !customer) return;
+    
+    if (!window.confirm("Marquer cette récompense comme utilisée ?")) return;
+
+    try {
+      const customerRef = doc(customersColRef(db, user.uid), customer.id);
+      
+      await runTransaction(db, async (transaction) => {
+        const customerDoc = await transaction.get(customerRef);
+        if (!customerDoc.exists()) throw new Error("Client introuvable");
+        
+        const data = customerDoc.data() as CustomerDoc;
+        const rewards = data.availableRewards || [];
+        const rewardIndex = rewards.findIndex(r => r.id === rewardId);
+        
+        if (rewardIndex === -1) throw new Error("Récompense introuvable");
+        
+        const reward = rewards[rewardIndex];
+        const updatedRewards = [...rewards];
+        updatedRewards[rewardIndex] = {
+          ...reward,
+          used: true,
+          usedAt: Date.now(),
+        };
+        
+        const rewardHistory = data.rewardHistory || [];
+        rewardHistory.push({
+          rewardId: reward.id,
+          rewardTitle: reward.title,
+          usedAt: Date.now(),
+        });
+        
+        transaction.update(customerRef, {
+          availableRewards: updatedRewards,
+          rewardHistory: rewardHistory,
+          updatedAt: Date.now(),
+        });
+      });
+
+      toast({
+        title: "Récompense utilisée",
+        description: "La récompense a été marquée comme utilisée",
+      });
+
+      // Recharger les données du client
+      const customerRef = doc(customersColRef(db, user.uid), customer.id);
+      const customerSnap = await getDoc(customerRef);
+      if (customerSnap.exists()) {
+        const data = customerSnap.data() as CustomerDoc;
+        setCustomer({
+          ...customer,
+          availableRewards: data.availableRewards || [],
+        });
+      }
+    } catch (error) {
+      console.error("Erreur utilisation récompense:", error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer la récompense comme utilisée",
+        variant: "destructive"
+      });
     }
   };
 
@@ -392,39 +459,96 @@ const CustomerDetailsPage = () => {
               </Card>
 
               {/* Récompenses */}
-              {customer.availableRewards && customer.availableRewards.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                      <Gift className="w-4 h-4" />
-                      Récompenses disponibles
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {customer.availableRewards
-                        .filter((r) => !r.used)
-                        .map((reward) => (
-                          <div
-                            key={reward.id}
-                            className="flex items-center justify-between p-3 bg-muted rounded-lg"
-                          >
-                            <div>
-                              <p className="font-medium text-sm">{reward.title}</p>
-                              <p className="text-xs text-muted-foreground">{reward.description}</p>
-                            </div>
-                            <Badge variant="default">Disponible</Badge>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                    <Gift className="w-4 h-4" />
+                    Récompenses
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {customer.availableRewards && customer.availableRewards.length > 0 ? (
+                    <div className="space-y-3">
+                      {/* Récompenses disponibles */}
+                      {customer.availableRewards.filter((r) => !r.used).length > 0 && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-2 block">Disponibles:</Label>
+                          <div className="space-y-2">
+                            {customer.availableRewards
+                              .filter((r) => !r.used)
+                              .map((reward) => (
+                                <div
+                                  key={reward.id}
+                                  className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg"
+                                >
+                                  <div className="flex-1">
+                                    <p className="font-medium text-sm">{reward.title}</p>
+                                    <p className="text-xs text-muted-foreground">{reward.description}</p>
+                                    {reward.createdAt && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Obtenue le {new Date(reward.createdAt).toLocaleDateString("fr-FR")}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="default" className="bg-green-500">Disponible</Badge>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleUseReward(reward.id)}
+                                      className="text-xs"
+                                    >
+                                      Utiliser
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
                           </div>
-                        ))}
-                      {customer.availableRewards.filter((r) => !r.used).length === 0 && (
+                        </div>
+                      )}
+                      
+                      {/* Récompenses utilisées */}
+                      {customer.availableRewards.filter((r) => r.used).length > 0 && (
+                        <div>
+                          <Label className="text-xs text-muted-foreground mb-2 block">Utilisées:</Label>
+                          <div className="space-y-2">
+                            {customer.availableRewards
+                              .filter((r) => r.used)
+                              .map((reward) => (
+                                <div
+                                  key={reward.id}
+                                  className="flex items-center justify-between p-3 bg-muted rounded-lg opacity-75"
+                                >
+                                  <div>
+                                    <p className="font-medium text-sm line-through">{reward.title}</p>
+                                    <p className="text-xs text-muted-foreground">{reward.description}</p>
+                                    {reward.usedAt && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Utilisée le {new Date(reward.usedAt).toLocaleDateString("fr-FR")}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">Utilisée</Badge>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {customer.availableRewards.filter((r) => !r.used).length === 0 && 
+                       customer.availableRewards.filter((r) => r.used).length === 0 && (
                         <p className="text-sm text-muted-foreground text-center py-4">
-                          Aucune récompense disponible
+                          Aucune récompense
                         </p>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Aucune récompense
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
 
               {/* Notes et préférences */}
               {(customer.notes || customer.allergies?.length || customer.preferences?.length) && (
@@ -478,6 +602,11 @@ const CustomerDetailsPage = () => {
                   </CardTitle>
                   <CardDescription>
                     {orders.length} commande{orders.length > 1 ? "s" : ""} au total
+                    {orders.length > 0 && (
+                      <span className="ml-2">
+                        • Moyenne: {Math.round(customer.totalAmountSpent / customer.totalOrders).toLocaleString()} XAF/commande
+                      </span>
+                    )}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -517,19 +646,25 @@ const CustomerDetailsPage = () => {
                           </div>
 
                           <div className="space-y-2 mb-3">
-                            {order.items.map((item, idx) => (
-                              <div
-                                key={idx}
-                                className="flex justify-between items-center text-sm bg-muted p-2 rounded"
-                              >
-                                <span>
-                                  {item.name} x{item.quantity}
-                                </span>
-                                <span className="font-medium">
-                                  {(item.price * item.quantity).toLocaleString()} XAF
-                                </span>
-                              </div>
-                            ))}
+                            {order.items.length > 0 ? (
+                              order.items.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="flex justify-between items-center text-sm bg-muted p-2 rounded"
+                                >
+                                  <span className="flex-1">
+                                    {item.name} x{item.quantity}
+                                  </span>
+                                  <span className="font-medium ml-2">
+                                    {(item.price * item.quantity).toLocaleString()} XAF
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-sm text-muted-foreground text-center py-2">
+                                Aucun détail disponible
+                              </p>
+                            )}
                           </div>
 
                           <div className="flex justify-between items-center pt-3 border-t">
