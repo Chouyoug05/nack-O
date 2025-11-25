@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft, Edit, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -80,6 +80,14 @@ const AdminDashboard = () => {
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [allRatings, setAllRatings] = useState<Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }>>([]);
   const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+  
+  // États pour la gestion des éléments
+  const [editingProduct, setEditingProduct] = useState<{ id: string; userId: string; name: string; category: string; price: number; quantity: number } | null>(null);
+  const [editingOrder, setEditingOrder] = useState<{ id: string; userId: string; orderNumber: number; status: string } | null>(null);
+  const [editingEvent, setEditingEvent] = useState<{ id: string; userId: string; title: string; date: string; time: string; location: string; maxCapacity: number; ticketPrice: number } | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
   
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
@@ -872,6 +880,139 @@ const AdminDashboard = () => {
     setPlanFeatures({ ...subscriptionPlans[planKey].features });
   };
 
+  // Fonctions de gestion des produits
+  const handleDeleteProduct = async (productId: string, userId: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) return;
+    
+    setDeletingProductId(productId);
+    try {
+      const productRef = doc(db, `profiles/${userId}/products`, productId);
+      await deleteDoc(productRef);
+      toast({ title: "Produit supprimé", description: "Le produit a été supprimé avec succès" });
+      loadAllProducts();
+    } catch (error) {
+      console.error('Erreur suppression produit:', error);
+      toast({ title: "Erreur", description: "Impossible de supprimer le produit", variant: "destructive" });
+    } finally {
+      setDeletingProductId(null);
+    }
+  };
+
+  const handleUpdateProduct = async (productId: string, userId: string, updates: { name?: string; category?: string; price?: number; quantity?: number }) => {
+    try {
+      const productRef = doc(db, `profiles/${userId}/products`, productId);
+      await updateDoc(productRef, {
+        ...updates,
+        updatedAt: Date.now(),
+      });
+      toast({ title: "Produit modifié", description: "Le produit a été mis à jour avec succès" });
+      setEditingProduct(null);
+      loadAllProducts();
+    } catch (error) {
+      console.error('Erreur modification produit:', error);
+      toast({ title: "Erreur", description: "Impossible de modifier le produit", variant: "destructive" });
+    }
+  };
+
+  // Fonctions de gestion des commandes
+  const handleUpdateOrderStatus = async (orderId: string, userId: string, newStatus: string) => {
+    try {
+      // Essayer d'abord dans orders, puis dans barOrders
+      const orderRef = doc(db, `profiles/${userId}/orders`, orderId);
+      const barOrderRef = doc(db, `profiles/${userId}/barOrders`, orderId);
+      
+      try {
+        await updateDoc(orderRef, { status: newStatus, updatedAt: Date.now() });
+      } catch {
+        await updateDoc(barOrderRef, { status: newStatus, updatedAt: Date.now() });
+      }
+      
+      toast({ title: "Commande modifiée", description: `Le statut a été changé en "${newStatus}"` });
+      setEditingOrder(null);
+      loadAllOrders();
+    } catch (error) {
+      console.error('Erreur modification commande:', error);
+      toast({ title: "Erreur", description: "Impossible de modifier la commande", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string, userId: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette commande ?")) return;
+    
+    setDeletingOrderId(orderId);
+    try {
+      const orderRef = doc(db, `profiles/${userId}/orders`, orderId);
+      const barOrderRef = doc(db, `profiles/${userId}/barOrders`, orderId);
+      
+      try {
+        await deleteDoc(orderRef);
+      } catch {
+        await deleteDoc(barOrderRef);
+      }
+      
+      toast({ title: "Commande supprimée", description: "La commande a été supprimée avec succès" });
+      loadAllOrders();
+    } catch (error) {
+      console.error('Erreur suppression commande:', error);
+      toast({ title: "Erreur", description: "Impossible de supprimer la commande", variant: "destructive" });
+    } finally {
+      setDeletingOrderId(null);
+    }
+  };
+
+  // Fonctions de gestion des événements
+  const handleUpdateEvent = async (eventId: string, userId: string, updates: { title?: string; date?: string; time?: string; location?: string; maxCapacity?: number; ticketPrice?: number }) => {
+    try {
+      const eventRef = doc(db, `profiles/${userId}/events`, eventId);
+      await updateDoc(eventRef, {
+        ...updates,
+        updatedAt: Date.now(),
+      });
+      toast({ title: "Événement modifié", description: "L'événement a été mis à jour avec succès" });
+      setEditingEvent(null);
+      loadAllEvents();
+    } catch (error) {
+      console.error('Erreur modification événement:', error);
+      toast({ title: "Erreur", description: "Impossible de modifier l'événement", variant: "destructive" });
+    }
+  };
+
+  const handleDeleteEvent = async (eventId: string, userId: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet événement ? Cette action supprimera également tous les billets associés.")) return;
+    
+    setDeletingEventId(eventId);
+    try {
+      const eventRef = doc(db, `profiles/${userId}/events`, eventId);
+      await deleteDoc(eventRef);
+      toast({ title: "Événement supprimé", description: "L'événement a été supprimé avec succès" });
+      loadAllEvents();
+    } catch (error) {
+      console.error('Erreur suppression événement:', error);
+      toast({ title: "Erreur", description: "Impossible de supprimer l'événement", variant: "destructive" });
+    } finally {
+      setDeletingEventId(null);
+    }
+  };
+
+  // Fonction pour réinitialiser les appréciations d'un produit
+  const handleResetRating = async (productId: string, userId: string) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir réinitialiser les appréciations de ce produit ?")) return;
+    
+    try {
+      const productRef = doc(db, `profiles/${userId}/products`, productId);
+      await updateDoc(productRef, {
+        rating: 0,
+        ratingCount: 0,
+        updatedAt: Date.now(),
+      });
+      toast({ title: "Appréciations réinitialisées", description: "Les appréciations ont été réinitialisées avec succès" });
+      loadAllRatings();
+    } catch (error) {
+      console.error('Erreur réinitialisation appréciations:', error);
+      toast({ title: "Erreur", description: "Impossible de réinitialiser les appréciations", variant: "destructive" });
+    }
+  };
+
   // Afficher un loader si en cours de vérification ou pas admin
   if (isAdminLoading || !isAdmin) {
     return (
@@ -889,8 +1030,8 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">Administration Nack</h1>
-          <p className="text-muted-foreground">Gestion complète de la plateforme</p>
+        <h1 className="text-3xl font-bold mb-2">Administration Nack</h1>
+        <p className="text-muted-foreground">Gestion complète de la plateforme</p>
         </div>
         <Button 
           variant="outline" 
@@ -1243,6 +1384,7 @@ const AdminDashboard = () => {
                     <TableHead>Prix</TableHead>
                     <TableHead>Quantité</TableHead>
                     <TableHead>Établissement</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1259,6 +1401,33 @@ const AdminDashboard = () => {
                             <span className="text-xs text-muted-foreground">{product.userName}</span>
                           )}
               </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setEditingProduct({ id: product.id, userId: product.userId, name: product.name, category: product.category, price: product.price, quantity: product.quantity })}
+                            title="Modifier le produit"
+                          >
+                            <Edit size={14} className="mr-2"/> Modifier
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={() => handleDeleteProduct(product.id, product.userId)}
+                            disabled={deletingProductId === product.id}
+                            title="Supprimer le produit"
+                          >
+                            {deletingProductId === product.id ? (
+                              <>...</>
+                            ) : (
+                              <>
+                                <Trash2 size={14} className="mr-2"/> Supprimer
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1305,6 +1474,7 @@ const AdminDashboard = () => {
                     <TableHead>Statut</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>Établissement</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1327,6 +1497,38 @@ const AdminDashboard = () => {
                             <span className="text-xs text-muted-foreground">{order.userName}</span>
                           )}
             </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end flex-wrap">
+                          <Select 
+                            value={order.status} 
+                            onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
+                          >
+                            <SelectTrigger className="w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">En attente</SelectItem>
+                              <SelectItem value="sent">Envoyée</SelectItem>
+                              <SelectItem value="cancelled">Annulée</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={() => handleDeleteOrder(order.id, order.userId)}
+                            disabled={deletingOrderId === order.id}
+                            title="Supprimer la commande"
+                          >
+                            {deletingOrderId === order.id ? (
+                              <>...</>
+                            ) : (
+                              <>
+                                <Trash2 size={14} className="mr-2"/> Supprimer
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1375,6 +1577,7 @@ const AdminDashboard = () => {
                     <TableHead>Billets vendus</TableHead>
                     <TableHead>Prix billet</TableHead>
                     <TableHead>Établissement</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1399,6 +1602,33 @@ const AdminDashboard = () => {
                           )}
                           </div>
                         </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => setEditingEvent({ id: event.id, userId: event.userId, title: event.title, date: event.date, time: event.time, location: event.location, maxCapacity: event.maxCapacity, ticketPrice: event.ticketPrice })}
+                            title="Modifier l'événement"
+                          >
+                            <Edit size={14} className="mr-2"/> Modifier
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            variant="destructive" 
+                            onClick={() => handleDeleteEvent(event.id, event.userId)}
+                            disabled={deletingEventId === event.id}
+                            title="Supprimer l'événement"
+                          >
+                            {deletingEventId === event.id ? (
+                              <>...</>
+                            ) : (
+                              <>
+                                <Trash2 size={14} className="mr-2"/> Supprimer
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </TableCell>
                       </TableRow>
                   ))}
                 </TableBody>
@@ -1442,6 +1672,7 @@ const AdminDashboard = () => {
                     <TableHead>Note</TableHead>
                     <TableHead>Nombre d'avis</TableHead>
                     <TableHead>Établissement</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1464,6 +1695,16 @@ const AdminDashboard = () => {
                             <span className="text-xs text-muted-foreground">{rating.userName}</span>
                           )}
                         </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => handleResetRating(rating.productId, rating.userId)}
+                            title="Réinitialiser les appréciations"
+                          >
+                            <X size={14} className="mr-2"/> Réinitialiser
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -1687,6 +1928,156 @@ const AdminDashboard = () => {
               disabled={newSubscriptionType === userToChangeSubscription?.currentType}
             >
               Confirmer le changement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de modification de produit */}
+      <Dialog open={!!editingProduct} onOpenChange={(open) => !open && setEditingProduct(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le produit</DialogTitle>
+            <DialogDescription>Modifiez les informations du produit</DialogDescription>
+          </DialogHeader>
+          {editingProduct && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Nom du produit</Label>
+                <Input
+                  value={editingProduct.name}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Catégorie</Label>
+                <Input
+                  value={editingProduct.category}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Prix (XAF)</Label>
+                  <Input
+                    type="number"
+                    value={editingProduct.price}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, price: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Quantité</Label>
+                  <Input
+                    type="number"
+                    value={editingProduct.quantity}
+                    onChange={(e) => setEditingProduct({ ...editingProduct, quantity: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingProduct(null)}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={() => {
+                if (editingProduct) {
+                  handleUpdateProduct(editingProduct.id, editingProduct.userId, {
+                    name: editingProduct.name,
+                    category: editingProduct.category,
+                    price: editingProduct.price,
+                    quantity: editingProduct.quantity,
+                  });
+                }
+              }}
+            >
+              Enregistrer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de modification d'événement */}
+      <Dialog open={!!editingEvent} onOpenChange={(open) => !open && setEditingEvent(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Modifier l'événement</DialogTitle>
+            <DialogDescription>Modifiez les informations de l'événement</DialogDescription>
+          </DialogHeader>
+          {editingEvent && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Titre de l'événement</Label>
+                <Input
+                  value={editingEvent.title}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Date</Label>
+                  <Input
+                    type="date"
+                    value={editingEvent.date}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Heure</Label>
+                  <Input
+                    type="time"
+                    value={editingEvent.time}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, time: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Lieu</Label>
+                <Input
+                  value={editingEvent.location}
+                  onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Capacité maximale</Label>
+                  <Input
+                    type="number"
+                    value={editingEvent.maxCapacity}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, maxCapacity: Number(e.target.value) })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Prix du billet (XAF)</Label>
+                  <Input
+                    type="number"
+                    value={editingEvent.ticketPrice}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, ticketPrice: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingEvent(null)}>
+              Annuler
+            </Button>
+            <Button 
+              onClick={() => {
+                if (editingEvent) {
+                  handleUpdateEvent(editingEvent.id, editingEvent.userId, {
+                    title: editingEvent.title,
+                    date: editingEvent.date,
+                    time: editingEvent.time,
+                    location: editingEvent.location,
+                    maxCapacity: editingEvent.maxCapacity,
+                    ticketPrice: editingEvent.ticketPrice,
+                  });
+                }
+              }}
+            >
+              Enregistrer
             </Button>
           </DialogFooter>
         </DialogContent>
