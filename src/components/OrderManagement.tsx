@@ -407,32 +407,37 @@ const OrderManagement = ({
         ) : (
           sortedOrders.map((order) => (
             <div key={order.id} className="bg-card border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <div className="font-semibold text-lg">#{order.orderNumber}</div>
-                  <Badge variant="outline" className="text-sm font-semibold">
-                    Table {order.tableNumber}
-                  </Badge>
-                  <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
-                    {getStatusIcon(order.status)}
-                    {getStatusText(order.status)}
-                  </Badge>
-                  {order.agentName && (
-                    <Badge variant="secondary" className="text-sm font-medium flex items-center gap-1">
-                      <User className="w-3 h-3" />
-                      {order.agentName}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 space-y-2">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="font-semibold text-lg">#{order.orderNumber}</div>
+                    <Badge variant="outline" className="text-sm font-semibold">
+                      Table {order.tableNumber}
                     </Badge>
-                  )}
-                </div>
-                <div className="text-right text-sm">
-                  <div className="text-muted-foreground">
-                    {new Date(order.createdAt).toLocaleTimeString()}
+                    <Badge className={`${getStatusColor(order.status)} flex items-center gap-1`}>
+                      {getStatusIcon(order.status)}
+                      {getStatusText(order.status)}
+                    </Badge>
                   </div>
-                  {!order.agentName && (
-                    <div className="text-xs text-muted-foreground">
-                      Code: {order.agentCode}
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 flex-wrap text-sm">
+                    <span className="text-muted-foreground">
+                      {new Date(order.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {order.agentName && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <Badge variant="secondary" className="text-xs font-medium flex items-center gap-1 w-fit">
+                          <User className="w-3 h-3" />
+                          Serveur: {order.agentName}
+                        </Badge>
+                      </>
+                    )}
+                    {!order.agentName && (
+                      <span className="text-xs text-muted-foreground">
+                        Code: {order.agentCode}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
