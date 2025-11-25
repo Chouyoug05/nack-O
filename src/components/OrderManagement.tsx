@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useOrders } from "@/contexts/OrderContext";
 import { Order, OrderStatus } from "@/types/order";
-import { Clock, CheckCircle, XCircle } from "lucide-react";
+import { Clock, CheckCircle, XCircle, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -408,7 +408,7 @@ const OrderManagement = ({
           sortedOrders.map((order) => (
             <div key={order.id} className="bg-card border rounded-lg p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <div className="font-semibold text-lg">#{order.orderNumber}</div>
                   <Badge variant="outline" className="text-sm font-semibold">
                     Table {order.tableNumber}
@@ -417,14 +417,22 @@ const OrderManagement = ({
                     {getStatusIcon(order.status)}
                     {getStatusText(order.status)}
                   </Badge>
+                  {order.agentName && (
+                    <Badge variant="secondary" className="text-sm font-medium flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      {order.agentName}
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-right text-sm">
                   <div className="text-muted-foreground">
                     {new Date(order.createdAt).toLocaleTimeString()}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Agent: {order.agentName ? `${order.agentName} (${order.agentCode})` : order.agentCode}
-                  </div>
+                  {!order.agentName && (
+                    <div className="text-xs text-muted-foreground">
+                      Code: {order.agentCode}
+                    </div>
+                  )}
                 </div>
               </div>
 

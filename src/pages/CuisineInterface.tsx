@@ -434,9 +434,19 @@ const OrderCard = ({ order, onStatusChange, getStatusBadge, getStatusColor }: Or
           <CardTitle className="text-lg">Commande #{order.orderNumber}</CardTitle>
           {getStatusBadge(currentStatus)}
         </div>
-        <CardDescription>
-          Table: {order.tableNumber} • {new Date(order.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-          {order.agentName && ` • Serveur: ${order.agentName}`}
+        <CardDescription className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+          <span>Table: {order.tableNumber}</span>
+          <span>•</span>
+          <span>{new Date(order.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+          {order.agentName && (
+            <>
+              <span>•</span>
+              <Badge variant="secondary" className="w-fit text-xs font-medium flex items-center gap-1">
+                <User className="w-3 h-3" />
+                Serveur: {order.agentName}
+              </Badge>
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
