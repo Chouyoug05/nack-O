@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef } from "@/lib/collections";
-import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup, deleteDoc } from "firebase/firestore";
+import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef, subscriptionPlansColRef, subscriptionPlanDocRef } from "@/lib/collections";
+import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup, deleteDoc, getDoc, setDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import type { PaymentTransaction } from "@/types/payment";
 import { Button } from "@/components/ui/button";
@@ -96,7 +96,10 @@ const AdminDashboard = () => {
     : 'menu';
   const [activeView, setActiveView] = useState<"menu" | "users" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications">(initialView);
   const [isSendingNotifications, setIsSendingNotifications] = useState(false);
-  const [subscriptionPlans, setSubscriptionPlans] = useState(SUBSCRIPTION_PLANS);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<{
+    transition: { name: string; price: number; features: SubscriptionFeatures };
+    'transition-pro-max': { name: string; price: number; features: SubscriptionFeatures };
+  }>(SUBSCRIPTION_PLANS);
   const [editingPlan, setEditingPlan] = useState<"transition" | "transition-pro-max" | null>(null);
   const [planFeatures, setPlanFeatures] = useState<SubscriptionFeatures>({
     products: true,
@@ -107,6 +110,10 @@ const AdminDashboard = () => {
     barConnectee: false,
     events: false,
   });
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
+  const [planPrice, setPlanPrice] = useState<number>(2500);
+  const [planEventsLimit, setPlanEventsLimit] = useState<number>(5);
+  const [planEventsExtraPrice, setPlanEventsExtraPrice] = useState<number>(1500);
 
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
@@ -131,6 +138,49 @@ const AdminDashboard = () => {
       setAllProfiles(list);
     });
     return () => unsub();
+  }, [isAdmin]);
+
+  // Charger les plans d'abonnement depuis Firestore
+  useEffect(() => {
+    if (!isAdmin) return;
+    const loadPlans = async () => {
+      setIsLoadingPlans(true);
+      try {
+        const plansRef = subscriptionPlansColRef(db);
+        const plansSnap = await getDocs(plansRef);
+        
+        const loadedPlans = {
+          transition: { ...SUBSCRIPTION_PLANS.transition },
+          'transition-pro-max': { ...SUBSCRIPTION_PLANS['transition-pro-max'] },
+        };
+        
+        plansSnap.docs.forEach((docSnap) => {
+          const planKey = docSnap.id;
+          const planData = docSnap.data();
+          if (planKey === 'transition') {
+            loadedPlans.transition = {
+              ...loadedPlans.transition,
+              ...planData,
+            } as typeof SUBSCRIPTION_PLANS.transition;
+          } else if (planKey === 'transition-pro-max') {
+            loadedPlans['transition-pro-max'] = {
+              ...loadedPlans['transition-pro-max'],
+              ...planData,
+            } as typeof SUBSCRIPTION_PLANS['transition-pro-max'];
+          }
+        });
+        
+        setSubscriptionPlans(loadedPlans);
+      } catch (error) {
+        console.error('Erreur chargement plans:', error);
+        // En cas d'erreur, utiliser les plans par défaut
+        setSubscriptionPlans(SUBSCRIPTION_PLANS);
+      } finally {
+        setIsLoadingPlans(false);
+      }
+    };
+    
+    loadPlans();
   }, [isAdmin]);
 
   const loadAllPayments = useCallback(async () => {
@@ -855,29 +905,73 @@ const AdminDashboard = () => {
     }
   };
 
-  const saveSubscriptionPlan = () => {
+  const saveSubscriptionPlan = async () => {
     if (!editingPlan) return;
     
-    const updatedPlans = { ...subscriptionPlans };
-    if (editingPlan === 'transition') {
-      updatedPlans.transition = {
-        ...updatedPlans.transition,
-        features: { ...planFeatures },
+    setIsLoadingPlans(true);
+    try {
+      const planRef = subscriptionPlanDocRef(db, editingPlan);
+      const currentPlan = subscriptionPlans[editingPlan];
+      
+      // Préparer les données à sauvegarder
+      const planData: {
+        name: string;
+        price: number;
+        features: SubscriptionFeatures;
+      } = {
+        name: currentPlan.name,
+        price: planPrice,
+        features: {
+          ...planFeatures,
+        },
       };
-    } else if (editingPlan === 'transition-pro-max') {
-      updatedPlans['transition-pro-max'] = {
-        ...updatedPlans['transition-pro-max'],
-        features: { ...planFeatures },
+      
+      // Ajouter les paramètres spécifiques à Pro Max
+      if (editingPlan === 'transition-pro-max') {
+        planData.features.eventsLimit = planEventsLimit;
+        planData.features.eventsExtraPrice = planEventsExtraPrice;
+      }
+      
+      // Sauvegarder dans Firestore
+      await setDoc(planRef, planData, { merge: true });
+      
+      // Mettre à jour l'état local
+      const updatedPlans = {
+        transition: editingPlan === 'transition' 
+          ? { ...currentPlan, price: planPrice, features: planData.features }
+          : subscriptionPlans.transition,
+        'transition-pro-max': editingPlan === 'transition-pro-max'
+          ? { ...currentPlan, price: planPrice, features: planData.features }
+          : subscriptionPlans['transition-pro-max'],
       };
-    }
     setSubscriptionPlans(updatedPlans);
+      
     setEditingPlan(null);
-    toast({ title: "Succès", description: `Plan ${editingPlan} mis à jour` });
+      toast({ 
+        title: "Succès", 
+        description: `Plan ${editingPlan} mis à jour et sauvegardé dans Firestore` 
+      });
+    } catch (error) {
+      console.error('Erreur sauvegarde plan:', error);
+      toast({ 
+        title: "Erreur", 
+        description: "Impossible de sauvegarder le plan", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsLoadingPlans(false);
+    }
   };
 
   const openEditPlan = (planKey: "transition" | "transition-pro-max") => {
     setEditingPlan(planKey);
-    setPlanFeatures({ ...subscriptionPlans[planKey].features });
+    const plan = subscriptionPlans[planKey];
+    setPlanFeatures({ ...plan.features });
+    setPlanPrice(plan.price);
+    if (planKey === 'transition-pro-max') {
+      setPlanEventsLimit(plan.features.eventsLimit ?? 5);
+      setPlanEventsExtraPrice(plan.features.eventsExtraPrice ?? 1500);
+    }
   };
 
   // Fonctions de gestion des produits
@@ -1427,7 +1521,7 @@ const AdminDashboard = () => {
                               </>
                             )}
                           </Button>
-                        </div>
+              </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1528,7 +1622,7 @@ const AdminDashboard = () => {
                               </>
                             )}
                           </Button>
-                        </div>
+            </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1627,8 +1721,8 @@ const AdminDashboard = () => {
                               </>
                             )}
                           </Button>
-                        </div>
-                      </TableCell>
+                          </div>
+                        </TableCell>
                       </TableRow>
                   ))}
                 </TableBody>
@@ -1770,9 +1864,24 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card mt-4">
           <CardHeader>
             <CardTitle>Modifier {subscriptionPlans[editingPlan].name}</CardTitle>
+            <CardDescription>
+              Les modifications seront sauvegardées dans Firestore et appliquées à tous les utilisateurs
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {Object.entries(planFeatures).map(([feature, enabled]) => (
+            <div className="space-y-2">
+              <Label>Prix mensuel (XAF)</Label>
+              <Input
+                type="number"
+                value={planPrice}
+                onChange={(e) => setPlanPrice(Number(e.target.value))}
+                placeholder="2500"
+              />
+            </div>
+            
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Fonctionnalités</Label>
+              {Object.entries(planFeatures).filter(([key]) => key !== 'eventsLimit' && key !== 'eventsExtraPrice').map(([feature, enabled]) => (
               <div key={feature} className="flex items-center gap-2">
                 <Checkbox 
                   checked={enabled} 
@@ -1780,11 +1889,41 @@ const AdminDashboard = () => {
                     setPlanFeatures({ ...planFeatures, [feature]: checked as boolean })
                   }
                 />
-                <Label>{feature}</Label>
+                  <Label className="capitalize">{feature === 'barConnectee' ? 'Bar Connectée' : feature}</Label>
               </div>
             ))}
-            <div className="flex gap-2">
-              <Button onClick={saveSubscriptionPlan}>Enregistrer</Button>
+            </div>
+            
+            {editingPlan === 'transition-pro-max' && (
+              <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-2">
+                  <Label>Limite d'événements inclus</Label>
+                  <Input
+                    type="number"
+                    value={planEventsLimit}
+                    onChange={(e) => setPlanEventsLimit(Number(e.target.value))}
+                    placeholder="5"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Prix événement supplémentaire (XAF)</Label>
+                  <Input
+                    type="number"
+                    value={planEventsExtraPrice}
+                    onChange={(e) => setPlanEventsExtraPrice(Number(e.target.value))}
+                    placeholder="1500"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <div className="flex gap-2 pt-4">
+              <Button 
+                onClick={saveSubscriptionPlan}
+                disabled={isLoadingPlans}
+              >
+                {isLoadingPlans ? "Enregistrement..." : "Enregistrer dans Firestore"}
+              </Button>
               <Button variant="outline" onClick={() => setEditingPlan(null)}>Annuler</Button>
             </div>
           </CardContent>

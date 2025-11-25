@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { hasFeatureAccess } from "@/utils/subscription";
+import { hasFeatureAccessSync } from "@/utils/subscription";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Lock } from "lucide-react";
@@ -16,7 +16,7 @@ interface FeatureGateProps {
 export const FeatureGate = ({ feature, children, fallback }: FeatureGateProps) => {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const hasAccess = hasFeatureAccess(profile, feature);
+  const hasAccess = hasFeatureAccessSync(profile, feature);
 
   if (hasAccess) {
     return <>{children}</>;

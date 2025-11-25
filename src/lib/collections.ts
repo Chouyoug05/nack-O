@@ -44,4 +44,10 @@ export const customersColRef = (db: Firestore, uid: string): CollectionReference
   collection(db, "profiles", uid, "customers") as CollectionReference;
 
 export const loyaltyConfigDocRef = (db: Firestore, uid: string) => 
-  doc(db, "profiles", uid, "config", "loyalty"); 
+  doc(db, "profiles", uid, "config", "loyalty");
+
+export const subscriptionPlansColRef = (db: Firestore): CollectionReference =>
+  collection(db, "subscriptionPlans") as CollectionReference;
+
+export const subscriptionPlanDocRef = (db: Firestore, planKey: string) =>
+  doc(db, "subscriptionPlans", planKey); 

@@ -1,4 +1,7 @@
 import type { UserProfile } from "@/types/profile";
+import { db } from "@/lib/firebase";
+import { subscriptionPlanDocRef } from "@/lib/collections";
+import { getDoc } from "firebase/firestore";
 
 export type SubscriptionPlan = 'trial' | 'transition' | 'transition-pro-max' | 'expired';
 
@@ -77,12 +80,39 @@ export function getCurrentPlan(profile: UserProfile | null | undefined): Subscri
 }
 
 /**
+ * Charge un plan depuis Firestore avec fallback sur les valeurs par défaut
+ */
+export async function getPlanFromFirestore(planKey: 'transition' | 'transition-pro-max') {
+  try {
+    const planRef = subscriptionPlanDocRef(db, planKey);
+    const planSnap = await getDoc(planRef);
+    
+    if (planSnap.exists()) {
+      const planData = planSnap.data();
+      return {
+        name: planData.name || SUBSCRIPTION_PLANS[planKey].name,
+        price: planData.price ?? SUBSCRIPTION_PLANS[planKey].price,
+        features: {
+          ...SUBSCRIPTION_PLANS[planKey].features,
+          ...planData.features,
+        },
+      };
+    }
+  } catch (error) {
+    console.error(`Erreur chargement plan ${planKey} depuis Firestore:`, error);
+  }
+  
+  // Fallback sur les valeurs par défaut
+  return SUBSCRIPTION_PLANS[planKey];
+}
+
+/**
  * Vérifie si l'utilisateur a accès à une fonctionnalité
  */
-export function hasFeatureAccess(
+export async function hasFeatureAccess(
   profile: UserProfile | null | undefined,
   feature: keyof SubscriptionFeatures
-): boolean {
+): Promise<boolean> {
   const plan = getCurrentPlan(profile);
   
   // En essai, tout est accessible
@@ -95,7 +125,32 @@ export function hasFeatureAccess(
     return false;
   }
   
-  // Vérifier selon le plan
+  // Charger le plan depuis Firestore
+  if (plan === 'transition') {
+    const planData = await getPlanFromFirestore('transition');
+    return planData.features[feature] === true;
+  }
+  
+  if (plan === 'transition-pro-max') {
+    const planData = await getPlanFromFirestore('transition-pro-max');
+    return planData.features[feature] === true;
+  }
+  
+  return false;
+}
+
+/**
+ * Version synchrone pour compatibilité (utilise les valeurs par défaut)
+ */
+export function hasFeatureAccessSync(
+  profile: UserProfile | null | undefined,
+  feature: keyof SubscriptionFeatures
+): boolean {
+  const plan = getCurrentPlan(profile);
+  
+  if (plan === 'trial') return true;
+  if (plan === 'expired') return false;
+  
   if (plan === 'transition') {
     return SUBSCRIPTION_PLANS.transition.features[feature] === true;
   }
@@ -139,6 +194,8 @@ export function canCreateEvent(profile: UserProfile | null | undefined): {
   
   // Pro Max : vérifier la limite
   if (plan === 'transition-pro-max') {
+    // Charger le plan depuis Firestore de manière asynchrone
+    // Pour l'instant, utiliser les valeurs par défaut (sera amélioré si nécessaire)
     const eventsLimit = SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsLimit ?? 5;
     const eventsCount = profile.eventsCount ?? 0;
     const eventsResetAt = profile.eventsResetAt ?? profile.subscriptionEndsAt ?? Date.now();
