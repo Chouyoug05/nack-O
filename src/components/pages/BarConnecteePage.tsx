@@ -649,6 +649,26 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     }
   };
 
+  // Fonction helper pour l'aperçu des cartes
+  const getCardPreviewClass = () => {
+    const borderRadius = {
+      small: "rounded-md",
+      medium: "rounded-lg",
+      large: "rounded-xl"
+    }[menuTheme.borderRadius];
+
+    switch (menuTheme.cardStyle) {
+      case 'minimalist':
+        return `${borderRadius} border border-gray-200`;
+      case 'shadow':
+        return `${borderRadius} shadow-md`;
+      case 'border':
+        return `${borderRadius} border-2 border-gray-300`;
+      default:
+        return `${borderRadius} shadow-md`;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -1221,26 +1241,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       )}
     </div>
   );
-
-  // Fonction helper pour l'aperçu des cartes
-  const getCardPreviewClass = () => {
-    const borderRadius = {
-      small: "rounded-md",
-      medium: "rounded-lg",
-      large: "rounded-xl"
-    }[menuTheme.borderRadius];
-
-    switch (menuTheme.cardStyle) {
-      case 'minimalist':
-        return `${borderRadius} border border-gray-200`;
-      case 'shadow':
-        return `${borderRadius} shadow-md`;
-      case 'border':
-        return `${borderRadius} border-2 border-gray-300`;
-      default:
-        return `${borderRadius} shadow-md`;
-    }
-  };
 };
 
 export default BarConnecteePage;
