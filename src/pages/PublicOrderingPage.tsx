@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData, getDocs, updateDoc } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Star, Grid3x3, Search, X } from "lucide-react";
+import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Grid3x3, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
@@ -213,7 +213,7 @@ const PublicOrderingPage = () => {
         productsQuery,
         handleProductsSnapshot,
         (error) => {
-          console.warn('⚠️ Erreur avec orderBy, chargement sans tri:', error);
+          // Erreur avec orderBy, charger sans tri
           if (unsubscribeProducts) {
             unsubscribeProducts();
             unsubscribeProducts = null;
@@ -233,7 +233,7 @@ const PublicOrderingPage = () => {
       );
       unsubscribeProductsRef.current = unsubscribeProducts;
     } catch (error) {
-      console.warn('⚠️ Erreur création query, chargement direct:', error);
+      // Erreur création query, charger directement
       unsubscribeProducts = onSnapshot(
         productsRef,
         handleProductsSnapshot,

@@ -111,16 +111,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     // Nettoyer les doubles barres obliques dans l'URL finale
     const cleanUrl = finalUrl.replace(/\/+/g, '/').replace(':/', '://');
     
-    console.log('🔗 Construction URL publique:', {
-      isDevelopment,
-      baseUrl,
-      basePath,
-      cleanBasePath,
-      finalUrl,
-      cleanUrl,
-      userId: user.uid
-    });
-    
     return cleanUrl;
   };
 
@@ -246,12 +236,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
             id: doc.id,
             ...doc.data()
           }));
-          console.log('Tous les produits chargés:', allProducts.length);
-          console.log('Détails des produits:', allProducts);
           
           // Filtrer les produits avec prix > 0 (le stock n'est pas requis pour les menus/plats)
           const productsInStock = allProducts.filter(product => {
-            const stock = product.quantity || product.stock || 0; // Utiliser quantity comme dans StockPage
+            const stock = product.quantity || product.stock || 0;
             // Vérifier le prix de manière très stricte (gérer string, number, null, undefined, NaN, chaînes vides)
             let priceValue = 0;
             if (typeof product.price === 'number' && !isNaN(product.price)) {
@@ -261,14 +249,9 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               priceValue = isNaN(parsed) ? 0 : parsed;
             }
             // Inclure les produits avec prix > 0 (stock peut être 0 pour les menus/plats)
-            const isValid = priceValue > 0;
-            if (!isValid) {
-              console.log(`❌ Produit "${product.name}" exclu: stock=${stock}, price=${priceValue} (original: ${product.price}, type: ${typeof product.price})`);
-            }
-            return isValid;
+            return priceValue > 0;
           });
           
-          console.log('Produits en stock après filtrage:', productsInStock.length);
           setProducts(productsInStock);
         } catch (error) {
           console.error('Erreur traitement produits:', error);
@@ -293,18 +276,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     
     const loadExistingQRCode = async () => {
       try {
-        console.log('Chargement QR Code existant pour:', user.uid);
         const configDoc = await getDoc(doc(db, `profiles/${user.uid}/barConnectee`, 'config'));
         
         if (configDoc.exists()) {
           const config = configDoc.data();
-          console.log('Configuration trouvée:', config);
           
           if (config.qrCodeGenerated) {
             // Utiliser l'URL sauvegardée ou générer une nouvelle
             const publicUrl = config.publicUrl || getPublicUrl();
-            
-            console.log('Génération QR Code avec URL:', publicUrl);
             
             const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
               width: 300,
@@ -315,10 +294,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               }
             });
             setQrCodeUrl(qrCodeDataUrl);
-            console.log('QR Code existant chargé');
           }
-        } else {
-          console.log('Aucune configuration QR Code trouvée');
         }
       } catch (error) {
         console.error('Erreur chargement QR Code:', error);
@@ -387,14 +363,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     try {
       const publicUrl = getPublicUrl();
       
-      console.log('Génération QR Code pour URL:', publicUrl);
-      console.log('Détails URL:', {
-        currentOrigin: window.location.origin,
-        basePath: import.meta.env.BASE_URL || '',
-        userId: user.uid,
-        finalUrl: publicUrl
-      });
-      
       const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
         width: 300,
         margin: 2,
@@ -404,7 +372,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         }
       });
       
-      console.log('QR Code généré avec succès');
       setQrCodeUrl(qrCodeDataUrl);
       
       // Sauvegarder l'URL publique dans Firestore
@@ -415,10 +382,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           establishmentName: profile.establishmentName,
           lastUpdated: Date.now()
         });
-        console.log('Configuration sauvegardée dans Firestore');
       } catch (firestoreError) {
-        console.warn('Erreur sauvegarde Firestore (permissions):', firestoreError);
-        // Continuer même si la sauvegarde échoue
+        // Ignorer l'erreur de sauvegarde (permissions)
       }
       
       toast({
@@ -460,8 +425,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       console.log('Ajout table:', tableData);
       console.log('Collection path:', `profiles/${user.uid}/tables`);
       
-      const docRef = await addDoc(collection(db, `profiles/${user.uid}/tables`), tableData);
-      console.log('Table ajoutée avec ID:', docRef.id);
+      await addDoc(collection(db, `profiles/${user.uid}/tables`), tableData);
       
       // Réinitialiser le formulaire
       setNewTableName("");
@@ -475,7 +439,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       });
     } catch (error) {
       console.error('Erreur ajout table:', error);
-      console.error('Détails erreur:', error.code, error.message);
       
       let errorMessage = "Impossible d'ajouter la table.";
       if (error.code === 'permission-denied') {
@@ -828,7 +791,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             alt={product.name} 
                             className="w-full h-full object-cover rounded-lg" 
                             onError={(e) => {
-                              console.log('Erreur chargement image pour', product.name, ':', product.imageUrl);
                               e.currentTarget.style.display = 'none';
                               e.currentTarget.nextElementSibling?.classList.remove('hidden');
                             }}
