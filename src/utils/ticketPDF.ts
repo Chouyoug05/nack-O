@@ -92,30 +92,54 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   
   let y = margin;
 
-  // Fonction helper pour texte
+  // Fonction helper pour tronquer le texte si nécessaire
+  const truncateText = (text: string, maxWidth: number, fontSize: number): string => {
+    doc.setFontSize(fontSize);
+    const textWidth = doc.getTextWidth(text);
+    if (textWidth <= maxWidth) return text;
+    
+    // Tronquer progressivement
+    let truncated = text;
+    while (doc.getTextWidth(truncated + '...') > maxWidth && truncated.length > 0) {
+      truncated = truncated.substring(0, truncated.length - 1);
+    }
+    return truncated + (truncated.length < text.length ? '...' : '');
+  };
+
+  // Fonction helper pour texte avec gestion du débordement
   const text = (
-    text: string,
+    textStr: string,
     x: number,
     yPos: number,
     size: number = 9,
     bold: boolean = false,
     color: number[] = BLACK,
-    align: 'left' | 'center' | 'right' = 'left'
+    align: 'left' | 'center' | 'right' = 'left',
+    maxWidth?: number
   ) => {
     doc.setFontSize(size);
     doc.setFont('helvetica', bold ? 'bold' : 'normal');
     doc.setTextColor(color[0], color[1], color[2]);
     
+    // Tronquer si nécessaire
+    let displayText = textStr;
+    if (maxWidth) {
+      displayText = truncateText(textStr, maxWidth, size);
+    } else if (align === 'center' || align === 'left') {
+      const availableWidth = align === 'center' ? contentWidth : contentWidth;
+      displayText = truncateText(textStr, availableWidth, size);
+    }
+    
     let xPos = x;
     if (align === 'center') {
-      const textWidth = doc.getTextWidth(text);
+      const textWidth = doc.getTextWidth(displayText);
       xPos = (pageWidth - textWidth) / 2;
     } else if (align === 'right') {
-      const textWidth = doc.getTextWidth(text);
+      const textWidth = doc.getTextWidth(displayText);
       xPos = pageWidth - margin - textWidth;
     }
     
-    doc.text(text, xPos, yPos);
+    doc.text(displayText, xPos, yPos);
   };
 
   // Fonction pour ligne
@@ -152,31 +176,31 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
 
   // Nom de l'établissement en MAJUSCULES
   const displayName = (ticketData.companyName || ticketData.establishmentName).toUpperCase();
-  text(displayName, pageWidth / 2, y, 10, true, BLACK, 'center');
+  text(displayName, pageWidth / 2, y, 9, true, BLACK, 'center', contentWidth);
   y += 5;
 
   // Adresse
   if (ticketData.fullAddress) {
-    text(ticketData.fullAddress, pageWidth / 2, y, 7, false, BLACK, 'center');
+    text(ticketData.fullAddress, pageWidth / 2, y, 7, false, BLACK, 'center', contentWidth);
     y += 4;
   }
 
   // Contacts (téléphones)
   const phone = ticketData.businessPhone || '';
   if (phone) {
-    text(phone, pageWidth / 2, y, 7, false, BLACK, 'center');
+    text(phone, pageWidth / 2, y, 7, false, BLACK, 'center', contentWidth);
     y += 4;
   }
 
   // RCCM (format: RCCM:RG.LBV2016A40301)
   if (ticketData.rcsNumber) {
-    text(`RCCM:${ticketData.rcsNumber}`, pageWidth / 2, y, 7, false, BLACK, 'center');
+    text(`RCCM:${ticketData.rcsNumber}`, pageWidth / 2, y, 7, false, BLACK, 'center', contentWidth);
     y += 4;
   }
 
   // NIF (format: NIF:257208B)
   if (ticketData.nifNumber) {
-    text(`NIF:${ticketData.nifNumber}`, pageWidth / 2, y, 7, false, BLACK, 'center');
+    text(`NIF:${ticketData.nifNumber}`, pageWidth / 2, y, 7, false, BLACK, 'center', contentWidth);
     y += 4;
   }
 
@@ -226,32 +250,46 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
     const itemTotal = Number(item.price) * Number(item.quantity);
     const priceText = itemTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     
-    // Format: "- 1 Produit .......... 1000,00"
-    const leftText = `- ${item.quantity} ${item.name}`;
-    
-    // Calculer l'espace disponible et ajouter des points
-    const leftWidth = doc.getTextWidth(leftText);
+    // Taille de police pour les produits
+    doc.setFontSize(8);
     const priceWidth = doc.getTextWidth(priceText);
-    const availableWidth = contentWidth - leftWidth - priceWidth - 2;
+    const prefixWidth = doc.getTextWidth(`- ${item.quantity} `);
+    const maxNameWidth = contentWidth - prefixWidth - priceWidth - 8; // 8mm pour les points
     
-    // Générer les points pour remplir l'espace
-    const dotChar = '.';
-    const dotWidth = doc.getTextWidth(dotChar);
-    const numDots = Math.max(1, Math.floor(availableWidth / dotWidth));
-    const dots = dotChar.repeat(numDots);
-    
-    // Ajuster le nom du produit si trop long
-    let displayLeftText = leftText;
-    if (leftWidth + priceWidth + (dotWidth * 3) > contentWidth) {
-      // Tronquer le nom du produit
-      const maxNameLength = Math.max(5, Math.floor((contentWidth - doc.getTextWidth(`- ${item.quantity} `) - priceWidth - (dotWidth * 5)) / (doc.getTextWidth('A'))));
-      const truncatedName = item.name.length > maxNameLength ? item.name.substring(0, maxNameLength - 3) + '...' : item.name;
-      displayLeftText = `- ${item.quantity} ${truncatedName}`;
+    // Tronquer le nom du produit si nécessaire
+    let productName = item.name;
+    if (doc.getTextWidth(productName) > maxNameWidth) {
+      let truncated = productName;
+      while (doc.getTextWidth(truncated + '...') > maxNameWidth && truncated.length > 0) {
+        truncated = truncated.substring(0, truncated.length - 1);
+      }
+      productName = truncated + (truncated.length < item.name.length ? '...' : '');
     }
     
-    // Afficher la ligne complète
-    const fullLine = `${displayLeftText} ${dots} ${priceText}`;
-    text(fullLine, margin, y, 8, false, BLACK);
+    const leftText = `- ${item.quantity} ${productName}`;
+    const leftWidth = doc.getTextWidth(leftText);
+    const availableWidth = contentWidth - leftWidth - priceWidth - 2;
+    
+    // Générer les points pour remplir l'espace (minimum 3 points)
+    const dotChar = '.';
+    const dotWidth = doc.getTextWidth(dotChar);
+    const numDots = Math.max(3, Math.floor(availableWidth / dotWidth));
+    const dots = dotChar.repeat(numDots);
+    
+    // Afficher le nom du produit à gauche
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(BLACK[0], BLACK[1], BLACK[2]);
+    doc.text(leftText, margin, y);
+    
+    // Afficher les points
+    const dotsX = margin + leftWidth + 1;
+    doc.text(dots, dotsX, y);
+    
+    // Afficher le prix à droite
+    const priceX = pageWidth - margin - priceWidth;
+    doc.text(priceText, priceX, y);
+    
     y += 4;
   });
 
@@ -260,34 +298,41 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   y += 4;
 
   // ===== TOTAL =====
-  text('Total des', margin, y, 9, false, BLACK);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(BLACK[0], BLACK[1], BLACK[2]);
+  doc.text('Total des', margin, y);
+  
   const totalValue = Math.round(ticketData.total * 100) / 100;
   const totalText = totalValue.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  text(totalText, pageWidth - margin, y, 10, true, BLACK, 'right');
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  const totalWidth = doc.getTextWidth(totalText);
+  doc.text(totalText, pageWidth - margin - totalWidth, y);
   y += 6;
 
   // ===== MENTIONS DE FIN =====
   // THANK YOU (toujours affiché)
-  text('THANK YOU', pageWidth / 2, y, 9, true, BLACK, 'center');
+  text('THANK YOU', pageWidth / 2, y, 9, true, BLACK, 'center', contentWidth);
   y += 5;
 
   // LIVRAISON A DOMICILE (si activé)
   if (ticketData.showDeliveryMention) {
-    text('LIVRAISON A DOMICILE', pageWidth / 2, y, 8, false, BLACK, 'center');
+    text('LIVRAISON A DOMICILE', pageWidth / 2, y, 8, false, BLACK, 'center', contentWidth);
     y += 4;
   }
 
   // C.S.S. X% (si activé)
   if (ticketData.showCSSMention) {
     const cssPercent = ticketData.cssPercentage || 1;
-    text(`C.S.S. ${cssPercent}%`, pageWidth / 2, y, 8, false, BLACK, 'center');
+    text(`C.S.S. ${cssPercent}%`, pageWidth / 2, y, 8, false, BLACK, 'center', contentWidth);
     y += 4;
   }
 
   // Message personnalisé (si défini)
   if (ticketData.ticketFooterMessage) {
     y += 2;
-    text(ticketData.ticketFooterMessage, pageWidth / 2, y, 7, false, BLACK, 'center');
+    text(ticketData.ticketFooterMessage, pageWidth / 2, y, 7, false, BLACK, 'center', contentWidth);
   }
 
   // Sauvegarder

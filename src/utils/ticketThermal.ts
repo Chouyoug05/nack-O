@@ -56,18 +56,26 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
   });
 
   // Formatage des produits : "- 1 Produit .......... 1000,00"
+  // Largeur ticket 58mm = ~32 caractères en police 8px
+  const MAX_LINE_LENGTH = 32;
   const productsRows = data.items.map(item => {
     const itemTotal = item.price * item.quantity;
     const priceText = itemTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const productName = item.name.length > 20 ? item.name.substring(0, 17) + '...' : item.name;
     
-    // Calculer les points pour aligner le prix à droite
-    // Largeur ticket ~32 caractères, on veut: "- 1 NomProduit ..... Prix"
-    const prefix = `- ${item.quantity} ${productName}`;
-    const availableWidth = 32 - prefix.length - priceText.length;
-    const dots = availableWidth > 0 ? ' .'.repeat(Math.floor(availableWidth / 2)) : ' ';
+    // Tronquer le nom du produit si nécessaire
+    const prefix = `- ${item.quantity} `;
+    const maxNameLength = MAX_LINE_LENGTH - prefix.length - priceText.length - 5; // 5 pour les points
+    let productName = item.name;
+    if (productName.length > maxNameLength) {
+      productName = productName.substring(0, maxNameLength - 3) + '...';
+    }
     
-    return `${prefix}${dots}${priceText}`;
+    // Construire la ligne complète
+    const leftPart = `${prefix}${productName}`;
+    const availableWidth = MAX_LINE_LENGTH - leftPart.length - priceText.length;
+    const dots = availableWidth > 0 ? '.'.repeat(Math.max(3, availableWidth)) : '...';
+    
+    return `${leftPart}${dots}${priceText}`;
   }).join('\n');
 
   const totalFormatted = data.total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -114,11 +122,18 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
       padding: 3mm;
       background: white;
       color: #000;
+      overflow-x: hidden;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     .ticket {
       width: 100%;
+      max-width: 100%;
       text-align: center;
+      overflow-x: hidden;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
     }
     
     .logo-container {
@@ -141,6 +156,9 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
       margin: 4px 0;
       letter-spacing: 0.5px;
       text-transform: uppercase;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
     }
     
     .company-info {
@@ -148,6 +166,9 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
       text-align: center;
       margin: 2px 0;
       line-height: 1.2;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
     }
     
     .powered-by {
@@ -177,6 +198,9 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
       font-size: 8px;
       line-height: 1.4;
       white-space: pre;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
     }
     
     .total-section {
