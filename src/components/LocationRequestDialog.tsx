@@ -119,7 +119,7 @@ const LocationRequestDialog = () => {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout: 10000,
+          timeout: 15000, // Augmenté à 15 secondes
           maximumAge: 0
         });
       });
@@ -144,11 +144,18 @@ const LocationRequestDialog = () => {
       });
     } catch (error: unknown) {
       const geoError = error as GeolocationPositionError;
-      const errorMessage = geoError.code === 1 
-        ? "Permission refusée. Veuillez autoriser la géolocalisation."
-        : geoError.code === 2
-        ? "Position indisponible. Vérifiez votre connexion."
-        : geoError.message || "Erreur lors de la récupération de la position.";
+      let errorMessage = "";
+
+      if (geoError.code === 1) {
+        errorMessage = "Permission refusée. Veuillez autoriser la géolocalisation.";
+      } else if (geoError.code === 2) {
+        errorMessage = "Position indisponible. Vérifiez votre connexion et le GPS de votre appareil.";
+      } else if (geoError.code === 3) {
+        errorMessage = "Délai d'attente dépassé. Veuillez réessayer.";
+      } else {
+        errorMessage = geoError.message || "Erreur lors de la récupération de la position.";
+      }
+
       setLocationError(errorMessage);
       toast({
         title: "Erreur de géolocalisation",
@@ -289,7 +296,12 @@ const LocationRequestDialog = () => {
           {/* Option 2: Géolocalisation automatique */}
           <Button
             type="button"
-            onClick={getCurrentLocation}
+            onClick={() => {
+              // Réinitialiser l'erreur et les suggestions avant de demander la position
+              setLocationError(null);
+              setShowSuggestions(false);
+              getCurrentLocation();
+            }}
             disabled={isGettingLocation}
             size="lg"
             variant="outline"
@@ -314,7 +326,9 @@ const LocationRequestDialog = () => {
           {locationError && (
             <Card className="border-red-200 bg-red-50">
               <CardContent className="p-4">
-                <p className="text-sm sm:text-base text-red-800">{locationError}</p>
+                <p className="text-sm sm:text-base text-red-800">
+                  {locationError}
+                </p>
               </CardContent>
             </Card>
           )}

@@ -1,17 +1,17 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, updateDoc, QuerySnapshot, DocumentData, getDocs } from "firebase/firestore";
-import { Card, CardContent } from "@/components/ui/card";
+import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData, getDocs, updateDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Star, Grid3x3, Search } from "lucide-react";
+import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Star, Grid3x3, Search, X } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
-import { printThermalTicket, downloadThermalTicket } from "@/utils/ticketThermal";
+import { printThermalTicket } from "@/utils/ticketThermal";
+import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 
 interface Product {
   id: string;
@@ -22,8 +22,9 @@ interface Product {
   available?: boolean;
   quantity?: number;
   stock?: number;
-  rating?: number; // Note moyenne (0-5)
-  ratingCount?: number; // Nombre d'avis
+  rating?: number;
+  ratingCount?: number;
+  description?: string;
 }
 
 interface TableZone {
@@ -52,15 +53,11 @@ interface Establishment {
 }
 
 const PublicOrderingPage = () => {
-  // ==========================================
-  // TOUS LES HOOKS EN PREMIER - ORDRE FIXE
-  // ==========================================
-  
-  // 1. Hooks de routing
+  // Hooks de routing
   const params = useParams<{ establishmentId: string }>();
   const establishmentId = useMemo(() => params?.establishmentId ?? null, [params?.establishmentId]);
   
-  // 2. useState - toujours dans le même ordre
+  // State
   const [products, setProducts] = useState<Product[]>([]);
   const [tables, setTables] = useState<TableZone[]>([]);
   const [establishment, setEstablishment] = useState<Establishment | null>(null);
@@ -73,62 +70,70 @@ const PublicOrderingPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [menuTheme, setMenuTheme] = useState<MenuThemeConfig>(defaultMenuTheme);
 
-  // 3. useRef
+  // useRef
   const isMountedRef = useRef<boolean>(true);
   const unsubscribeProductsRef = useRef<(() => void) | null>(null);
   const unsubscribeTablesRef = useRef<(() => void) | null>(null);
 
-  // 4. useMemo
+  // useMemo
   const total = useMemo(() => {
     return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   }, [cart]);
 
-  // 5. useEffect - toujours avant les returns
+  // Charger le thème du menu
   useEffect(() => {
-    // Réinitialiser le flag
+    if (!establishmentId) return;
+
+    const loadTheme = async () => {
+      try {
+        const themeDoc = await getDoc(doc(db, `profiles/${establishmentId}/menuDigital`, 'theme'));
+        if (themeDoc.exists()) {
+          setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
+        }
+      } catch (error) {
+        console.error('Erreur chargement thème:', error);
+      }
+    };
+
+    loadTheme();
+  }, [establishmentId]);
+
+  // useEffect principal
+  useEffect(() => {
     isMountedRef.current = true;
     
-    // Nettoyer les anciens abonnements
     if (unsubscribeProductsRef.current) {
       try {
         unsubscribeProductsRef.current();
-      } catch (e) {
-        // Ignore
-      }
+      } catch (e) {}
       unsubscribeProductsRef.current = null;
     }
     if (unsubscribeTablesRef.current) {
       try {
         unsubscribeTablesRef.current();
-      } catch (e) {
-        // Ignore
-      }
+      } catch (e) {}
       unsubscribeTablesRef.current = null;
     }
 
-    // Fonction de nettoyage
     const cleanup = () => {
       isMountedRef.current = false;
       if (unsubscribeProductsRef.current) {
         try {
           unsubscribeProductsRef.current();
-        } catch (e) {
-          // Ignore
-        }
+        } catch (e) {}
         unsubscribeProductsRef.current = null;
       }
       if (unsubscribeTablesRef.current) {
         try {
           unsubscribeTablesRef.current();
-        } catch (e) {
-          // Ignore
-        }
+        } catch (e) {}
         unsubscribeTablesRef.current = null;
       }
     };
 
-    // Si pas d'ID
     if (!establishmentId) {
       setIsLoading(false);
       return cleanup;
@@ -161,7 +166,6 @@ const PublicOrderingPage = () => {
     // Charger les produits
     const productsRef = collection(db, `profiles/${establishmentId}/products`);
     
-    // Fonction pour traiter les produits
     const handleProductsSnapshot = (snapshot: QuerySnapshot<DocumentData>) => {
       if (!isMountedRef.current) return;
       
@@ -177,41 +181,30 @@ const PublicOrderingPage = () => {
           stock: data.quantity || data.stock || 0,
           rating: data.rating || 0,
           ratingCount: data.ratingCount || 0,
-          // S'assurer que imageUrl est bien récupéré
+          description: data.description || '',
           imageUrl: (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') 
             ? data.imageUrl.trim() 
             : undefined,
         } as Product;
       });
       
-      // Filtrer les produits :
-      // - Prix > 0 (exclure les produits gratuits/à 0 XAF)
-      // - available !== false (inclure si undefined/null)
-      // - Stock non obligatoire (on affiche même si stock = 0 ou undefined)
       const availableProducts = productsData.filter(p => {
         const priceValue = typeof p.price === 'number' 
           ? p.price 
           : parseFloat(String(p.price || '0')) || 0;
-        
-        // Produit disponible si prix > 0 et pas explicitement désactivé
         return priceValue > 0 && p.available !== false;
       });
       
-      // Trier par nom manuellement
       availableProducts.sort((a, b) => {
         const nameA = (a.name || '').toLowerCase();
         const nameB = (b.name || '').toLowerCase();
         return nameA.localeCompare(nameB);
       });
       
-      console.log('📦 Produits disponibles:', availableProducts.length, 'sur', productsData.length);
-      console.log('📦 Exemple produit avec image:', availableProducts.find(p => p.imageUrl)?.name, availableProducts.find(p => p.imageUrl)?.imageUrl);
-      
       setProducts(availableProducts);
       setIsLoading(false);
     };
     
-    // Essayer avec orderBy, mais si ça échoue, charger sans tri
     let unsubscribeProducts: (() => void) | null = null;
     
     try {
@@ -220,7 +213,6 @@ const PublicOrderingPage = () => {
         productsQuery,
         handleProductsSnapshot,
         (error) => {
-          // Si orderBy échoue (champ name manquant), charger sans tri
           console.warn('⚠️ Erreur avec orderBy, chargement sans tri:', error);
           if (unsubscribeProducts) {
             unsubscribeProducts();
@@ -241,7 +233,6 @@ const PublicOrderingPage = () => {
       );
       unsubscribeProductsRef.current = unsubscribeProducts;
     } catch (error) {
-      // Si la création de la query échoue, charger directement
       console.warn('⚠️ Erreur création query, chargement direct:', error);
       unsubscribeProducts = onSnapshot(
         productsRef,
@@ -278,14 +269,10 @@ const PublicOrderingPage = () => {
     );
     unsubscribeTablesRef.current = unsubscribeTables;
 
-    // Toujours retourner cleanup
     return cleanup;
   }, [establishmentId]);
 
-  // ==========================================
-  // FONCTIONS - APRÈS TOUS LES HOOKS
-  // ==========================================
-
+  // Fonctions
   const addToCart = (product: Product) => {
     const priceValue = typeof product.price === 'number' 
       ? product.price 
@@ -325,12 +312,10 @@ const PublicOrderingPage = () => {
     });
   };
 
-  // Calculer les catégories disponibles
   const availableCategories = useMemo(() => {
     return [...new Set(products.map(p => p.category).filter(Boolean))].sort();
   }, [products]);
 
-  // Filtrer les produits par catégorie et recherche
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -338,73 +323,6 @@ const PublicOrderingPage = () => {
       return matchesSearch && matchesCategory;
     });
   }, [products, searchTerm, activeCategoryTab]);
-
-  // Fonction pour noter un produit
-  const rateProduct = async (productId: string, rating: number) => {
-    if (!establishmentId || rating < 1 || rating > 5) return;
-    
-    try {
-      const ratingsRef = collection(db, `profiles/${establishmentId}/products/${productId}/ratings`);
-      await addDoc(ratingsRef, {
-        rating,
-        createdAt: Date.now()
-      });
-
-      // Recalculer la note moyenne
-      const ratingsQuery = query(ratingsRef, orderBy('createdAt'));
-      const ratingsSnapshot = await getDocs(ratingsQuery);
-      const ratings = ratingsSnapshot.docs.map(d => d.data().rating as number);
-      
-      if (ratings.length > 0) {
-        const avgRating = ratings.reduce((sum, r) => sum + r, 0) / ratings.length;
-        
-        // Mettre à jour le produit avec la nouvelle note moyenne
-        await updateDoc(doc(db, `profiles/${establishmentId}/products/${productId}`), {
-          rating: avgRating,
-          ratingCount: ratings.length
-        });
-      }
-    } catch (error) {
-      console.error('Erreur lors de la notation:', error);
-    }
-  };
-
-  // Composant d'étoiles
-  const StarRating = ({ product }: { product: Product }) => {
-    const [hoverRating, setHoverRating] = useState(0);
-    const rating = product.rating || 0;
-    const ratingCount = product.ratingCount || 0;
-
-    return (
-      <div className="flex items-center gap-2">
-        <div className="flex items-center">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => rateProduct(product.id, star)}
-              onMouseEnter={() => setHoverRating(star)}
-              onMouseLeave={() => setHoverRating(0)}
-              className="focus:outline-none"
-            >
-              <Star
-                className={`w-4 h-4 ${
-                  star <= (hoverRating || rating)
-                    ? 'fill-yellow-400 text-yellow-400'
-                    : 'text-gray-300'
-                }`}
-              />
-            </button>
-          ))}
-        </div>
-        {rating > 0 && (
-          <span className="text-xs text-gray-600">
-            {rating.toFixed(1)} ({ratingCount})
-          </span>
-        )}
-      </div>
-    );
-  };
 
   const placeOrder = async () => {
     if (!establishmentId || cart.length === 0 || !selectedTable) {
@@ -509,7 +427,6 @@ const PublicOrderingPage = () => {
         })),
         total,
         createdAt: Date.now(),
-        // Informations personnalisées du profil
         companyName: establishment.companyName,
         fullAddress: establishment.fullAddress,
         businessPhone: establishment.businessPhone,
@@ -526,16 +443,53 @@ const PublicOrderingPage = () => {
     }
   };
 
-  // ==========================================
-  // RENDU CONDITIONNEL - APRÈS TOUS LES HOOKS
-  // ==========================================
+  // Styles dynamiques basés sur le thème
+  const getCardStyle = () => {
+    const baseStyle = "bg-white transition-all duration-200 hover:scale-[1.02]";
+    const borderRadius = {
+      small: "rounded-md",
+      medium: "rounded-lg",
+      large: "rounded-xl"
+    }[menuTheme.borderRadius];
+
+    switch (menuTheme.cardStyle) {
+      case 'minimalist':
+        return `${baseStyle} ${borderRadius} border border-gray-200`;
+      case 'shadow':
+        return `${baseStyle} ${borderRadius} shadow-md hover:shadow-lg`;
+      case 'border':
+        return `${baseStyle} ${borderRadius} border-2 border-gray-300`;
+      default:
+        return `${baseStyle} ${borderRadius} shadow-md`;
+    }
+  };
+
+  const getBackgroundStyle = () => {
+    if (menuTheme.backgroundType === 'image' && menuTheme.backgroundColor.startsWith('http')) {
+      return {
+        backgroundImage: `url(${menuTheme.backgroundColor})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      };
+    }
+    // Fond texturé façon papier avec pattern CSS
+    return {
+      backgroundColor: menuTheme.backgroundColor,
+      backgroundImage: `
+        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px),
+        repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px)
+      `,
+      backgroundSize: '100% 100%'
+    };
+  };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center" style={getBackgroundStyle()}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Chargement du menu...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: menuTheme.primaryColor }}></div>
+          <p className="text-gray-700" style={{ color: menuTheme.primaryColor }}>Chargement du menu...</p>
         </div>
       </div>
     );
@@ -545,11 +499,11 @@ const PublicOrderingPage = () => {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
         <div className="flex w-full max-w-sm flex-col items-center gap-6 rounded-2xl bg-white p-8 text-center shadow-2xl">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full text-white" style={{ backgroundColor: menuTheme.primaryColor }}>
             <CheckCircle className="w-10 h-10" />
           </div>
           <div className="flex flex-col gap-2">
-            <h2 className="text-2xl font-bold">Commande validée !</h2>
+            <h2 className="text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>Commande validée !</h2>
             <p className="text-gray-600">
               Merci pour votre commande. Elle est en cours de préparation.
             </p>
@@ -560,8 +514,8 @@ const PublicOrderingPage = () => {
               Montrez ce QR Code au serveur
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Button onClick={printReceipt} className="w-full bg-gradient-primary text-white">
+          <div className="grid grid-cols-2 gap-3 w-full">
+            <Button onClick={printReceipt} className="w-full text-white" style={{ backgroundColor: menuTheme.primaryColor }}>
               <Printer className="w-4 h-4 mr-2" />
               Imprimer
             </Button>
@@ -587,25 +541,30 @@ const PublicOrderingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      <header className="sticky top-0 z-10 bg-white shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <div className="min-h-screen pb-24" style={getBackgroundStyle()}>
+      {/* Header avec logo */}
+      <header className="sticky top-0 z-10 bg-white/98 backdrop-blur-sm shadow-md border-b-2" style={{ borderColor: menuTheme.primaryColor + '40' }}>
+        <div className="container mx-auto px-4 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             {establishment?.logoUrl && (
               <img 
                 src={establishment.logoUrl} 
                 alt={establishment.establishmentName} 
-                className="w-10 h-10 rounded-full"
+                className="w-14 h-14 rounded-full object-cover border-2 shadow-sm"
+                style={{ borderColor: menuTheme.primaryColor }}
               />
             )}
-            <h1 className="text-xl font-bold">
+            <h1 className="text-3xl font-bold tracking-wide" style={{ color: menuTheme.primaryColor, fontFamily: menuTheme.titleFont || 'Georgia, serif' }}>
               {establishment?.establishmentName || "Menu"}
             </h1>
           </div>
-          <div className="relative">
-            <ShoppingBag className="w-6 h-6" />
+          <div className="relative cursor-pointer">
+            <ShoppingBag className="w-7 h-7" style={{ color: menuTheme.primaryColor }} />
             {cart.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+              <span 
+                className="absolute -top-2 -right-2 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg"
+                style={{ backgroundColor: menuTheme.primaryColor }}
+              >
                 {cart.reduce((sum, item) => sum + item.quantity, 0)}
               </span>
             )}
@@ -617,19 +576,17 @@ const PublicOrderingPage = () => {
         {/* Filtres et recherche */}
         <div className="mb-6 space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
-            {/* Recherche */}
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <Input
                 placeholder="Rechercher un produit..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-white/90"
               />
             </div>
-            {/* Filtre par catégorie */}
             <Select value={activeCategoryTab} onValueChange={setActiveCategoryTab}>
-              <SelectTrigger className="w-full sm:w-[250px]">
+              <SelectTrigger className="w-full sm:w-[250px] bg-white/90">
                 <SelectValue>
                   {activeCategoryTab === "all" ? "Toutes les catégories" : activeCategoryTab}
                 </SelectValue>
@@ -651,59 +608,66 @@ const PublicOrderingPage = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Grille produits - 2 colonnes mobile, 3 colonnes tablette+ */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
           {filteredProducts.map((product) => {
             const priceValue = typeof product.price === 'number' 
               ? product.price 
               : parseFloat(String(product.price)) || 0;
             
             return (
-              <Card key={product.id} className="overflow-hidden">
+              <div
+                key={product.id}
+                className={getCardStyle()}
+                onClick={() => setSelectedProduct(product)}
+                role="button"
+                tabIndex={0}
+              >
                 {product.imageUrl ? (
-                  <div className="w-full h-48 bg-gray-100 overflow-hidden">
+                  <div className="w-full h-40 bg-gray-100 overflow-hidden">
                     <img
                       src={product.imageUrl}
                       alt={product.name}
                       className="w-full h-full object-cover"
                       loading="lazy"
                       onError={(e) => {
-                        // Si l'image ne charge pas, afficher l'icône par défaut
                         const target = e.currentTarget;
                         target.style.display = 'none';
                         const parent = target.parentElement;
                         if (parent && !parent.querySelector('svg')) {
-                          parent.className = 'w-full h-48 bg-gray-100 flex items-center justify-center';
+                          parent.className = 'w-full h-40 bg-gray-100 flex items-center justify-center';
                           parent.innerHTML = '<svg class="w-16 h-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>';
                         }
                       }}
                     />
                   </div>
                 ) : (
-                  <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
-                    <Package className="w-16 h-16 text-gray-400" />
+                  <div className="w-full h-40 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+                    <Package className="w-16 h-16 text-gray-300" />
                   </div>
                 )}
-                <CardContent className="p-4">
-                  <h3 className="font-bold text-lg mb-2">{product.name}</h3>
-                  {/* Appréciations avec étoiles */}
-                  <div className="mb-3">
-                    <StarRating product={product} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold text-primary">
+                <div className="p-5">
+                  <h3 className="font-semibold text-lg mb-3 line-clamp-2 leading-tight" style={{ color: menuTheme.primaryColor, fontFamily: 'Georgia, serif' }}>
+                    {product.name}
+                  </h3>
+                  <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: menuTheme.primaryColor + '20' }}>
+                    <span className="text-xl font-bold tracking-wide" style={{ color: menuTheme.primaryColor }}>
                       {priceValue.toLocaleString('fr-FR')} XAF
                     </span>
                     <Button
                       size="sm"
-                      onClick={() => addToCart(product)}
-                      className="flex items-center gap-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToCart(product);
+                      }}
+                      className="text-white shadow-md hover:shadow-lg transition-shadow"
+                      style={{ backgroundColor: menuTheme.primaryColor }}
                     >
                       <Plus className="w-4 h-4" />
-                      Ajouter
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -719,12 +683,13 @@ const PublicOrderingPage = () => {
         )}
       </main>
 
+      {/* Panier fixe en bas */}
       {cart.length > 0 && (
-        <footer className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4">
+        <footer className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-20">
           <div className="container mx-auto flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total</p>
-              <p className="text-2xl font-bold">
+              <p className="text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>
                 {total.toLocaleString('fr-FR')} XAF
               </p>
             </div>
@@ -736,7 +701,8 @@ const PublicOrderingPage = () => {
                   placeOrder();
                 }
               }}
-              className="px-8"
+              className="px-8 text-white"
+              style={{ backgroundColor: menuTheme.primaryColor }}
             >
               Commander
             </Button>
@@ -744,11 +710,12 @@ const PublicOrderingPage = () => {
         </footer>
       )}
 
+      {/* Panier flottant */}
       {cart.length > 0 && (
-        <div className="fixed bottom-24 right-4 bg-white rounded-lg shadow-xl p-4 max-w-xs max-h-64 overflow-y-auto">
-          <h3 className="font-bold mb-2">Panier</h3>
+        <div className="fixed bottom-24 right-4 bg-white rounded-lg shadow-xl p-4 max-w-xs max-h-64 overflow-y-auto z-10 border" style={{ borderColor: menuTheme.primaryColor + '30' }}>
+          <h3 className="font-bold mb-2" style={{ color: menuTheme.primaryColor }}>Panier</h3>
           {cart.map((item) => (
-            <div key={item.productId} className="flex items-center justify-between mb-2 pb-2 border-b">
+            <div key={item.productId} className="flex items-center justify-between mb-2 pb-2 border-b last:border-b-0">
               <div className="flex-1">
                 <p className="text-sm font-medium">{item.name}</p>
                 <p className="text-xs text-gray-600">
@@ -782,10 +749,11 @@ const PublicOrderingPage = () => {
         </div>
       )}
 
+      {/* Dialog sélection table */}
       <Dialog open={showTableDialog} onOpenChange={setShowTableDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2" style={{ color: menuTheme.primaryColor }}>
               <MapPin className="w-5 h-5" />
               Votre position
             </DialogTitle>
@@ -836,12 +804,62 @@ const PublicOrderingPage = () => {
                   }
                 }}
                 disabled={!selectedTable}
-                className="flex-1"
+                className="flex-1 text-white"
+                style={{ backgroundColor: menuTheme.primaryColor }}
               >
                 Confirmer
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Popup produit */}
+      <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
+        <DialogContent className="max-w-md">
+          {selectedProduct && (
+            <>
+              <DialogHeader>
+                <DialogTitle style={{ color: menuTheme.primaryColor }}>{selectedProduct.name}</DialogTitle>
+                <DialogDescription>
+                  {selectedProduct.description || "Détails du produit"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {selectedProduct.imageUrl && (
+                  <div className="w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
+                    <img
+                      src={selectedProduct.imageUrl}
+                      alt={selectedProduct.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                {selectedProduct.description && (
+                  <p className="text-gray-600">{selectedProduct.description}</p>
+                )}
+                <div className="flex items-center justify-between pt-4 border-t">
+                  <span className="text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>
+                    {(typeof selectedProduct.price === 'number' 
+                      ? selectedProduct.price 
+                      : parseFloat(String(selectedProduct.price)) || 0
+                    ).toLocaleString('fr-FR')} XAF
+                  </span>
+                  <Button
+                    onClick={() => {
+                      addToCart(selectedProduct);
+                      setSelectedProduct(null);
+                    }}
+                    className="text-white"
+                    style={{ backgroundColor: menuTheme.primaryColor }}
+                  >
+                    <ShoppingBag className="w-4 h-4 mr-2" />
+                    Commander
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

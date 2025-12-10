@@ -18,7 +18,9 @@ import {
   Clock,
   AlertCircle,
   ShoppingCart,
-  Package
+  Package,
+  Settings,
+  Palette
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +30,7 @@ import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
 import { notificationsColRef } from "@/lib/collections";
 import { generateTicketPDF } from "@/utils/ticketPDF";
+import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 
 interface TableZone {
   id: string;
@@ -85,6 +88,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const [newTableDescription, setNewTableDescription] = useState("");
   const [error, setError] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
+  const [menuTheme, setMenuTheme] = useState<MenuThemeConfig>(defaultMenuTheme);
+  const [isSavingTheme, setIsSavingTheme] = useState(false);
 
   // Fonction utilitaire pour obtenir l'URL publique
   const getPublicUrl = () => {
@@ -322,6 +327,50 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
     loadExistingQRCode();
   }, [user]);
+
+  // Charger le thème du menu
+  useEffect(() => {
+    if (!user) return;
+
+    const loadTheme = async () => {
+      try {
+        const themeDoc = await getDoc(doc(db, `profiles/${user.uid}/menuDigital`, 'theme'));
+        if (themeDoc.exists()) {
+          setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
+        }
+      } catch (error) {
+        console.error('Erreur chargement thème:', error);
+      }
+    };
+
+    loadTheme();
+  }, [user]);
+
+  // Sauvegarder le thème
+  const saveTheme = async () => {
+    if (!user) return;
+
+    setIsSavingTheme(true);
+    try {
+      await setDoc(doc(db, `profiles/${user.uid}/menuDigital`, 'theme'), {
+        ...menuTheme,
+        updatedAt: Date.now()
+      });
+      toast({
+        title: "Thème sauvegardé",
+        description: "Les paramètres du menu digital ont été mis à jour."
+      });
+    } catch (error) {
+      console.error('Erreur sauvegarde thème:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder le thème.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSavingTheme(false);
+    }
+  };
 
   // Générer le QR Code
   const generateQRCode = async () => {
@@ -681,6 +730,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           <QrCode className="w-4 h-4 mr-2" />
           Scanner
         </Button>
+        <Button
+          variant={activeTab === "settings" ? "default" : "outline"}
+          onClick={() => handleTabChange("settings")}
+          className={activeTab === "settings" ? "bg-gradient-primary text-white shadow-button" : ""}
+        >
+          <Settings className="w-4 h-4 mr-2" />
+          Paramètres
+        </Button>
       </div>
 
       {/* Sections conditionnelles */}
@@ -1032,8 +1089,196 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           </Card>
         </div>
       )}
+
+      {activeTab === "settings" && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5" />
+                Personnalisation du Menu Digital
+              </CardTitle>
+              <CardDescription>
+                Personnalisez l'apparence de votre menu digital pour vos clients
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Couleurs */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Couleurs</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="primaryColor">Couleur principale</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="primaryColor"
+                        type="color"
+                        value={menuTheme.primaryColor}
+                        onChange={(e) => setMenuTheme({ ...menuTheme, primaryColor: e.target.value })}
+                        className="w-20 h-10"
+                      />
+                      <Input
+                        type="text"
+                        value={menuTheme.primaryColor}
+                        onChange={(e) => setMenuTheme({ ...menuTheme, primaryColor: e.target.value })}
+                        placeholder="#8B2635"
+                        className="flex-1"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Couleur des titres et boutons</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="secondaryColor">Couleur secondaire</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="secondaryColor"
+                        type="color"
+                        value={menuTheme.secondaryColor}
+                        onChange={(e) => setMenuTheme({ ...menuTheme, secondaryColor: e.target.value })}
+                        className="w-20 h-10"
+                      />
+                      <Input
+                        type="text"
+                        value={menuTheme.secondaryColor}
+                        onChange={(e) => setMenuTheme({ ...menuTheme, secondaryColor: e.target.value })}
+                        placeholder="#D4A574"
+                        className="flex-1"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Couleur d'accentuation</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Arrière-plan */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Arrière-plan</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="backgroundType">Type d'arrière-plan</Label>
+                  <select
+                    id="backgroundType"
+                    value={menuTheme.backgroundType}
+                    onChange={(e) => setMenuTheme({ ...menuTheme, backgroundType: e.target.value as 'color' | 'image' })}
+                    className="w-full px-3 py-2 border border-input rounded-md"
+                  >
+                    <option value="color">Couleur unie</option>
+                    <option value="image">Image</option>
+                  </select>
+                </div>
+                {menuTheme.backgroundType === 'color' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="backgroundColor">Couleur d'arrière-plan</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="backgroundColor"
+                        type="color"
+                        value={menuTheme.backgroundColor}
+                        onChange={(e) => setMenuTheme({ ...menuTheme, backgroundColor: e.target.value })}
+                        className="w-20 h-10"
+                      />
+                      <Input
+                        type="text"
+                        value={menuTheme.backgroundColor}
+                        onChange={(e) => setMenuTheme({ ...menuTheme, backgroundColor: e.target.value })}
+                        placeholder="#F5F1EB"
+                        className="flex-1"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="backgroundImage">URL de l'image</Label>
+                    <Input
+                      id="backgroundImage"
+                      type="text"
+                      value={menuTheme.backgroundColor}
+                      onChange={(e) => setMenuTheme({ ...menuTheme, backgroundColor: e.target.value })}
+                      placeholder="https://exemple.com/image.jpg"
+                    />
+                    <p className="text-xs text-muted-foreground">Collez l'URL de votre image d'arrière-plan</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Style des cartes */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Style des cartes produits</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="cardStyle">Style</Label>
+                  <select
+                    id="cardStyle"
+                    value={menuTheme.cardStyle}
+                    onChange={(e) => setMenuTheme({ ...menuTheme, cardStyle: e.target.value as 'minimalist' | 'shadow' | 'border' })}
+                    className="w-full px-3 py-2 border border-input rounded-md"
+                  >
+                    <option value="minimalist">Minimaliste (bordure fine)</option>
+                    <option value="shadow">Avec ombre</option>
+                    <option value="border">Bordure épaisse</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="borderRadius">Arrondis</Label>
+                  <select
+                    id="borderRadius"
+                    value={menuTheme.borderRadius}
+                    onChange={(e) => setMenuTheme({ ...menuTheme, borderRadius: e.target.value as 'small' | 'medium' | 'large' })}
+                    className="w-full px-3 py-2 border border-input rounded-md"
+                  >
+                    <option value="small">Petits</option>
+                    <option value="medium">Moyens</option>
+                    <option value="large">Grands</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Aperçu */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Aperçu</h3>
+                <div className="p-4 border rounded-lg" style={{ backgroundColor: menuTheme.backgroundColor }}>
+                  <div className={`bg-white p-4 ${getCardPreviewClass()}`}>
+                    <h4 className="font-semibold mb-2" style={{ color: menuTheme.primaryColor }}>
+                      Exemple de produit
+                    </h4>
+                    <p className="text-sm text-gray-600 mb-2">Description du produit</p>
+                    <p className="font-bold" style={{ color: menuTheme.primaryColor }}>
+                      5 000 XAF
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bouton sauvegarder */}
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={saveTheme} disabled={isSavingTheme}>
+                  {isSavingTheme ? "Sauvegarde..." : "Sauvegarder les paramètres"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
+
+  // Fonction helper pour l'aperçu des cartes
+  const getCardPreviewClass = () => {
+    const borderRadius = {
+      small: "rounded-md",
+      medium: "rounded-lg",
+      large: "rounded-xl"
+    }[menuTheme.borderRadius];
+
+    switch (menuTheme.cardStyle) {
+      case 'minimalist':
+        return `${borderRadius} border border-gray-200`;
+      case 'shadow':
+        return `${borderRadius} shadow-md`;
+      case 'border':
+        return `${borderRadius} border-2 border-gray-300`;
+      default:
+        return `${borderRadius} shadow-md`;
+    }
+  };
 };
 
 export default BarConnecteePage;
