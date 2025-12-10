@@ -581,6 +581,7 @@ const AdminDashboard = () => {
   // Suivre les vues déjà chargées pour éviter les rechargements inutiles
   const loadedViewsRef = useRef<Set<string>>(new Set());
   const prevProfilesLengthRef = useRef(0);
+  const prevViewsRef = useRef<string>(activeView);
   
   // Restaurer les données depuis le cache si elles sont vides mais le cache contient des données
   useEffect(() => {
@@ -589,77 +590,139 @@ const AdminDashboard = () => {
     // Restaurer les données depuis le cache si elles existent et que l'état est vide
     if (dataCacheRef.current.products.length > 0 && allProducts.length === 0) {
       setAllProducts(dataCacheRef.current.products);
+      setIsLoadingProducts(false);
     }
     if (dataCacheRef.current.orders.length > 0 && allOrders.length === 0) {
       setAllOrders(dataCacheRef.current.orders);
+      setIsLoadingOrders(false);
     }
     if (dataCacheRef.current.events.length > 0 && allEvents.length === 0) {
       setAllEvents(dataCacheRef.current.events);
+      setIsLoadingEvents(false);
     }
     if (dataCacheRef.current.ratings.length > 0 && allRatings.length === 0) {
       setAllRatings(dataCacheRef.current.ratings);
+      setIsLoadingRatings(false);
     }
     if (dataCacheRef.current.payments.length > 0 && allPayments.length === 0) {
       setAllPayments(dataCacheRef.current.payments);
+      setIsLoadingPayments(false);
     }
     if ((dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) && 
         globalStats.totalProducts === 0 && globalStats.totalOrders === 0) {
       setGlobalStats(dataCacheRef.current.globalStats);
+      setIsLoadingGlobalStats(false);
     }
   }, [isAdmin, allProducts.length, allOrders.length, allEvents.length, allRatings.length, allPayments.length, globalStats.totalProducts, globalStats.totalOrders]);
+  
+  // Initialiser les états de chargement au démarrage et lors du changement de vue
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    // S'assurer que seuls les états de chargement de la vue active sont actifs
+    const currentView = activeView;
+    
+    // Arrêter le chargement des vues non actives
+    if (currentView !== 'products') setIsLoadingProducts(false);
+    if (currentView !== 'orders') setIsLoadingOrders(false);
+    if (currentView !== 'events') setIsLoadingEvents(false);
+    if (currentView !== 'ratings') setIsLoadingRatings(false);
+    if (currentView !== 'menu') {
+      setIsLoadingGlobalStats(false);
+      setIsLoadingPayments(false);
+    }
+  }, [isAdmin, activeView]);
   
   // Charger les données quand on change de vue ou quand les profils deviennent disponibles
   useEffect(() => {
     if (!isAdmin) return;
     
     const profilesJustLoaded = prevProfilesLengthRef.current === 0 && allProfiles.length > 0;
+    const prevView = prevViewsRef.current;
+    const viewChanged = prevView !== activeView;
+    
+    // Si on change de vue, réinitialiser les états de chargement des autres vues
+    if (viewChanged) {
+      // Arrêter le chargement des vues non actives
+      if (activeView !== 'products') setIsLoadingProducts(false);
+      if (activeView !== 'orders') setIsLoadingOrders(false);
+      if (activeView !== 'events') setIsLoadingEvents(false);
+      if (activeView !== 'ratings') setIsLoadingRatings(false);
+      if (activeView !== 'menu') {
+        setIsLoadingGlobalStats(false);
+        setIsLoadingPayments(false);
+      }
+    }
+    
     const viewAlreadyLoaded = loadedViewsRef.current.has(activeView);
     
-    // Si la vue est déjà chargée et que les profils n'ont pas changé, ne rien faire
-    // Les données sont déjà affichées depuis le cache
-    if (viewAlreadyLoaded && !profilesJustLoaded) {
+    // Si la vue est déjà chargée et que les profils n'ont pas changé, s'assurer que le chargement est arrêté
+    if (viewAlreadyLoaded && !profilesJustLoaded && !viewChanged) {
+      // S'assurer que les états de chargement sont à false pour la vue active
+      switch (activeView) {
+        case 'products':
+          setIsLoadingProducts(false);
+          break;
+        case 'orders':
+          setIsLoadingOrders(false);
+          break;
+        case 'events':
+          setIsLoadingEvents(false);
+          break;
+        case 'ratings':
+          setIsLoadingRatings(false);
+          break;
+        case 'menu':
+          setIsLoadingGlobalStats(false);
+          setIsLoadingPayments(false);
+          break;
+      }
       prevProfilesLengthRef.current = allProfiles.length;
+      prevViewsRef.current = activeView;
       return;
     }
     
     // Si on n'a pas de profils, restaurer depuis le cache si disponible
     if (allProfiles.length === 0) {
       prevProfilesLengthRef.current = 0;
-      // Restaurer les données depuis le cache pour la vue active
+      // Restaurer les données depuis le cache pour la vue active et arrêter le chargement
       switch (activeView) {
         case 'products':
           if (dataCacheRef.current.products.length > 0) {
             setAllProducts(dataCacheRef.current.products);
-            setIsLoadingProducts(false);
           }
+          setIsLoadingProducts(false);
           break;
         case 'orders':
           if (dataCacheRef.current.orders.length > 0) {
             setAllOrders(dataCacheRef.current.orders);
-            setIsLoadingOrders(false);
           }
+          setIsLoadingOrders(false);
           break;
         case 'events':
           if (dataCacheRef.current.events.length > 0) {
             setAllEvents(dataCacheRef.current.events);
-            setIsLoadingEvents(false);
           }
+          setIsLoadingEvents(false);
           break;
         case 'ratings':
           if (dataCacheRef.current.ratings.length > 0) {
             setAllRatings(dataCacheRef.current.ratings);
-            setIsLoadingRatings(false);
           }
+          setIsLoadingRatings(false);
           break;
         case 'menu':
           if (dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) {
             setGlobalStats(dataCacheRef.current.globalStats);
-            setIsLoadingGlobalStats(false);
           }
+          setIsLoadingGlobalStats(false);
           if (dataCacheRef.current.payments.length > 0) {
             setAllPayments(dataCacheRef.current.payments);
-            setIsLoadingPayments(false);
           }
+          setIsLoadingPayments(false);
+          break;
+        case 'users':
+          // Les utilisateurs sont déjà chargés via onSnapshot
           break;
       }
       return;
@@ -696,6 +759,7 @@ const AdminDashboard = () => {
     }
     
     prevProfilesLengthRef.current = allProfiles.length;
+    prevViewsRef.current = activeView;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin, activeView, allProfiles.length]);
 
