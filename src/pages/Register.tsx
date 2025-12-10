@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Eye, EyeOff, Building2, MapPin, Map, Navigation } from "lucide-react";
+import { Eye, EyeOff, Building2, MapPin, Map, Navigation, Search } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
+import { geocodeAddress, searchAddresses, reverseGeocode } from "@/utils/geocoding";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +35,10 @@ const Register = () => {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [addressInput, setAddressInput] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -113,6 +118,86 @@ const Register = () => {
     }
   };
 
+  // Recherche d'adresses avec autocomplétion
+  const handleAddressInputChange = async (value: string) => {
+    setAddressInput(value);
+    if (value.length >= 3) {
+      setIsSearchingAddress(true);
+      const suggestions = await searchAddresses(value);
+      setAddressSuggestions(suggestions);
+      setShowSuggestions(true);
+      setIsSearchingAddress(false);
+    } else {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Sélection d'une adresse depuis les suggestions
+  const handleSelectAddress = async (suggestion: { display_name: string; lat: string; lon: string }) => {
+    setAddressInput(suggestion.display_name);
+    setFormData({
+      ...formData,
+      latitude: parseFloat(suggestion.lat),
+      longitude: parseFloat(suggestion.lon),
+      address: suggestion.display_name
+    });
+    setShowSuggestions(false);
+    toast({
+      title: "Adresse sélectionnée",
+      description: "Les coordonnées ont été récupérées avec succès",
+    });
+  };
+
+  // Géocoder une adresse saisie manuellement
+  const handleGeocodeAddress = async () => {
+    if (!addressInput.trim() || addressInput.trim().length < 3) {
+      toast({
+        title: "Adresse invalide",
+        description: "Veuillez saisir une adresse valide (minimum 3 caractères)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSearchingAddress(true);
+    setLocationError(null);
+
+    try {
+      const result = await geocodeAddress(addressInput);
+      if (result) {
+        setFormData({
+          ...formData,
+          latitude: result.latitude,
+          longitude: result.longitude,
+          address: result.displayName
+        });
+        setAddressInput(result.displayName);
+        toast({
+          title: "Adresse localisée",
+          description: "Les coordonnées ont été récupérées avec succès",
+        });
+      } else {
+        setLocationError("Impossible de trouver cette adresse. Vérifiez l'orthographe ou essayez une adresse plus précise.");
+        toast({
+          title: "Adresse introuvable",
+          description: "Impossible de localiser cette adresse",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      setLocationError("Erreur lors de la recherche de l'adresse");
+      toast({
+        title: "Erreur",
+        description: "Impossible de géocoder l'adresse",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearchingAddress(false);
+      setShowSuggestions(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
       ...formData,
@@ -129,8 +214,8 @@ const Register = () => {
         if (!validateWhatsApp(formData.whatsapp)) return false;
         return true;
       case 3:
-        // Géolocalisation optionnelle mais recommandée
-        return true;
+        // Localisation obligatoire (adresse ou GPS)
+        return !!(formData.address && formData.latitude && formData.longitude);
       case 4:
         if (!formData.password || formData.password.length < 6) return false;
         if (formData.password !== formData.confirmPassword) return false;
@@ -358,11 +443,74 @@ const Register = () => {
                       </p>
                     </div>
 
+                    {/* Option 1: Saisie manuelle d'adresse */}
+                    <div className="space-y-2">
+                      <Label htmlFor="address" className="text-lg font-semibold">
+                        Adresse de l'établissement *
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          id="address"
+                          type="text"
+                          placeholder="Ex: Avenue de l'Indépendance, Libreville, Gabon"
+                          value={addressInput}
+                          onChange={(e) => handleAddressInputChange(e.target.value)}
+                          onFocus={() => addressInput.length >= 3 && setShowSuggestions(true)}
+                          onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                          className="h-14 text-lg pr-12"
+                          required
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleGeocodeAddress}
+                          disabled={isSearchingAddress || !addressInput.trim() || addressInput.trim().length < 3}
+                          className="absolute right-1 top-1/2 -translate-y-1/2 h-12 w-12"
+                        >
+                          <Search className={`h-5 w-5 ${isSearchingAddress ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </div>
+                      
+                      {/* Suggestions d'adresses */}
+                      {showSuggestions && addressSuggestions.length > 0 && (
+                        <div className="border rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto z-10">
+                          {addressSuggestions.map((suggestion, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={() => handleSelectAddress(suggestion)}
+                              className="w-full text-left px-4 py-3 hover:bg-gray-100 border-b last:border-b-0 text-sm"
+                            >
+                              <MapPin className="inline-block w-4 h-4 mr-2 text-gray-400" />
+                              {suggestion.display_name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <p className="text-xs text-muted-foreground">
+                        Saisissez l'adresse complète de votre établissement. Des suggestions apparaîtront automatiquement.
+                      </p>
+                    </div>
+
+                    {/* Séparateur OU */}
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-white px-2 text-muted-foreground">Ou</span>
+                      </div>
+                    </div>
+
+                    {/* Option 2: Géolocalisation automatique */}
                     <Button
                       type="button"
                       onClick={getCurrentLocation}
                       disabled={isGettingLocation}
-                      className="w-full h-16 bg-gradient-primary text-white text-lg font-semibold"
+                      variant="outline"
+                      className="w-full h-14 text-lg"
                     >
                       {isGettingLocation ? (
                         <>
@@ -371,8 +519,8 @@ const Register = () => {
                         </>
                       ) : (
                         <>
-                          <MapPin className="w-5 h-5 mr-2" />
-                          Obtenir ma position automatiquement
+                          <Navigation className="w-5 h-5 mr-2" />
+                          Utiliser ma position GPS
                         </>
                       )}
                     </Button>
@@ -390,24 +538,10 @@ const Register = () => {
                           <p className="text-sm text-green-700">{formData.address}</p>
                         )}
                         <p className="text-xs text-green-600 mt-1">
-                          {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                          Coordonnées: {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
                         </p>
                       </div>
                     )}
-
-                    <div className="text-center">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setFormData({ ...formData, latitude: undefined, longitude: undefined, address: "" });
-                          setLocationError(null);
-                        }}
-                        className="text-sm"
-                      >
-                        Réessayer
-                      </Button>
-                    </div>
 
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                       <p className="text-xs text-yellow-800">

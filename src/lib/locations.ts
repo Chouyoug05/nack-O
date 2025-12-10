@@ -22,8 +22,29 @@ export interface EstablishmentWithLocation {
  * Récupère tous les établissements qui ont une localisation enregistrée
  * Cette fonction peut être utilisée pour créer une carte interactive
  */
+/**
+ * Recherche d'établissements par texte (nom, adresse, type)
+ */
+export async function searchEstablishmentsByText(searchText: string): Promise<EstablishmentWithLocation[]> {
+  if (!searchText || searchText.trim().length < 2) {
+    return [];
+  }
+
+  const searchLower = searchText.toLowerCase().trim();
+  const all = await getAllEstablishmentsWithLocation();
+  
+  return all.filter((establishment) => {
+    const nameMatch = establishment.establishmentName.toLowerCase().includes(searchLower);
+    const typeMatch = establishment.establishmentType.toLowerCase().includes(searchLower);
+    const addressMatch = establishment.address?.toLowerCase().includes(searchLower);
+    
+    return nameMatch || typeMatch || addressMatch;
+  });
+}
+
 export async function getAllEstablishmentsWithLocation(): Promise<EstablishmentWithLocation[]> {
   try {
+    // Essayer d'abord avec une requête optimisée (si index existe)
     const q = query(
       profilesColRef(db),
       where("latitude", "!=", null),
@@ -61,7 +82,8 @@ export async function getAllEstablishmentsWithLocation(): Promise<EstablishmentW
 
       snapshot.forEach((doc) => {
         const data = doc.data() as UserProfile;
-        if (data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        // Accepter les établissements avec adresse même sans coordonnées GPS
+        if ((data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') || data.address) {
           establishments.push({
             uid: data.uid,
             establishmentName: data.establishmentName,
@@ -70,8 +92,8 @@ export async function getAllEstablishmentsWithLocation(): Promise<EstablishmentW
             email: data.email,
             phone: data.phone,
             logoUrl: data.logoUrl,
-            latitude: data.latitude,
-            longitude: data.longitude,
+            latitude: data.latitude || 0,
+            longitude: data.longitude || 0,
             address: data.address,
           });
         }
@@ -126,7 +148,7 @@ export function subscribeToEstablishmentsWithLocation(
       },
       (error) => {
         console.error("Erreur lors de l'écoute des établissements:", error);
-        // Fallback: récupérer tous les profils et filtrer
+        // Fallback: récupérer tous les profils et filtrer (inclure ceux avec adresse même sans GPS)
         const q = query(profilesColRef(db), orderBy("establishmentName"));
         return onSnapshot(
           q,
@@ -134,7 +156,8 @@ export function subscribeToEstablishmentsWithLocation(
             const establishments: EstablishmentWithLocation[] = [];
             snapshot.forEach((doc) => {
               const data = doc.data() as UserProfile;
-              if (data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+              // Accepter les établissements avec coordonnées GPS OU avec adresse
+              if ((data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') || data.address) {
                 establishments.push({
                   uid: data.uid,
                   establishmentName: data.establishmentName,
@@ -143,8 +166,8 @@ export function subscribeToEstablishmentsWithLocation(
                   email: data.email,
                   phone: data.phone,
                   logoUrl: data.logoUrl,
-                  latitude: data.latitude,
-                  longitude: data.longitude,
+                  latitude: data.latitude || 0,
+                  longitude: data.longitude || 0,
                   address: data.address,
                 });
               }
@@ -165,7 +188,8 @@ export function subscribeToEstablishmentsWithLocation(
       const establishments: EstablishmentWithLocation[] = [];
       snapshot.forEach((doc) => {
         const data = doc.data() as UserProfile;
-        if (data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        // Accepter les établissements avec coordonnées GPS OU avec adresse
+        if ((data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') || data.address) {
           establishments.push({
             uid: data.uid,
             establishmentName: data.establishmentName,
@@ -174,8 +198,8 @@ export function subscribeToEstablishmentsWithLocation(
             email: data.email,
             phone: data.phone,
             logoUrl: data.logoUrl,
-            latitude: data.latitude,
-            longitude: data.longitude,
+            latitude: data.latitude || 0,
+            longitude: data.longitude || 0,
             address: data.address,
           });
         }

@@ -1,10 +1,13 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { MapPin, Navigation, Map, CheckCircle2 } from "lucide-react";
+import { MapPin, Navigation, Map, CheckCircle2, Search } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { geocodeAddress, searchAddresses, reverseGeocode } from "@/utils/geocoding";
 
 const LocationRequestDialog = () => {
   const { profile, saveProfile } = useAuth();
@@ -13,6 +16,10 @@ const LocationRequestDialog = () => {
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+  const [addressInput, setAddressInput] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     // Afficher le dialog si le profil existe mais n'a pas de géolocalisation et qu'on ne l'a pas encore demandé
@@ -20,6 +27,84 @@ const LocationRequestDialog = () => {
       setIsOpen(true);
     }
   }, [profile]);
+
+  // Recherche d'adresses avec autocomplétion
+  const handleAddressInputChange = async (value: string) => {
+    setAddressInput(value);
+    if (value.length >= 3) {
+      setIsSearchingAddress(true);
+      const suggestions = await searchAddresses(value);
+      setAddressSuggestions(suggestions);
+      setShowSuggestions(true);
+      setIsSearchingAddress(false);
+    } else {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  // Sélection d'une adresse depuis les suggestions
+  const handleSelectAddress = async (suggestion: { display_name: string; lat: string; lon: string }) => {
+    setAddressInput(suggestion.display_name);
+    setLocation({
+      lat: parseFloat(suggestion.lat),
+      lng: parseFloat(suggestion.lon),
+      address: suggestion.display_name
+    });
+    setShowSuggestions(false);
+    setLocationError(null);
+    toast({
+      title: "Adresse sélectionnée",
+      description: "Les coordonnées ont été récupérées avec succès",
+    });
+  };
+
+  // Géocoder une adresse saisie manuellement
+  const handleGeocodeAddress = async () => {
+    if (!addressInput.trim() || addressInput.trim().length < 3) {
+      toast({
+        title: "Adresse invalide",
+        description: "Veuillez saisir une adresse valide (minimum 3 caractères)",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSearchingAddress(true);
+    setLocationError(null);
+
+    try {
+      const result = await geocodeAddress(addressInput);
+      if (result) {
+        setLocation({
+          lat: result.latitude,
+          lng: result.longitude,
+          address: result.displayName
+        });
+        toast({
+          title: "Adresse localisée",
+          description: "Les coordonnées ont été récupérées avec succès",
+        });
+      } else {
+        setLocationError("Impossible de trouver cette adresse. Vérifiez l'orthographe ou essayez une adresse plus précise.");
+        toast({
+          title: "Adresse introuvable",
+          description: "Impossible de localiser cette adresse",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      setLocationError("Erreur lors de la recherche de l'adresse");
+      toast({
+        title: "Erreur",
+        description: "Impossible de géocoder l'adresse",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearchingAddress(false);
+      setShowSuggestions(false);
+    }
+  };
 
   const getCurrentLocation = async () => {
     if (!navigator.geolocation) {
@@ -44,17 +129,11 @@ const LocationRequestDialog = () => {
 
       // Optionnel: obtenir l'adresse via reverse geocoding
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-          {
-            headers: {
-              'User-Agent': 'Nack App'
-            }
-          }
-        );
-        const data = await response.json();
-        const address = data.display_name || undefined;
-        setLocation(prev => prev ? { ...prev, address } : null);
+        const address = await reverseGeocode(latitude, longitude);
+        if (address) {
+          setLocation(prev => prev ? { ...prev, address } : null);
+          setAddressInput(address);
+        }
       } catch {
         // Ignore l'erreur de reverse geocoding
       }
@@ -147,25 +226,86 @@ const LocationRequestDialog = () => {
             </CardContent>
           </Card>
 
-          {/* Bouton de géolocalisation */}
+          {/* Option 1: Saisie manuelle d'adresse */}
+          <div className="space-y-2">
+            <Label htmlFor="address-dialog" className="text-base font-semibold">
+              Adresse de l'établissement
+            </Label>
+            <div className="relative">
+              <Input
+                id="address-dialog"
+                type="text"
+                placeholder="Ex: Avenue de l'Indépendance, Libreville, Gabon"
+                value={addressInput}
+                onChange={(e) => handleAddressInputChange(e.target.value)}
+                onFocus={() => addressInput.length >= 3 && setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                className="h-12 text-base pr-12"
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={handleGeocodeAddress}
+                disabled={isSearchingAddress || !addressInput.trim() || addressInput.trim().length < 3}
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10"
+              >
+                <Search className={`h-4 w-4 ${isSearchingAddress ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+            
+            {/* Suggestions d'adresses */}
+            {showSuggestions && addressSuggestions.length > 0 && (
+              <div className="border rounded-lg bg-white shadow-lg max-h-48 overflow-y-auto z-10">
+                {addressSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => handleSelectAddress(suggestion)}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-100 border-b last:border-b-0 text-sm"
+                  >
+                    <MapPin className="inline-block w-4 h-4 mr-2 text-gray-400" />
+                    {suggestion.display_name}
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            <p className="text-xs text-muted-foreground">
+              Saisissez l'adresse complète de votre établissement. Des suggestions apparaîtront automatiquement.
+            </p>
+          </div>
+
+          {/* Séparateur OU */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-white px-2 text-muted-foreground">Ou</span>
+            </div>
+          </div>
+
+          {/* Option 2: Géolocalisation automatique */}
           <Button
             type="button"
             onClick={getCurrentLocation}
             disabled={isGettingLocation}
             size="lg"
-            className="w-full h-14 sm:h-16 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-base sm:text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
+            variant="outline"
+            className="w-full h-14"
           >
             {isGettingLocation ? (
               <>
-                <Navigation className="w-5 h-5 sm:w-6 sm:h-6 mr-2 animate-spin" />
+                <Navigation className="w-5 h-5 mr-2 animate-spin" />
                 <span className="hidden sm:inline">Récupération de la position...</span>
                 <span className="sm:hidden">Récupération...</span>
               </>
             ) : (
               <>
-                <MapPin className="w-5 h-5 sm:w-6 sm:h-6 mr-2" />
-                <span className="hidden sm:inline">Obtenir ma position automatiquement</span>
-                <span className="sm:hidden">Ma position</span>
+                <Navigation className="w-5 h-5 mr-2" />
+                <span className="hidden sm:inline">Utiliser ma position GPS</span>
+                <span className="sm:hidden">GPS</span>
               </>
             )}
           </Button>
@@ -211,16 +351,16 @@ const LocationRequestDialog = () => {
             ) : (
               <div className="w-full text-center">
                 <p className="text-sm text-muted-foreground mb-2">
-                  La géolocalisation est obligatoire pour continuer
+                  Saisissez votre adresse ou utilisez la géolocalisation GPS
                 </p>
               </div>
             )}
           </div>
 
           {/* Note */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4">
-            <p className="text-xs sm:text-sm text-amber-800 text-center">
-              ⚠️ La géolocalisation est obligatoire pour utiliser Nack. Vous pourrez modifier votre position plus tard dans les paramètres.
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
+            <p className="text-xs sm:text-sm text-blue-800 text-center">
+              💡 Vous pouvez saisir votre adresse manuellement ou utiliser la géolocalisation GPS. Vous pourrez modifier votre position plus tard dans les paramètres.
             </p>
           </div>
         </div>
