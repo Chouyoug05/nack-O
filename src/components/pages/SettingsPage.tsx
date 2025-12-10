@@ -71,8 +71,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     fullAddress: profile?.fullAddress || "",
     customMessage: profile?.customMessage || "",
     legalMentions: profile?.legalMentions || "",
+    ticketLogoUrl: profile?.ticketLogoUrl || "",
+    showDeliveryMention: profile?.showDeliveryMention ?? false,
+    showCSSMention: profile?.showCSSMention ?? false,
+    cssPercentage: profile?.cssPercentage || 1,
+    ticketFooterMessage: profile?.ticketFooterMessage || "",
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [ticketLogoFile, setTicketLogoFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [receipts, setReceipts] = useState<Array<{ id: string; transactionId: string; amount: number; paidAt: number; reference: string; subscriptionType: string }>>([]);
   const [isLoadingReceipts, setIsLoadingReceipts] = useState(false);
@@ -325,6 +331,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         fullAddress: profile.fullAddress || "",
         customMessage: profile.customMessage || "",
         legalMentions: profile.legalMentions || "",
+        ticketLogoUrl: profile.ticketLogoUrl || "",
+        showDeliveryMention: profile.showDeliveryMention ?? false,
+        showCSSMention: profile.showCSSMention ?? false,
+        cssPercentage: profile.cssPercentage || 1,
+        ticketFooterMessage: profile.ticketFooterMessage || "",
       });
     }
   }, [profile]);
@@ -843,6 +854,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         fullAddress: ticketCustomization.fullAddress || undefined,
                         customMessage: ticketCustomization.customMessage || undefined,
                         legalMentions: ticketCustomization.legalMentions || undefined,
+                        ticketLogoUrl: ticketCustomization.ticketLogoUrl || undefined,
+                        showDeliveryMention: ticketCustomization.showDeliveryMention,
+                        showCSSMention: ticketCustomization.showCSSMention,
+                        cssPercentage: ticketCustomization.cssPercentage,
+                        ticketFooterMessage: ticketCustomization.ticketFooterMessage || undefined,
                       });
                       toast({ title: "Informations sauvegardées", description: "Profil mis à jour" });
                     } catch {
@@ -937,6 +953,107 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       rows={3}
                     />
                   </div>
+
+                  {/* Séparateur */}
+                  <div className="border-t pt-4 mt-4">
+                    <h3 className="font-semibold mb-4">Paramètres avancés du ticket</h3>
+                  </div>
+
+                  {/* Logo noir et blanc pour tickets */}
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-logo">Logo noir et blanc pour tickets</Label>
+                    <div className="flex items-center gap-4">
+                      {ticketCustomization.ticketLogoUrl && (
+                        <img 
+                          src={ticketCustomization.ticketLogoUrl} 
+                          alt="Logo ticket" 
+                          className="w-16 h-16 object-contain border rounded"
+                          style={{ filter: 'grayscale(100%) contrast(1.2)' }}
+                        />
+                      )}
+                      <div className="flex-1">
+                        <Input
+                          id="ticket-logo"
+                          type="file"
+                          accept="image/*"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              setTicketLogoFile(file);
+                              try {
+                                const uploadedUrl = await uploadImageToCloudinary(file, "ticket-logos");
+                                setTicketCustomization({...ticketCustomization, ticketLogoUrl: uploadedUrl});
+                                toast({ title: "Logo téléversé", description: "Le logo a été converti en noir et blanc" });
+                              } catch (error) {
+                                toast({ title: "Erreur", description: "Impossible de téléverser le logo", variant: "destructive" });
+                              }
+                            }
+                          }}
+                          className="cursor-pointer"
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Logo qui apparaîtra en noir et blanc sur les tickets (recommandé: logo simple, contrasté)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Mentions optionnelles */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="show-delivery">Afficher "LIVRAISON A DOMICILE"</Label>
+                        <p className="text-xs text-muted-foreground">Afficher cette mention sur les tickets</p>
+                      </div>
+                      <Switch
+                        id="show-delivery"
+                        checked={ticketCustomization.showDeliveryMention}
+                        onCheckedChange={(checked) => setTicketCustomization({...ticketCustomization, showDeliveryMention: checked})}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="show-css">Afficher "C.S.S. X%"</Label>
+                        <p className="text-xs text-muted-foreground">Afficher le pourcentage de contribution sociale</p>
+                      </div>
+                      <Switch
+                        id="show-css"
+                        checked={ticketCustomization.showCSSMention}
+                        onCheckedChange={(checked) => setTicketCustomization({...ticketCustomization, showCSSMention: checked})}
+                      />
+                    </div>
+                    {ticketCustomization.showCSSMention && (
+                      <div className="space-y-2 ml-4">
+                        <Label htmlFor="css-percentage">Pourcentage C.S.S.</Label>
+                        <Input
+                          id="css-percentage"
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={ticketCustomization.cssPercentage}
+                          onChange={(e) => setTicketCustomization({...ticketCustomization, cssPercentage: parseFloat(e.target.value) || 1})}
+                          placeholder="1"
+                          className="w-24"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Message personnalisé en bas du ticket */}
+                  <div className="space-y-2">
+                    <Label htmlFor="ticket-footer-message">Message personnalisé en bas du ticket</Label>
+                    <Input
+                      id="ticket-footer-message"
+                      value={ticketCustomization.ticketFooterMessage}
+                      onChange={(e) => setTicketCustomization({...ticketCustomization, ticketFooterMessage: e.target.value})}
+                      placeholder="Ex: Merci de votre visite !"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Message qui apparaîtra en bas du ticket après les mentions
+                    </p>
+                  </div>
+
                   <Button onClick={async () => {
                     try {
                       setIsSaving(true);
@@ -955,6 +1072,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         fullAddress: ticketCustomization.fullAddress || undefined,
                         customMessage: ticketCustomization.customMessage || undefined,
                         legalMentions: ticketCustomization.legalMentions || undefined,
+                        ticketLogoUrl: ticketCustomization.ticketLogoUrl || undefined,
+                        showDeliveryMention: ticketCustomization.showDeliveryMention,
+                        showCSSMention: ticketCustomization.showCSSMention,
+                        cssPercentage: ticketCustomization.cssPercentage,
+                        ticketFooterMessage: ticketCustomization.ticketFooterMessage || undefined,
                       });
                       toast({ title: "Personnalisation sauvegardée", description: "Les informations des tickets ont été mises à jour" });
                     } catch {

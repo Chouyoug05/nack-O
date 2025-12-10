@@ -36,6 +36,12 @@ export interface UserProfile {
   fullAddress?: string; // Adresse complète pour les tickets
   customMessage?: string; // Message personnalisé (ex : "Merci pour votre confiance ❤️")
   legalMentions?: string; // Mentions légales
+  // Paramètres avancés des tickets
+  ticketLogoUrl?: string; // Logo noir et blanc pour les tickets
+  showDeliveryMention?: boolean; // Afficher "LIVRAISON A DOMICILE"
+  showCSSMention?: boolean; // Afficher "C.S.S. X%"
+  cssPercentage?: number; // Pourcentage CSS (par défaut 1)
+  ticketFooterMessage?: string; // Message personnalisé en bas du ticket
   createdAt: number;
   updatedAt: number;
 } 

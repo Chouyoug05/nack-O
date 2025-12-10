@@ -1,6 +1,7 @@
 /**
  * Génération de ticket thermique 58mm pour imprimantes ESC/POS
  * Format HTML/CSS minimal compatible avec les imprimantes thermiques
+ * Design inspiré des tickets de restaurant gabonais
  */
 
 export interface ThermalTicketData {
@@ -23,6 +24,20 @@ export interface ThermalTicketData {
   nifNumber?: string;
   legalMentions?: string;
   customMessage?: string;
+  // Paramètres avancés
+  ticketLogoUrl?: string; // Logo noir et blanc pour tickets
+  showDeliveryMention?: boolean;
+  showCSSMention?: boolean;
+  cssPercentage?: number;
+  ticketFooterMessage?: string;
+}
+
+/**
+ * Convertit une image en noir et blanc (pour le logo)
+ */
+function convertImageToBW(imageUrl: string): string {
+  // Pour le HTML, on utilise un filtre CSS pour convertir en noir et blanc
+  return imageUrl;
 }
 
 /**
@@ -40,20 +55,24 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
     minute: '2-digit'
   });
 
-  // Formatage des produits avec alignement (ticket 58mm = ~32 caractères)
-  // Format: PRODUIT            QTE    PRIX
-  //         Biere Castel        2    2 000
+  // Formatage des produits : "- 1 Produit .......... 1000,00"
   const productsRows = data.items.map(item => {
     const itemTotal = item.price * item.quantity;
-    // Nom max 18 caractères pour correspondre au format demandé
-    const name = item.name.length > 18 ? item.name.substring(0, 15) + '...' : item.name;
-    const namePadded = name.padEnd(18);
-    const qte = item.quantity.toString().padStart(3);
-    const price = itemTotal.toLocaleString('fr-FR').padStart(8);
-    return `${namePadded} ${qte} ${price}`;
+    const priceText = itemTotal.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const productName = item.name.length > 20 ? item.name.substring(0, 17) + '...' : item.name;
+    
+    // Calculer les points pour aligner le prix à droite
+    // Largeur ticket ~32 caractères, on veut: "- 1 NomProduit ..... Prix"
+    const prefix = `- ${item.quantity} ${productName}`;
+    const availableWidth = 32 - prefix.length - priceText.length;
+    const dots = availableWidth > 0 ? ' .'.repeat(Math.floor(availableWidth / 2)) : ' ';
+    
+    return `${prefix}${dots}${priceText}`;
   }).join('\n');
 
-  const totalFormatted = data.total.toLocaleString('fr-FR');
+  const totalFormatted = data.total.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const displayName = (data.companyName || data.establishmentName).toUpperCase();
+  const logoUrl = data.ticketLogoUrl || data.establishmentLogo;
 
   const html = `
 <!DOCTYPE html>
@@ -61,7 +80,7 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ticket NACK - ${data.orderNumber}</title>
+  <title>Ticket - ${data.orderNumber}</title>
   <style>
     @page {
       size: 58mm auto;
@@ -86,192 +105,131 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
     }
     
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      font-size: 11px;
-      line-height: 1.4;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      line-height: 1.3;
       width: 58mm;
       max-width: 58mm;
       margin: 0 auto;
-      padding: 4mm;
+      padding: 3mm;
       background: white;
-      color: #1a1a1a;
+      color: #000;
     }
     
     .ticket {
       width: 100%;
-    }
-    
-    .header {
       text-align: center;
-      margin-bottom: 10px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #dc2626;
     }
     
-    .header h1 {
-      font-size: 20px;
-      font-weight: 700;
-      margin: 0 0 4px 0;
-      letter-spacing: 2px;
-      color: #dc2626;
-    }
-    
-    .logo-section {
+    .logo-container {
       text-align: center;
-      margin: 8px 0;
+      margin-bottom: 5px;
     }
     
-    .logo-section img {
-      max-width: 40px;
-      max-height: 40px;
-      margin-bottom: 4px;
+    .logo-container img {
+      max-width: 25mm;
+      max-height: 20mm;
+      filter: grayscale(100%) contrast(1.2);
+      image-rendering: -webkit-optimize-contrast;
+      image-rendering: crisp-edges;
     }
     
     .company-name {
-      font-size: 13px;
-      font-weight: 700;
+      font-size: 11px;
+      font-weight: bold;
       text-align: center;
-      margin: 6px 0;
-      color: #1a1a1a;
+      margin: 4px 0;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
     }
     
     .company-info {
-      font-size: 9px;
+      font-size: 8px;
       text-align: center;
       margin: 2px 0;
+      line-height: 1.2;
+    }
+    
+    .powered-by {
+      font-size: 7px;
+      text-align: center;
+      margin: 3px 0;
       color: #666;
-      line-height: 1.3;
     }
     
     .separator {
-      border-top: 1px dashed #ccc;
-      margin: 8px 0;
+      border-top: 1px solid #000;
+      margin: 5px 0;
       width: 100%;
     }
     
-    .separator-thick {
-      border-top: 2px solid #dc2626;
-      margin: 10px 0;
-      width: 100%;
-    }
-    
-    .order-info {
-      text-align: center;
-      margin: 8px 0;
-      padding: 6px;
-      background: #fef2f2;
-      border-radius: 4px;
-    }
-    
-    .order-number {
-      font-size: 14px;
-      font-weight: 700;
-      color: #dc2626;
-      margin-bottom: 4px;
-    }
-    
-    .order-date {
-      font-size: 9px;
-      color: #666;
-    }
-    
-    .table-info {
-      font-size: 10px;
-      color: #666;
-      margin-top: 4px;
-    }
-    
-    .products-header {
-      font-weight: 700;
-      font-size: 10px;
-      margin: 8px 0 4px 0;
+    .ticket-info {
       text-align: left;
-      border-bottom: 1px solid #e5e5e5;
-      padding-bottom: 4px;
-      color: #1a1a1a;
-    }
-    
-    .products {
-      text-align: left;
-      font-size: 10px;
+      font-size: 8px;
       margin: 4px 0;
-      line-height: 1.5;
+      line-height: 1.4;
     }
     
-    .product-item {
-      margin: 6px 0;
-      padding: 4px 0;
-      border-bottom: 1px dotted #e5e5e5;
+    .products-section {
+      text-align: left;
+      margin: 5px 0;
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
+      line-height: 1.4;
+      white-space: pre;
     }
     
-    .product-name {
-      font-weight: 500;
-      margin-bottom: 2px;
-    }
-    
-    .product-details {
-      display: flex;
-      justify-content: space-between;
-      font-size: 9px;
-      color: #666;
-    }
-    
-    .total-line {
-      margin-top: 10px;
-      padding-top: 8px;
-      border-top: 2px solid #dc2626;
-      text-align: right;
+    .total-section {
+      margin-top: 5px;
+      padding-top: 3px;
+      border-top: 1px solid #000;
+      text-align: left;
     }
     
     .total-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: #1a1a1a;
-      margin-bottom: 4px;
+      font-size: 9px;
+      font-weight: bold;
     }
     
     .total-amount {
-      font-size: 16px;
-      font-weight: 700;
-      color: #dc2626;
-    }
-    
-    .legal-mentions {
-      font-size: 8px;
-      color: #999;
-      text-align: center;
-      margin: 8px 0;
-      line-height: 1.3;
-      font-style: italic;
-    }
-    
-    .footer {
-      margin-top: 12px;
-      padding-top: 8px;
-      border-top: 1px dashed #ccc;
       font-size: 10px;
+      font-weight: bold;
+      text-align: right;
+      margin-top: 2px;
+    }
+    
+    .footer-mentions {
       text-align: center;
-      color: #dc2626;
-      font-weight: 500;
+      margin-top: 6px;
+      font-size: 9px;
+      font-weight: bold;
+      line-height: 1.5;
+    }
+    
+    .footer-message {
+      text-align: center;
+      margin-top: 4px;
+      font-size: 8px;
+      color: #333;
     }
     
     .print-button {
       display: block;
       width: 100%;
-      padding: 12px;
-      margin: 20px auto;
-      background: #dc2626;
+      padding: 10px;
+      margin: 15px auto;
+      background: #000;
       color: white;
       border: none;
-      border-radius: 4px;
-      font-size: 16px;
+      border-radius: 3px;
+      font-size: 14px;
       font-weight: bold;
       cursor: pointer;
       text-align: center;
     }
     
     .print-button:hover {
-      background: #b91c1c;
+      background: #333;
     }
     
     @media print {
@@ -283,67 +241,65 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
 </head>
 <body>
   <div class="ticket">
-    <div class="header">
-      <h1>NACK!</h1>
-    </div>
-    
-    ${data.establishmentLogo ? `
-    <div class="logo-section">
-      <img src="${data.establishmentLogo}" alt="Logo" />
+    <!-- Logo en noir et blanc -->
+    ${logoUrl ? `
+    <div class="logo-container">
+      <img src="${logoUrl}" alt="Logo" style="filter: grayscale(100%) contrast(1.5);" />
     </div>
     ` : ''}
     
-    <div class="company-name">${data.companyName || data.establishmentName}</div>
+    <!-- Nom de l'établissement en MAJUSCULES -->
+    <div class="company-name">${displayName}</div>
     
+    <!-- Adresse -->
     ${data.fullAddress ? `<div class="company-info">${data.fullAddress}</div>` : ''}
-    ${data.businessPhone ? `<div class="company-info">📞 ${data.businessPhone}</div>` : ''}
-    ${data.rcsNumber ? `<div class="company-info">RCS: ${data.rcsNumber}</div>` : ''}
-    ${data.nifNumber ? `<div class="company-info">NIF: ${data.nifNumber}</div>` : ''}
     
-    <div class="separator-thick"></div>
+    <!-- Contacts -->
+    ${data.businessPhone ? `<div class="company-info">${data.businessPhone}</div>` : ''}
     
-    <div class="order-info">
-      <div class="order-number">COMMANDE #${data.orderNumber}</div>
-      <div class="order-date">${dateStr} à ${timeStr}</div>
-      ${data.tableZone ? `<div class="table-info">Table: ${data.tableZone}</div>` : ''}
+    <!-- RCCM -->
+    ${data.rcsNumber ? `<div class="company-info">RCCM:${data.rcsNumber}</div>` : ''}
+    
+    <!-- NIF -->
+    ${data.nifNumber ? `<div class="company-info">NIF:${data.nifNumber}</div>` : ''}
+    
+    <!-- Powered by NACK! -->
+    <div class="powered-by">Powered by NACK!</div>
+    
+    <div class="separator"></div>
+    
+    <!-- Références du ticket -->
+    <div class="ticket-info">
+      <div>${dateStr}</div>
+      <div>${timeStr}</div>
+      ${data.tableZone && data.tableZone !== 'Caisse' ? `<div>TABLE ${data.tableZone.toUpperCase()}</div>` : ''}
+      <div>Aucun ticket: ${data.orderNumber}</div>
     </div>
     
     <div class="separator"></div>
     
-    <div class="products-header">
-      PRODUITS
+    <!-- Liste des produits -->
+    <div class="products-section">
+${productsRows}
     </div>
     
-    <div class="products">
-      ${data.items.map(item => {
-        const itemTotal = item.price * item.quantity;
-        return `
-        <div class="product-item">
-          <div class="product-name">${item.name}</div>
-          <div class="product-details">
-            <span>${item.quantity} x ${item.price.toLocaleString('fr-FR')} XAF</span>
-            <span style="font-weight: 600;">${itemTotal.toLocaleString('fr-FR')} XAF</span>
-          </div>
-        </div>
-        `;
-      }).join('')}
-    </div>
-    
-    <div class="separator-thick"></div>
-    
-    <div class="total-line">
-      <div class="total-label">TOTAL À PAYER</div>
-      <div class="total-amount">${totalFormatted} XAF</div>
-    </div>
-    
-    ${data.legalMentions ? `
     <div class="separator"></div>
-    <div class="legal-mentions">${data.legalMentions}</div>
-    ` : ''}
     
-    <div class="footer">
-      ${data.customMessage || 'Merci pour votre confiance ! ❤️'}
+    <!-- Total -->
+    <div class="total-section">
+      <div class="total-label">Total des</div>
+      <div class="total-amount">${totalFormatted}</div>
     </div>
+    
+    <!-- Mentions de fin -->
+    <div class="footer-mentions">
+      <div>THANK YOU</div>
+      ${data.showDeliveryMention ? '<div>LIVRAISON A DOMICILE</div>' : ''}
+      ${data.showCSSMention ? `<div>C.S.S. ${data.cssPercentage || 1}%</div>` : ''}
+    </div>
+    
+    <!-- Message personnalisé -->
+    ${data.ticketFooterMessage ? `<div class="footer-message">${data.ticketFooterMessage}</div>` : ''}
   </div>
   
   <button class="print-button no-print" onclick="window.print()">
@@ -382,8 +338,6 @@ export function printThermalTicket(data: ThermalTicketData): void {
   printWindow.onload = () => {
     setTimeout(() => {
       printWindow.print();
-      // Fermer la fenêtre après impression (optionnel)
-      // printWindow.close();
     }, 250);
   };
 }
@@ -403,4 +357,3 @@ export function downloadThermalTicket(data: ThermalTicketData): void {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
-

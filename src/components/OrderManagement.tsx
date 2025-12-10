@@ -276,7 +276,13 @@ const OrderManagement = ({
               rcsNumber: profileData?.rcsNumber,
               nifNumber: profileData?.nifNumber,
               legalMentions: profileData?.legalMentions,
-              customMessage: profileData?.customMessage
+              customMessage: profileData?.customMessage,
+              // Paramètres avancés
+              ticketLogoUrl: profileData?.ticketLogoUrl,
+              showDeliveryMention: profileData?.showDeliveryMention,
+              showCSSMention: profileData?.showCSSMention,
+              cssPercentage: profileData?.cssPercentage,
+              ticketFooterMessage: profileData?.ticketFooterMessage
             };
 
             const { printThermalTicket } = await import('@/utils/ticketThermal');

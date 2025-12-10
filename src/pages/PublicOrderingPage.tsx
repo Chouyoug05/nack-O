@@ -50,6 +50,11 @@ interface Establishment {
   nifNumber?: string;
   legalMentions?: string;
   customMessage?: string;
+  ticketLogoUrl?: string;
+  showDeliveryMention?: boolean;
+  showCSSMention?: boolean;
+  cssPercentage?: number;
+  ticketFooterMessage?: string;
 }
 
 const PublicOrderingPage = () => {
@@ -155,6 +160,11 @@ const PublicOrderingPage = () => {
             nifNumber: profileData.nifNumber,
             legalMentions: profileData.legalMentions,
             customMessage: profileData.customMessage,
+            ticketLogoUrl: profileData.ticketLogoUrl,
+            showDeliveryMention: profileData.showDeliveryMention,
+            showCSSMention: profileData.showCSSMention,
+            cssPercentage: profileData.cssPercentage,
+            ticketFooterMessage: profileData.ticketFooterMessage,
           });
         }
       })
@@ -403,6 +413,11 @@ const PublicOrderingPage = () => {
         nifNumber: establishment.nifNumber,
         legalMentions: establishment.legalMentions,
         customMessage: establishment.customMessage,
+        ticketLogoUrl: establishment.ticketLogoUrl,
+        showDeliveryMention: establishment.showDeliveryMention,
+        showCSSMention: establishment.showCSSMention,
+        cssPercentage: establishment.cssPercentage,
+        ticketFooterMessage: establishment.ticketFooterMessage,
       };
 
       await generateTicketPDF(ticketData);
@@ -433,7 +448,12 @@ const PublicOrderingPage = () => {
         rcsNumber: establishment.rcsNumber,
         nifNumber: establishment.nifNumber,
         legalMentions: establishment.legalMentions,
-        customMessage: establishment.customMessage
+        customMessage: establishment.customMessage,
+        ticketLogoUrl: establishment.ticketLogoUrl,
+        showDeliveryMention: establishment.showDeliveryMention,
+        showCSSMention: establishment.showCSSMention,
+        cssPercentage: establishment.cssPercentage,
+        ticketFooterMessage: establishment.ticketFooterMessage
       };
 
       printThermalTicket(thermalData);
