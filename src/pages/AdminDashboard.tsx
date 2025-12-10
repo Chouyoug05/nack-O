@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"; // useRef importé
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -80,6 +80,31 @@ const AdminDashboard = () => {
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [allRatings, setAllRatings] = useState<Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }>>([]);
   const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+  
+  // Cache des données pour éviter qu'elles disparaissent
+  const dataCacheRef = useRef<{
+    products: typeof allProducts;
+    orders: typeof allOrders;
+    events: typeof allEvents;
+    ratings: typeof allRatings;
+    globalStats: typeof globalStats;
+    payments: typeof allPayments;
+  }>({
+    products: [],
+    orders: [],
+    events: [],
+    ratings: [],
+    globalStats: {
+      totalProducts: 0,
+      totalOrders: 0,
+      totalBarOrders: 0,
+      totalEvents: 0,
+      totalTeamMembers: 0,
+      totalRatings: 0,
+      avgRating: 0,
+    },
+    payments: [],
+  });
   
   // États pour la gestion des éléments
   const [editingProduct, setEditingProduct] = useState<{ id: string; userId: string; name: string; category: string; price: number; quantity: number } | null>(null);
@@ -172,8 +197,9 @@ const AdminDashboard = () => {
         
         setSubscriptionPlans(loadedPlans);
       } catch (error) {
-        console.error('Erreur chargement plans:', error);
-        // En cas d'erreur, utiliser les plans par défaut
+        // En cas d'erreur (permissions, etc.), utiliser les plans par défaut
+        // L'erreur est silencieuse car les plans par défaut sont toujours disponibles
+        // Ne pas afficher d'erreur si c'est juste un problème de permissions non déployées
         setSubscriptionPlans(SUBSCRIPTION_PLANS);
       } finally {
         setIsLoadingPlans(false);
@@ -184,6 +210,14 @@ const AdminDashboard = () => {
   }, [isAdmin]);
 
   const loadAllPayments = useCallback(async () => {
+    if (allProfiles.length === 0) {
+      // Si pas de profils, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.payments.length > 0 && allPayments.length === 0) {
+        setAllPayments(dataCacheRef.current.payments);
+      }
+      setIsLoadingPayments(false);
+      return;
+    }
     setIsLoadingPayments(true);
     try {
       const payments: Array<PaymentTransaction & { userEmail?: string; userName?: string }> = [];
@@ -211,15 +245,29 @@ const AdminDashboard = () => {
       // Trier par date de paiement (plus récent en premier)
       payments.sort((a, b) => (b.paidAt || b.createdAt || 0) - (a.paidAt || a.createdAt || 0));
       setAllPayments(payments);
+      dataCacheRef.current.payments = payments;
     } catch (error) {
       console.error('Erreur chargement paiements:', error);
       toast({ title: "Erreur", description: "Impossible de charger les paiements", variant: "destructive" });
+      // En cas d'erreur, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.payments.length > 0) {
+        setAllPayments(dataCacheRef.current.payments);
+      }
     } finally {
       setIsLoadingPayments(false);
     }
   }, [allProfiles, toast]);
 
   const loadGlobalStats = useCallback(async () => {
+    if (allProfiles.length === 0) {
+      // Si pas de profils, restaurer depuis le cache si disponible
+      if ((dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) && 
+          globalStats.totalProducts === 0 && globalStats.totalOrders === 0) {
+        setGlobalStats(dataCacheRef.current.globalStats);
+      }
+      setIsLoadingGlobalStats(false);
+      return;
+    }
     setIsLoadingGlobalStats(true);
     try {
       let totalProducts = 0;
@@ -273,7 +321,7 @@ const AdminDashboard = () => {
         }
       }
 
-      setGlobalStats({
+      const stats = {
         totalProducts,
         totalOrders,
         totalBarOrders,
@@ -281,16 +329,29 @@ const AdminDashboard = () => {
         totalTeamMembers,
         totalRatings,
         avgRating: totalRatings > 0 ? sumRatings / totalRatings : 0,
-      });
+      };
+      setGlobalStats(stats);
+      dataCacheRef.current.globalStats = stats;
     } catch (error) {
       console.error('Erreur chargement stats globales:', error);
+      // En cas d'erreur, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) {
+        setGlobalStats(dataCacheRef.current.globalStats);
+      }
     } finally {
       setIsLoadingGlobalStats(false);
     }
   }, [allProfiles]);
 
   const loadAllProducts = useCallback(async () => {
-    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
+    if (allProfiles.length === 0) {
+      // Si pas de profils, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.products.length > 0 && allProducts.length === 0) {
+        setAllProducts(dataCacheRef.current.products);
+      }
+      setIsLoadingProducts(false);
+      return;
+    }
     setIsLoadingProducts(true);
     try {
       const products: Array<{ id: string; name: string; category: string; price: number; quantity: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -319,16 +380,28 @@ const AdminDashboard = () => {
       }
       
       setAllProducts(products);
+      dataCacheRef.current.products = products;
     } catch (error) {
       console.error('Erreur chargement produits:', error);
       toast({ title: "Erreur", description: "Impossible de charger les produits", variant: "destructive" });
+      // En cas d'erreur, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.products.length > 0) {
+        setAllProducts(dataCacheRef.current.products);
+      }
     } finally {
       setIsLoadingProducts(false);
     }
   }, [allProfiles, toast]);
 
   const loadAllOrders = useCallback(async () => {
-    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
+    if (allProfiles.length === 0) {
+      // Si pas de profils, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.orders.length > 0 && allOrders.length === 0) {
+        setAllOrders(dataCacheRef.current.orders);
+      }
+      setIsLoadingOrders(false);
+      return;
+    }
     setIsLoadingOrders(true);
     try {
       const orders: Array<{ id: string; orderNumber: number; tableNumber: string; total: number; status: string; createdAt: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -380,16 +453,28 @@ const AdminDashboard = () => {
       // Trier par date (plus récent en premier)
       orders.sort((a, b) => b.createdAt - a.createdAt);
       setAllOrders(orders);
+      dataCacheRef.current.orders = orders;
     } catch (error) {
       console.error('Erreur chargement commandes:', error);
       toast({ title: "Erreur", description: "Impossible de charger les commandes", variant: "destructive" });
+      // En cas d'erreur, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.orders.length > 0) {
+        setAllOrders(dataCacheRef.current.orders);
+      }
     } finally {
       setIsLoadingOrders(false);
     }
   }, [allProfiles, toast]);
 
   const loadAllEvents = useCallback(async () => {
-    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
+    if (allProfiles.length === 0) {
+      // Si pas de profils, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.events.length > 0 && allEvents.length === 0) {
+        setAllEvents(dataCacheRef.current.events);
+      }
+      setIsLoadingEvents(false);
+      return;
+    }
     setIsLoadingEvents(true);
     try {
       const events: Array<{ id: string; title: string; date: string; time: string; location: string; maxCapacity: number; ticketPrice: number; ticketsSold: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -427,16 +512,28 @@ const AdminDashboard = () => {
         return dateB - dateA;
       });
       setAllEvents(events);
+      dataCacheRef.current.events = events;
     } catch (error) {
       console.error('Erreur chargement événements:', error);
       toast({ title: "Erreur", description: "Impossible de charger les événements", variant: "destructive" });
+      // En cas d'erreur, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.events.length > 0) {
+        setAllEvents(dataCacheRef.current.events);
+      }
     } finally {
       setIsLoadingEvents(false);
     }
   }, [allProfiles, toast]);
 
   const loadAllRatings = useCallback(async () => {
-    if (allProfiles.length === 0) return; // Ne pas charger si pas de profils
+    if (allProfiles.length === 0) {
+      // Si pas de profils, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.ratings.length > 0 && allRatings.length === 0) {
+        setAllRatings(dataCacheRef.current.ratings);
+      }
+      setIsLoadingRatings(false);
+      return;
+    }
     setIsLoadingRatings(true);
     try {
       const ratings: Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }> = [];
@@ -468,45 +565,139 @@ const AdminDashboard = () => {
       // Trier par nombre d'avis (plus d'avis en premier)
       ratings.sort((a, b) => b.ratingCount - a.ratingCount);
       setAllRatings(ratings);
+      dataCacheRef.current.ratings = ratings;
     } catch (error) {
       console.error('Erreur chargement appréciations:', error);
       toast({ title: "Erreur", description: "Impossible de charger les appréciations", variant: "destructive" });
+      // En cas d'erreur, restaurer depuis le cache si disponible
+      if (dataCacheRef.current.ratings.length > 0) {
+        setAllRatings(dataCacheRef.current.ratings);
+      }
     } finally {
       setIsLoadingRatings(false);
     }
   }, [allProfiles, toast]);
 
-  // Charger les données seulement quand on change de vue active
+  // Suivre les vues déjà chargées pour éviter les rechargements inutiles
+  const loadedViewsRef = useRef<Set<string>>(new Set());
+  const prevProfilesLengthRef = useRef(0);
+  
+  // Restaurer les données depuis le cache si elles sont vides mais le cache contient des données
   useEffect(() => {
-    if (!isAdmin || allProfiles.length === 0) return;
+    if (!isAdmin) return;
     
-    // Toujours charger les stats globales pour le menu
-    if (activeView === 'menu') {
-      loadGlobalStats();
-      loadAllPayments();
+    // Restaurer les données depuis le cache si elles existent et que l'état est vide
+    if (dataCacheRef.current.products.length > 0 && allProducts.length === 0) {
+      setAllProducts(dataCacheRef.current.products);
+    }
+    if (dataCacheRef.current.orders.length > 0 && allOrders.length === 0) {
+      setAllOrders(dataCacheRef.current.orders);
+    }
+    if (dataCacheRef.current.events.length > 0 && allEvents.length === 0) {
+      setAllEvents(dataCacheRef.current.events);
+    }
+    if (dataCacheRef.current.ratings.length > 0 && allRatings.length === 0) {
+      setAllRatings(dataCacheRef.current.ratings);
+    }
+    if (dataCacheRef.current.payments.length > 0 && allPayments.length === 0) {
+      setAllPayments(dataCacheRef.current.payments);
+    }
+    if ((dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) && 
+        globalStats.totalProducts === 0 && globalStats.totalOrders === 0) {
+      setGlobalStats(dataCacheRef.current.globalStats);
+    }
+  }, [isAdmin, allProducts.length, allOrders.length, allEvents.length, allRatings.length, allPayments.length, globalStats.totalProducts, globalStats.totalOrders]);
+  
+  // Charger les données quand on change de vue ou quand les profils deviennent disponibles
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    const profilesJustLoaded = prevProfilesLengthRef.current === 0 && allProfiles.length > 0;
+    const viewAlreadyLoaded = loadedViewsRef.current.has(activeView);
+    
+    // Si la vue est déjà chargée et que les profils n'ont pas changé, ne rien faire
+    // Les données sont déjà affichées depuis le cache
+    if (viewAlreadyLoaded && !profilesJustLoaded) {
+      prevProfilesLengthRef.current = allProfiles.length;
       return;
     }
     
-    // Charger les données spécifiques selon la vue
-    switch (activeView) {
-      case 'products':
-        loadAllProducts();
-        break;
-      case 'orders':
-        loadAllOrders();
-        break;
-      case 'events':
-        loadAllEvents();
-        break;
-      case 'ratings':
-        loadAllRatings();
-        break;
-      case 'users':
-        // Les utilisateurs sont déjà chargés via onSnapshot
-        break;
+    // Si on n'a pas de profils, restaurer depuis le cache si disponible
+    if (allProfiles.length === 0) {
+      prevProfilesLengthRef.current = 0;
+      // Restaurer les données depuis le cache pour la vue active
+      switch (activeView) {
+        case 'products':
+          if (dataCacheRef.current.products.length > 0) {
+            setAllProducts(dataCacheRef.current.products);
+            setIsLoadingProducts(false);
+          }
+          break;
+        case 'orders':
+          if (dataCacheRef.current.orders.length > 0) {
+            setAllOrders(dataCacheRef.current.orders);
+            setIsLoadingOrders(false);
+          }
+          break;
+        case 'events':
+          if (dataCacheRef.current.events.length > 0) {
+            setAllEvents(dataCacheRef.current.events);
+            setIsLoadingEvents(false);
+          }
+          break;
+        case 'ratings':
+          if (dataCacheRef.current.ratings.length > 0) {
+            setAllRatings(dataCacheRef.current.ratings);
+            setIsLoadingRatings(false);
+          }
+          break;
+        case 'menu':
+          if (dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) {
+            setGlobalStats(dataCacheRef.current.globalStats);
+            setIsLoadingGlobalStats(false);
+          }
+          if (dataCacheRef.current.payments.length > 0) {
+            setAllPayments(dataCacheRef.current.payments);
+            setIsLoadingPayments(false);
+          }
+          break;
+      }
+      return;
     }
+    
+    // Charger les données selon la vue
+    if (activeView === 'menu') {
+      loadGlobalStats();
+      loadAllPayments();
+      loadedViewsRef.current.add('menu');
+    } else {
+      switch (activeView) {
+        case 'products':
+          loadAllProducts();
+          loadedViewsRef.current.add('products');
+          break;
+        case 'orders':
+          loadAllOrders();
+          loadedViewsRef.current.add('orders');
+          break;
+        case 'events':
+          loadAllEvents();
+          loadedViewsRef.current.add('events');
+          break;
+        case 'ratings':
+          loadAllRatings();
+          loadedViewsRef.current.add('ratings');
+          break;
+        case 'users':
+          // Les utilisateurs sont déjà chargés via onSnapshot
+          loadedViewsRef.current.add('users');
+          break;
+      }
+    }
+    
+    prevProfilesLengthRef.current = allProfiles.length;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, allProfiles.length, activeView]);
+  }, [isAdmin, activeView, allProfiles.length]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
@@ -1171,7 +1362,7 @@ const AdminDashboard = () => {
           {isLoadingGlobalStats ? "Chargement..." : "Actualiser"}
         </Button>
       </div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -1210,6 +1401,9 @@ const AdminDashboard = () => {
             <div className="text-3xl font-bold">
               {isLoadingGlobalStats ? "..." : (globalStats.totalOrders + globalStats.totalBarOrders).toLocaleString()}
             </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {globalStats.totalOrders} normales • {globalStats.totalBarOrders} bar connectée
+            </div>
           </CardContent>
         </Card>
         <Card className="border-0 shadow-card">
@@ -1225,6 +1419,70 @@ const AdminDashboard = () => {
             </div>
             <div className="text-xs text-muted-foreground mt-1">
               {globalStats.totalRatings} avis
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Statistiques supplémentaires */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <Card className="border-0 shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Calendar size={16} className="text-orange-600"/> Événements
+            </CardTitle>
+            <CardDescription>Total événements</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {isLoadingGlobalStats ? "..." : globalStats.totalEvents.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Users size={16} className="text-indigo-600"/> Équipe
+            </CardTitle>
+            <CardDescription>Membres d'équipe</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {isLoadingGlobalStats ? "..." : globalStats.totalTeamMembers.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <CreditCard size={16} className="text-green-600"/> Paiements
+            </CardTitle>
+            <CardDescription>Paiements complétés</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold">
+              {isLoadingPayments ? "..." : allPayments.length.toLocaleString()}
+            </div>
+            {allPayments.length > 0 && (
+              <div className="text-xs text-muted-foreground mt-1">
+                {allPayments.slice(0, 5).reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} XAF (5 derniers)
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-card">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <TrendingUp size={16} className="text-green-600"/> Revenus
+            </CardTitle>
+            <CardDescription>Revenus mensuels estimés</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-green-600">
+              {stats.monthly.toLocaleString()} XAF
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Basé sur {stats.active} abonnements actifs
             </div>
           </CardContent>
         </Card>
@@ -1290,20 +1548,37 @@ const AdminDashboard = () => {
         </button>
       </div>
 
-      {/* Revenus estimés */}
-      <Card className="border-0 shadow-card mt-8">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp size={20} className="text-green-600"/> Revenus estimés
-          </CardTitle>
-          <CardDescription>Basé sur les abonnements actifs de 30 jours</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-3xl font-bold text-green-600">
-            ≈ {stats.monthly.toLocaleString()} XAF/mois
-          </div>
-        </CardContent>
-      </Card>
+      {/* Paiements récents */}
+      {allPayments.length > 0 && (
+        <Card className="border-0 shadow-card mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard size={20} className="text-blue-600"/> Paiements récents
+            </CardTitle>
+            <CardDescription>Les 5 derniers paiements complétés</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {allPayments.slice(0, 5).map((payment) => (
+                <div key={payment.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div>
+                    <div className="font-medium">{payment.userName || payment.userEmail || "Utilisateur inconnu"}</div>
+                    <div className="text-sm text-muted-foreground">
+                      {payment.paidAt ? new Date(payment.paidAt).toLocaleDateString('fr-FR') : "Date inconnue"}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold text-green-600">{payment.amount?.toLocaleString() || 0} XAF</div>
+                    <Badge variant="outline" className="text-xs">
+                      {payment.planType || "N/A"}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 

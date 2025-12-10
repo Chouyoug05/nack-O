@@ -11,6 +11,9 @@ import { db } from "@/lib/firebase";
 import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
 import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc, getDocs } from "firebase/firestore";
 import type { SaleDoc, SaleItem, PaymentMethod } from "@/types/inventory";
+import type { UserProfile } from "@/types/profile";
+import { OrderCancelDialog } from "@/components/OrderCancelDialog";
+import { cancelOrderWithLogging, canCancelOrder, checkRefundRequired } from "@/utils/orderCancellation";
 
 interface FirestoreOrderItem {
   id?: string;
@@ -72,10 +75,12 @@ const OrderManagement = ({
 }: OrderManagementProps) => {
   const { orders: localOrders, updateOrderStatus } = useOrders();
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [fsOrders, setFsOrders] = useState<Order[]>([]);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
   const [paymentMethodByOrder, setPaymentMethodByOrder] = useState<Record<string, PaymentMethod>>({});
+  const [cancelDialogOrder, setCancelDialogOrder] = useState<Order | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Determine which uid to use for Firestore operations
   const uidToUse = ownerOverrideUid || user?.uid;
@@ -247,14 +252,15 @@ const OrderManagement = ({
         const shouldPrint = window.confirm(`Commande validée avec succès !\n\nSouhaitez-vous imprimer le reçu pour le client ?`);
         if (shouldPrint) {
           try {
-            // Récupérer le nom de l'établissement
+            // Récupérer toutes les informations du profil pour le ticket
             const profileRef = fsDoc(db, 'profiles', uidToUse);
             const profileSnap = await getDoc(profileRef);
-            const establishmentName = profileSnap.exists() ? (profileSnap.data() as { establishmentName?: string }).establishmentName || 'Établissement' : 'Établissement';
+            const profileData = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
             
             const thermalData = {
               orderNumber: String(order.orderNumber || `C-${Date.now()}`),
-              establishmentName,
+              establishmentName: profileData?.establishmentName || 'Établissement',
+              establishmentLogo: profileData?.logoUrl,
               tableZone: order.tableNumber || 'Table',
               items: order.items.map(item => ({
                 name: item.name,
@@ -262,7 +268,15 @@ const OrderManagement = ({
                 price: item.price
               })),
               total: order.total,
-              createdAt: order.createdAt instanceof Date ? order.createdAt.getTime() : (order.createdAt || Date.now())
+              createdAt: order.createdAt instanceof Date ? order.createdAt.getTime() : (order.createdAt || Date.now()),
+              // Informations personnalisées du profil
+              companyName: profileData?.companyName,
+              fullAddress: profileData?.fullAddress,
+              businessPhone: profileData?.businessPhone || profileData?.phone,
+              rcsNumber: profileData?.rcsNumber,
+              nifNumber: profileData?.nifNumber,
+              legalMentions: profileData?.legalMentions,
+              customMessage: profileData?.customMessage
             };
 
             const { printThermalTicket } = await import('@/utils/ticketThermal');
@@ -295,87 +309,97 @@ const OrderManagement = ({
     }
   };
 
-  const handleCancelOrder = async (order: Order) => {
-    // Vérifier si une vente existe pour cette commande (argent déjà reçu)
-    if (order.status === 'sent' && uidToUse) {
-      try {
-        // Vérifier si une vente correspondante existe
-        const salesQuery = query(
-          salesColRef(db, uidToUse),
-          orderBy("createdAt", "desc")
-        );
-        const salesSnapshot = await getDocs(salesQuery);
-        
-        const orderCreatedAt = order.createdAt instanceof Date 
-          ? order.createdAt.getTime() 
-          : (typeof order.createdAt === 'number' ? order.createdAt : Date.now());
-        
-        // Chercher une vente créée après la commande avec le même total
-        const matchingSale = salesSnapshot.docs.find(doc => {
-          const sale = doc.data() as SaleDoc;
-          const saleCreatedAt = sale.createdAt;
-          // Vente créée dans les 30 minutes après la commande et avec le même total
-          return saleCreatedAt >= orderCreatedAt 
-            && saleCreatedAt <= orderCreatedAt + (30 * 60 * 1000)
-            && Math.abs(sale.total - order.total) < 1; // Tolérance de 1 XAF pour les arrondis
-        });
-
-        if (matchingSale) {
-          const confirmed = window.confirm(
-            `⚠️ ATTENTION : Cette commande a déjà été payée (${order.total.toLocaleString()} XAF).\n\n` +
-            `L'annulation de cette commande nécessitera un remboursement au client.\n\n` +
-            `Voulez-vous vraiment annuler cette commande ?`
-          );
-          if (!confirmed) {
-            return;
-          }
-        } else if (order.status === 'sent') {
-          // Même si pas de vente trouvée, demander confirmation pour les commandes 'sent'
-          const confirmed = window.confirm(
-            `⚠️ ATTENTION : Cette commande a été envoyée à la caisse.\n\n` +
-            `Il est possible que l'argent ait déjà été reçu.\n\n` +
-            `Voulez-vous vraiment annuler cette commande ?`
-          );
-          if (!confirmed) {
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Erreur lors de la vérification des ventes:', error);
-        // En cas d'erreur, demander quand même confirmation pour les commandes 'sent'
-        if (order.status === 'sent') {
-          const confirmed = window.confirm(
-            `⚠️ ATTENTION : Cette commande a été envoyée à la caisse.\n\n` +
-            `Il est possible que l'argent ait déjà été reçu.\n\n` +
-            `Voulez-vous vraiment annuler cette commande ?`
-          );
-          if (!confirmed) {
-            return;
-          }
-        }
-      }
-    }
-
-    if (uidToUse && (typeof navigator === 'undefined' || navigator.onLine)) {
-      const updatePayload: { status: 'cancelled'; agentToken?: string } = { status: 'cancelled' };
-      if (agentToken && !isOwnerAuthed) {
-        updatePayload.agentToken = agentToken;
-      }
-      updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), updatePayload).catch(() => {
-        queueManagerUpdate(order.id, 'cancelled');
-        toast({ title: "Annulation mise en file", description: "La commande sera annulée dès le retour en ligne." });
+  const handleCancelOrderClick = async (order: Order) => {
+    if (!uidToUse || !user) {
+      toast({
+        title: "Erreur",
+        description: "Vous devez être connecté pour annuler une commande.",
+        variant: "destructive"
       });
-    } else {
-      queueManagerUpdate(order.id, 'cancelled');
-      toast({ title: "Annulation hors-ligne", description: "La commande sera annulée dès le retour en ligne." });
+      return;
     }
-    setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'cancelled' } : o));
-    updateOrderStatus(order.id, 'cancelled');
-    toast({
-      title: "Commande annulée",
-      description: `Commande #${order.orderNumber} annulée`,
-      variant: "destructive"
-    });
+
+    // Vérifier si l'annulation est possible
+    const canCancel = await canCancelOrder(order.id, uidToUse, order.status, order.createdAt);
+    if (!canCancel.canCancel) {
+      toast({
+        title: "Annulation impossible",
+        description: canCancel.reason || "Cette commande ne peut pas être annulée.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Vérifier si un remboursement est nécessaire
+    const refundCheck = await checkRefundRequired(order.id, uidToUse, order.total, order.createdAt);
+    
+    // Ouvrir le dialog d'annulation
+    setCancelDialogOrder({
+      ...order,
+      // Ajouter paymentMethod si trouvé
+      ...(refundCheck.paymentMethod && { paymentMethod: refundCheck.paymentMethod as PaymentMethod })
+    } as Order & { paymentMethod?: PaymentMethod });
+  };
+
+  const handleConfirmCancel = async (reason: string, refundRequired: boolean) => {
+    if (!cancelDialogOrder || !uidToUse || !user) return;
+
+    setIsCancelling(true);
+    try {
+      // Récupérer le paymentMethod de la commande ou de la vérification
+      let paymentMethod: PaymentMethod | undefined;
+      if (refundRequired) {
+        const refundCheck = await checkRefundRequired(
+          cancelDialogOrder.id,
+          uidToUse,
+          cancelDialogOrder.total,
+          cancelDialogOrder.createdAt
+        );
+        paymentMethod = refundCheck.paymentMethod as PaymentMethod | undefined;
+      }
+
+      // Annuler avec journalisation
+      await cancelOrderWithLogging(
+        cancelDialogOrder.id,
+        uidToUse,
+        cancelDialogOrder.orderNumber,
+        cancelDialogOrder.status,
+        cancelDialogOrder.total,
+        cancelDialogOrder.createdAt,
+        user.uid,
+        profile?.ownerName || user.email || 'Utilisateur',
+        reason,
+        refundRequired,
+        paymentMethod,
+        {
+          flowType: 'table_order',
+          agentCode: cancelDialogOrder.agentCode,
+          agentName: cancelDialogOrder.agentName,
+          tableNumber: cancelDialogOrder.tableNumber
+        }
+      );
+
+      // Mettre à jour l'état local
+      setFsOrders(prev => prev.map(o => o.id === cancelDialogOrder.id ? { ...o, status: 'cancelled' } : o));
+      updateOrderStatus(cancelDialogOrder.id, 'cancelled');
+
+      toast({
+        title: "Commande annulée",
+        description: `Commande #${cancelDialogOrder.orderNumber} annulée${refundRequired ? '. Remboursement requis.' : '.'}`,
+        variant: refundRequired ? "default" : "destructive"
+      });
+
+      setCancelDialogOrder(null);
+    } catch (error) {
+      console.error('Erreur lors de l\'annulation:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible d'annuler la commande.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   // Trier les commandes : en attente d'abord, puis par date
@@ -494,8 +518,8 @@ const OrderManagement = ({
                   {(order.status === 'pending' || order.status === 'sent') && (
                   <Button
                     variant="destructive"
-                    onClick={() => handleCancelOrder(order)}
-                    disabled={processingIds.has(order.id)}
+                    onClick={() => handleCancelOrderClick(order)}
+                    disabled={processingIds.has(order.id) || isCancelling}
                     type="button"
                       className={order.status === 'sent' ? 'flex-1' : ''}
                   >
@@ -509,6 +533,20 @@ const OrderManagement = ({
           ))
         )}
       </CardContent>
+
+      {/* Dialog d'annulation */}
+      {cancelDialogOrder && (
+        <OrderCancelDialog
+          isOpen={!!cancelDialogOrder}
+          onClose={() => setCancelDialogOrder(null)}
+          onConfirm={handleConfirmCancel}
+          orderNumber={String(cancelDialogOrder.orderNumber)}
+          orderTotal={cancelDialogOrder.total}
+          orderStatus={cancelDialogOrder.status}
+          paymentMethod={(cancelDialogOrder as Order & { paymentMethod?: PaymentMethod }).paymentMethod}
+          isLoading={isCancelling}
+        />
+      )}
     </Card>
   );
 };

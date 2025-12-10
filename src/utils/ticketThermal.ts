@@ -6,6 +6,7 @@
 export interface ThermalTicketData {
   orderNumber: string;
   establishmentName: string;
+  establishmentLogo?: string;
   tableZone: string;
   items: Array<{
     name: string;
@@ -14,6 +15,14 @@ export interface ThermalTicketData {
   }>;
   total: number;
   createdAt: number;
+  // Informations personnalisées pour les tickets
+  companyName?: string;
+  fullAddress?: string;
+  businessPhone?: string;
+  rcsNumber?: string;
+  nifNumber?: string;
+  legalMentions?: string;
+  customMessage?: string;
 }
 
 /**
@@ -77,85 +86,173 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
     }
     
     body {
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      line-height: 1.2;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 11px;
+      line-height: 1.4;
       width: 58mm;
       max-width: 58mm;
       margin: 0 auto;
-      padding: 5mm;
+      padding: 4mm;
       background: white;
-      color: black;
+      color: #1a1a1a;
     }
     
     .ticket {
       width: 100%;
-      text-align: center;
     }
     
     .header {
-      margin-bottom: 8px;
+      text-align: center;
+      margin-bottom: 10px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #dc2626;
     }
     
     .header h1 {
-      font-size: 18px;
-      font-weight: bold;
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0 0 4px 0;
+      letter-spacing: 2px;
+      color: #dc2626;
+    }
+    
+    .logo-section {
+      text-align: center;
+      margin: 8px 0;
+    }
+    
+    .logo-section img {
+      max-width: 40px;
+      max-height: 40px;
       margin-bottom: 4px;
-      letter-spacing: 1px;
+    }
+    
+    .company-name {
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      margin: 6px 0;
+      color: #1a1a1a;
+    }
+    
+    .company-info {
+      font-size: 9px;
+      text-align: center;
+      margin: 2px 0;
+      color: #666;
+      line-height: 1.3;
     }
     
     .separator {
-      border-top: 1px dashed #000;
+      border-top: 1px dashed #ccc;
       margin: 8px 0;
       width: 100%;
     }
     
-    .info-line {
-      font-size: 10px;
-      margin: 4px 0;
-      text-align: left;
+    .separator-thick {
+      border-top: 2px solid #dc2626;
+      margin: 10px 0;
+      width: 100%;
     }
     
-    .info-line strong {
-      font-weight: bold;
+    .order-info {
+      text-align: center;
+      margin: 8px 0;
+      padding: 6px;
+      background: #fef2f2;
+      border-radius: 4px;
+    }
+    
+    .order-number {
+      font-size: 14px;
+      font-weight: 700;
+      color: #dc2626;
+      margin-bottom: 4px;
+    }
+    
+    .order-date {
+      font-size: 9px;
+      color: #666;
+    }
+    
+    .table-info {
+      font-size: 10px;
+      color: #666;
+      margin-top: 4px;
     }
     
     .products-header {
-      font-weight: bold;
-      font-size: 11px;
+      font-weight: 700;
+      font-size: 10px;
       margin: 8px 0 4px 0;
       text-align: left;
-      border-bottom: 1px solid #000;
-      padding-bottom: 2px;
-      font-family: 'Courier New', monospace;
-      white-space: pre;
+      border-bottom: 1px solid #e5e5e5;
+      padding-bottom: 4px;
+      color: #1a1a1a;
     }
     
     .products {
       text-align: left;
       font-size: 10px;
       margin: 4px 0;
-      line-height: 1.4;
-      font-family: 'Courier New', monospace;
-      white-space: pre;
+      line-height: 1.5;
+    }
+    
+    .product-item {
+      margin: 6px 0;
+      padding: 4px 0;
+      border-bottom: 1px dotted #e5e5e5;
+    }
+    
+    .product-name {
+      font-weight: 500;
+      margin-bottom: 2px;
+    }
+    
+    .product-details {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: #666;
     }
     
     .total-line {
-      margin-top: 8px;
-      padding-top: 4px;
-      border-top: 1px dashed #000;
-      font-weight: bold;
-      font-size: 12px;
-      text-align: left;
-      font-family: 'Courier New', monospace;
-      white-space: pre;
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 2px solid #dc2626;
+      text-align: right;
+    }
+    
+    .total-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 4px;
+    }
+    
+    .total-amount {
+      font-size: 16px;
+      font-weight: 700;
+      color: #dc2626;
+    }
+    
+    .legal-mentions {
+      font-size: 8px;
+      color: #999;
+      text-align: center;
+      margin: 8px 0;
+      line-height: 1.3;
+      font-style: italic;
     }
     
     .footer {
       margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px dashed #ccc;
       font-size: 10px;
       text-align: center;
-      font-style: italic;
+      color: #dc2626;
+      font-weight: 500;
     }
     
     .print-button {
@@ -190,35 +287,62 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
       <h1>NACK!</h1>
     </div>
     
-    <div class="separator"></div>
-    
-    <div class="info-line">
-      <strong>Nom du commerce :</strong> ${data.establishmentName}
+    ${data.establishmentLogo ? `
+    <div class="logo-section">
+      <img src="${data.establishmentLogo}" alt="Logo" />
     </div>
-    <div class="info-line">
-      <strong>Date :</strong> ${dateStr}  ${timeStr}
+    ` : ''}
+    
+    <div class="company-name">${data.companyName || data.establishmentName}</div>
+    
+    ${data.fullAddress ? `<div class="company-info">${data.fullAddress}</div>` : ''}
+    ${data.businessPhone ? `<div class="company-info">📞 ${data.businessPhone}</div>` : ''}
+    ${data.rcsNumber ? `<div class="company-info">RCS: ${data.rcsNumber}</div>` : ''}
+    ${data.nifNumber ? `<div class="company-info">NIF: ${data.nifNumber}</div>` : ''}
+    
+    <div class="separator-thick"></div>
+    
+    <div class="order-info">
+      <div class="order-number">COMMANDE #${data.orderNumber}</div>
+      <div class="order-date">${dateStr} à ${timeStr}</div>
+      ${data.tableZone ? `<div class="table-info">Table: ${data.tableZone}</div>` : ''}
     </div>
     
     <div class="separator"></div>
     
     <div class="products-header">
-PRODUIT            QTE    PRIX
+      PRODUITS
     </div>
     
     <div class="products">
-${productsRows}
+      ${data.items.map(item => {
+        const itemTotal = item.price * item.quantity;
+        return `
+        <div class="product-item">
+          <div class="product-name">${item.name}</div>
+          <div class="product-details">
+            <span>${item.quantity} x ${item.price.toLocaleString('fr-FR')} XAF</span>
+            <span style="font-weight: 600;">${itemTotal.toLocaleString('fr-FR')} XAF</span>
+          </div>
+        </div>
+        `;
+      }).join('')}
     </div>
     
-    <div class="separator"></div>
+    <div class="separator-thick"></div>
     
     <div class="total-line">
-TOTAL                ${totalFormatted.padStart(8)} FCFA
+      <div class="total-label">TOTAL À PAYER</div>
+      <div class="total-amount">${totalFormatted} XAF</div>
     </div>
     
+    ${data.legalMentions ? `
     <div class="separator"></div>
+    <div class="legal-mentions">${data.legalMentions}</div>
+    ` : ''}
     
     <div class="footer">
-Merci pour votre achat !
+      ${data.customMessage || 'Merci pour votre confiance ! ❤️'}
     </div>
   </div>
   

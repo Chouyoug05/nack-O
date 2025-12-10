@@ -40,6 +40,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
 import { addDoc, doc as fsDoc, getDoc, onSnapshot, orderBy, query, runTransaction, where, updateDoc, writeBatch, doc as fsDocDirect } from "firebase/firestore";
 import type { ProductDoc, PaymentMethod, SaleDoc, SaleItem } from "@/types/inventory";
+import type { UserProfile } from "@/types/profile";
 
 interface Product {
   id: string;
@@ -377,14 +378,15 @@ const SalesPage = () => {
       const shouldPrint = window.confirm(`Vente enregistrée avec succès !\n\nSouhaitez-vous imprimer le reçu pour le client ?`);
       if (shouldPrint) {
         try {
-          // Récupérer le nom de l'établissement
+          // Récupérer toutes les informations du profil pour le ticket
           const profileRef = fsDoc(db, 'profiles', ownerUidForWrites);
           const profileSnap = await getDoc(profileRef);
-          const establishmentName = profileSnap.exists() ? (profileSnap.data() as { establishmentName?: string }).establishmentName || 'Établissement' : 'Établissement';
+          const profileData = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
           
           const thermalData = {
             orderNumber: `V-${Date.now()}`,
-            establishmentName,
+            establishmentName: profileData?.establishmentName || 'Établissement',
+            establishmentLogo: profileData?.logoUrl,
             tableZone: 'Caisse',
             items: cart.map(item => ({
               name: item.name,
@@ -392,7 +394,15 @@ const SalesPage = () => {
               price: item.price
             })),
             total: cartTotal,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            // Informations personnalisées du profil
+            companyName: profileData?.companyName,
+            fullAddress: profileData?.fullAddress,
+            businessPhone: profileData?.businessPhone || profileData?.phone,
+            rcsNumber: profileData?.rcsNumber,
+            nifNumber: profileData?.nifNumber,
+            legalMentions: profileData?.legalMentions,
+            customMessage: profileData?.customMessage
           };
 
           const { printThermalTicket } = await import('@/utils/ticketThermal');

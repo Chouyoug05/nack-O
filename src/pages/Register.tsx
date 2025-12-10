@@ -41,6 +41,7 @@ const Register = () => {
 
   const establishmentTypes = [
     { value: "bar", label: "Bar" },
+    { value: "restaurant", label: "Restaurant" },
     { value: "snack", label: "Snack Bar" },
     { value: "nightclub", label: "Boîte de nuit" },
     { value: "restaurant-bar", label: "Restaurant-Bar" },

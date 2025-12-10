@@ -500,6 +500,7 @@ const PublicOrderingPage = () => {
       const thermalData = {
         orderNumber,
         establishmentName: establishment.establishmentName,
+        establishmentLogo: establishment.logoUrl,
         tableZone: selectedTable,
         items: cart.map(item => ({
           name: item.name,
@@ -507,7 +508,15 @@ const PublicOrderingPage = () => {
           price: item.price
         })),
         total,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        // Informations personnalisées du profil
+        companyName: establishment.companyName,
+        fullAddress: establishment.fullAddress,
+        businessPhone: establishment.businessPhone,
+        rcsNumber: establishment.rcsNumber,
+        nifNumber: establishment.nifNumber,
+        legalMentions: establishment.legalMentions,
+        customMessage: establishment.customMessage
       };
 
       printThermalTicket(thermalData);

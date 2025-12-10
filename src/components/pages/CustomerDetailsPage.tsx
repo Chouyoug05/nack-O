@@ -240,7 +240,6 @@ const CustomerDetailsPage = () => {
       });
 
       // Recharger les données du client
-      const customerRef = doc(customersColRef(db, user.uid), customer.id);
       const customerSnap = await getDoc(customerRef);
       if (customerSnap.exists()) {
         const data = customerSnap.data() as CustomerDoc;

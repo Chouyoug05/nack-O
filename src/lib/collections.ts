@@ -50,4 +50,10 @@ export const subscriptionPlansColRef = (db: Firestore): CollectionReference =>
   collection(db, "subscriptionPlans") as CollectionReference;
 
 export const subscriptionPlanDocRef = (db: Firestore, planKey: string) =>
-  doc(db, "subscriptionPlans", planKey); 
+  doc(db, "subscriptionPlans", planKey);
+
+export const orderCancellationsColRef = (db: Firestore, uid: string): CollectionReference =>
+  collection(db, "profiles", uid, "orderCancellations") as CollectionReference;
+
+export const barOrdersColRef = (db: Firestore, uid: string): CollectionReference =>
+  collection(db, "profiles", uid, "barOrders") as CollectionReference; 
