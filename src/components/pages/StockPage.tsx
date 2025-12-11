@@ -39,7 +39,9 @@ import {
   Upload,
   FileText,
   Eye,
-  EyeOff
+  EyeOff,
+  Image as ImageIcon,
+  Sparkles
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -49,6 +51,7 @@ import type { ProductDoc, LossDoc, FoodCost } from "@/types/inventory";
 import type { UserProfile } from "@/types/profile";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
+import { searchProductImage } from "@/utils/productImageSearch";
 
 interface Product {
   id: string;
@@ -193,6 +196,7 @@ const StockPage = () => {
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
+  const [isSearchingImage, setIsSearchingImage] = useState(false);
 
   const [lossData, setLossData] = useState({
     productId: "",
@@ -342,6 +346,45 @@ const StockPage = () => {
     if (!iconName) return Package;
     const iconItem = availableIcons.find(item => item.name === iconName);
     return iconItem ? iconItem.icon : Package;
+  };
+
+  // Fonction pour rechercher automatiquement une image
+  const handleSearchImage = async () => {
+    if (!newProduct.name || newProduct.name.trim().length === 0) {
+      toast({
+        title: "Nom requis",
+        description: "Veuillez d'abord saisir le nom du produit",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSearchingImage(true);
+    try {
+      const imageUrl = await searchProductImage(newProduct.name, newProduct.category);
+      if (imageUrl) {
+        setNewProduct({ ...newProduct, imageUrl });
+        toast({
+          title: "Image trouvée !",
+          description: "Une image a été trouvée et ajoutée au produit"
+        });
+      } else {
+        toast({
+          title: "Aucune image trouvée",
+          description: "Impossible de trouver une image pour ce produit. Vous pouvez télécharger une image manuellement.",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Erreur lors de la recherche d'image:", error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur est survenue lors de la recherche d'image",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearchingImage(false);
+    }
   };
 
   const filteredProducts = products.filter(product => {
@@ -1383,7 +1426,67 @@ const StockPage = () => {
 
                         <div>
                           <Label htmlFor="productImage" className="text-lg font-semibold mb-3 block text-center">Photo (optionnel)</Label>
-                          <Input id="productImage" type="file" accept="image/*" onChange={(e) => setImageFile(e.target.files?.[0] || null)} className="h-14 text-lg" />
+                          <div className="space-y-3">
+                            <div className="flex gap-2">
+                              <Input 
+                                id="productImage" 
+                                type="file" 
+                                accept="image/*" 
+                                onChange={(e) => setImageFile(e.target.files?.[0] || null)} 
+                                className="h-14 text-lg flex-1" 
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleSearchImage}
+                                disabled={isSearchingImage || !newProduct.name}
+                                className="h-14 px-4"
+                                title="Rechercher automatiquement une image basée sur le nom du produit"
+                              >
+                                {isSearchingImage ? (
+                                  <>
+                                    <Sparkles className="w-5 h-5 mr-2 animate-spin" />
+                                    Recherche...
+                                  </>
+                                ) : (
+                                  <>
+                                    <ImageIcon className="w-5 h-5 mr-2" />
+                                    Trouver une image
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                            {newProduct.imageUrl && (
+                              <div className="mt-3">
+                                <p className="text-sm text-muted-foreground mb-2">Image trouvée :</p>
+                                <img 
+                                  src={newProduct.imageUrl} 
+                                  alt={newProduct.name}
+                                  className="w-full h-48 object-cover rounded-lg border"
+                                  onError={() => {
+                                    setNewProduct({ ...newProduct, imageUrl: "" });
+                                    toast({
+                                      title: "Image invalide",
+                                      description: "L'image trouvée n'a pas pu être chargée",
+                                      variant: "destructive"
+                                    });
+                                  }}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setNewProduct({ ...newProduct, imageUrl: "" })}
+                                  className="mt-2 text-red-600 hover:text-red-700"
+                                >
+                                  Supprimer l'image
+                                </Button>
+                              </div>
+                            )}
+                            <p className="text-xs text-muted-foreground text-center">
+                              Vous pouvez télécharger une image ou utiliser le bouton pour en trouver une automatiquement
+                            </p>
+                          </div>
                         </div>
                       </div>
                     )}
