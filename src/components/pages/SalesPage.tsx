@@ -765,7 +765,7 @@ const SalesPage = () => {
                         {sale.type === 'bar-connectee' && (
                           <span className="ml-2 inline-flex items-center gap-1">
                             <QrCode className="w-3 h-3" />
-                            Bar Connectée
+                            Menu Digital
                           </span>
                         )}
                       </p>

@@ -1056,35 +1056,38 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2 w-full">
                         {order.status === 'pending' && (
                           <>
-                            <Button size="sm" onClick={() => confirmOrder(order.id)}>
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Confirmer
+                            <Button size="sm" onClick={() => confirmOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                              <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                              <span className="hidden sm:inline">Confirmer</span>
+                              <span className="sm:hidden">Conf.</span>
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)}>
-                              <X className="w-4 h-4 mr-2" />
-                              Annuler
+                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                              <X className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                              <span className="truncate">Annuler</span>
                             </Button>
                           </>
                         )}
                         {order.status === 'confirmed' && (
                           <>
-                            <Button size="sm" onClick={() => markAsServed(order.id)}>
-                              <CheckCircle className="w-4 h-4 mr-2" />
-                              Servir & Payer
+                            <Button size="sm" onClick={() => markAsServed(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[120px] text-xs sm:text-sm">
+                              <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                              <span className="hidden sm:inline">Servir & Payer</span>
+                              <span className="sm:hidden">Servir</span>
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)}>
-                              <X className="w-4 h-4 mr-2" />
-                              Annuler
+                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                              <X className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                              <span className="truncate">Annuler</span>
                             </Button>
                           </>
                         )}
                         {order.status !== 'cancelled' && (
-                          <Button variant="outline" size="sm" onClick={() => downloadOrderTicket(order)}>
-                            <Download className="w-4 h-4 mr-2" />
-                            Ticket PDF
+                          <Button variant="outline" size="sm" onClick={() => downloadOrderTicket(order)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                            <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                            <span className="hidden sm:inline">Ticket PDF</span>
+                            <span className="sm:hidden">PDF</span>
                           </Button>
                         )}
                       </div>

@@ -213,58 +213,59 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-80 p-0 z-50" 
+        className="w-[95vw] sm:w-80 max-w-sm p-0 z-50" 
         align="end"
         sideOffset={5}
       >
-        <div className="p-4 border-b border-border">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg">Notifications</h3>
+        <div className="p-2 sm:p-4 border-b border-border">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h3 className="font-semibold text-sm sm:text-lg flex-shrink-0">Notifications</h3>
             {unreadCount > 0 && (
               <Button 
                 variant="ghost" 
                 size="sm" 
                 onClick={markAllAsRead}
-                className="text-xs hover:bg-accent"
+                className="text-xs hover:bg-accent shrink-0"
               >
-                Tout marquer comme lu
+                <span className="hidden sm:inline">Tout marquer comme lu</span>
+                <span className="sm:hidden">Tout lu</span>
               </Button>
             )}
           </div>
           {badgeCount > 0 && (
-            <p className="text-sm text-muted-foreground mt-1">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words overflow-hidden">
               {pendingOrders} commande{pendingOrders > 1 ? "s" : ""} en attente • {unreadCount} notif
             </p>
           )}
         </div>
 
-        <ScrollArea className="h-80">
-          <div className="p-2">
+        <ScrollArea className="h-[60vh] sm:h-80 max-h-[500px]">
+          <div className="p-1 sm:p-2">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Bell className="w-12 h-12 text-muted-foreground/50 mb-2" />
                 <p className="text-sm text-muted-foreground">Aucune notification</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1 sm:space-y-2">
                 {notifications.map((notification) => (
                   <Card 
                     key={notification.id} 
-                    className={`cursor-pointer transition-all hover:shadow-sm border ${
+                    className={`cursor-pointer transition-all hover:shadow-sm border group ${
                       !notification.read 
                         ? getTypeColor(notification.type) + " shadow-sm" 
                         : "bg-background"
                     }`}
                     onClick={() => handleNotificationClick(notification)}
                   >
-                    <CardContent className="p-3">
-                      <div className="flex items-start gap-3">
+                    <CardContent className="p-2 sm:p-3">
+                      <div className="flex items-start gap-2 sm:gap-3">
                         <div className="flex-shrink-0 mt-0.5">
                           {getIcon(notification.type)}
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2">
-                            <h4 className={`text-sm font-medium truncate ${
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <div className="flex items-start justify-between gap-1 sm:gap-2">
+                            <h4 className={`text-xs sm:text-sm font-medium break-words flex-1 min-w-0 ${
                               !notification.read ? "font-semibold" : ""
                             }`}>
                               {notification.title}
@@ -272,7 +273,7 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-6 w-6 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 flex-shrink-0"
+                              className="h-5 w-5 sm:h-6 sm:w-6 opacity-0 group-hover:opacity-100 hover:bg-red-100 hover:text-red-600 flex-shrink-0"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 deleteNotification(notification.id);
@@ -281,11 +282,11 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
                               <X className="w-3 h-3" />
                             </Button>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2 break-words overflow-hidden">
                             {notification.message}
                           </p>
-                          <div className="flex items-center justify-between mt-2">
-                            <p className="text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between mt-2 gap-2">
+                            <p className="text-xs text-muted-foreground truncate">
                               {notification.time}
                             </p>
                             {!notification.read && (

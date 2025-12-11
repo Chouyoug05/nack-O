@@ -113,7 +113,7 @@ const menuCards: MenuCard[] = [
   },
   {
     key: "bar-connectee",
-    title: "Bar Connectée",
+    title: "Menu Digital",
     description: "",
     icon: QrCode,
     hint: "QR",
@@ -218,7 +218,7 @@ const Dashboard = () => {
       }
     ));
 
-    // Bar Connectée pending orders count
+    // Menu Digital pending orders count
     try {
       const barOrdersRef = collection(db, `profiles/${user.uid}/barOrders`);
       const pendingQ = query(barOrdersRef, where('status', '==', 'pending'));
