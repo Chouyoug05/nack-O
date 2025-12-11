@@ -24,7 +24,8 @@ import {
   Info,
   Wrench,
   Paintbrush,
-  Download
+  Download,
+  FileText
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadLogo } from "@/lib/upload";
@@ -35,6 +36,7 @@ import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
+import { TermsAndConditions } from "@/components/TermsAndConditions";
 import { receiptsColRef, paymentsColRef, productsColRef, salesColRef, lossesColRef, eventsColRef, teamColRef, ordersColRef, notificationsColRef } from "@/lib/collections";
 import { db } from "@/lib/firebase";
 import { getDocs, query, orderBy, deleteDoc, writeBatch, collection } from "firebase/firestore";
@@ -1240,6 +1242,27 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                     <h4 className="font-medium text-blue-800 mb-2">Version</h4>
                     <p className="text-sm text-blue-700">Nack! v1.0.0</p>
+                  </div>
+
+                  <div className="border border-gray-200 p-4 rounded-lg">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <FileText size={18} className="text-nack-red" />
+                        <h4 className="font-medium">Conditions d'utilisation</h4>
+                      </div>
+                      <TermsAndConditions
+                        trigger={
+                          <Button variant="outline" size="sm">
+                            Consulter
+                          </Button>
+                        }
+                      />
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Consultez les conditions générales d'utilisation de NACK!, incluant les informations sur 
+                      l'utilisation de vos données à des fins d'études de marché et d'amélioration des services 
+                      pour le bien-être de la population gabonaise.
+                    </p>
                   </div>
 
                   <div className="space-y-3">
