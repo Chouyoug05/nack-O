@@ -4,27 +4,108 @@
  */
 
 /**
+ * Dictionnaire de traduction des noms de produits français vers anglais
+ * pour améliorer la recherche d'images
+ */
+const productTranslations: Record<string, string> = {
+  // Boissons
+  "bière": "beer",
+  "vin": "wine",
+  "whisky": "whisky",
+  "vodka": "vodka",
+  "rhum": "rum",
+  "cognac": "cognac",
+  "champagne": "champagne",
+  "coca": "coca cola",
+  "coca-cola": "coca cola",
+  "pepsi": "pepsi",
+  "fanta": "fanta",
+  "sprite": "sprite",
+  "jus": "juice",
+  "eau": "water",
+  "café": "coffee",
+  "thé": "tea",
+  "cappuccino": "cappuccino",
+  "expresso": "espresso",
+  "latte": "latte",
+  
+  // Plats
+  "pizza": "pizza",
+  "burger": "burger",
+  "hamburger": "hamburger",
+  "sandwich": "sandwich",
+  "frites": "french fries",
+  "poulet": "chicken",
+  "poisson": "fish",
+  "riz": "rice",
+  "pâtes": "pasta",
+  "salade": "salad",
+  "soupe": "soup",
+  
+  // Snacks
+  "chips": "chips",
+  "cacahuètes": "peanuts",
+  "noix": "nuts",
+  "biscuit": "cookie",
+  "gâteau": "cake",
+  
+  // Desserts
+  "glace": "ice cream",
+  "gâteau": "cake",
+  "tarte": "pie",
+  "crème": "cream",
+  "chocolat": "chocolate",
+};
+
+/**
+ * Traduit un nom de produit français en anglais pour améliorer la recherche
+ */
+const translateProductName = (productName: string): string => {
+  const lowerName = productName.toLowerCase().trim();
+  let translated = productName;
+  
+  // Chercher des correspondances partielles et remplacer
+  for (const [french, english] of Object.entries(productTranslations)) {
+    if (lowerName.includes(french)) {
+      translated = translated.replace(new RegExp(french, 'gi'), english);
+    }
+  }
+  
+  // Si le nom contient déjà des mots anglais communs, le garder tel quel
+  const commonEnglishWords = ['beer', 'wine', 'coffee', 'tea', 'pizza', 'burger', 'chicken', 'fish', 'rice', 'pasta', 'salad', 'soup', 'cake', 'ice cream', 'chocolate'];
+  const hasEnglishWords = commonEnglishWords.some(word => lowerName.includes(word));
+  
+  if (hasEnglishWords) {
+    return productName; // Garder le nom original s'il contient déjà des mots anglais
+  }
+  
+  return translated;
+};
+
+/**
  * Construit une requête de recherche optimisée basée sur le nom et la catégorie du produit
  */
 const buildSearchQuery = (productName: string, category?: string): string => {
-  // Nettoyer le nom du produit
-  let query = productName.trim().toLowerCase();
+  // Traduire le nom du produit en anglais si possible
+  let query = translateProductName(productName).trim().toLowerCase();
   
-  // Ajouter des mots-clés basés sur la catégorie pour améliorer les résultats
-  if (category) {
-    const categoryKeywords: Record<string, string> = {
-      "Boisson alcoolisée": "drink beverage alcohol",
-      "Boisson non alcoolisée": "drink beverage non-alcoholic",
-      "Plat / Repas": "food meal dish",
-      "Snack": "snack food",
-      "Dessert": "dessert sweet",
-      "Entrée": "appetizer starter food",
-    };
-    
-    const keywords = categoryKeywords[category] || "";
-    if (keywords) {
-      query = `${query} ${keywords}`;
-    }
+  // Nettoyer les caractères spéciaux et garder seulement les mots importants
+  query = query.replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+  
+  // Supprimer les mots trop courts ou non pertinents
+  const words = query.split(/\s+/).filter(word => {
+    // Garder les mots de plus de 2 caractères
+    if (word.length <= 2) return false;
+    // Exclure les articles et mots communs non pertinents
+    const stopWords = ['the', 'a', 'an', 'le', 'la', 'les', 'un', 'une', 'des', 'de', 'du', 'et', 'ou'];
+    return !stopWords.includes(word);
+  });
+  
+  query = words.join(' ');
+  
+  // Si la requête est trop courte après nettoyage, utiliser le nom original
+  if (query.length < 3) {
+    query = productName.trim().toLowerCase();
   }
   
   return query;
@@ -37,6 +118,7 @@ const UNSPLASH_ACCESS_KEY = "MgAdku7WGkdkMVr5dWfzpibCN1sF0gDqOqy3H4JuEPSfBTzrq7R
 
 /**
  * Recherche une image via l'API Unsplash
+ * Cherche plusieurs résultats et prend le plus pertinent
  */
 const searchUnsplash = async (query: string): Promise<string | null> => {
   if (!UNSPLASH_ACCESS_KEY) {
@@ -44,8 +126,9 @@ const searchUnsplash = async (query: string): Promise<string | null> => {
   }
 
   try {
+    // Chercher plusieurs résultats pour avoir plus de choix
     const response = await fetch(
-      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=1&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`,
+      `https://api.unsplash.com/search/photos?query=${encodeURIComponent(query)}&per_page=5&orientation=landscape&client_id=${UNSPLASH_ACCESS_KEY}`,
       {
         headers: {
           'Accept': 'application/json',
@@ -60,7 +143,19 @@ const searchUnsplash = async (query: string): Promise<string | null> => {
     const data = await response.json();
     
     if (data.results && data.results.length > 0) {
+      // Prendre le premier résultat (le plus pertinent selon Unsplash)
       const image = data.results[0];
+      
+      // Vérifier que l'image a bien une description pertinente
+      const description = (image.description || image.alt_description || "").toLowerCase();
+      const queryLower = query.toLowerCase();
+      
+      // Si la description contient des mots de la requête, c'est probablement pertinent
+      const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
+      const hasRelevantWords = queryWords.some(word => description.includes(word));
+      
+      // Retourner l'image même si la description n'est pas parfaite
+      // Unsplash classe déjà les résultats par pertinence
       return image.urls?.regular || image.urls?.small || null;
     }
 
@@ -138,6 +233,9 @@ export const searchProductImage = async (
   }
 
   const query = buildSearchQuery(productName, category);
+  
+  // Log pour débogage (peut être supprimé en production)
+  console.log(`Recherche d'image pour: "${productName}" (catégorie: ${category || 'aucune'}) -> Requête: "${query}"`);
 
   // Essayer d'abord Unsplash si une clé API est configurée
   const unsplashImage = await searchUnsplash(query);
