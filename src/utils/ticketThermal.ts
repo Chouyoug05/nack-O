@@ -61,8 +61,9 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
   const SEPARATOR = '-'.repeat(MAX_LINE_LENGTH);
   
   const productsRows = data.items.map(item => {
-    const itemTotal = item.price * item.quantity;
-    const priceText = itemTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const itemTotal = Math.round(item.price * item.quantity);
+    // Formatage simple sans séparateurs : 3000 au lieu de 3,000
+    const priceText = itemTotal.toString();
     
     // Tronquer le nom si nécessaire (max 25 caractères)
     let productName = item.name;
@@ -78,7 +79,8 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
     return `${articleCol}${qteCol}${prixCol}`;
   }).join('\n');
 
-  const totalFormatted = data.total.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  // Formatage simple sans séparateurs : 3000 au lieu de 3,000
+  const totalFormatted = Math.round(data.total).toString();
   const totalLine = `TOTAL${' '.repeat(21)}${totalFormatted.padStart(10)}`;
 
   const html = `

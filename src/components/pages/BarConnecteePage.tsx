@@ -20,7 +20,8 @@ import {
   ShoppingCart,
   Package,
   Settings,
-  Palette
+  Palette,
+  X
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -51,7 +52,7 @@ interface BarOrder {
     price: number;
   }>;
   total: number;
-  status: 'pending' | 'confirmed' | 'served';
+  status: 'pending' | 'confirmed' | 'served' | 'cancelled';
   createdAt: number;
   receiptNumber: string;
 }
@@ -209,7 +210,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           newOrders.forEach(async (order) => {
             try {
               await addDoc(notificationsColRef(db, user.uid), {
-                title: "Nouvelle commande Bar Connectée",
+                title: "Nouvelle commande Menu Digital",
                 message: `Commande #${order.orderNumber} - ${order.tableZone} - ${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`,
                 type: "info",
                 createdAt: Date.now(),
@@ -504,6 +505,33 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   };
 
   // Marquer comme servie (avec paiement, diminution stock et intégration ventes)
+  const cancelOrder = async (orderId: string) => {
+    if (!user) return;
+    
+    if (!window.confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+      return;
+    }
+    
+    try {
+      await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
+        status: 'cancelled',
+        cancelledAt: Date.now()
+      }, { merge: true });
+      
+      toast({
+        title: "Commande annulée",
+        description: "La commande a été annulée avec succès.",
+      });
+    } catch (error) {
+      console.error('Erreur annulation commande:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible d'annuler la commande.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const markAsServed = async (orderId: string) => {
     if (!user || !profile) return;
     
@@ -570,7 +598,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         paymentMethod: 'cash',
         createdAt: Date.now(),
         servedAt: Date.now(),
-        source: 'Bar Connectée'
+        source: 'Menu Digital'
       };
 
       const saleRef = doc(collection(db, `profiles/${user.uid}/sales`));
@@ -601,6 +629,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         return <Badge variant="outline" className="text-blue-600 border-blue-600"><CheckCircle className="w-3 h-3 mr-1" />Confirmée</Badge>;
       case 'served':
         return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" />Servie & Payée</Badge>;
+      case 'cancelled':
+        return <Badge variant="outline" className="text-red-600 border-red-600"><X className="w-3 h-3 mr-1" />Annulée</Badge>;
       default:
         return <Badge variant="outline"><AlertCircle className="w-3 h-3 mr-1" />Inconnu</Badge>;
     }
@@ -674,7 +704,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-foreground mb-1">Bar Connectée</h2>
+          <h2 className="text-xl font-bold text-foreground mb-1">Menu Digital</h2>
           <p className="text-sm text-muted-foreground">Gérez les commandes QR de vos clients</p>
         </div>
       </div>
@@ -1028,21 +1058,35 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
                       <div className="flex gap-2">
                         {order.status === 'pending' && (
-                          <Button size="sm" onClick={() => confirmOrder(order.id)}>
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Confirmer
-                          </Button>
+                          <>
+                            <Button size="sm" onClick={() => confirmOrder(order.id)}>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Confirmer
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)}>
+                              <X className="w-4 h-4 mr-2" />
+                              Annuler
+                            </Button>
+                          </>
                         )}
                         {order.status === 'confirmed' && (
-                          <Button size="sm" onClick={() => markAsServed(order.id)}>
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Servir & Payer
+                          <>
+                            <Button size="sm" onClick={() => markAsServed(order.id)}>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Servir & Payer
+                            </Button>
+                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)}>
+                              <X className="w-4 h-4 mr-2" />
+                              Annuler
+                            </Button>
+                          </>
+                        )}
+                        {order.status !== 'cancelled' && (
+                          <Button variant="outline" size="sm" onClick={() => downloadOrderTicket(order)}>
+                            <Download className="w-4 h-4 mr-2" />
+                            Ticket PDF
                           </Button>
                         )}
-                        <Button variant="outline" size="sm" onClick={() => downloadOrderTicket(order)}>
-                          <Download className="w-4 h-4 mr-2" />
-                          Ticket PDF
-                        </Button>
                       </div>
                     </div>
                   ))}

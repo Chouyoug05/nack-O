@@ -159,8 +159,9 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
 
   // ===== LISTE DES PRODUITS =====
   ticketData.items.forEach((item) => {
-    const itemTotal = Number(item.price) * Number(item.quantity);
-    const priceText = itemTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const itemTotal = Math.round(Number(item.price) * Number(item.quantity));
+    // Formatage simple sans séparateurs : 3000 au lieu de 3,000
+    const priceText = itemTotal.toString();
     
     // Tronquer le nom si nécessaire (max 25 caractères)
     let productName = item.name || 'Produit';
@@ -181,7 +182,8 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
 
   // ===== TOTAL =====
   const totalValue = Math.round(ticketData.total);
-  const totalText = totalValue.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  // Formatage simple sans séparateurs : 3000 au lieu de 3,000
+  const totalText = totalValue.toString();
   text('TOTAL', margin, y, 9, true);
   text(totalText, pageWidth - margin, y, 9, true, 'right');
   y += 3;
