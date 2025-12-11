@@ -3,7 +3,6 @@ import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Eye, EyeOff, Building2, MapPin, Map, Navigation, Search } from "lucide-react";
@@ -13,7 +12,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { geocodeAddress, searchAddresses, reverseGeocode } from "@/utils/geocoding";
-import { TermsAndConditions } from "@/components/TermsAndConditions";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -41,7 +39,6 @@ const Register = () => {
   const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -232,7 +229,6 @@ const Register = () => {
       case 4:
         if (!formData.password || formData.password.length < 6) return false;
         if (formData.password !== formData.confirmPassword) return false;
-        if (!acceptedTerms) return false;
         return true;
       default:
         return true;
@@ -240,15 +236,6 @@ const Register = () => {
   };
 
   const handleSubmit = async () => {
-    if (!acceptedTerms) {
-      toast({
-        title: "Conditions d'utilisation",
-        description: "Veuillez accepter les conditions d'utilisation pour continuer",
-        variant: "destructive"
-      });
-      return;
-    }
-
     if (formData.password !== formData.confirmPassword) {
       toast({
         title: "Erreur",
@@ -644,32 +631,6 @@ const Register = () => {
                       />
                       <p className="text-xs text-muted-foreground">Vous pouvez ajouter votre logo plus tard</p>
                     </div>
-
-                    {/* Conditions d'utilisation */}
-                    <div className="space-y-3 pt-4 border-t">
-                      <div className="flex items-start space-x-3">
-                        <Checkbox
-                          id="terms"
-                          checked={acceptedTerms}
-                          onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
-                          className="mt-1"
-                        />
-                        <div className="space-y-1 leading-none">
-                          <Label
-                            htmlFor="terms"
-                            className="text-sm font-normal cursor-pointer"
-                          >
-                            J'accepte les{" "}
-                            <TermsAndConditions />
-                            {" "}de NACK!
-                          </Label>
-                          <p className="text-xs text-muted-foreground">
-                            En acceptant, vous reconnaissez que vos données peuvent être utilisées à des fins d'études de marché 
-                            et d'amélioration des services pour le bien-être de la population gabonaise.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
@@ -710,7 +671,7 @@ const Register = () => {
               ) : (
                 <Button 
                   onClick={handleSubmit}
-                  disabled={isLoading || !validateStep(4) || !acceptedTerms}
+                  disabled={isLoading || !validateStep(4)}
                   className="bg-green-600 hover:bg-green-700 text-white h-14 px-8 text-lg font-bold ml-auto"
                 >
                   {isLoading ? 'Création du compte...' : 'Créer mon compte'}
