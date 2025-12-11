@@ -31,11 +31,14 @@ const buildSearchQuery = (productName: string, category?: string): string => {
 };
 
 /**
- * Recherche une image via l'API Unsplash (si clé API disponible)
+ * Configuration Unsplash - Clé API
+ */
+const UNSPLASH_ACCESS_KEY = "MgAdku7WGkdkMVr5dWfzpibCN1sF0gDqOqy3H4JuEPSfBTzrq7RbcMaz";
+
+/**
+ * Recherche une image via l'API Unsplash
  */
 const searchUnsplash = async (query: string): Promise<string | null> => {
-  const UNSPLASH_ACCESS_KEY = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
-  
   if (!UNSPLASH_ACCESS_KEY) {
     return null;
   }
@@ -69,11 +72,14 @@ const searchUnsplash = async (query: string): Promise<string | null> => {
 };
 
 /**
+ * Configuration Pexels - Clé API (optionnelle)
+ */
+const PEXELS_API_KEY = ""; // Optionnel: ajouter votre clé Pexels ici si vous en avez une
+
+/**
  * Recherche une image via l'API Pexels (alternative gratuite)
  */
 const searchPexels = async (query: string): Promise<string | null> => {
-  const PEXELS_API_KEY = import.meta.env.VITE_PEXELS_API_KEY;
-  
   if (!PEXELS_API_KEY) {
     return null;
   }
