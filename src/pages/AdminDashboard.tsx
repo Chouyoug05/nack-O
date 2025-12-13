@@ -2285,6 +2285,114 @@ const AdminDashboard = () => {
           }} disabled={allRatings.length === 0}>
             <Download size={16} className="mr-2"/> CSV
           </Button>
+          <Button variant="outline" size="sm" onClick={async () => {
+            const { jsPDF } = await import("jspdf");
+            const doc = new jsPDF({ unit: "pt", format: "a4" });
+            let y = 40;
+            const pageWidth = 595;
+            const margin = 40;
+            const tableWidth = pageWidth - (2 * margin);
+            const rowHeight = 20;
+            
+            // En-tête
+            doc.setFontSize(18);
+            doc.setFont(undefined, 'bold');
+            doc.text("Liste des Appréciations", margin, y);
+            y += 30;
+            
+            // Date d'export
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Exporté le ${new Date().toLocaleDateString('fr-FR', { 
+              day: '2-digit', 
+              month: '2-digit', 
+              year: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
+            })}`, margin, y);
+            y += 20;
+            
+            // Ligne de séparation
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 15;
+            
+            // En-têtes du tableau
+            doc.setFontSize(10);
+            doc.setFont(undefined, 'bold');
+            doc.setFillColor(240, 240, 240);
+            doc.rect(margin, y, tableWidth, rowHeight, 'F');
+            doc.setDrawColor(200, 200, 200);
+            doc.rect(margin, y, tableWidth, rowHeight);
+            
+            const colWidths = [150, 60, 80, 150, 155];
+            let x = margin + 5;
+            doc.text("Produit", x, y + 14);
+            x += colWidths[0];
+            doc.text("Note", x, y + 14);
+            x += colWidths[1];
+            doc.text("Nombre d'avis", x, y + 14);
+            x += colWidths[2];
+            doc.text("Établissement", x, y + 14);
+            x += colWidths[3];
+            doc.text("Propriétaire", x, y + 14);
+            
+            y += rowHeight;
+            
+            // Données
+            doc.setFont(undefined, 'normal');
+            let pageNumber = 1;
+            
+            for (let i = 0; i < allRatings.length; i++) {
+              const rating = allRatings[i];
+              
+              // Nouvelle page si nécessaire
+              if (y + rowHeight > 800) {
+                doc.addPage();
+                y = 40;
+                pageNumber++;
+                doc.setFontSize(10);
+                doc.text(`Page ${pageNumber}`, pageWidth - margin - 30, 30);
+              }
+              
+              // Fond alterné
+              if (i % 2 === 0) {
+                doc.setFillColor(250, 250, 250);
+                doc.rect(margin, y, tableWidth, rowHeight, 'F');
+              } else {
+                doc.setFillColor(255, 255, 255);
+                doc.rect(margin, y, tableWidth, rowHeight, 'F');
+              }
+              
+              // Bordures
+              doc.setDrawColor(200, 200, 200);
+              doc.rect(margin, y, tableWidth, rowHeight);
+              
+              // Données
+              x = margin + 5;
+              doc.text((rating.productName || '').substring(0, 30), x, y + 14);
+              x += colWidths[0];
+              doc.text(rating.rating.toFixed(1), x, y + 14);
+              x += colWidths[1];
+              doc.text(rating.ratingCount.toString(), x, y + 14);
+              x += colWidths[2];
+              doc.text((rating.establishmentName || '').substring(0, 30), x, y + 14);
+              x += colWidths[3];
+              doc.text((rating.userName || '').substring(0, 30), x, y + 14);
+              
+              y += rowHeight;
+            }
+            
+            // Pied de page
+            doc.setFontSize(8);
+            doc.text(`Total: ${allRatings.length} appréciation(s)`, margin, y + 10);
+            doc.text(`Page ${pageNumber}`, pageWidth - margin - 30, y + 10);
+            
+            doc.save(`appreciations-${new Date().toISOString().split('T')[0]}.pdf`);
+          }} disabled={allRatings.length === 0}>
+            <FileText size={16} className="mr-2"/> PDF
+          </Button>
           <Button variant="outline" size="sm" onClick={loadAllRatings} disabled={isLoadingRatings}>
             {isLoadingRatings ? "Chargement..." : "Actualiser"}
           </Button>
