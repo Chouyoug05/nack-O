@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"; // us
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef, subscriptionPlansColRef, subscriptionPlanDocRef } from "@/lib/collections";
+import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef, subscriptionPlansColRef, subscriptionPlanDocRef, customersColRef } from "@/lib/collections";
 import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup, deleteDoc, getDoc, setDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import type { PaymentTransaction } from "@/types/payment";
@@ -22,12 +22,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft, Edit, X } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft, Edit, X, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SUBSCRIPTION_PLANS, type SubscriptionFeatures } from "@/utils/subscription";
+import { 
+  exportUsersPdf, 
+  exportUsersCsv, 
+  exportProductsCsv,
+  exportProductsPdf,
+  exportOrdersCsv,
+  exportOrdersPdf,
+  exportEventsCsv,
+  exportEventsPdf,
+  exportPaymentsCsv,
+  exportPaymentsPdf,
+  exportCustomersCsv,
+  exportCustomersPdf
+} from "@/utils/exportAdminData";
 
 interface NotificationForm {
   title: string;
@@ -80,6 +94,26 @@ const AdminDashboard = () => {
   const [isLoadingEvents, setIsLoadingEvents] = useState(false);
   const [allRatings, setAllRatings] = useState<Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }>>([]);
   const [isLoadingRatings, setIsLoadingRatings] = useState(false);
+  const [allCustomers, setAllCustomers] = useState<Array<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    phone?: string;
+    email?: string;
+    customerId?: string;
+    loyaltyType?: string;
+    status?: string;
+    points?: number;
+    totalPointsEarned?: number;
+    totalAmountSpent?: number;
+    totalOrders?: number;
+    lastVisit?: Date;
+    createdAt?: Date;
+    userId: string;
+    userName?: string;
+    establishmentName?: string;
+  }>>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   
   // Cache des données pour éviter qu'elles disparaissent
   const dataCacheRef = useRef<{
@@ -116,7 +150,7 @@ const AdminDashboard = () => {
   
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
-  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications'].includes(viewParam)) 
+  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers'].includes(viewParam)) 
     ? viewParam as typeof activeView 
     : 'menu';
   const [activeView, setActiveView] = useState<"menu" | "users" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications">(initialView);
@@ -143,7 +177,7 @@ const AdminDashboard = () => {
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
     const viewParam = searchParams.get('view');
-    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications'].includes(viewParam)) {
+    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers'].includes(viewParam)) {
       setActiveView(viewParam as typeof activeView);
     }
   }, [searchParams]);
@@ -522,6 +556,74 @@ const AdminDashboard = () => {
       }
     } finally {
       setIsLoadingEvents(false);
+    }
+  }, [allProfiles, toast]);
+
+  const loadAllCustomers = useCallback(async () => {
+    if (allProfiles.length === 0) {
+      setIsLoadingCustomers(false);
+      return;
+    }
+    setIsLoadingCustomers(true);
+    try {
+      const customers: Array<{
+        id: string;
+        firstName: string;
+        lastName: string;
+        phone?: string;
+        email?: string;
+        customerId?: string;
+        loyaltyType?: string;
+        status?: string;
+        points?: number;
+        totalPointsEarned?: number;
+        totalAmountSpent?: number;
+        totalOrders?: number;
+        lastVisit?: Date;
+        createdAt?: Date;
+        userId: string;
+        userName?: string;
+        establishmentName?: string;
+      }> = [];
+      
+      for (const profile of allProfiles) {
+        try {
+          const customersRef = customersColRef(db, profile.uid);
+          const customersSnap = await getDocs(customersRef);
+          
+          customersSnap.forEach(doc => {
+            const data = doc.data();
+            customers.push({
+              id: doc.id,
+              firstName: data.firstName || '',
+              lastName: data.lastName || '',
+              phone: data.phone,
+              email: data.email,
+              customerId: data.customerId,
+              loyaltyType: data.loyaltyType,
+              status: data.status,
+              points: data.points || 0,
+              totalPointsEarned: data.totalPointsEarned || 0,
+              totalAmountSpent: data.totalAmountSpent || 0,
+              totalOrders: data.totalOrders || 0,
+              lastVisit: data.lastVisit ? new Date(data.lastVisit) : undefined,
+              createdAt: data.createdAt ? new Date(data.createdAt) : undefined,
+              userId: profile.uid,
+              userName: profile.ownerName,
+              establishmentName: profile.establishmentName,
+            });
+          });
+        } catch (error) {
+          console.error(`Erreur chargement clients pour ${profile.uid}:`, error);
+        }
+      }
+      
+      setAllCustomers(customers);
+    } catch (error) {
+      console.error('Erreur chargement clients:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les clients", variant: "destructive" });
+    } finally {
+      setIsLoadingCustomers(false);
     }
   }, [allProfiles, toast]);
 
@@ -1610,16 +1712,36 @@ const AdminDashboard = () => {
           <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
           <p className="text-sm text-muted-foreground">Envoyer</p>
         </button>
+        <button
+          onClick={() => navigate('/admin?view=customers')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Users size={48} className="text-teal-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Clients</h2>
+          <p className="text-sm text-muted-foreground">{allCustomers.length} total</p>
+        </button>
       </div>
 
       {/* Paiements récents */}
       {allPayments.length > 0 && (
         <Card className="border-0 shadow-card mt-8">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CreditCard size={20} className="text-blue-600"/> Paiements récents
-            </CardTitle>
-            <CardDescription>Les 5 derniers paiements complétés</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard size={20} className="text-blue-600"/> Paiements récents
+                </CardTitle>
+                <CardDescription>Les 5 derniers paiements complétés</CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={() => exportPaymentsCsv(allPayments)}>
+                  <Download size={16} className="mr-2"/> CSV
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportPaymentsPdf(allPayments)}>
+                  <FileText size={16} className="mr-2"/> PDF
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -1653,9 +1775,17 @@ const AdminDashboard = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Utilisateurs</h1>
           <p className="text-sm text-muted-foreground">Gérer les utilisateurs et leurs abonnements</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportUsersCsv(filtered)}>
+            <Download size={16} className="mr-2"/> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportUsersPdf(filtered)}>
+            <FileText size={16} className="mr-2"/> PDF
+          </Button>
         </div>
       </div>
       
@@ -1811,11 +1941,17 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold">Produits</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des produits de tous les utilisateurs ({allProducts.length} total)</p>
               </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportProductsCsv(allProducts)} disabled={allProducts.length === 0}>
+            <Download size={16} className="mr-2"/> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportProductsPdf(allProducts)} disabled={allProducts.length === 0}>
+            <FileText size={16} className="mr-2"/> PDF
+          </Button>
           <Button variant="outline" size="sm" onClick={loadAllProducts} disabled={isLoadingProducts}>
             {isLoadingProducts ? "Chargement..." : "Actualiser"}
           </Button>
-              </div>
+        </div>
               </div>
           <Card className="border-0 shadow-card">
             <CardContent>
@@ -1900,7 +2036,13 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold">Commandes</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des commandes de tous les utilisateurs ({allOrders.length} total)</p>
         </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportOrdersCsv(allOrders)} disabled={allOrders.length === 0}>
+            <Download size={16} className="mr-2"/> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportOrdersPdf(allOrders)} disabled={allOrders.length === 0}>
+            <FileText size={16} className="mr-2"/> PDF
+          </Button>
           <Button variant="outline" size="sm" onClick={loadAllOrders} disabled={isLoadingOrders}>
             {isLoadingOrders ? "Chargement..." : "Actualiser"}
           </Button>
@@ -2001,11 +2143,17 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold">Événements</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des événements de tous les utilisateurs ({allEvents.length} total)</p>
               </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportEventsCsv(allEvents)} disabled={allEvents.length === 0}>
+            <Download size={16} className="mr-2"/> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportEventsPdf(allEvents)} disabled={allEvents.length === 0}>
+            <FileText size={16} className="mr-2"/> PDF
+          </Button>
           <Button variant="outline" size="sm" onClick={loadAllEvents} disabled={isLoadingEvents}>
             {isLoadingEvents ? "Chargement..." : "Actualiser"}
-                  </Button>
-                </div>
+          </Button>
+        </div>
               </div>
       <Card className="border-0 shadow-card">
         <CardContent>
@@ -2100,11 +2248,47 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold">Appréciations</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des appréciations de tous les utilisateurs ({allRatings.length} produits notés)</p>
               </div>
-        <div className="ml-auto">
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => {
+            // Export des appréciations en CSV (format simple)
+            const rows: string[][] = [
+              ["Produit", "Note", "Nombre d'avis", "Établissement", "Propriétaire", "ID Produit"]
+            ];
+            allRatings.forEach(rating => {
+              rows.push([
+                rating.productName || '',
+                rating.rating.toFixed(1),
+                rating.ratingCount.toString(),
+                rating.establishmentName || '',
+                rating.userName || '',
+                rating.productId
+              ]);
+            });
+            const csvRows = rows.map(row => row.map(cell => {
+              const cellStr = String(cell || '').replace(/"/g, '""');
+              if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+                return `"${cellStr}"`;
+              }
+              return cellStr;
+            }).join(','));
+            const csv = csvRows.join('\n');
+            const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `appreciations-${new Date().toISOString().split('T')[0]}.csv`;
+            a.style.display = "none";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }} disabled={allRatings.length === 0}>
+            <Download size={16} className="mr-2"/> CSV
+          </Button>
           <Button variant="outline" size="sm" onClick={loadAllRatings} disabled={isLoadingRatings}>
             {isLoadingRatings ? "Chargement..." : "Actualiser"}
-              </Button>
-            </div>
+          </Button>
+        </div>
       </div>
       <Card className="border-0 shadow-card">
           <CardContent>
@@ -2164,6 +2348,91 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
               </div>
+  );
+
+  // Vue Clients
+  const renderCustomersView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold">Clients</h1>
+          <p className="text-sm text-muted-foreground">Vue d'ensemble des clients de tous les utilisateurs ({allCustomers.length} total)</p>
+        </div>
+        <div className="ml-auto flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => exportCustomersCsv(allCustomers)} disabled={allCustomers.length === 0}>
+            <Download size={16} className="mr-2"/> CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportCustomersPdf(allCustomers)} disabled={allCustomers.length === 0}>
+            <FileText size={16} className="mr-2"/> PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={loadAllCustomers} disabled={isLoadingCustomers}>
+            {isLoadingCustomers ? "Chargement..." : "Actualiser"}
+          </Button>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardContent>
+          {isLoadingCustomers ? (
+            <div className="text-center py-8 text-muted-foreground">Chargement des clients...</div>
+          ) : allCustomers.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Aucun client trouvé</div>
+          ) : (
+            <div className="border rounded-md overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Prénom</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Téléphone</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>ID Client</TableHead>
+                    <TableHead>Type fidélité</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead>Points</TableHead>
+                    <TableHead>Montant dépensé</TableHead>
+                    <TableHead>Commandes</TableHead>
+                    <TableHead>Établissement</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allCustomers.map((customer) => (
+                    <TableRow key={`${customer.userId}-${customer.id}`}>
+                      <TableCell className="font-medium">{customer.firstName}</TableCell>
+                      <TableCell>{customer.lastName}</TableCell>
+                      <TableCell>{customer.phone || '-'}</TableCell>
+                      <TableCell>{customer.email || '-'}</TableCell>
+                      <TableCell>{customer.customerId || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{customer.loyaltyType || 'N/A'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        {customer.status === 'vip' && <Badge className="bg-yellow-100 text-yellow-700" variant="secondary">VIP</Badge>}
+                        {customer.status === 'fidel' && <Badge className="bg-blue-100 text-blue-700" variant="secondary">Fidèle</Badge>}
+                        {!customer.status && <Badge variant="secondary">Standard</Badge>}
+                      </TableCell>
+                      <TableCell>{customer.points || 0}</TableCell>
+                      <TableCell className="font-semibold">{(customer.totalAmountSpent || 0).toLocaleString()} XAF</TableCell>
+                      <TableCell>{customer.totalOrders || 0}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{customer.establishmentName || customer.userName || 'N/A'}</span>
+                          {customer.userName && customer.establishmentName && (
+                            <span className="text-xs text-muted-foreground">{customer.userName}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 
   // Vue Abonnements
@@ -2343,6 +2612,7 @@ const AdminDashboard = () => {
       {activeView === "orders" && renderOrdersView()}
       {activeView === "events" && renderEventsView()}
       {activeView === "ratings" && renderRatingsView()}
+      {activeView === "customers" && renderCustomersView()}
       {activeView === "subscriptions" && renderSubscriptionsView()}
       {activeView === "notifications" && renderNotificationsView()}
 
