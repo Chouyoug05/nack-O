@@ -136,7 +136,14 @@ const searchUnsplash = async (query: string): Promise<string | null> => {
       }
     );
 
+    // Gérer les erreurs d'authentification
+    if (response.status === 401) {
+      console.warn('Clé API Unsplash invalide ou expirée. Utilisation d\'une alternative.');
+      return null;
+    }
+
     if (!response.ok) {
+      console.warn(`Erreur Unsplash (${response.status}): ${response.statusText}`);
       return null;
     }
 
@@ -146,16 +153,7 @@ const searchUnsplash = async (query: string): Promise<string | null> => {
       // Prendre le premier résultat (le plus pertinent selon Unsplash)
       const image = data.results[0];
       
-      // Vérifier que l'image a bien une description pertinente
-      const description = (image.description || image.alt_description || "").toLowerCase();
-      const queryLower = query.toLowerCase();
-      
-      // Si la description contient des mots de la requête, c'est probablement pertinent
-      const queryWords = queryLower.split(/\s+/).filter(w => w.length > 2);
-      const hasRelevantWords = queryWords.some(word => description.includes(word));
-      
-      // Retourner l'image même si la description n'est pas parfaite
-      // Unsplash classe déjà les résultats par pertinence
+      // Retourner l'image
       return image.urls?.regular || image.urls?.small || null;
     }
 
@@ -208,13 +206,67 @@ const searchPexels = async (query: string): Promise<string | null> => {
 };
 
 /**
+ * Recherche une image via l'API Foodish (gratuite, pour produits alimentaires)
+ */
+const searchFoodish = async (query: string): Promise<string | null> => {
+  try {
+    // Foodish API est gratuite et ne nécessite pas de clé API
+    // Elle retourne des images aléatoires de nourriture
+    const response = await fetch('https://foodish-api.herokuapp.com/images/');
+    
+    if (!response.ok) {
+      return null;
+    }
+
+    const data = await response.json();
+    return data.image || null;
+  } catch (error) {
+    console.error('Erreur Foodish:', error);
+    return null;
+  }
+};
+
+/**
+ * Recherche une image via l'API Pixabay (nécessite une clé API gratuite)
+ * Pour obtenir une clé: https://pixabay.com/api/docs/
+ */
+const searchPixabay = async (query: string): Promise<string | null> => {
+  // Pixabay nécessite une clé API gratuite
+  // Pour l'instant, on retourne null - peut être activé avec une clé API
+  return null;
+  
+  /* Exemple d'utilisation avec une clé API:
+  try {
+    const PIXABAY_API_KEY = ""; // À configurer si disponible
+    if (!PIXABAY_API_KEY) return null;
+    
+    const response = await fetch(
+      `https://pixabay.com/api/?key=${PIXABAY_API_KEY}&q=${encodeURIComponent(query)}&image_type=photo&category=food&per_page=3&safesearch=true`
+    );
+    
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.hits && data.hits.length > 0) {
+      return data.hits[0].webformatURL || data.hits[0].previewURL || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Erreur Pixabay:', error);
+    return null;
+  }
+  */
+};
+
+/**
  * Génère une image placeholder basée sur le nom du produit
  * Utilise un service d'images placeholder avec un seed basé sur le nom
  */
-const generatePlaceholderImage = (productName: string): string => {
+const generatePlaceholderImage = (productName: string, category?: string): string => {
   // Créer un seed basé sur le nom pour avoir une image cohérente
   const seed = productName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  
   // Utiliser Lorem Picsum avec un seed pour avoir une image déterministe
+  // L'image sera toujours la même pour le même nom de produit
   return `https://picsum.photos/seed/${encodeURIComponent(seed)}/400/400`;
 };
 
@@ -249,9 +301,24 @@ export const searchProductImage = async (
     return pexelsImage;
   }
 
+  // Si c'est un produit alimentaire, essayer Foodish (gratuit, sans clé API)
+  const foodCategories = ["Boisson alcoolisée", "Boisson non alcoolisée", "Plat / Repas", "Snack", "Dessert", "Entrée"];
+  if (category && foodCategories.includes(category)) {
+    const foodishImage = await searchFoodish(query);
+    if (foodishImage) {
+      return foodishImage;
+    }
+  }
+
+  // Essayer Pixabay si une clé API est configurée
+  const pixabayImage = await searchPixabay(query);
+  if (pixabayImage) {
+    return pixabayImage;
+  }
+
   // En dernier recours, générer une image placeholder
-  // Note: Cette image sera toujours la même pour le même nom de produit
-  return generatePlaceholderImage(productName);
+  // L'image sera toujours la même pour le même nom de produit
+  return generatePlaceholderImage(productName, category);
 };
 
 
