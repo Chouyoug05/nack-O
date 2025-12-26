@@ -1,17 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData, updateDoc, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Grid3x3, Search } from "lucide-react";
+import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Grid3x3, Search, CreditCard, AlertCircle } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
+import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
+import { paymentsColRef, disbursementRequestsColRef } from "@/lib/collections";
 
 interface Product {
   id: string;
@@ -55,6 +57,9 @@ interface Establishment {
   showCSSMention?: boolean;
   cssPercentage?: number;
   ticketFooterMessage?: string;
+  disbursementId?: string; // Disbursement ID pour recevoir les paiements
+  disbursementStatus?: 'pending' | 'approved' | 'rejected'; // Statut du Disbursement ID
+  airtelMoneyNumber?: string; // Numéro Airtel Money
 }
 
 const PublicOrderingPage = () => {
@@ -77,6 +82,10 @@ const PublicOrderingPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [menuTheme, setMenuTheme] = useState<MenuThemeConfig>(defaultMenuTheme);
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showAirtelNumberDialog, setShowAirtelNumberDialog] = useState(false);
+  const [airtelNumberInput, setAirtelNumberInput] = useState("");
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // useRef
   const isMountedRef = useRef<boolean>(true);
@@ -165,6 +174,9 @@ const PublicOrderingPage = () => {
             showCSSMention: profileData.showCSSMention,
             cssPercentage: profileData.cssPercentage,
             ticketFooterMessage: profileData.ticketFooterMessage,
+            disbursementId: profileData.disbursementId,
+            disbursementStatus: profileData.disbursementStatus,
+            airtelMoneyNumber: profileData.airtelMoneyNumber,
           });
         }
       })
@@ -334,10 +346,56 @@ const PublicOrderingPage = () => {
     });
   }, [products, searchTerm, activeCategoryTab]);
 
-  const placeOrder = async () => {
+  const requestAirtelNumber = async () => {
+    if (!establishmentId || !airtelNumberInput.trim()) {
+      alert('Veuillez entrer un numéro Airtel Money valide.');
+      return;
+    }
+
+    try {
+      // Créer une demande de Disbursement ID
+      await addDoc(disbursementRequestsColRef(db), {
+        userId: establishmentId,
+        establishmentName: establishment?.establishmentName || '',
+        ownerName: establishment?.companyName || '',
+        email: '', // Sera rempli par l'admin
+        airtelMoneyNumber: airtelNumberInput.trim(),
+        status: 'pending',
+        requestedAt: Date.now(),
+      });
+
+      // Mettre à jour le profil avec le numéro Airtel Money
+      await updateDoc(doc(db, 'profiles', establishmentId), {
+        airtelMoneyNumber: airtelNumberInput.trim(),
+        disbursementStatus: 'pending',
+        updatedAt: Date.now(),
+      });
+
+      setShowAirtelNumberDialog(false);
+      setAirtelNumberInput("");
+      alert('Votre demande a été envoyée à l\'administration. Vous recevrez un message une fois votre Disbursement ID configuré.');
+    } catch (error) {
+      console.error('Erreur demande numéro Airtel:', error);
+      alert('Erreur lors de l\'envoi de la demande. Veuillez réessayer.');
+    }
+  };
+
+  const placeOrder = async (withPayment: boolean = false) => {
     if (!establishmentId || cart.length === 0 || !selectedTable) {
       alert('Veuillez sélectionner une table avant de commander.');
       return;
+    }
+
+    // Si paiement demandé mais pas de Disbursement ID configuré
+    if (withPayment && (!establishment?.disbursementId || establishment.disbursementStatus !== 'approved')) {
+      if (!establishment?.airtelMoneyNumber) {
+        // Demander le numéro Airtel Money
+        setShowAirtelNumberDialog(true);
+        return;
+      } else {
+        alert('Votre Disbursement ID est en attente de validation par l\'administration. Vous pouvez commander sans paiement pour l\'instant.');
+        return;
+      }
     }
 
     try {
@@ -358,8 +416,70 @@ const PublicOrderingPage = () => {
         }
       };
 
-      await addDoc(collection(db, `profiles/${establishmentId}/barOrders`), orderData);
+      const orderDocRef = await addDoc(collection(db, `profiles/${establishmentId}/barOrders`), orderData);
 
+      // Si paiement demandé et Disbursement ID configuré
+      if (withPayment && establishment?.disbursementId && establishment.disbursementStatus === 'approved') {
+        setIsProcessingPayment(true);
+        try {
+          const transactionId = `TXN-MENU-${establishmentId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          const base = (import.meta.env.VITE_PUBLIC_BASE_URL as string || window.location.origin).replace(/\/+$/, '');
+          const reference = `menu-digital-${orderNumberValue}`;
+          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&orderId=${orderDocRef.id}`;
+          const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
+          const logoURL = `${base}/favicon.png`;
+
+          // Enregistrer la transaction de paiement
+          await addDoc(paymentsColRef(db, establishmentId), {
+            userId: establishmentId,
+            transactionId,
+            subscriptionType: 'menu-digital',
+            amount: total,
+            status: 'pending',
+            paymentMethod: 'airtel-money',
+            reference,
+            paymentLink: '',
+            redirectSuccess,
+            redirectError,
+            orderId: orderDocRef.id,
+            establishmentId,
+            disbursementId: establishment.disbursementId,
+            createdAt: Date.now(),
+          });
+
+          // Créer le lien de paiement
+          const paymentLink = await createMenuDigitalPaymentLink({
+            amount: total,
+            reference,
+            redirectSuccess,
+            redirectError,
+            logoURL,
+            disbursementId: establishment.disbursementId,
+          });
+
+          // Mettre à jour la transaction avec le lien
+          const paymentsRef = paymentsColRef(db, establishmentId);
+          const paymentsQuery = query(paymentsRef, orderBy('createdAt', 'desc'));
+          const paymentsSnapshot = await getDocs(paymentsQuery);
+          if (!paymentsSnapshot.empty) {
+            const latestPayment = paymentsSnapshot.docs[0];
+            await updateDoc(doc(db, `profiles/${establishmentId}/payments`, latestPayment.id), {
+              paymentLink,
+            });
+          }
+
+          // Rediriger vers le paiement
+          window.location.href = paymentLink;
+          return;
+        } catch (error) {
+          console.error('Erreur création paiement:', error);
+          alert('Erreur lors de la création du lien de paiement. La commande a été enregistrée mais le paiement n\'a pas pu être initié.');
+        } finally {
+          setIsProcessingPayment(false);
+        }
+      }
+
+      // Si pas de paiement ou paiement échoué, continuer normalement
       const receiptData = {
         orderNumber: orderNumberValue,
         receiptNumber,
@@ -713,19 +833,43 @@ const PublicOrderingPage = () => {
                 {total.toLocaleString('fr-FR')} XAF
               </p>
             </div>
-            <Button
-              onClick={() => {
-                if (!selectedTable) {
-                  setShowTableDialog(true);
-                } else {
-                  placeOrder();
-                }
-              }}
-              className="px-8 text-white"
-              style={{ backgroundColor: menuTheme.primaryColor }}
-            >
-              Commander
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  if (!selectedTable) {
+                    setShowTableDialog(true);
+                  } else {
+                    placeOrder(false);
+                  }
+                }}
+                variant="outline"
+                className="px-6"
+                style={{ borderColor: menuTheme.primaryColor, color: menuTheme.primaryColor }}
+              >
+                Commander
+              </Button>
+              {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
+                <Button
+                  onClick={() => {
+                    if (!selectedTable) {
+                      setShowTableDialog(true);
+                    } else {
+                      placeOrder(true);
+                    }
+                  }}
+                  disabled={isProcessingPayment}
+                  className="px-6 text-white"
+                  style={{ backgroundColor: menuTheme.primaryColor }}
+                >
+                  {isProcessingPayment ? 'Traitement...' : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Payer {total.toLocaleString('fr-FR')} XAF
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         </footer>
       )}
@@ -816,19 +960,42 @@ const PublicOrderingPage = () => {
               >
                 Annuler
               </Button>
-              <Button
-                onClick={() => {
-                  if (selectedTable) {
-                    setShowTableDialog(false);
-                    placeOrder();
-                  }
-                }}
-                disabled={!selectedTable}
-                className="flex-1 text-white"
-                style={{ backgroundColor: menuTheme.primaryColor }}
-              >
-                Confirmer
-              </Button>
+              <div className="flex gap-2 w-full">
+                <Button
+                  onClick={() => {
+                    if (selectedTable) {
+                      setShowTableDialog(false);
+                      placeOrder(false);
+                    }
+                  }}
+                  disabled={!selectedTable}
+                  variant="outline"
+                  className="flex-1"
+                  style={{ borderColor: menuTheme.primaryColor, color: menuTheme.primaryColor }}
+                >
+                  Commander
+                </Button>
+                {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
+                  <Button
+                    onClick={() => {
+                      if (selectedTable) {
+                        setShowTableDialog(false);
+                        placeOrder(true);
+                      }
+                    }}
+                    disabled={!selectedTable || isProcessingPayment}
+                    className="flex-1 text-white"
+                    style={{ backgroundColor: menuTheme.primaryColor }}
+                  >
+                    {isProcessingPayment ? '...' : (
+                      <>
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Payer
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </DialogContent>
@@ -880,6 +1047,55 @@ const PublicOrderingPage = () => {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogue pour demander le numéro Airtel Money */}
+      <Dialog open={showAirtelNumberDialog} onOpenChange={setShowAirtelNumberDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Recevoir les paiements sur Airtel Money</DialogTitle>
+            <DialogDescription>
+              Pour recevoir les paiements des commandes directement sur votre compte Airtel Money, 
+              veuillez entrer votre numéro Airtel Money. Votre demande sera envoyée à l'administration 
+              pour configuration du Disbursement ID.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="airtelNumber">Numéro Airtel Money</Label>
+              <Input
+                id="airtelNumber"
+                type="tel"
+                placeholder="Ex: 0612345678"
+                value={airtelNumberInput}
+                onChange={(e) => setAirtelNumberInput(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Format: 10 chiffres (ex: 0612345678)
+              </p>
+            </div>
+            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
+                <p className="text-sm text-yellow-800">
+                  Une fois votre demande approuvée par l'administration, vous recevrez un message de confirmation 
+                  et pourrez commencer à recevoir les paiements automatiquement.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowAirtelNumberDialog(false);
+              setAirtelNumberInput("");
+            }}>
+              Annuler
+            </Button>
+            <Button onClick={requestAirtelNumber} disabled={!airtelNumberInput.trim()}>
+              Envoyer la demande
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

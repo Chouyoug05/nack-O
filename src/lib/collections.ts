@@ -56,4 +56,7 @@ export const orderCancellationsColRef = (db: Firestore, uid: string): Collection
   collection(db, "profiles", uid, "orderCancellations") as CollectionReference;
 
 export const barOrdersColRef = (db: Firestore, uid: string): CollectionReference =>
-  collection(db, "profiles", uid, "barOrders") as CollectionReference; 
+  collection(db, "profiles", uid, "barOrders") as CollectionReference;
+
+export const disbursementRequestsColRef = (db: Firestore): CollectionReference =>
+  collection(db, "disbursementRequests") as CollectionReference; 

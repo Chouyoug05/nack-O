@@ -5,6 +5,7 @@ export interface CreatePaymentLinkParams {
   redirectError: string;
   logoURL: string;
   isTransfer?: boolean;
+  disbursement?: string; // Disbursement ID pour recevoir l'argent
 }
 
 interface CreatePaymentLinkResponse {
@@ -21,7 +22,7 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     redirect_success: params.redirectSuccess,
     redirect_error: params.redirectError,
     amount: params.amount,
-    disbursement: undefined as unknown as string, // set later if needed
+    disbursement: params.disbursement || undefined as unknown as string, // set later if needed
     logoURL: params.logoURL,
     isTransfer: params.isTransfer ?? false,
   } as Record<string, unknown>;
@@ -40,7 +41,7 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
         redirect_success: params.redirectSuccess,
         redirect_error: params.redirectError,
         amount: params.amount,
-        disbursement: undefined,
+        disbursement: params.disbursement || undefined,
         logoURL: params.logoURL,
         isTransfer: params.isTransfer ?? false,
       }),
@@ -69,7 +70,7 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
       redirect_success: params.redirectSuccess,
       redirect_error: params.redirectError,
       amount: params.amount,
-      disbursement: SINGPAY_DISBURSEMENT,
+      disbursement: params.disbursement || SINGPAY_DISBURSEMENT,
       logoURL: params.logoURL,
       isTransfer: params.isTransfer ?? false,
     };

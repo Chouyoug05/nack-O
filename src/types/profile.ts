@@ -42,6 +42,10 @@ export interface UserProfile {
   showCSSMention?: boolean; // Afficher "C.S.S. X%"
   cssPercentage?: number; // Pourcentage CSS (par défaut 1)
   ticketFooterMessage?: string; // Message personnalisé en bas du ticket
+  // Paiement Menu Digital
+  airtelMoneyNumber?: string; // Numéro Airtel Money pour recevoir les paiements
+  disbursementId?: string; // Disbursement ID SingPay (configuré par l'admin)
+  disbursementStatus?: 'pending' | 'approved' | 'rejected'; // Statut du Disbursement ID
   createdAt: number;
   updatedAt: number;
 } 

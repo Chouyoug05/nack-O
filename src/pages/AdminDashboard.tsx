@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"; // us
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef, subscriptionPlansColRef, subscriptionPlanDocRef, customersColRef } from "@/lib/collections";
+import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef, subscriptionPlansColRef, subscriptionPlanDocRef, customersColRef, disbursementRequestsColRef } from "@/lib/collections";
 import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup, deleteDoc, getDoc, setDoc } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import type { PaymentTransaction } from "@/types/payment";
@@ -42,6 +42,8 @@ import {
   exportCustomersCsv,
   exportCustomersPdf
 } from "@/utils/exportAdminData";
+import type { DisbursementRequest } from "@/types/payment";
+import { disbursementRequestsColRef } from "@/lib/collections";
 
 interface NotificationForm {
   title: string;
@@ -114,6 +116,9 @@ const AdminDashboard = () => {
     establishmentName?: string;
   }>>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [disbursementRequests, setDisbursementRequests] = useState<Array<DisbursementRequest & { userEmail?: string }>>([]);
+  const [isLoadingDisbursements, setIsLoadingDisbursements] = useState(false);
+  const [editingDisbursement, setEditingDisbursement] = useState<{ id: string; disbursementId: string } | null>(null);
   
   // Cache des données pour éviter qu'elles disparaissent
   const dataCacheRef = useRef<{
@@ -150,10 +155,10 @@ const AdminDashboard = () => {
   
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
-  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers'].includes(viewParam)) 
+  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements'].includes(viewParam)) 
     ? viewParam as typeof activeView 
     : 'menu';
-  const [activeView, setActiveView] = useState<"menu" | "users" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications">(initialView);
+  const [activeView, setActiveView] = useState<"menu" | "users" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "disbursements">(initialView);
   const [isSendingNotifications, setIsSendingNotifications] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState<{
     transition: { name: string; price: number; features: SubscriptionFeatures };
@@ -177,7 +182,7 @@ const AdminDashboard = () => {
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
     const viewParam = searchParams.get('view');
-    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers'].includes(viewParam)) {
+    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements'].includes(viewParam)) {
       setActiveView(viewParam as typeof activeView);
     }
   }, [searchParams]);
@@ -627,6 +632,112 @@ const AdminDashboard = () => {
     }
   }, [allProfiles, toast]);
 
+  // Charger les demandes de Disbursement ID
+  const loadDisbursementRequests = useCallback(async () => {
+    setIsLoadingDisbursements(true);
+    try {
+      const requestsSnapshot = await getDocs(query(disbursementRequestsColRef(db), orderBy('requestedAt', 'desc')));
+      const requests: Array<DisbursementRequest & { userEmail?: string }> = [];
+      
+      for (const docSnap of requestsSnapshot.docs) {
+        const data = docSnap.data() as DisbursementRequest;
+        const profile = allProfiles.find(p => p.uid === data.userId);
+        requests.push({
+          ...data,
+          id: docSnap.id,
+          userEmail: profile?.email,
+        });
+      }
+      
+      setDisbursementRequests(requests);
+    } catch (error) {
+      console.error('Erreur chargement demandes Disbursement:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les demandes", variant: "destructive" });
+    } finally {
+      setIsLoadingDisbursements(false);
+    }
+  }, [allProfiles, toast]);
+
+  // Charger les demandes au montage et quand les profils changent
+  useEffect(() => {
+    if (isAdmin && allProfiles.length > 0) {
+      loadDisbursementRequests();
+    }
+  }, [isAdmin, allProfiles.length, loadDisbursementRequests]);
+
+  // Approuver une demande de Disbursement ID
+  const approveDisbursement = async (requestId: string, userId: string, disbursementId: string, notes?: string) => {
+    try {
+      // Mettre à jour la demande
+      await updateDoc(doc(db, 'disbursementRequests', requestId), {
+        status: 'approved',
+        disbursementId,
+        approvedAt: Date.now(),
+        approvedBy: 'admin',
+        notes: notes || '',
+      });
+
+      // Mettre à jour le profil utilisateur
+      await updateDoc(doc(db, 'profiles', userId), {
+        disbursementId,
+        disbursementStatus: 'approved',
+        updatedAt: Date.now(),
+      });
+
+      // Envoyer une notification à l'utilisateur
+      const profile = allProfiles.find(p => p.uid === userId);
+      if (profile) {
+        await addDoc(notificationsColRef(db, userId), {
+          title: 'Disbursement ID approuvé',
+          message: `Votre Disbursement ID a été configuré avec succès. Vous pouvez maintenant recevoir les paiements des commandes Menu Digital directement sur votre compte Airtel Money ${profile.airtelMoneyNumber || ''}.`,
+          type: 'success',
+          read: false,
+          createdAt: Date.now(),
+        });
+      }
+
+      toast({ title: "Disbursement ID approuvé", description: "L'utilisateur a été notifié" });
+      loadDisbursementRequests();
+    } catch (error) {
+      console.error('Erreur approbation Disbursement:', error);
+      toast({ title: "Erreur", description: "Impossible d'approuver la demande", variant: "destructive" });
+    }
+  };
+
+  // Rejeter une demande de Disbursement ID
+  const rejectDisbursement = async (requestId: string, userId: string, reason: string) => {
+    try {
+      // Mettre à jour la demande
+      await updateDoc(doc(db, 'disbursementRequests', requestId), {
+        status: 'rejected',
+        rejectionReason: reason,
+        approvedAt: Date.now(),
+        approvedBy: 'admin',
+      });
+
+      // Mettre à jour le profil utilisateur
+      await updateDoc(doc(db, 'profiles', userId), {
+        disbursementStatus: 'rejected',
+        updatedAt: Date.now(),
+      });
+
+      // Envoyer une notification à l'utilisateur
+      await addDoc(notificationsColRef(db, userId), {
+        title: 'Demande Disbursement ID rejetée',
+        message: `Votre demande de Disbursement ID a été rejetée. Raison: ${reason}`,
+        type: 'error',
+        read: false,
+        createdAt: Date.now(),
+      });
+
+      toast({ title: "Demande rejetée", description: "L'utilisateur a été notifié" });
+      loadDisbursementRequests();
+    } catch (error) {
+      console.error('Erreur rejet Disbursement:', error);
+      toast({ title: "Erreur", description: "Impossible de rejeter la demande", variant: "destructive" });
+    }
+  };
+
   const loadAllRatings = useCallback(async () => {
     if (allProfiles.length === 0) {
       // Si pas de profils, restaurer depuis le cache si disponible
@@ -836,28 +947,28 @@ const AdminDashboard = () => {
       loadAllPayments();
       loadedViewsRef.current.add('menu');
     } else {
-      switch (activeView) {
-        case 'products':
-          loadAllProducts();
+    switch (activeView) {
+      case 'products':
+        loadAllProducts();
           loadedViewsRef.current.add('products');
-          break;
-        case 'orders':
-          loadAllOrders();
+        break;
+      case 'orders':
+        loadAllOrders();
           loadedViewsRef.current.add('orders');
-          break;
-        case 'events':
-          loadAllEvents();
+        break;
+      case 'events':
+        loadAllEvents();
           loadedViewsRef.current.add('events');
-          break;
-        case 'ratings':
-          loadAllRatings();
+        break;
+      case 'ratings':
+        loadAllRatings();
           loadedViewsRef.current.add('ratings');
-          break;
-        case 'users':
-          // Les utilisateurs sont déjà chargés via onSnapshot
+        break;
+      case 'users':
+        // Les utilisateurs sont déjà chargés via onSnapshot
           loadedViewsRef.current.add('users');
-          break;
-      }
+        break;
+    }
     }
     
     prevProfilesLengthRef.current = allProfiles.length;
@@ -1720,17 +1831,27 @@ const AdminDashboard = () => {
           <h2 className="text-lg font-semibold text-gray-900">Clients</h2>
           <p className="text-sm text-muted-foreground">{allCustomers.length} total</p>
         </button>
+        <button
+          onClick={() => navigate('/admin?view=disbursements')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <CreditCard size={48} className="text-blue-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Disbursement ID</h2>
+          <p className="text-sm text-muted-foreground">
+            {disbursementRequests.filter(r => r.status === 'pending').length} en attente
+          </p>
+        </button>
       </div>
 
       {/* Paiements récents */}
       {allPayments.length > 0 && (
-        <Card className="border-0 shadow-card mt-8">
-          <CardHeader>
+      <Card className="border-0 shadow-card mt-8">
+        <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2">
                   <CreditCard size={20} className="text-blue-600"/> Paiements récents
-                </CardTitle>
+          </CardTitle>
                 <CardDescription>Les 5 derniers paiements complétés</CardDescription>
               </div>
               <div className="flex gap-2">
@@ -1742,8 +1863,8 @@ const AdminDashboard = () => {
                 </Button>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
+        </CardHeader>
+        <CardContent>
             <div className="space-y-2">
               {allPayments.slice(0, 5).map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
@@ -1761,9 +1882,9 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               ))}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
       )}
     </div>
   );
@@ -1951,7 +2072,7 @@ const AdminDashboard = () => {
           <Button variant="outline" size="sm" onClick={loadAllProducts} disabled={isLoadingProducts}>
             {isLoadingProducts ? "Chargement..." : "Actualiser"}
           </Button>
-        </div>
+              </div>
               </div>
           <Card className="border-0 shadow-card">
             <CardContent>
@@ -2152,8 +2273,8 @@ const AdminDashboard = () => {
           </Button>
           <Button variant="outline" size="sm" onClick={loadAllEvents} disabled={isLoadingEvents}>
             {isLoadingEvents ? "Chargement..." : "Actualiser"}
-          </Button>
-        </div>
+                  </Button>
+                </div>
               </div>
       <Card className="border-0 shadow-card">
         <CardContent>
@@ -2395,8 +2516,8 @@ const AdminDashboard = () => {
           </Button>
           <Button variant="outline" size="sm" onClick={loadAllRatings} disabled={isLoadingRatings}>
             {isLoadingRatings ? "Chargement..." : "Actualiser"}
-          </Button>
-        </div>
+              </Button>
+            </div>
       </div>
       <Card className="border-0 shadow-card">
           <CardContent>
@@ -2531,17 +2652,127 @@ const AdminDashboard = () => {
                             <span className="text-xs text-muted-foreground">{customer.userName}</span>
                           )}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
         </CardContent>
       </Card>
-    </div>
+              </div>
   );
+
+  // Vue Disbursement ID
+  const renderDisbursementsView = () => {
+    const pendingRequests = disbursementRequests.filter(r => r.status === 'pending');
+    return (
+      <div className="p-4 md:p-6 lg:p-8">
+        <div className="flex items-center gap-4 mb-6">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+            <ArrowLeft size={16} className="mr-2"/> Retour
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Disbursement ID</h1>
+            <p className="text-sm text-muted-foreground">
+              Gérer les demandes de Disbursement ID pour recevoir les paiements Menu Digital
+              {pendingRequests.length > 0 && (
+                <Badge className="ml-2 bg-amber-500">{pendingRequests.length} en attente</Badge>
+              )}
+            </p>
+          </div>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="sm" onClick={loadDisbursementRequests} disabled={isLoadingDisbursements}>
+              {isLoadingDisbursements ? "Chargement..." : "Actualiser"}
+            </Button>
+          </div>
+        </div>
+        <Card className="border-0 shadow-card">
+          <CardContent>
+            {isLoadingDisbursements ? (
+              <div className="text-center py-8 text-muted-foreground">Chargement des demandes...</div>
+            ) : disbursementRequests.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">Aucune demande trouvée</div>
+            ) : (
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Établissement</TableHead>
+                      <TableHead>Propriétaire</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Numéro Airtel Money</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Disbursement ID</TableHead>
+                      <TableHead>Date demande</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {disbursementRequests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell className="font-medium">{request.establishmentName}</TableCell>
+                        <TableCell>{request.ownerName}</TableCell>
+                        <TableCell>{request.userEmail || '-'}</TableCell>
+                        <TableCell className="font-mono text-sm">{request.airtelMoneyNumber}</TableCell>
+                        <TableCell>
+                          {request.status === 'pending' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">En attente</Badge>}
+                          {request.status === 'approved' && <Badge className="bg-green-100 text-green-700" variant="secondary">Approuvé</Badge>}
+                          {request.status === 'rejected' && <Badge className="bg-red-100 text-red-700" variant="secondary">Rejeté</Badge>}
+                        </TableCell>
+                        <TableCell>
+                          {request.disbursementId ? (
+                            <code className="text-xs bg-muted px-2 py-1 rounded">{request.disbursementId}</code>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>{new Date(request.requestedAt).toLocaleString('fr-FR')}</TableCell>
+                        <TableCell className="text-right">
+                          {request.status === 'pending' && (
+                            <div className="flex gap-2 justify-end">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingDisbursement({ id: request.id, disbursementId: '' })}
+                              >
+                                <Edit size={14} className="mr-2"/> Configurer
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => {
+                                  const reason = prompt('Raison du rejet:');
+                                  if (reason) {
+                                    rejectDisbursement(request.id, request.userId, reason);
+                                  }
+                                }}
+                              >
+                                <X size={14} className="mr-2"/> Rejeter
+                              </Button>
+                            </div>
+                          )}
+                          {request.status === 'approved' && (
+                            <Badge variant="outline" className="text-green-600">✓ Configuré</Badge>
+                          )}
+                          {request.status === 'rejected' && request.rejectionReason && (
+                            <div className="text-xs text-muted-foreground text-right max-w-[200px]">
+                              {request.rejectionReason}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
 
   // Vue Abonnements
   const renderSubscriptionsView = () => (
@@ -2721,6 +2952,7 @@ const AdminDashboard = () => {
       {activeView === "events" && renderEventsView()}
       {activeView === "ratings" && renderRatingsView()}
       {activeView === "customers" && renderCustomersView()}
+      {activeView === "disbursements" && renderDisbursementsView()}
       {activeView === "subscriptions" && renderSubscriptionsView()}
       {activeView === "notifications" && renderNotificationsView()}
 
@@ -2983,6 +3215,62 @@ const AdminDashboard = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialog de configuration Disbursement ID */}
+      <Dialog open={!!editingDisbursement} onOpenChange={(open) => !open && setEditingDisbursement(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configurer le Disbursement ID</DialogTitle>
+            <DialogDescription>
+              Entrez le Disbursement ID SingPay pour cet établissement. L'utilisateur recevra une notification de confirmation.
+            </DialogDescription>
+          </DialogHeader>
+          {editingDisbursement && (() => {
+            const request = disbursementRequests.find(r => r.id === editingDisbursement.id);
+            return (
+              <div className="space-y-4 py-4">
+                <div className="bg-muted p-3 rounded-lg">
+                  <p className="text-sm font-medium mb-1">Établissement</p>
+                  <p className="text-sm">{request?.establishmentName}</p>
+                  <p className="text-sm font-medium mt-2 mb-1">Numéro Airtel Money</p>
+                  <p className="text-sm">{request?.airtelMoneyNumber}</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="disbursementId">Disbursement ID</Label>
+                  <Input
+                    id="disbursementId"
+                    placeholder="Entrez le Disbursement ID"
+                    value={editingDisbursement.disbursementId}
+                    onChange={(e) => setEditingDisbursement({ ...editingDisbursement, disbursementId: e.target.value })}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Le Disbursement ID permet de recevoir automatiquement les paiements sur le compte Airtel Money.
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingDisbursement(null)}>
+              Annuler
+            </Button>
+            <Button
+              onClick={() => {
+                if (editingDisbursement && editingDisbursement.disbursementId.trim()) {
+                  const request = disbursementRequests.find(r => r.id === editingDisbursement.id);
+                  if (request) {
+                    approveDisbursement(request.id, request.userId, editingDisbursement.disbursementId.trim());
+                    setEditingDisbursement(null);
+                  }
+                }
+              }}
+              disabled={!editingDisbursement?.disbursementId.trim()}
+            >
+              Approuver et configurer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

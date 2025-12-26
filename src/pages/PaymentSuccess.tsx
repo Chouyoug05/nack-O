@@ -24,6 +24,7 @@ const PaymentSuccess = () => {
         const reference = searchParams.get('reference') || '';
         const transactionId = searchParams.get('transactionId') || '';
         const paymentType = searchParams.get('type') || 'subscription';
+        const orderId = searchParams.get('orderId') || '';
         
         // Vérification de sécurité: s'assurer qu'on a au moins une référence ou un transactionId
         if (!reference && !transactionId) {
@@ -132,11 +133,15 @@ const PaymentSuccess = () => {
           }
         }
         
-        // Détecter le type d'abonnement depuis la référence ou l'URL
-        let subscriptionType: 'transition' | 'transition-pro-max' = 'transition';
+        // Détecter le type de paiement depuis la référence ou l'URL
+        let subscriptionType: 'transition' | 'transition-pro-max' | 'menu-digital' = 'transition';
         let amount = 2500;
+        let isMenuDigitalPayment = false;
         
-        if (reference.includes('transition-pro-max') || reference.includes('pro-max')) {
+        if (reference.includes('menu-digital')) {
+          subscriptionType = 'menu-digital';
+          isMenuDigitalPayment = true;
+        } else if (reference.includes('transition-pro-max') || reference.includes('pro-max')) {
           subscriptionType = 'transition-pro-max';
           amount = SUBSCRIPTION_PLANS['transition-pro-max'].price;
         } else {
@@ -157,9 +162,22 @@ const PaymentSuccess = () => {
               const paymentDoc = paymentsSnapshot.docs[0];
               paymentTransaction = { id: paymentDoc.id, ...paymentDoc.data() } as PaymentTransaction;
               
+              // Si c'est un paiement Menu Digital, récupérer le montant depuis la transaction
+              if (paymentTransaction.subscriptionType === 'menu-digital') {
+                isMenuDigitalPayment = true;
+                amount = paymentTransaction.amount;
+              }
+              
               // VÉRIFICATION IMPORTANTE: Si la transaction est déjà complétée, ne pas la traiter à nouveau
               if (paymentTransaction.status === 'completed') {
                 console.warn(`PaymentSuccess: Transaction ${transactionId} déjà complétée. Ignorant le traitement dupliqué.`);
+                
+                // Pour les paiements Menu Digital, rediriger vers la page de commande
+                if (isMenuDigitalPayment && orderId) {
+                  setTimeout(() => navigate(`/menu/${paymentTransaction.establishmentId || user.uid}`, { replace: true }), 2000);
+                  return;
+                }
+                
                 // Vérifier si un reçu existe déjà
                 const receiptsRef = receiptsColRef(db, user.uid);
                 const receiptQuery = query(receiptsRef, where('transactionId', '==', transactionId));
@@ -210,6 +228,45 @@ const PaymentSuccess = () => {
           }
         }
         
+        // Gérer les paiements Menu Digital différemment
+        if (isMenuDigitalPayment && paymentTransaction) {
+          // Mettre à jour la transaction de paiement
+          await updateDoc(doc(paymentsRef, paymentTransaction.id), {
+            status: 'completed',
+            paidAt: now,
+            updatedAt: now,
+          });
+
+          // Mettre à jour le statut de la commande si orderId est fourni
+          if (orderId && paymentTransaction.establishmentId) {
+            try {
+              const { barOrdersColRef } = await import('@/lib/collections');
+              const orderRef = doc(db, `profiles/${paymentTransaction.establishmentId}/barOrders`, orderId);
+              await updateDoc(orderRef, {
+                status: 'paid',
+                paidAt: now,
+                paymentMethod: 'airtel-money',
+                paymentTransactionId: transactionId,
+              });
+            } catch (error) {
+              console.error('Erreur mise à jour commande:', error);
+            }
+          }
+
+          // Rediriger vers la page de commande avec un message de succès
+          setTimeout(() => {
+            if (paymentTransaction.establishmentId) {
+              navigate(`/menu/${paymentTransaction.establishmentId}`, { 
+                replace: true,
+                state: { paymentSuccess: true }
+              });
+            } else {
+              navigate('/dashboard', { replace: true });
+            }
+          }, 2000);
+          return;
+        }
+        
         // Calculer la nouvelle date de fin d'abonnement
         // CORRECTION IMPORTANTE: Chaque paiement donne TOUJOURS exactement 30 jours à partir de maintenant
         // Ne JAMAIS accumuler les jours - même si l'abonnement actuel a encore des jours restants
@@ -237,7 +294,7 @@ const PaymentSuccess = () => {
           eventsResetAt?: number;
         } = {
           plan: 'active',
-          subscriptionType,
+          subscriptionType: subscriptionType as 'transition' | 'transition-pro-max',
           subscriptionEndsAt: newSubscriptionEndsAt,
           lastPaymentAt: now,
           updatedAt: now,

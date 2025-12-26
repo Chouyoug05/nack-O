@@ -2,7 +2,7 @@ export interface PaymentTransaction {
   id: string;
   userId: string;
   transactionId: string; // ID unique de la transaction
-  subscriptionType: 'transition' | 'transition-pro-max';
+  subscriptionType: 'transition' | 'transition-pro-max' | 'menu-digital';
   amount: number; // Montant en XAF
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   paymentMethod: 'airtel-money' | 'moov-money' | 'other';
@@ -14,5 +14,25 @@ export interface PaymentTransaction {
   paidAt?: number; // Timestamp de paiement confirmé
   subscriptionEndsAt?: number; // Date de fin d'abonnement après paiement
   notes?: string; // Notes supplémentaires
+  // Pour les paiements Menu Digital
+  orderId?: string; // ID de la commande associée
+  establishmentId?: string; // ID de l'établissement
+  disbursementId?: string; // Disbursement ID utilisé pour ce paiement
+}
+
+export interface DisbursementRequest {
+  id: string;
+  userId: string;
+  establishmentName: string;
+  ownerName: string;
+  email: string;
+  airtelMoneyNumber: string;
+  status: 'pending' | 'approved' | 'rejected';
+  disbursementId?: string; // Rempli par l'admin
+  requestedAt: number;
+  approvedAt?: number;
+  approvedBy?: string; // ID de l'admin qui a approuvé
+  rejectionReason?: string;
+  notes?: string;
 }
 
