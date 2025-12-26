@@ -21,7 +21,8 @@ import {
   Package,
   Settings,
   Palette,
-  X
+  X,
+  CreditCard
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -29,7 +30,7 @@ import { db } from "@/lib/firebase";
 import { doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch } from "firebase/firestore";
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
-import { notificationsColRef } from "@/lib/collections";
+import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collections";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 
@@ -1281,6 +1282,213 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                 <Button onClick={saveTheme} disabled={isSavingTheme}>
                   {isSavingTheme ? "Sauvegarde..." : "Sauvegarder les paramètres"}
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Section Paiement Menu Digital */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Paiement Menu Digital
+              </CardTitle>
+              <CardDescription>
+                Activez le paiement en ligne pour que vos clients puissent payer directement via Airtel Money
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Statut du Disbursement ID */}
+              <div className="space-y-2">
+                <Label>Statut du paiement</Label>
+                {profile?.disbursementStatus === 'approved' && profile?.disbursementId ? (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-700">
+                      <CheckCircle className="w-5 h-5" />
+                      <span className="font-semibold">Paiement activé</span>
+                    </div>
+                    <p className="text-sm text-green-600 mt-2">
+                      Vos clients peuvent maintenant payer leurs commandes directement via Airtel Money.
+                      L'argent sera transféré automatiquement sur votre compte.
+                    </p>
+                    {profile.disbursementId && (
+                      <p className="text-xs text-gray-600 mt-2 font-mono">
+                        Disbursement ID: {profile.disbursementId}
+                      </p>
+                    )}
+                  </div>
+                ) : profile?.disbursementStatus === 'pending' ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-amber-700">
+                      <Clock className="w-5 h-5" />
+                      <span className="font-semibold">En attente de validation</span>
+                    </div>
+                    <p className="text-sm text-amber-600 mt-2">
+                      Votre demande de Disbursement ID est en cours de traitement par l'administration.
+                      Vous recevrez une notification une fois qu'elle sera approuvée.
+                    </p>
+                  </div>
+                ) : profile?.disbursementStatus === 'rejected' ? (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-red-700">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="font-semibold">Demande rejetée</span>
+                    </div>
+                    <p className="text-sm text-red-600 mt-2">
+                      Votre demande a été rejetée. Veuillez contacter l'administration pour plus d'informations.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-gray-700">
+                      <AlertCircle className="w-5 h-5" />
+                      <span className="font-semibold">Paiement non activé</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Pour activer le paiement en ligne, vous devez fournir votre numéro Airtel Money.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Numéro Airtel Money */}
+              {(!profile?.airtelMoneyNumber || profile?.disbursementStatus !== 'approved') && (
+                <div className="space-y-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="space-y-2">
+                    <Label htmlFor="airtelMoneyNumber">Numéro Airtel Money *</Label>
+                    <Input
+                      id="airtelMoneyNumber"
+                      type="tel"
+                      placeholder="Ex: 0623456789"
+                      value={profile?.airtelMoneyNumber || ''}
+                      onChange={async (e) => {
+                        if (!user) return;
+                        try {
+                          await setDoc(doc(db, 'profiles', user.uid), {
+                            airtelMoneyNumber: e.target.value,
+                            updatedAt: Date.now(),
+                          }, { merge: true });
+                          toast({
+                            title: "Numéro enregistré",
+                            description: "Votre numéro Airtel Money a été enregistré. Une demande sera envoyée à l'administration.",
+                          });
+                        } catch (error) {
+                          console.error('Erreur sauvegarde numéro:', error);
+                          toast({
+                            title: "Erreur",
+                            description: "Impossible d'enregistrer le numéro.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="bg-white"
+                    />
+                    <p className="text-xs text-gray-600">
+                      Ce numéro sera utilisé pour recevoir les paiements de vos clients.
+                      Une fois validé par l'administration, le paiement en ligne sera activé.
+                    </p>
+                  </div>
+                  
+                  {profile?.airtelMoneyNumber && !profile?.disbursementId && (
+                    <Button
+                      onClick={async () => {
+                        if (!user || !profile?.airtelMoneyNumber) return;
+                        try {
+                          await addDoc(disbursementRequestsColRef(db), {
+                            userId: user.uid,
+                            userEmail: profile.email,
+                            ownerName: profile.ownerName,
+                            establishmentName: profile.establishmentName,
+                            airtelMoneyNumber: profile.airtelMoneyNumber,
+                            status: 'pending',
+                            requestedAt: Date.now(),
+                          });
+                          
+                          await setDoc(doc(db, 'profiles', user.uid), {
+                            disbursementStatus: 'pending',
+                            updatedAt: Date.now(),
+                          }, { merge: true });
+                          
+                          toast({
+                            title: "Demande envoyée",
+                            description: "Votre demande a été envoyée à l'administration. Vous recevrez une notification une fois qu'elle sera traitée.",
+                          });
+                        } catch (error) {
+                          console.error('Erreur envoi demande:', error);
+                          toast({
+                            title: "Erreur",
+                            description: "Impossible d'envoyer la demande.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      className="w-full"
+                    >
+                      Envoyer la demande d'activation
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              {/* Livraison */}
+              <div className="space-y-4 pt-4 border-t">
+                <h3 className="font-semibold text-lg">Livraison</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="deliveryEnabled"
+                      checked={profile?.deliveryEnabled || false}
+                      onChange={async (e) => {
+                        if (!user) return;
+                        try {
+                          await setDoc(doc(db, 'profiles', user.uid), {
+                            deliveryEnabled: e.target.checked,
+                            updatedAt: Date.now(),
+                          }, { merge: true });
+                          toast({
+                            title: "Paramètre enregistré",
+                            description: e.target.checked ? "Livraison activée" : "Livraison désactivée",
+                          });
+                        } catch (error) {
+                          console.error('Erreur sauvegarde livraison:', error);
+                        }
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <Label htmlFor="deliveryEnabled" className="cursor-pointer">
+                      Activer la livraison à domicile
+                    </Label>
+                  </div>
+                  {profile?.deliveryEnabled && (
+                    <div className="space-y-2">
+                      <Label htmlFor="deliveryPrice">Prix de livraison (XAF)</Label>
+                      <Input
+                        id="deliveryPrice"
+                        type="number"
+                        min="0"
+                        placeholder="Ex: 1000"
+                        value={profile?.deliveryPrice || ''}
+                        onChange={async (e) => {
+                          if (!user) return;
+                          const price = parseInt(e.target.value) || 0;
+                          try {
+                            await setDoc(doc(db, 'profiles', user.uid), {
+                              deliveryPrice: price,
+                              updatedAt: Date.now(),
+                            }, { merge: true });
+                          } catch (error) {
+                            console.error('Erreur sauvegarde prix livraison:', error);
+                          }
+                        }}
+                        className="bg-white"
+                      />
+                      <p className="text-xs text-gray-600">
+                        Ce montant sera ajouté au total de la commande lorsque les clients choisissent la livraison.
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

@@ -60,6 +60,8 @@ interface Establishment {
   disbursementId?: string; // Disbursement ID pour recevoir les paiements
   disbursementStatus?: 'pending' | 'approved' | 'rejected'; // Statut du Disbursement ID
   airtelMoneyNumber?: string; // Numéro Airtel Money
+  deliveryEnabled?: boolean; // Livraison activée
+  deliveryPrice?: number; // Prix de livraison en XAF
 }
 
 const PublicOrderingPage = () => {
@@ -86,16 +88,22 @@ const PublicOrderingPage = () => {
   const [showAirtelNumberDialog, setShowAirtelNumberDialog] = useState(false);
   const [airtelNumberInput, setAirtelNumberInput] = useState("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  // Livraison
+  const [isDelivery, setIsDelivery] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState("");
 
   // useRef
   const isMountedRef = useRef<boolean>(true);
   const unsubscribeProductsRef = useRef<(() => void) | null>(null);
   const unsubscribeTablesRef = useRef<(() => void) | null>(null);
 
-  // useMemo
+  // Calcul du total de la commande (articles du panier + livraison si applicable)
+  // Ce total est utilisé pour le paiement Menu Digital, PAS le prix de l'abonnement
   const total = useMemo(() => {
-    return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  }, [cart]);
+    const itemsTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const deliveryFee = (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0;
+    return itemsTotal + deliveryFee;
+  }, [cart, isDelivery, establishment]);
 
   // Charger le thème du menu
   useEffect(() => {
@@ -177,6 +185,8 @@ const PublicOrderingPage = () => {
             disbursementId: profileData.disbursementId,
             disbursementStatus: profileData.disbursementStatus,
             airtelMoneyNumber: profileData.airtelMoneyNumber,
+            deliveryEnabled: profileData.deliveryEnabled,
+            deliveryPrice: profileData.deliveryPrice,
           });
         }
       })
@@ -381,8 +391,19 @@ const PublicOrderingPage = () => {
   };
 
   const placeOrder = async (withPayment: boolean = false) => {
-    if (!establishmentId || cart.length === 0 || !selectedTable) {
-      alert('Veuillez sélectionner une table avant de commander.');
+    if (!establishmentId || cart.length === 0) {
+      alert('Votre panier est vide.');
+      return;
+    }
+    
+    // Validation : table ou livraison
+    if (!isDelivery && !selectedTable) {
+      alert('Veuillez sélectionner une table ou activer la livraison.');
+      return;
+    }
+    
+    if (isDelivery && !deliveryAddress.trim()) {
+      alert('Veuillez saisir votre adresse de livraison.');
       return;
     }
 
@@ -405,11 +426,14 @@ const PublicOrderingPage = () => {
       const orderData = {
         orderNumber: orderNumberValue,
         receiptNumber,
-        tableZone: selectedTable,
+        tableZone: isDelivery ? 'Livraison' : selectedTable,
         items: cart,
         total,
         status: 'pending',
         createdAt: Date.now(),
+        isDelivery: isDelivery || false,
+        deliveryAddress: isDelivery ? deliveryAddress : undefined,
+        deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
         customerInfo: {
           userAgent: navigator.userAgent,
           timestamp: Date.now()
@@ -430,11 +454,13 @@ const PublicOrderingPage = () => {
           const logoURL = `${base}/favicon.png`;
 
           // Enregistrer la transaction de paiement
+          // IMPORTANT: Le montant 'total' correspond au total de la commande (articles du panier),
+          // PAS au prix de l'abonnement mensuel. C'est calculé comme: sum(item.price * item.quantity)
           await addDoc(paymentsColRef(db, establishmentId), {
             userId: establishmentId,
             transactionId,
             subscriptionType: 'menu-digital',
-            amount: total,
+            amount: total, // Montant de la commande (articles), pas l'abonnement
             status: 'pending',
             paymentMethod: 'airtel-money',
             reference,
@@ -448,8 +474,9 @@ const PublicOrderingPage = () => {
           });
 
           // Créer le lien de paiement
+          // Le montant 'total' est le total de la commande (articles), calculé depuis le panier
           const paymentLink = await createMenuDigitalPaymentLink({
-            amount: total,
+            amount: total, // Total des articles commandés, pas le prix de l'abonnement
             reference,
             redirectSuccess,
             redirectError,
@@ -836,7 +863,7 @@ const PublicOrderingPage = () => {
             <div className="flex gap-2">
               <Button
                 onClick={() => {
-                  if (!selectedTable) {
+                  if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
                     setShowTableDialog(true);
                   } else {
                     placeOrder(false);
@@ -851,7 +878,7 @@ const PublicOrderingPage = () => {
               {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
                 <Button
                   onClick={() => {
-                    if (!selectedTable) {
+                    if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
                       setShowTableDialog(true);
                     } else {
                       placeOrder(true);
@@ -878,42 +905,58 @@ const PublicOrderingPage = () => {
       {cart.length > 0 && (
         <div className="fixed bottom-24 right-4 bg-white rounded-lg shadow-xl p-4 max-w-xs max-h-64 overflow-y-auto z-10 border" style={{ borderColor: menuTheme.primaryColor + '30' }}>
           <h3 className="font-bold mb-2" style={{ color: menuTheme.primaryColor }}>Panier</h3>
-          {cart.map((item) => (
-            <div key={item.productId} className="flex items-center justify-between mb-2 pb-2 border-b last:border-b-0">
-              <div className="flex-1">
-                <p className="text-sm font-medium">{item.name}</p>
-                <p className="text-xs text-gray-600">
-                  {(item.price * item.quantity).toLocaleString('fr-FR')} XAF
-                </p>
+          <div className="max-h-40 overflow-y-auto">
+            {cart.map((item) => (
+              <div key={item.productId} className="flex items-center justify-between mb-2 pb-2 border-b last:border-b-0">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{item.name}</p>
+                  <p className="text-xs text-gray-600">
+                    {(item.price * item.quantity).toLocaleString('fr-FR')} XAF
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => removeFromCart(item.productId)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const product = products.find(p => p.id === item.productId);
+                      if (product) addToCart(product);
+                    }}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => removeFromCart(item.productId)}
-                  className="h-6 w-6 p-0"
-                >
-                  <Minus className="w-3 h-3" />
-                </Button>
-                <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const product = products.find(p => p.id === item.productId);
-                    if (product) addToCart(product);
-                  }}
-                  className="h-6 w-6 p-0"
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
+            ))}
+          </div>
+          {isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice && (
+            <div className="mt-2 pt-2 border-t">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Livraison:</span>
+                <span className="font-medium">{establishment.deliveryPrice.toLocaleString('fr-FR')} XAF</span>
               </div>
             </div>
-          ))}
+          )}
+          <div className="mt-2 pt-2 border-t">
+            <div className="flex justify-between font-bold">
+              <span style={{ color: menuTheme.primaryColor }}>Total:</span>
+              <span style={{ color: menuTheme.primaryColor }}>{total.toLocaleString('fr-FR')} XAF</span>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Dialog sélection table */}
+      {/* Dialog sélection table ou livraison */}
       <Dialog open={showTableDialog} onOpenChange={setShowTableDialog}>
         <DialogContent>
           <DialogHeader>
@@ -922,40 +965,90 @@ const PublicOrderingPage = () => {
               Votre position
             </DialogTitle>
             <DialogDescription>
-              Sélectionnez votre table ou zone pour finaliser votre commande
+              Sélectionnez votre table, zone ou activez la livraison
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {tables.length === 0 ? (
-              <div className="space-y-2">
-                <Label>Table ou zone</Label>
-                <Input
-                  placeholder="Ex: Table 3, Comptoir..."
-                  value={selectedTable}
-                  onChange={(e) => setSelectedTable(e.target.value)}
-                />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Label>Table ou zone</Label>
-                <select
-                  value={selectedTable}
-                  onChange={(e) => setSelectedTable(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md"
-                >
-                  <option value="">Sélectionnez votre table/zone</option>
-                  {tables.map((table) => (
-                    <option key={table.id} value={table.name}>
-                      {table.name}
-                    </option>
-                  ))}
-                </select>
+            {/* Option livraison */}
+            {establishment?.deliveryEnabled && (
+              <div className="space-y-2 p-4 border rounded-lg bg-gray-50">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="deliveryCheckbox"
+                    checked={isDelivery}
+                    onChange={(e) => {
+                      setIsDelivery(e.target.checked);
+                      if (e.target.checked) {
+                        setSelectedTable("");
+                      }
+                    }}
+                    className="w-4 h-4"
+                  />
+                  <Label htmlFor="deliveryCheckbox" className="font-semibold cursor-pointer">
+                    Livraison à domicile
+                    {establishment.deliveryPrice && (
+                      <span className="text-sm font-normal text-gray-600 ml-2">
+                        (+{establishment.deliveryPrice.toLocaleString('fr-FR')} XAF)
+                      </span>
+                    )}
+                  </Label>
+                </div>
+                {isDelivery && (
+                  <div className="mt-2">
+                    <Label htmlFor="deliveryAddress">Adresse de livraison *</Label>
+                    <Input
+                      id="deliveryAddress"
+                      placeholder="Ex: Quartier Nzeng-Ayong, Rue 123..."
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                )}
               </div>
             )}
+            
+            {/* Sélection table/zone (si livraison désactivée) */}
+            {!isDelivery && (
+              <>
+                {tables.length === 0 ? (
+                  <div className="space-y-2">
+                    <Label>Table ou zone</Label>
+                    <Input
+                      placeholder="Ex: Table 3, Comptoir..."
+                      value={selectedTable}
+                      onChange={(e) => setSelectedTable(e.target.value)}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label>Table ou zone</Label>
+                    <select
+                      value={selectedTable}
+                      onChange={(e) => setSelectedTable(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-md"
+                    >
+                      <option value="">Sélectionnez votre table/zone</option>
+                      {tables.map((table) => (
+                        <option key={table.id} value={table.name}>
+                          {table.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+            
             <div className="flex gap-2 pt-4">
               <Button
                 variant="outline"
-                onClick={() => setShowTableDialog(false)}
+                onClick={() => {
+                  setShowTableDialog(false);
+                  setIsDelivery(false);
+                  setDeliveryAddress("");
+                }}
                 className="flex-1"
               >
                 Annuler
@@ -963,12 +1056,12 @@ const PublicOrderingPage = () => {
               <div className="flex gap-2 w-full">
                 <Button
                   onClick={() => {
-                    if (selectedTable) {
+                    if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
                       setShowTableDialog(false);
                       placeOrder(false);
                     }
                   }}
-                  disabled={!selectedTable}
+                  disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable)}
                   variant="outline"
                   className="flex-1"
                   style={{ borderColor: menuTheme.primaryColor, color: menuTheme.primaryColor }}
@@ -978,12 +1071,12 @@ const PublicOrderingPage = () => {
                 {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
                   <Button
                     onClick={() => {
-                      if (selectedTable) {
+                      if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
                         setShowTableDialog(false);
                         placeOrder(true);
                       }
                     }}
-                    disabled={!selectedTable || isProcessingPayment}
+                    disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable) || isProcessingPayment}
                     className="flex-1 text-white"
                     style={{ backgroundColor: menuTheme.primaryColor }}
                   >

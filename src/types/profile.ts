@@ -46,6 +46,9 @@ export interface UserProfile {
   airtelMoneyNumber?: string; // Numéro Airtel Money pour recevoir les paiements
   disbursementId?: string; // Disbursement ID SingPay (configuré par l'admin)
   disbursementStatus?: 'pending' | 'approved' | 'rejected'; // Statut du Disbursement ID
+  // Livraison
+  deliveryEnabled?: boolean; // Activer la livraison
+  deliveryPrice?: number; // Prix de livraison en XAF
   createdAt: number;
   updatedAt: number;
 } 

@@ -641,18 +641,29 @@ const AdminDashboard = () => {
       
       for (const docSnap of requestsSnapshot.docs) {
         const data = docSnap.data() as DisbursementRequest;
-        const profile = allProfiles.find(p => p.uid === data.userId);
+        // Chercher le profil dans allProfiles, ou charger depuis Firestore si pas trouvé
+        let profile = allProfiles.find(p => p.uid === data.userId);
+        if (!profile && data.userId) {
+          try {
+            const profileDoc = await getDoc(doc(db, 'profiles', data.userId));
+            if (profileDoc.exists()) {
+              profile = profileDoc.data() as UserProfile;
+            }
+          } catch (err) {
+            console.error(`Erreur chargement profil ${data.userId}:`, err);
+          }
+        }
         requests.push({
           ...data,
           id: docSnap.id,
-          userEmail: profile?.email,
+          userEmail: profile?.email || data.userEmail,
         });
       }
       
       setDisbursementRequests(requests);
     } catch (error) {
       console.error('Erreur chargement demandes Disbursement:', error);
-      toast({ title: "Erreur", description: "Impossible de charger les demandes", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de charger les demandes. Veuillez réessayer.", variant: "destructive" });
     } finally {
       setIsLoadingDisbursements(false);
     }
