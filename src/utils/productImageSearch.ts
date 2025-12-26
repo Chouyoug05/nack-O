@@ -47,7 +47,6 @@ const productTranslations: Record<string, string> = {
   "cacahuètes": "peanuts",
   "noix": "nuts",
   "biscuit": "cookie",
-  "gâteau": "cake",
   
   // Desserts
   "glace": "ice cream",
