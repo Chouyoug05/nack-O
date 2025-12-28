@@ -27,7 +27,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch } from "firebase/firestore";
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
 import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collections";
@@ -1392,8 +1392,43 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                   {profile?.airtelMoneyNumber && !profile?.disbursementId && (
                     <Button
                       onClick={async () => {
-                        if (!user || !profile?.airtelMoneyNumber) return;
+                        if (!user || !profile?.airtelMoneyNumber) {
+                          toast({
+                            title: "Erreur",
+                            description: "Numéro Airtel Money requis.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        
+                        // Vérifier que toutes les données nécessaires sont présentes
+                        if (!profile.email || !profile.ownerName || !profile.establishmentName) {
+                          toast({
+                            title: "Données incomplètes",
+                            description: "Veuillez compléter votre profil (email, nom du propriétaire, nom de l'établissement) avant d'envoyer la demande.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        
                         try {
+                          // Vérifier si une demande existe déjà
+                          const existingRequestsQuery = query(
+                            disbursementRequestsColRef(db),
+                            where('userId', '==', user.uid),
+                            where('status', '==', 'pending')
+                          );
+                          const existingSnapshot = await getDocs(existingRequestsQuery);
+                          
+                          if (!existingSnapshot.empty) {
+                            toast({
+                              title: "Demande déjà en cours",
+                              description: "Vous avez déjà une demande en attente de traitement.",
+                              variant: "default",
+                            });
+                            return;
+                          }
+                          
                           await addDoc(disbursementRequestsColRef(db), {
                             userId: user.uid,
                             userEmail: profile.email,
@@ -1415,9 +1450,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                           });
                         } catch (error) {
                           console.error('Erreur envoi demande:', error);
+                          const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
                           toast({
                             title: "Erreur",
-                            description: "Impossible d'envoyer la demande.",
+                            description: `Impossible d'envoyer la demande: ${errorMessage}`,
                             variant: "destructive",
                           });
                         }

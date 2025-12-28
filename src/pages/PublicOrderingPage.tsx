@@ -13,7 +13,7 @@ import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
-import { paymentsColRef, disbursementRequestsColRef } from "@/lib/collections";
+import { paymentsColRef } from "@/lib/collections";
 
 interface Product {
   id: string;
@@ -362,32 +362,11 @@ const PublicOrderingPage = () => {
       return;
     }
 
-    try {
-      // Créer une demande de Disbursement ID
-      await addDoc(disbursementRequestsColRef(db), {
-        userId: establishmentId,
-        establishmentName: establishment?.establishmentName || '',
-        ownerName: establishment?.companyName || '',
-        email: '', // Sera rempli par l'admin
-        airtelMoneyNumber: airtelNumberInput.trim(),
-        status: 'pending',
-        requestedAt: Date.now(),
-      });
-
-      // Mettre à jour le profil avec le numéro Airtel Money
-      await updateDoc(doc(db, 'profiles', establishmentId), {
-        airtelMoneyNumber: airtelNumberInput.trim(),
-        disbursementStatus: 'pending',
-        updatedAt: Date.now(),
-      });
-
-      setShowAirtelNumberDialog(false);
-      setAirtelNumberInput("");
-      alert('Votre demande a été envoyée à l\'administration. Vous recevrez un message une fois votre Disbursement ID configuré.');
-    } catch (error) {
-      console.error('Erreur demande numéro Airtel:', error);
-      alert('Erreur lors de l\'envoi de la demande. Veuillez réessayer.');
-    }
+    // Note: La création de demande de Disbursement ID doit être faite depuis l'interface d'administration
+    // (BarConnecteePage) car elle nécessite une authentification. Ici, on informe simplement le client.
+    setShowAirtelNumberDialog(false);
+    setAirtelNumberInput("");
+    alert('Le paiement en ligne n\'est pas encore disponible pour cet établissement. L\'établissement doit configurer son Disbursement ID depuis son interface d\'administration. Vous pouvez commander sans paiement pour l\'instant.');
   };
 
   const placeOrder = async (withPayment: boolean = false) => {

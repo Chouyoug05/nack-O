@@ -11,13 +11,10 @@ service cloud.firestore {
       allow write: if request.auth != null; // only authenticated app users write
     }
 
-    // Admins registry: readable by the admin user himself; writable only for creating own document
+    // Admins registry: readable by the admin user himself; not writable from client
     match /admins/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
-      // Permettre la création uniquement de son propre document admin (pour initialisation)
-      allow create: if request.auth != null && request.auth.uid == uid;
-      // Les mises à jour et suppressions nécessitent d'être déjà admin (sécurité)
-      allow update, delete: if false;
+      allow write: if false;
     }
 
     // Public read for events and tickets
@@ -93,5 +90,18 @@ service cloud.firestore {
     match /subscriptionPlans/{planId} {
       allow read, write: if isAdmin();
     }
+
+    // Disbursement requests: users can create, admins can read/write
+    match /disbursementRequests/{requestId} {
+      // Les utilisateurs authentifiés peuvent créer leur propre demande
+      allow create: if request.auth != null && 
+                      request.resource.data.userId == request.auth.uid &&
+                      request.resource.data.status == 'pending';
+      // Les utilisateurs peuvent lire leur propre demande
+      allow read: if request.auth != null && 
+                   (resource.data.userId == request.auth.uid || isAdmin());
+      // Seuls les admins peuvent mettre à jour ou supprimer
+      allow update, delete: if isAdmin();
+    }
   }
-} 
+}

@@ -1753,7 +1753,7 @@ const AdminDashboard = () => {
             </div>
             {allPayments.length > 0 && (
               <div className="text-xs text-muted-foreground mt-1">
-                {allPayments.slice(0, 5).reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} XAF (5 derniers)
+                {allPayments.reduce((sum, p) => sum + (p.amount || 0), 0).toLocaleString()} XAF (total)
               </div>
             )}
           </CardContent>
@@ -1858,14 +1858,14 @@ const AdminDashboard = () => {
       {allPayments.length > 0 && (
       <Card className="border-0 shadow-card mt-8">
         <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
           <CardTitle className="flex items-center gap-2">
                   <CreditCard size={20} className="text-blue-600"/> Paiements récents
           </CardTitle>
-                <CardDescription>Les 5 derniers paiements complétés</CardDescription>
+                <CardDescription>Tous les paiements complétés ({allPayments.length} total)</CardDescription>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={() => exportPaymentsCsv(allPayments)}>
                   <Download size={16} className="mr-2"/> CSV
                 </Button>
@@ -1876,8 +1876,8 @@ const AdminDashboard = () => {
             </div>
         </CardHeader>
         <CardContent>
-            <div className="space-y-2">
-              {allPayments.slice(0, 5).map((payment) => (
+            <div className="space-y-2 max-h-[600px] overflow-y-auto">
+              {allPayments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div>
                     <div className="font-medium">{payment.userName || payment.userEmail || "Utilisateur inconnu"}</div>
@@ -1903,7 +1903,7 @@ const AdminDashboard = () => {
   // Vue Utilisateurs
   const renderUsersView = () => (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
         </Button>
@@ -1911,7 +1911,7 @@ const AdminDashboard = () => {
           <h1 className="text-2xl font-bold">Utilisateurs</h1>
           <p className="text-sm text-muted-foreground">Gérer les utilisateurs et leurs abonnements</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportUsersCsv(filtered)}>
             <Download size={16} className="mr-2"/> CSV
           </Button>
@@ -1959,11 +1959,11 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          <div className="border rounded-md overflow-hidden">
-            <Table>
+          <div className="border rounded-md overflow-x-auto">
+            <Table className="min-w-[800px]">
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10"></TableHead>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
                   <TableHead>Utilisateur</TableHead>
                   <TableHead>Établissement</TableHead>
                   <TableHead>Plan</TableHead>
@@ -2065,15 +2065,15 @@ const AdminDashboard = () => {
   // Vue Produits
   const renderProductsView = () => (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Produits</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des produits de tous les utilisateurs ({allProducts.length} total)</p>
-              </div>
-        <div className="ml-auto flex gap-2">
+        </div>
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportProductsCsv(allProducts)} disabled={allProducts.length === 0}>
             <Download size={16} className="mr-2"/> CSV
           </Button>
@@ -2092,8 +2092,8 @@ const AdminDashboard = () => {
           ) : allProducts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucun produit trouvé</div>
           ) : (
-            <div className="border rounded-md overflow-hidden">
-              <Table>
+            <div className="border rounded-md overflow-x-auto">
+              <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Produit</TableHead>
@@ -2160,15 +2160,15 @@ const AdminDashboard = () => {
   // Vue Commandes
   const renderOrdersView = () => (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Commandes</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des commandes de tous les utilisateurs ({allOrders.length} total)</p>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportOrdersCsv(allOrders)} disabled={allOrders.length === 0}>
             <Download size={16} className="mr-2"/> CSV
           </Button>
@@ -2187,8 +2187,8 @@ const AdminDashboard = () => {
           ) : allOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucune commande trouvée</div>
           ) : (
-            <div className="border rounded-md overflow-hidden">
-              <Table>
+            <div className="border rounded-md overflow-x-auto">
+              <Table className="min-w-[900px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>N° Commande</TableHead>
@@ -2267,15 +2267,15 @@ const AdminDashboard = () => {
   // Vue Événements
   const renderEventsView = () => (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
-                </Button>
-        <div>
+        </Button>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Événements</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des événements de tous les utilisateurs ({allEvents.length} total)</p>
-              </div>
-        <div className="ml-auto flex gap-2">
+        </div>
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportEventsCsv(allEvents)} disabled={allEvents.length === 0}>
             <Download size={16} className="mr-2"/> CSV
           </Button>
@@ -2294,8 +2294,8 @@ const AdminDashboard = () => {
           ) : allEvents.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucun événement trouvé</div>
           ) : (
-            <div className="border rounded-md overflow-hidden">
-              <Table>
+            <div className="border rounded-md overflow-x-auto">
+              <Table className="min-w-[1000px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Titre</TableHead>
@@ -2372,15 +2372,15 @@ const AdminDashboard = () => {
   // Vue Appréciations
   const renderRatingsView = () => (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
         </Button>
-              <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Appréciations</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des appréciations de tous les utilisateurs ({allRatings.length} produits notés)</p>
-              </div>
-        <div className="ml-auto flex gap-2">
+        </div>
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => {
             // Export des appréciations en CSV (format simple)
             const rows: string[][] = [
@@ -2537,15 +2537,15 @@ const AdminDashboard = () => {
           ) : allRatings.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucune appréciation trouvée</div>
             ) : (
-              <div className="border rounded-md overflow-hidden">
-                <Table>
+              <div className="border rounded-md overflow-x-auto">
+                <Table className="min-w-[700px]">
                   <TableHeader>
                     <TableRow>
-                    <TableHead>Produit</TableHead>
-                    <TableHead>Note</TableHead>
-                    <TableHead>Nombre d'avis</TableHead>
-                    <TableHead>Établissement</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                      <TableHead>Produit</TableHead>
+                      <TableHead>Note</TableHead>
+                      <TableHead>Nombre d'avis</TableHead>
+                      <TableHead>Établissement</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -2593,15 +2593,15 @@ const AdminDashboard = () => {
   // Vue Clients
   const renderCustomersView = () => (
     <div className="p-4 md:p-6 lg:p-8">
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
           <ArrowLeft size={16} className="mr-2"/> Retour
         </Button>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold">Clients</h1>
           <p className="text-sm text-muted-foreground">Vue d'ensemble des clients de tous les utilisateurs ({allCustomers.length} total)</p>
         </div>
-        <div className="ml-auto flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportCustomersCsv(allCustomers)} disabled={allCustomers.length === 0}>
             <Download size={16} className="mr-2"/> CSV
           </Button>
@@ -2620,8 +2620,8 @@ const AdminDashboard = () => {
           ) : allCustomers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucun client trouvé</div>
           ) : (
-            <div className="border rounded-md overflow-hidden">
-              <Table>
+            <div className="border rounded-md overflow-x-auto">
+              <Table className="min-w-[1200px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Prénom</TableHead>
@@ -2680,11 +2680,11 @@ const AdminDashboard = () => {
     const pendingRequests = disbursementRequests.filter(r => r.status === 'pending');
     return (
       <div className="p-4 md:p-6 lg:p-8">
-        <div className="flex items-center gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
           <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
             <ArrowLeft size={16} className="mr-2"/> Retour
           </Button>
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold">Disbursement ID</h1>
             <p className="text-sm text-muted-foreground">
               Gérer les demandes de Disbursement ID pour recevoir les paiements Menu Digital
@@ -2693,7 +2693,7 @@ const AdminDashboard = () => {
               )}
             </p>
           </div>
-          <div className="ml-auto flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             <Button variant="outline" size="sm" onClick={loadDisbursementRequests} disabled={isLoadingDisbursements}>
               {isLoadingDisbursements ? "Chargement..." : "Actualiser"}
             </Button>
@@ -2706,8 +2706,8 @@ const AdminDashboard = () => {
             ) : disbursementRequests.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">Aucune demande trouvée</div>
             ) : (
-              <div className="border rounded-md overflow-hidden">
-                <Table>
+              <div className="border rounded-md overflow-x-auto">
+                <Table className="min-w-[1000px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Établissement</TableHead>
