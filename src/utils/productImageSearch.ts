@@ -275,6 +275,9 @@ const generateImageWithGemini = async (productName: string, category?: string): 
     // Construire un prompt descriptif pour générer l'image
     const prompt = buildImageGenerationPrompt(productName, category);
     
+    // Log du prompt pour débogage
+    console.log(`[Gemini] Génération d'image avec le prompt: "${prompt}"`);
+    
     // Utiliser l'API Gemini pour générer l'image
     // Modèle: gemini-2.0-flash-exp-image-generation (modèle expérimental pour génération d'images)
     const response = await fetch(
@@ -308,29 +311,44 @@ const generateImageWithGemini = async (productName: string, category?: string): 
 
     const data = await response.json();
     
+    // Log de la réponse pour débogage
+    console.log('[Gemini] Réponse API:', JSON.stringify(data, null, 2));
+    
     // L'API Gemini retourne l'image dans les parts de la réponse
     if (data.candidates && data.candidates[0]?.content?.parts) {
       const parts = data.candidates[0].content.parts;
       
+      console.log('[Gemini] Nombre de parts trouvées:', parts.length);
+      
       // Chercher une partie avec une image (base64)
       for (const part of parts) {
+        console.log('[Gemini] Part type:', Object.keys(part));
+        
         if (part.inlineData && part.inlineData.data) {
           // Image en base64 - convertir en data URL pour l'affichage
           const mimeType = part.inlineData.mimeType || 'image/png';
+          console.log('[Gemini] Image trouvée en base64, type:', mimeType);
           return `data:${mimeType};base64,${part.inlineData.data}`;
         }
         // Si l'API retourne une URL d'image
         if (part.url) {
+          console.log('[Gemini] URL d\'image trouvée:', part.url);
           return part.url;
+        }
+        // Vérifier si c'est du texte (peut contenir des instructions)
+        if (part.text) {
+          console.log('[Gemini] Texte dans la réponse:', part.text);
         }
       }
     }
 
     // Si aucune image trouvée dans la réponse standard, essayer d'autres formats
     if (data.imageData) {
+      console.log('[Gemini] Image trouvée dans imageData');
       return `data:image/png;base64,${data.imageData}`;
     }
 
+    console.warn('[Gemini] Aucune image trouvée dans la réponse');
     return null;
   } catch (error) {
     console.error('Erreur génération image Gemini:', error);
@@ -340,27 +358,37 @@ const generateImageWithGemini = async (productName: string, category?: string): 
 
 /**
  * Construit un prompt optimisé pour la génération d'image via IA
+ * Le prompt est conçu pour générer une image spécifique du produit mentionné
  */
 const buildImageGenerationPrompt = (productName: string, category?: string): string => {
-  let prompt = `A professional, appetizing photo of ${productName}`;
+  // Traduire le nom du produit en anglais si nécessaire pour améliorer la génération
+  const translatedName = translateProductName(productName);
   
-  // Ajouter des détails selon la catégorie
+  // Commencer avec le nom du produit comme élément principal
+  let prompt = `Generate an image of ${translatedName}`;
+  
+  // Ajouter des détails spécifiques selon la catégorie pour guider la génération
   if (category) {
     const categoryPrompts: Record<string, string> = {
-      "Boisson alcoolisée": "a glass or bottle on a clean background, restaurant style",
-      "Boisson non alcoolisée": "a refreshing drink in a glass, restaurant style",
-      "Plat / Repas": "a beautifully plated dish, restaurant presentation",
-      "Snack": "appetizing snack food, restaurant quality",
-      "Dessert": "a delicious dessert, restaurant presentation",
-      "Entrée": "an appetizing starter dish, restaurant presentation",
+      "Boisson alcoolisée": "showing the drink in a glass or bottle, clean restaurant background, professional food photography",
+      "Boisson non alcoolisée": "showing the drink in a glass, refreshing appearance, restaurant style, professional food photography",
+      "Plat / Repas": "showing the dish beautifully plated, restaurant presentation, professional food photography",
+      "Snack": "showing the snack food, appetizing appearance, restaurant quality, professional food photography",
+      "Dessert": "showing the dessert, delicious presentation, restaurant style, professional food photography",
+      "Entrée": "showing the starter dish, appetizing presentation, restaurant style, professional food photography",
     };
     
     if (categoryPrompts[category]) {
-      prompt += `, ${categoryPrompts[category]}`;
+      prompt = `Generate an image of ${translatedName}, ${categoryPrompts[category]}`;
+    } else {
+      prompt += ", professional food photography, restaurant style, high quality";
     }
+  } else {
+    prompt += ", professional food photography, restaurant style, high quality, appetizing";
   }
   
-  prompt += ", high quality, professional photography, good lighting, appetizing";
+  // Ajouter des instructions supplémentaires pour garantir la qualité
+  prompt += ", good lighting, sharp focus, centered composition, suitable for menu display";
   
   return prompt;
 };
