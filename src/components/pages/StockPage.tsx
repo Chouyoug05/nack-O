@@ -51,7 +51,7 @@ import type { ProductDoc, LossDoc, FoodCost } from "@/types/inventory";
 import type { UserProfile } from "@/types/profile";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
-import { searchProductImage, searchGoogleImages } from "@/utils/productImageSearch";
+import { searchGoogleImages } from "@/utils/productImageSearch";
 
 interface Product {
   id: string;
@@ -363,33 +363,23 @@ const StockPage = () => {
 
     setIsSearchingImage(true);
     try {
-      // Rechercher des images via Google Images
+      // Rechercher des images via Google Images (scraping direct)
       const images = await searchGoogleImages(newProduct.name, newProduct.category);
       if (images && images.length > 0) {
         setFoundImages(images);
         setShowImageSelectionDialog(true);
       } else {
-        // Si Google Images ne fonctionne pas, essayer la méthode classique
-        const imageUrl = await searchProductImage(newProduct.name, newProduct.category);
-        if (imageUrl) {
-          setNewProduct({ ...newProduct, imageUrl });
-          toast({
-            title: "Image trouvée !",
-            description: "Une image a été trouvée et ajoutée au produit"
-          });
-        } else {
-          toast({
-            title: "Aucune image trouvée",
-            description: "Impossible de trouver une image pour ce produit. Vous pouvez télécharger une image manuellement.",
-            variant: "destructive"
-          });
-        }
+        toast({
+          title: "Aucune image trouvée",
+          description: "Impossible de trouver des images pour ce produit. Veuillez réessayer ou télécharger une image manuellement.",
+          variant: "destructive"
+        });
       }
     } catch (error) {
       console.error("Erreur lors de la recherche d'image:", error);
       toast({
         title: "Erreur",
-        description: "Une erreur est survenue lors de la recherche d'image",
+        description: "Une erreur est survenue lors de la recherche d'image. Veuillez réessayer.",
         variant: "destructive"
       });
     } finally {
