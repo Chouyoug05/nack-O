@@ -1,8 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, updateDoc, addDoc, query, where, getDocs } from "firebase/firestore";
+import { doc, updateDoc, addDoc, query, where, getDocs, getDoc, collectionGroup } from "firebase/firestore";
 import { notificationsColRef, paymentsColRef, receiptsColRef } from "@/lib/collections";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
@@ -12,9 +12,106 @@ const PaymentSuccess = () => {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const [establishmentInfo, setEstablishmentInfo] = useState<{ name: string; logoUrl?: string } | null>(null);
 
   useEffect(() => {
     const run = async () => {
+      // Pour les paiements menu digital, l'utilisateur n'est pas nécessairement authentifié
+      const reference = searchParams.get('reference') || '';
+      const isMenuDigitalPayment = reference.includes('menu-digital');
+      
+      if (isMenuDigitalPayment) {
+        // Charger les informations de l'établissement depuis la transaction
+        const transactionId = searchParams.get('transactionId') || '';
+        const orderId = searchParams.get('orderId') || '';
+        
+        if (transactionId) {
+          try {
+            // Chercher la transaction dans toutes les collections payments
+            const paymentsQuery = query(
+              collectionGroup(db, 'payments'),
+              where('transactionId', '==', transactionId)
+            );
+            const snapshot = await getDocs(paymentsQuery);
+            
+            if (!snapshot.empty) {
+              const paymentData = snapshot.docs[0].data() as PaymentTransaction;
+              const establishmentId = paymentData.establishmentId;
+              
+              if (establishmentId) {
+                // Charger les infos de l'établissement
+                const profileDoc = await getDoc(doc(db, 'profiles', establishmentId));
+                if (profileDoc.exists()) {
+                  const profileData = profileDoc.data();
+                  setEstablishmentInfo({
+                    name: profileData.establishmentName || 'Établissement',
+                    logoUrl: profileData.logoUrl,
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Erreur chargement établissement:', error);
+          }
+        }
+        
+        // Mettre à jour la transaction et la commande même sans authentification
+        try {
+          const transactionId = searchParams.get('transactionId') || '';
+          
+          if (transactionId) {
+            const paymentsQuery = query(
+              collectionGroup(db, 'payments'),
+              where('transactionId', '==', transactionId)
+            );
+            const snapshot = await getDocs(paymentsQuery);
+            
+            if (!snapshot.empty) {
+              const paymentDoc = snapshot.docs[0];
+              const paymentData = paymentDoc.data() as PaymentTransaction;
+              
+              // Mettre à jour la transaction
+              await updateDoc(paymentDoc.ref, {
+                status: 'completed',
+                paidAt: Date.now(),
+                updatedAt: Date.now(),
+              });
+              
+              // Mettre à jour la commande si orderId fourni
+              if (orderId && paymentData.establishmentId) {
+                const orderRef = doc(db, `profiles/${paymentData.establishmentId}/barOrders`, orderId);
+                await updateDoc(orderRef, {
+                  status: 'paid',
+                  paidAt: Date.now(),
+                  paymentMethod: 'airtel-money',
+                  paymentTransactionId: transactionId,
+                });
+              }
+              
+              // Rediriger vers le menu après 3 secondes
+              setTimeout(() => {
+                if (paymentData.establishmentId) {
+                  navigate(`/commande/${paymentData.establishmentId}`, { 
+                    replace: true,
+                    state: { paymentSuccess: true }
+                  });
+                } else {
+                  navigate('/', { replace: true });
+                }
+              }, 3000);
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Erreur traitement paiement menu digital:', error);
+        }
+        
+        // Redirection par défaut si erreur
+        setTimeout(() => navigate('/', { replace: true }), 3000);
+        return;
+      }
+      
+      // Pour les autres types de paiement, authentification requise
       if (!user) return;
       try {
         const now = Date.now();
@@ -174,7 +271,10 @@ const PaymentSuccess = () => {
                 
                 // Pour les paiements Menu Digital, rediriger vers la page de commande
                 if (isMenuDigitalPayment && orderId) {
-                  setTimeout(() => navigate(`/menu/${paymentTransaction.establishmentId || user.uid}`, { replace: true }), 2000);
+                  setTimeout(() => navigate(`/commande/${paymentTransaction.establishmentId || user.uid}`, { 
+                    replace: true,
+                    state: { paymentSuccess: true }
+                  }), 2000);
                   return;
                 }
                 
@@ -256,7 +356,7 @@ const PaymentSuccess = () => {
           // Rediriger vers la page de commande avec un message de succès
           setTimeout(() => {
             if (paymentTransaction.establishmentId) {
-              navigate(`/menu/${paymentTransaction.establishmentId}`, { 
+              navigate(`/commande/${paymentTransaction.establishmentId}`, { 
                 replace: true,
                 state: { paymentSuccess: true }
               });
@@ -422,13 +522,39 @@ const PaymentSuccess = () => {
     run();
   }, [user, profile, navigate, searchParams]);
 
+  const reference = searchParams.get('reference') || '';
+  const isMenuDigitalPayment = reference.includes('menu-digital');
+
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
-      <div className="max-w-md w-full text-center space-y-4">
-        <h1 className="text-2xl font-bold">Paiement confirmé</h1>
-        <p className="text-sm text-muted-foreground">Votre abonnement a été activé. Redirection…</p>
-        <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg text-sm text-yellow-800">
-          Avertissement: le paiement est disponible uniquement via <strong>Airtel Money</strong>. Moov Money est momentanément indisponible.
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-md w-full text-center space-y-6 bg-white rounded-2xl shadow-xl p-8">
+        {establishmentInfo?.logoUrl && (
+          <div className="flex justify-center mb-4">
+            <img 
+              src={establishmentInfo.logoUrl} 
+              alt={establishmentInfo.name}
+              className="w-20 h-20 rounded-full object-cover border-4 border-green-500"
+            />
+          </div>
+        )}
+        <div className="flex justify-center mb-4">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+            <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+        </div>
+        <h1 className="text-3xl font-bold text-gray-900">
+          {isMenuDigitalPayment ? 'Paiement confirmé !' : 'Paiement confirmé'}
+        </h1>
+        <p className="text-sm text-gray-600">
+          {isMenuDigitalPayment 
+            ? 'Votre commande a été payée avec succès. Vous allez être redirigé vers le menu...'
+            : 'Votre abonnement a été activé. Redirection…'}
+        </p>
+        <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">
+          <p className="font-semibold mb-1">💳 Paiement par Airtel Money</p>
+          <p className="text-xs">Le paiement est disponible uniquement via <strong>Airtel Money</strong> pour le moment.</p>
         </div>
       </div>
     </div>

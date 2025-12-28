@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useLocation } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData, updateDoc, getDocs } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
@@ -67,6 +67,7 @@ interface Establishment {
 const PublicOrderingPage = () => {
   // Hooks de routing
   const params = useParams<{ establishmentId: string }>();
+  const location = useLocation();
   const establishmentId = useMemo(() => params?.establishmentId ?? null, [params?.establishmentId]);
   
   // State
@@ -88,6 +89,7 @@ const PublicOrderingPage = () => {
   const [showAirtelNumberDialog, setShowAirtelNumberDialog] = useState(false);
   const [airtelNumberInput, setAirtelNumberInput] = useState("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   // Livraison
   const [isDelivery, setIsDelivery] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -104,6 +106,16 @@ const PublicOrderingPage = () => {
     const deliveryFee = (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0;
     return itemsTotal + deliveryFee;
   }, [cart, isDelivery, establishment]);
+
+  // Vérifier si on revient d'un paiement réussi
+  useEffect(() => {
+    if (location.state && (location.state as any).paymentSuccess) {
+      setShowPaymentSuccess(true);
+      setCart([]); // Vider le panier après paiement réussi
+      // Masquer le message après 5 secondes
+      setTimeout(() => setShowPaymentSuccess(false), 5000);
+    }
+  }, [location.state]);
 
   // Charger le thème du menu
   useEffect(() => {
@@ -429,8 +441,9 @@ const PublicOrderingPage = () => {
           const base = (import.meta.env.VITE_PUBLIC_BASE_URL as string || window.location.origin).replace(/\/+$/, '');
           const reference = `menu-digital-${orderNumberValue}`;
           const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&orderId=${orderDocRef.id}`;
-          const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
-          const logoURL = `${base}/favicon.png`;
+          const redirectError = `${base}/payment/error?reference=${reference}&transactionId=${transactionId}`;
+          // Utiliser le logo de l'établissement, ou un logo par défaut
+          const logoURL = establishment?.logoUrl || `${base}/favicon.png`;
 
           // Enregistrer la transaction de paiement
           // IMPORTANT: Le montant 'total' correspond au total de la commande (articles du panier),
@@ -688,27 +701,50 @@ const PublicOrderingPage = () => {
 
   return (
     <div className="min-h-screen pb-24" style={getBackgroundStyle()}>
+      {/* Message de succès après paiement */}
+      {showPaymentSuccess && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md px-4">
+          <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4 shadow-lg flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-green-900">Paiement réussi !</p>
+              <p className="text-sm text-green-700">Votre commande a été payée avec succès.</p>
+            </div>
+            <button
+              onClick={() => setShowPaymentSuccess(false)}
+              className="text-green-600 hover:text-green-800"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Header avec logo */}
       <header className="sticky top-0 z-10 bg-white/98 backdrop-blur-sm shadow-md border-b-2" style={{ borderColor: menuTheme.primaryColor + '40' }}>
-        <div className="container mx-auto px-4 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3 sm:py-5 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
             {establishment?.logoUrl && (
               <img 
                 src={establishment.logoUrl} 
                 alt={establishment.establishmentName} 
-                className="w-14 h-14 rounded-full object-cover border-2 shadow-sm"
+                className="w-10 h-10 sm:w-14 sm:h-14 rounded-full object-cover border-2 shadow-sm flex-shrink-0"
                 style={{ borderColor: menuTheme.primaryColor }}
               />
             )}
-            <h1 className="text-3xl font-bold tracking-wide" style={{ color: menuTheme.primaryColor, fontFamily: menuTheme.titleFont || 'Georgia, serif' }}>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-wide truncate" style={{ color: menuTheme.primaryColor, fontFamily: menuTheme.titleFont || 'Georgia, serif' }}>
               {establishment?.establishmentName || "Menu"}
             </h1>
           </div>
-          <div className="relative cursor-pointer">
-            <ShoppingBag className="w-7 h-7" style={{ color: menuTheme.primaryColor }} />
+          <div className="relative cursor-pointer flex-shrink-0 ml-2">
+            <ShoppingBag className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: menuTheme.primaryColor }} />
             {cart.length > 0 && (
               <span 
-                className="absolute -top-2 -right-2 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center font-bold shadow-lg"
+                className="absolute -top-2 -right-2 text-white text-xs rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center font-bold shadow-lg"
                 style={{ backgroundColor: menuTheme.primaryColor }}
               >
                 {cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -718,10 +754,10 @@ const PublicOrderingPage = () => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 pb-32 sm:pb-24">
         {/* Filtres et recherche */}
-        <div className="mb-6 space-y-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <div className="mb-4 sm:mb-6 space-y-3 sm:space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={18} />
               <Input
@@ -755,7 +791,7 @@ const PublicOrderingPage = () => {
         </div>
 
         {/* Grille produits - 2 colonnes mobile, 3 colonnes tablette+ */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
           {filteredProducts.map((product) => {
             const priceValue = typeof product.price === 'number' 
               ? product.price 
@@ -831,15 +867,15 @@ const PublicOrderingPage = () => {
 
       {/* Panier fixe en bas */}
       {cart.length > 0 && (
-        <footer className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-4 z-20">
-          <div className="container mx-auto flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Total</p>
-              <p className="text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>
+        <footer className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-2 sm:p-4 z-20">
+          <div className="container mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
+            <div className="flex-1">
+              <p className="text-xs sm:text-sm text-gray-600">Total</p>
+              <p className="text-lg sm:text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>
                 {total.toLocaleString('fr-FR')} XAF
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap sm:flex-nowrap">
               <Button
                 onClick={() => {
                   if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
@@ -849,31 +885,35 @@ const PublicOrderingPage = () => {
                   }
                 }}
                 variant="outline"
-                className="px-6"
+                className="px-4 sm:px-6 text-sm sm:text-base flex-1 sm:flex-none"
                 style={{ borderColor: menuTheme.primaryColor, color: menuTheme.primaryColor }}
               >
                 Commander
               </Button>
               {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
-                <Button
-                  onClick={() => {
-                    if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
-                      setShowTableDialog(true);
-                    } else {
-                      placeOrder(true);
-                    }
-                  }}
-                  disabled={isProcessingPayment}
-                  className="px-6 text-white"
-                  style={{ backgroundColor: menuTheme.primaryColor }}
-                >
-                  {isProcessingPayment ? 'Traitement...' : (
-                    <>
-                      <CreditCard className="w-4 h-4 mr-2" />
-                      Payer {total.toLocaleString('fr-FR')} XAF
-                    </>
-                  )}
-                </Button>
+                <div className="flex flex-col items-stretch sm:items-end gap-1 flex-1 sm:flex-none">
+                  <Button
+                    onClick={() => {
+                      if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
+                        setShowTableDialog(true);
+                      } else {
+                        placeOrder(true);
+                      }
+                    }}
+                    disabled={isProcessingPayment}
+                    className="px-4 sm:px-6 text-white text-sm sm:text-base w-full sm:w-auto"
+                    style={{ backgroundColor: menuTheme.primaryColor }}
+                  >
+                    {isProcessingPayment ? 'Traitement...' : (
+                      <>
+                        <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                        <span className="hidden sm:inline">Payer </span>
+                        {total.toLocaleString('fr-FR')} XAF
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-xs text-gray-500 text-center sm:text-right">💳 Airtel Money uniquement</p>
+                </div>
               )}
             </div>
           </div>
@@ -882,7 +922,7 @@ const PublicOrderingPage = () => {
 
       {/* Panier flottant */}
       {cart.length > 0 && (
-        <div className="fixed bottom-24 right-4 bg-white rounded-lg shadow-xl p-4 max-w-xs max-h-64 overflow-y-auto z-10 border" style={{ borderColor: menuTheme.primaryColor + '30' }}>
+        <div className="fixed bottom-20 sm:bottom-24 right-2 sm:right-4 bg-white rounded-lg shadow-xl p-3 sm:p-4 max-w-xs max-h-64 overflow-y-auto z-10 border hidden sm:block" style={{ borderColor: menuTheme.primaryColor + '30' }}>
           <h3 className="font-bold mb-2" style={{ color: menuTheme.primaryColor }}>Panier</h3>
           <div className="max-h-40 overflow-y-auto">
             {cart.map((item) => (
@@ -1048,24 +1088,27 @@ const PublicOrderingPage = () => {
                   Commander
                 </Button>
                 {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
-                  <Button
-                    onClick={() => {
-                      if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
-                        setShowTableDialog(false);
-                        placeOrder(true);
-                      }
-                    }}
-                    disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable) || isProcessingPayment}
-                    className="flex-1 text-white"
-                    style={{ backgroundColor: menuTheme.primaryColor }}
-                  >
-                    {isProcessingPayment ? '...' : (
-                      <>
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Payer
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex-1 flex flex-col gap-1">
+                    <Button
+                      onClick={() => {
+                        if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
+                          setShowTableDialog(false);
+                          placeOrder(true);
+                        }
+                      }}
+                      disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable) || isProcessingPayment}
+                      className="w-full text-white"
+                      style={{ backgroundColor: menuTheme.primaryColor }}
+                    >
+                      {isProcessingPayment ? '...' : (
+                        <>
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Payer
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-center text-gray-500">💳 Airtel Money uniquement</p>
+                  </div>
                 )}
               </div>
             </div>
