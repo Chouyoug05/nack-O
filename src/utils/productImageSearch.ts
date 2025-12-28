@@ -57,6 +57,60 @@ const productTranslations: Record<string, string> = {
 };
 
 /**
+ * Dictionnaire de descriptions détaillées pour produits locaux/africains
+ * Utilisé pour générer des images précises via IA
+ */
+const productDescriptions: Record<string, string> = {
+  // Produits locaux africains
+  "alloco": "fried plantain banana fritters, golden brown, crispy on the outside, soft inside, West African street food",
+  "alloco banane": "fried plantain banana fritters, golden brown, crispy on the outside, soft inside, West African street food",
+  "banane plantain": "fried plantain banana fritters, golden brown, crispy on the outside, soft inside, West African street food",
+  "beignet": "African donut, fried dough, golden brown, round shape, sweet, West African street food",
+  "beignet banane": "banana fritter, fried banana dough, golden brown, crispy, West African snack",
+  "poulet braisé": "grilled chicken, marinated, charred skin, West African style, served with onions and spices",
+  "poulet DG": "chicken DG, sautéed chicken with vegetables, plantains, spicy sauce, West African dish",
+  "riz gras": "jollof rice, one-pot rice dish, red-orange color, with vegetables and meat, West African cuisine",
+  "jollof": "jollof rice, one-pot rice dish, red-orange color, with vegetables and meat, West African cuisine",
+  "riz sauce": "rice with sauce, white rice with tomato-based sauce, vegetables, West African dish",
+  "attiéké": "cassava couscous, fermented cassava, white grains, served with fish or meat, Ivorian dish",
+  "foutou": "fufu, pounded cassava and plantain, white smooth dough, served with soup, West African dish",
+  "fufu": "pounded cassava and plantain, white smooth dough, served with soup, West African dish",
+  "ndolé": "bitterleaf stew, green leafy vegetable stew, with meat or fish, peanuts, Cameroonian dish",
+  "poulet yassa": "chicken yassa, marinated chicken with onions, lemon, mustard, Senegalese dish",
+  "thieboudienne": "ceebu jen, rice with fish and vegetables, red sauce, Senegalese national dish",
+  "mafé": "peanut stew, meat in peanut sauce, rich brown sauce, West African dish",
+  "tchep": "rice with fish, red rice dish, vegetables, West African cuisine",
+  "akara": "black-eyed pea fritters, fried bean fritters, golden brown, round shape, West African snack",
+  "bissap": "hibiscus drink, red-purple color, refreshing, West African beverage",
+  "gingembre": "ginger drink, spicy ginger beverage, golden color, West African drink",
+  "tamarin": "tamarind drink, sweet and sour, brown color, West African beverage",
+  "dablé": "peanut brittle, sweet peanut candy, West African snack",
+  "koki": "steamed black-eyed pea pudding, wrapped in leaves, Cameroonian dish",
+  "eru": "wild spinach stew, green leafy vegetable, with meat or fish, Cameroonian dish",
+  "achu": "pounded cocoyam, yellow-orange color, served with soup, Cameroonian dish",
+  "kwacoco": "steamed cocoyam, wrapped in leaves, Cameroonian dish",
+  "bobolo": "fermented cassava sticks, wrapped in leaves, Cameroonian dish",
+  "soya": "grilled meat skewers, spicy, charred, West African street food",
+  "suya": "spicy grilled meat skewers, peanut spice rub, charred, West African street food",
+  "brochette": "grilled meat skewers, marinated, charred, West African street food",
+  "poisson braisé": "grilled fish, whole fish, charred skin, West African style",
+  "poisson frit": "fried fish, whole fish, golden brown, crispy skin, West African style",
+  "sauce arachide": "peanut sauce, rich brown sauce, with meat or vegetables, West African sauce",
+  "sauce gombo": "okra sauce, green slimy sauce, with meat or fish, West African sauce",
+  "sauce tomate": "tomato sauce, red sauce, with meat or fish, West African sauce",
+  "couscous": "couscous, small grains, served with sauce, North African dish",
+  "tajine": "tagine, slow-cooked stew, with meat and vegetables, North African dish",
+  "pastel": "fried pastry, filled with fish or meat, golden brown, West African snack",
+  "fataya": "fried pastry, filled with meat or fish, triangular shape, West African snack",
+  "dibi": "grilled lamb or mutton, charred, served with onions, Senegalese dish",
+  "yassa": "marinated meat or fish with onions, lemon, mustard, Senegalese dish",
+  "thiakry": "millet couscous dessert, sweet, with yogurt, Senegalese dessert",
+  "thiakri": "millet couscous dessert, sweet, with yogurt, Senegalese dessert",
+  "jus de bissap": "hibiscus juice, red-purple color, refreshing, West African beverage",
+  "jus de gingembre": "ginger juice, spicy ginger beverage, golden color, West African drink",
+};
+
+/**
  * Traduit un nom de produit français en anglais pour améliorer la recherche
  */
 const translateProductName = (productName: string): string => {
@@ -357,34 +411,63 @@ const generateImageWithGemini = async (productName: string, category?: string): 
 };
 
 /**
+ * Trouve une description détaillée pour un produit local/africain
+ */
+const getProductDescription = (productName: string): string | null => {
+  const lowerName = productName.toLowerCase().trim();
+  
+  // Chercher une correspondance exacte
+  if (productDescriptions[lowerName]) {
+    return productDescriptions[lowerName];
+  }
+  
+  // Chercher une correspondance partielle
+  for (const [key, description] of Object.entries(productDescriptions)) {
+    if (lowerName.includes(key) || key.includes(lowerName)) {
+      return description;
+    }
+  }
+  
+  return null;
+};
+
+/**
  * Construit un prompt optimisé pour la génération d'image via IA
  * Le prompt est conçu pour générer une image spécifique du produit mentionné
  */
 const buildImageGenerationPrompt = (productName: string, category?: string): string => {
-  // Traduire le nom du produit en anglais si nécessaire pour améliorer la génération
+  // Vérifier d'abord si c'est un produit local avec une description détaillée
+  const productDescription = getProductDescription(productName);
+  
+  if (productDescription) {
+    // Utiliser la description détaillée pour les produits locaux
+    return `Generate a high-quality professional food photography image of ${productDescription}, restaurant menu style, good lighting, sharp focus, centered composition, appetizing appearance, suitable for menu display`;
+  }
+  
+  // Pour les autres produits, traduire le nom en anglais
   const translatedName = translateProductName(productName);
   
   // Commencer avec le nom du produit comme élément principal
-  let prompt = `Generate an image of ${translatedName}`;
+  let prompt = `Generate a high-quality professional food photography image of ${translatedName}`;
   
   // Ajouter des détails spécifiques selon la catégorie pour guider la génération
   if (category) {
     const categoryPrompts: Record<string, string> = {
-      "Boisson alcoolisée": "showing the drink in a glass or bottle, clean restaurant background, professional food photography",
-      "Boisson non alcoolisée": "showing the drink in a glass, refreshing appearance, restaurant style, professional food photography",
-      "Plat / Repas": "showing the dish beautifully plated, restaurant presentation, professional food photography",
-      "Snack": "showing the snack food, appetizing appearance, restaurant quality, professional food photography",
-      "Dessert": "showing the dessert, delicious presentation, restaurant style, professional food photography",
-      "Entrée": "showing the starter dish, appetizing presentation, restaurant style, professional food photography",
+      "Boisson alcoolisée": "showing the drink in a glass or bottle, clean restaurant background",
+      "Boisson non alcoolisée": "showing the drink in a glass, refreshing appearance, restaurant style",
+      "Plat / Repas": "showing the dish beautifully plated, restaurant presentation",
+      "Snack": "showing the snack food, appetizing appearance, restaurant quality",
+      "Dessert": "showing the dessert, delicious presentation, restaurant style",
+      "Entrée": "showing the starter dish, appetizing presentation, restaurant style",
     };
     
     if (categoryPrompts[category]) {
-      prompt = `Generate an image of ${translatedName}, ${categoryPrompts[category]}`;
+      prompt += `, ${categoryPrompts[category]}`;
     } else {
-      prompt += ", professional food photography, restaurant style, high quality";
+      prompt += ", restaurant style, high quality";
     }
   } else {
-    prompt += ", professional food photography, restaurant style, high quality, appetizing";
+    prompt += ", restaurant style, high quality, appetizing";
   }
   
   // Ajouter des instructions supplémentaires pour garantir la qualité
