@@ -490,6 +490,47 @@ const generatePlaceholderImage = (productName: string, category?: string): strin
 };
 
 /**
+ * Recherche des images via Google Images en utilisant une fonction backend (Playwright/Puppeteer)
+ * Retourne jusqu'à 3 images pour que l'utilisateur puisse choisir
+ */
+export const searchGoogleImages = async (
+  productName: string,
+  category?: string
+): Promise<string[]> => {
+  try {
+    const query = buildSearchQuery(productName, category);
+    
+    // Appeler la fonction Netlify qui utilise Playwright/Puppeteer pour scraper Google Images
+    const baseUrl = import.meta.env.VITE_PUBLIC_BASE_URL || window.location.origin;
+    const apiUrl = `${baseUrl}/.netlify/functions/search-google-images`;
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      console.warn(`Erreur API recherche images (${response.status}): ${response.statusText}`);
+      return [];
+    }
+
+    const data = await response.json();
+    
+    if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+      return data.images.slice(0, 3);
+    }
+
+    return [];
+  } catch (error) {
+    console.error('Erreur recherche Google Images:', error);
+    return [];
+  }
+};
+
+/**
  * Recherche une image pour un produit
  * @param productName - Nom du produit
  * @param category - Catégorie du produit (optionnel)

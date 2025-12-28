@@ -51,7 +51,7 @@ import type { ProductDoc, LossDoc, FoodCost } from "@/types/inventory";
 import type { UserProfile } from "@/types/profile";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
-import { searchProductImage } from "@/utils/productImageSearch";
+import { searchProductImage, searchGoogleImages } from "@/utils/productImageSearch";
 
 interface Product {
   id: string;
@@ -197,6 +197,8 @@ const StockPage = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
   const [isSearchingImage, setIsSearchingImage] = useState(false);
+  const [showImageSelectionDialog, setShowImageSelectionDialog] = useState(false);
+  const [foundImages, setFoundImages] = useState<string[]>([]);
 
   const [lossData, setLossData] = useState({
     productId: "",
@@ -348,7 +350,7 @@ const StockPage = () => {
     return iconItem ? iconItem.icon : Package;
   };
 
-  // Fonction pour rechercher automatiquement une image
+  // Fonction pour rechercher automatiquement des images sur Google Images
   const handleSearchImage = async () => {
     if (!newProduct.name || newProduct.name.trim().length === 0) {
       toast({
@@ -361,19 +363,27 @@ const StockPage = () => {
 
     setIsSearchingImage(true);
     try {
-      const imageUrl = await searchProductImage(newProduct.name, newProduct.category);
-      if (imageUrl) {
-        setNewProduct({ ...newProduct, imageUrl });
-        toast({
-          title: "Image trouvée !",
-          description: "Une image a été trouvée et ajoutée au produit"
-        });
+      // Rechercher des images via Google Images
+      const images = await searchGoogleImages(newProduct.name, newProduct.category);
+      if (images && images.length > 0) {
+        setFoundImages(images);
+        setShowImageSelectionDialog(true);
       } else {
-        toast({
-          title: "Aucune image trouvée",
-          description: "Impossible de trouver une image pour ce produit. Vous pouvez télécharger une image manuellement.",
-          variant: "destructive"
-        });
+        // Si Google Images ne fonctionne pas, essayer la méthode classique
+        const imageUrl = await searchProductImage(newProduct.name, newProduct.category);
+        if (imageUrl) {
+          setNewProduct({ ...newProduct, imageUrl });
+          toast({
+            title: "Image trouvée !",
+            description: "Une image a été trouvée et ajoutée au produit"
+          });
+        } else {
+          toast({
+            title: "Aucune image trouvée",
+            description: "Impossible de trouver une image pour ce produit. Vous pouvez télécharger une image manuellement.",
+            variant: "destructive"
+          });
+        }
       }
     } catch (error) {
       console.error("Erreur lors de la recherche d'image:", error);
@@ -385,6 +395,17 @@ const StockPage = () => {
     } finally {
       setIsSearchingImage(false);
     }
+  };
+
+  // Fonction pour sélectionner une image parmi les résultats
+  const handleSelectImage = (imageUrl: string) => {
+    setNewProduct({ ...newProduct, imageUrl });
+    setShowImageSelectionDialog(false);
+    setFoundImages([]);
+    toast({
+      title: "Image sélectionnée !",
+      description: "L'image a été ajoutée au produit"
+    });
   };
 
   const filteredProducts = products.filter(product => {
@@ -2132,6 +2153,58 @@ const StockPage = () => {
             <Button variant="outline" onClick={() => setIsSecurityDialogOpen(false)}>Annuler</Button>
             <Button onClick={handleSaveSecurityCode} disabled={isSavingCode} className="bg-gradient-primary text-white">
               {isSavingCode ? 'Enregistrement…' : 'Enregistrer le code'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de sélection d'image depuis Google Images */}
+      <Dialog open={showImageSelectionDialog} onOpenChange={setShowImageSelectionDialog}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Choisir une image pour "{newProduct.name}"</DialogTitle>
+            <DialogDescription>
+              Sélectionnez l'image qui correspond le mieux à votre produit parmi les résultats de recherche Google Images.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
+            {foundImages.map((imageUrl, index) => (
+              <div
+                key={index}
+                className="relative group cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-all"
+                onClick={() => handleSelectImage(imageUrl)}
+              >
+                <img
+                  src={imageUrl}
+                  alt={`Option ${index + 1}`}
+                  className="w-full h-48 object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
+                  <Button
+                    variant="default"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectImage(imageUrl);
+                    }}
+                  >
+                    Sélectionner
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          {foundImages.length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>Aucune image trouvée. Veuillez réessayer ou télécharger une image manuellement.</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setShowImageSelectionDialog(false)}>
+              Annuler
             </Button>
           </div>
         </DialogContent>
