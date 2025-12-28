@@ -257,6 +257,115 @@ const searchPixabay = async (query: string): Promise<string | null> => {
 };
 
 /**
+ * Configuration Gemini - Clé API pour génération d'images
+ * Obtenez votre clé sur: https://aistudio.google.com/apikey
+ */
+const GEMINI_API_KEY = "AIzaSyAGFIIBvG21u8O7PA-lGLk7Dy9i595doXQ";
+
+/**
+ * Génère une image via l'API Gemini (Imagen)
+ * Utilise le modèle gemini-2.0-flash-exp-image-generation pour générer des images
+ */
+const generateImageWithGemini = async (productName: string, category?: string): Promise<string | null> => {
+  if (!GEMINI_API_KEY) {
+    return null;
+  }
+
+  try {
+    // Construire un prompt descriptif pour générer l'image
+    const prompt = buildImageGenerationPrompt(productName, category);
+    
+    // Utiliser l'API Gemini pour générer l'image
+    // Modèle: gemini-2.0-flash-exp-image-generation (modèle expérimental pour génération d'images)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp-image-generation:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+          }
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(`Erreur Gemini API (${response.status}): ${errorText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    // L'API Gemini retourne l'image dans les parts de la réponse
+    if (data.candidates && data.candidates[0]?.content?.parts) {
+      const parts = data.candidates[0].content.parts;
+      
+      // Chercher une partie avec une image (base64)
+      for (const part of parts) {
+        if (part.inlineData && part.inlineData.data) {
+          // Image en base64 - convertir en data URL pour l'affichage
+          const mimeType = part.inlineData.mimeType || 'image/png';
+          return `data:${mimeType};base64,${part.inlineData.data}`;
+        }
+        // Si l'API retourne une URL d'image
+        if (part.url) {
+          return part.url;
+        }
+      }
+    }
+
+    // Si aucune image trouvée dans la réponse standard, essayer d'autres formats
+    if (data.imageData) {
+      return `data:image/png;base64,${data.imageData}`;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Erreur génération image Gemini:', error);
+    return null;
+  }
+};
+
+/**
+ * Construit un prompt optimisé pour la génération d'image via IA
+ */
+const buildImageGenerationPrompt = (productName: string, category?: string): string => {
+  let prompt = `A professional, appetizing photo of ${productName}`;
+  
+  // Ajouter des détails selon la catégorie
+  if (category) {
+    const categoryPrompts: Record<string, string> = {
+      "Boisson alcoolisée": "a glass or bottle on a clean background, restaurant style",
+      "Boisson non alcoolisée": "a refreshing drink in a glass, restaurant style",
+      "Plat / Repas": "a beautifully plated dish, restaurant presentation",
+      "Snack": "appetizing snack food, restaurant quality",
+      "Dessert": "a delicious dessert, restaurant presentation",
+      "Entrée": "an appetizing starter dish, restaurant presentation",
+    };
+    
+    if (categoryPrompts[category]) {
+      prompt += `, ${categoryPrompts[category]}`;
+    }
+  }
+  
+  prompt += ", high quality, professional photography, good lighting, appetizing";
+  
+  return prompt;
+};
+
+/**
  * Génère une image placeholder basée sur le nom du produit
  * Utilise un service d'images placeholder avec un seed basé sur le nom
  */
@@ -313,6 +422,12 @@ export const searchProductImage = async (
   const pixabayImage = await searchPixabay(query);
   if (pixabayImage) {
     return pixabayImage;
+  }
+
+  // Essayer de générer une image via Gemini/Imagen si une clé API est configurée
+  const geminiImage = await generateImageWithGemini(productName, category);
+  if (geminiImage) {
+    return geminiImage;
   }
 
   // En dernier recours, générer une image placeholder
