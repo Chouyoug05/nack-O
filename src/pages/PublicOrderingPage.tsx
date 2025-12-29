@@ -414,25 +414,6 @@ const PublicOrderingPage = () => {
       const orderNumberValue = `CMD${Date.now().toString().slice(-6)}`;
       const receiptNumber = `RCP${Date.now().toString().slice(-6)}`;
 
-      const orderData = {
-        orderNumber: orderNumberValue,
-        receiptNumber,
-        tableZone: isDelivery ? 'Livraison' : selectedTable,
-        items: cart,
-        total,
-        status: 'pending',
-        createdAt: Date.now(),
-        isDelivery: isDelivery || false,
-        deliveryAddress: isDelivery ? deliveryAddress : undefined,
-        deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
-        customerInfo: {
-          userAgent: navigator.userAgent,
-          timestamp: Date.now()
-        }
-      };
-
-      const orderDocRef = await addDoc(collection(db, `profiles/${establishmentId}/barOrders`), orderData);
-
       // Si paiement demandé et Disbursement ID configuré
       if (withPayment && establishment?.disbursementId && establishment.disbursementStatus === 'approved') {
         setIsProcessingPayment(true);
@@ -440,14 +421,34 @@ const PublicOrderingPage = () => {
           const transactionId = `TXN-MENU-${establishmentId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
           const base = (import.meta.env.VITE_PUBLIC_BASE_URL as string || window.location.origin).replace(/\/+$/, '');
           const reference = `menu-digital-${orderNumberValue}`;
-          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&orderId=${orderDocRef.id}&establishmentId=${establishmentId}`;
+          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`;
           const redirectError = `${base}/payment/error?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`;
           // Utiliser le logo de l'établissement, ou un logo par défaut
           const logoURL = establishment?.logoUrl || `${base}/favicon.png`;
 
-          // Enregistrer la transaction de paiement
+          // Préparer les données de commande à stocker dans la transaction
+          // La commande sera créée seulement après paiement réussi
+          const orderData = {
+            orderNumber: orderNumberValue,
+            receiptNumber,
+            tableZone: isDelivery ? 'Livraison' : selectedTable,
+            items: cart,
+            total,
+            status: 'pending',
+            createdAt: Date.now(),
+            isDelivery: isDelivery || false,
+            deliveryAddress: isDelivery ? deliveryAddress : undefined,
+            deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
+            customerInfo: {
+              userAgent: navigator.userAgent,
+              timestamp: Date.now()
+            }
+          };
+
+          // Enregistrer la transaction de paiement avec les données de commande
           // IMPORTANT: Le montant 'total' correspond au total de la commande (articles du panier),
           // PAS au prix de l'abonnement mensuel. C'est calculé comme: sum(item.price * item.quantity)
+          // La commande sera créée seulement après paiement réussi dans PaymentSuccess.tsx
           await addDoc(paymentsColRef(db, establishmentId), {
             userId: establishmentId,
             transactionId,
@@ -459,9 +460,10 @@ const PublicOrderingPage = () => {
             paymentLink: '',
             redirectSuccess,
             redirectError,
-            orderId: orderDocRef.id,
             establishmentId,
             disbursementId: establishment.disbursementId,
+            // Stocker les données de commande dans la transaction pour création après paiement
+            orderData: orderData,
             createdAt: Date.now(),
           });
 
@@ -492,13 +494,13 @@ const PublicOrderingPage = () => {
           return;
         } catch (error) {
           console.error('Erreur création paiement:', error);
-          alert('Erreur lors de la création du lien de paiement. La commande a été enregistrée mais le paiement n\'a pas pu être initié.');
+          alert('Erreur lors de la création du lien de paiement. Veuillez réessayer.');
         } finally {
           setIsProcessingPayment(false);
         }
       }
 
-      // Si pas de paiement ou paiement échoué, continuer normalement
+      // Si pas de paiement, créer la commande immédiatement
       const receiptData = {
         orderNumber: orderNumberValue,
         receiptNumber,

@@ -15,9 +15,10 @@ export interface PaymentTransaction {
   subscriptionEndsAt?: number; // Date de fin d'abonnement après paiement
   notes?: string; // Notes supplémentaires
   // Pour les paiements Menu Digital
-  orderId?: string; // ID de la commande associée
+  orderId?: string; // ID de la commande associée (créée après paiement réussi)
   establishmentId?: string; // ID de l'établissement
   disbursementId?: string; // Disbursement ID utilisé pour ce paiement
+  orderData?: any; // Données de la commande à créer après paiement réussi (si paiement demandé)
 }
 
 export interface DisbursementRequest {

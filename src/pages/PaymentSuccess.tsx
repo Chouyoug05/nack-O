@@ -68,7 +68,7 @@ const PaymentSuccess = () => {
             
             if (!snapshot.empty) {
               const paymentDoc = snapshot.docs[0];
-              const paymentData = paymentDoc.data() as PaymentTransaction;
+              const paymentData = paymentDoc.data() as PaymentTransaction & { orderData?: any };
               
               // Mettre à jour la transaction
               await updateDoc(paymentDoc.ref, {
@@ -77,8 +77,26 @@ const PaymentSuccess = () => {
                 updatedAt: Date.now(),
               });
               
-              // Mettre à jour la commande si orderId fourni
-              if (orderId && paymentData.establishmentId) {
+              // CRÉER la commande seulement après paiement réussi
+              // Les données de commande sont stockées dans orderData de la transaction
+              if (paymentData.orderData && paymentData.establishmentId) {
+                const { barOrdersColRef } = await import('@/lib/collections');
+                
+                // Créer la commande avec le statut 'paid' directement
+                const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId), {
+                  ...paymentData.orderData,
+                  status: 'paid', // Commande payée directement
+                  paidAt: Date.now(),
+                  paymentMethod: 'airtel-money',
+                  paymentTransactionId: transactionId,
+                });
+                
+                // Mettre à jour la transaction avec l'ID de la commande créée
+                await updateDoc(paymentDoc.ref, {
+                  orderId: orderDocRef.id,
+                });
+              } else if (orderId && paymentData.establishmentId) {
+                // Fallback : si orderId existe déjà (ancien système), mettre à jour
                 const orderRef = doc(db, `profiles/${paymentData.establishmentId}/barOrders`, orderId);
                 await updateDoc(orderRef, {
                   status: 'paid',
@@ -339,6 +357,8 @@ const PaymentSuccess = () => {
         
         // Gérer les paiements Menu Digital différemment
         if (isMenuDigitalPayment && paymentTransaction) {
+          const paymentData = paymentTransaction as PaymentTransaction & { orderData?: any };
+          
           // Mettre à jour la transaction de paiement
           await updateDoc(doc(paymentsRef, paymentTransaction.id), {
             status: 'completed',
@@ -346,8 +366,30 @@ const PaymentSuccess = () => {
             updatedAt: now,
           });
 
-          // Mettre à jour le statut de la commande si orderId est fourni
-          if (orderId && paymentTransaction.establishmentId) {
+          // CRÉER la commande seulement après paiement réussi
+          // Les données de commande sont stockées dans orderData de la transaction
+          if (paymentData.orderData && paymentTransaction.establishmentId) {
+            try {
+              const { barOrdersColRef } = await import('@/lib/collections');
+              
+              // Créer la commande avec le statut 'paid' directement
+              const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId), {
+                ...paymentData.orderData,
+                status: 'paid', // Commande payée directement
+                paidAt: now,
+                paymentMethod: 'airtel-money',
+                paymentTransactionId: transactionId,
+              });
+              
+              // Mettre à jour la transaction avec l'ID de la commande créée
+              await updateDoc(doc(paymentsRef, paymentTransaction.id), {
+                orderId: orderDocRef.id,
+              });
+            } catch (error) {
+              console.error('Erreur création commande après paiement:', error);
+            }
+          } else if (orderId && paymentTransaction.establishmentId) {
+            // Fallback : si orderId existe déjà (ancien système), mettre à jour
             try {
               const { barOrdersColRef } = await import('@/lib/collections');
               const orderRef = doc(db, `profiles/${paymentTransaction.establishmentId}/barOrders`, orderId);
