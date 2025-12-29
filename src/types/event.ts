@@ -15,6 +15,7 @@ export interface EventDoc {
   ownerUid?: string;
   eventId?: string;
   organizerWhatsapp?: string;
+  paymentEnabled?: boolean; // Activer le paiement en ligne pour cet événement
 }
 
 export type TicketStatus = 'paid' | 'pending' | 'cancelled';

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useEvents, Event } from "@/contexts/EventContext";
 import { canCreateEvent, getCurrentEventsCount } from "@/utils/subscription";
@@ -48,6 +49,7 @@ type NewEventPayload = {
   imageUrl?: string;
   ticketsSold?: number;
   organizerWhatsapp?: string;
+  paymentEnabled?: boolean;
 };
 
 interface Ticket {
@@ -104,7 +106,8 @@ const EventsPage = () => {
     ticketPrice: "",
     currency: "XAF",
     imageUrl: "",
-    organizerWhatsapp: ""
+    organizerWhatsapp: "",
+    paymentEnabled: false
   });
 
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -275,6 +278,7 @@ const EventsPage = () => {
       isActive: true,
       imageUrl: finalImageUrl || undefined,
       organizerWhatsapp: newEvent.organizerWhatsapp || undefined,
+      paymentEnabled: newEvent.paymentEnabled || false,
     } satisfies NewEventPayload;
 
     try {
@@ -290,6 +294,7 @@ const EventsPage = () => {
           currency: data.currency,
           imageUrl: data.imageUrl,
           organizerWhatsapp: data.organizerWhatsapp,
+          paymentEnabled: data.paymentEnabled,
         });
         toast({ title: "Événement modifié", description: `${data.title} a été mis à jour avec succès` });
       } else {
@@ -328,7 +333,7 @@ const EventsPage = () => {
         
         toast({ title: "Événement créé", description: `${data.title} a été créé avec succès` });
       }
-      setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "" });
+      setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "", paymentEnabled: false });
       setSelectedImage(null);
       setImagePreview(null);
       setIsCreateModalOpen(false);
@@ -511,7 +516,8 @@ const EventsPage = () => {
                         ticketPrice: String(event.ticketPrice),
                         currency: event.currency,
                         imageUrl: event.imageUrl || "",
-                        organizerWhatsapp: event.organizerWhatsapp || ""
+                        organizerWhatsapp: event.organizerWhatsapp || "",
+                        paymentEnabled: event.paymentEnabled || false
                       });
                       if (event.imageUrl) setImagePreview(event.imageUrl);
                       setSelectedEvent(event);
@@ -596,7 +602,7 @@ const EventsPage = () => {
           if (!open) {
             setIsEditingEvent(false);
             setSelectedEvent(null);
-            setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "" });
+            setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "", paymentEnabled: false });
             setSelectedImage(null);
             setImagePreview(null);
           }
@@ -606,7 +612,7 @@ const EventsPage = () => {
               onClick={() => {
                 setIsEditingEvent(false);
                 setSelectedEvent(null);
-                setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "" });
+                setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "", paymentEnabled: false });
                 setSelectedImage(null);
                 setImagePreview(null);
               }}
@@ -720,6 +726,23 @@ const EventsPage = () => {
                       onChange={(e) => setNewEvent({...newEvent, organizerWhatsapp: e.target.value})}
                       placeholder="Ex: +241 6XX XX XX XX"
                     />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <div className="flex items-center space-x-2 p-3 border rounded-lg bg-muted/30">
+                      <Checkbox
+                        id="paymentEnabled"
+                        checked={newEvent.paymentEnabled}
+                        onCheckedChange={(checked) => setNewEvent({...newEvent, paymentEnabled: checked === true})}
+                      />
+                      <Label htmlFor="paymentEnabled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                        Activer le paiement en ligne (Airtel Money)
+                      </Label>
+                    </div>
+                    {newEvent.paymentEnabled && (
+                      <p className="text-xs text-muted-foreground ml-6">
+                        Les clients pourront payer leurs billets directement en ligne. Assurez-vous d'avoir configuré votre Disbursement ID dans les paramètres.
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="capacity">Capacité maximale</Label>

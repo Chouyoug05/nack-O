@@ -50,6 +50,7 @@ const EventPublicPage = () => {
             imageUrl: data.imageUrl,
             ownerUid: data.ownerUid,
             organizerWhatsapp: data.organizerWhatsapp,
+            paymentEnabled: data.paymentEnabled ?? false,
           };
           setEvent(e);
           setIsPopupOpen(true);

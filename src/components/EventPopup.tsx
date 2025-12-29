@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Dialog, DialogContent, DialogOverlay } from "@/components/ui/dialog";
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -11,11 +11,14 @@ import {
   Users, 
   Ticket,
   ShoppingCart,
+  CreditCard,
   X
 } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import EventPaymentDialog from "@/components/EventPaymentDialog";
 import { useAuth } from "@/contexts/AuthContext";
+import { db } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
 
 interface EventPopupProps {
   event: Event;
@@ -27,6 +30,32 @@ const EventPopup = ({ event, isOpen, onClose }: EventPopupProps) => {
   const { toast } = useToast();
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const { profile } = useAuth();
+  const [ownerProfile, setOwnerProfile] = useState<{ disbursementId?: string; disbursementStatus?: string } | null>(null);
+  
+  // Récupérer le profil du propriétaire pour vérifier le disbursementId
+  useEffect(() => {
+    const fetchOwnerProfile = async () => {
+      if (event.ownerUid) {
+        try {
+          const profileRef = doc(db, 'profiles', event.ownerUid);
+          const profileSnap = await getDoc(profileRef);
+          if (profileSnap.exists()) {
+            const data = profileSnap.data();
+            setOwnerProfile({
+              disbursementId: data.disbursementId,
+              disbursementStatus: data.disbursementStatus,
+            });
+          }
+        } catch (error) {
+          console.error('Erreur récupération profil propriétaire:', error);
+        }
+      }
+    };
+    
+    if (event.paymentEnabled && event.ownerUid) {
+      fetchOwnerProfile();
+    }
+  }, [event.paymentEnabled, event.ownerUid]);
 
   const handlePaymentSuccess = (ticketData: { quantity: number; eventName: string; totalPrice: number }) => {
     toast({
@@ -57,8 +86,9 @@ const EventPopup = ({ event, isOpen, onClose }: EventPopupProps) => {
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogOverlay className="bg-black/80 backdrop-blur-sm fixed inset-0 z-[100]" />
+      <Dialog open={isOpen && !isPaymentDialogOpen} onOpenChange={(open) => {
+        if (!open) onClose();
+      }}>
         <DialogContent className="fixed top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] z-[101] w-[95vw] sm:w-[90vw] md:w-[85vw] lg:w-[900px] xl:w-[1100px] max-w-[1100px] max-h-[95vh] overflow-auto p-0 border-0 shadow-2xl bg-transparent">
           {/* Container principal avec design moderne */}
           <div className="bg-gradient-to-br from-nack-beige-light to-nack-cream rounded-3xl overflow-hidden shadow-elegant relative">
@@ -157,14 +187,28 @@ const EventPopup = ({ event, isOpen, onClose }: EventPopupProps) => {
 
                     {remainingTickets > 0 && !isEventPassed && event.isActive ? (
                       <div className="grid grid-cols-1 gap-2">
-                      <Button
+                        {/* Bouton de paiement en ligne si activé */}
+                        {event.paymentEnabled && ownerProfile?.disbursementId && ownerProfile?.disbursementStatus === 'approved' && (
+                          <Button
+                            onClick={() => {
+                              setIsPaymentDialogOpen(true);
+                              onClose(); // Fermer le popup principal
+                            }}
+                            className="w-full bg-gradient-primary text-white shadow-button"
+                          >
+                            <CreditCard className="mr-2" size={18} />
+                            Payer le billet
+                          </Button>
+                        )}
+                        {/* Bouton WhatsApp */}
+                        <Button
                           variant="outline"
                           disabled={!profile?.phone}
                           onClick={handleWhatsappReserve}
                           className="w-full"
-                      >
+                        >
                           Réserver via WhatsApp
-                      </Button>
+                        </Button>
                       </div>
                     ) : (
                       <div className="text-center py-3">
@@ -188,12 +232,18 @@ const EventPopup = ({ event, isOpen, onClose }: EventPopupProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog de paiement (conservée mais non utilisée directement) */}
+      {/* Dialog de paiement */}
       <EventPaymentDialog
         event={event}
         isOpen={isPaymentDialogOpen}
-        onClose={() => setIsPaymentDialogOpen(false)}
-        onPaymentSuccess={handlePaymentSuccess}
+        onClose={() => {
+          setIsPaymentDialogOpen(false);
+          // Si le popup principal était ouvert, on peut le rouvrir si nécessaire
+        }}
+        onPaymentSuccess={(ticketData) => {
+          handlePaymentSuccess(ticketData);
+          setIsPaymentDialogOpen(false);
+        }}
       />
     </>
   );

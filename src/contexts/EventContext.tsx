@@ -22,11 +22,12 @@ export interface Event {
   imageUrl?: string;
   ownerUid?: string;
   organizerWhatsapp?: string;
+  paymentEnabled?: boolean; // Activer le paiement en ligne pour cet événement
 }
 
 interface EventContextType {
   events: Event[];
-  addEvent: (event: Pick<EventDoc, 'title' | 'description' | 'date' | 'time' | 'location' | 'maxCapacity' | 'ticketPrice' | 'currency' | 'isActive' | 'imageUrl' | 'organizerWhatsapp'> & { ticketsSold?: number }) => Promise<string>;
+  addEvent: (event: Pick<EventDoc, 'title' | 'description' | 'date' | 'time' | 'location' | 'maxCapacity' | 'ticketPrice' | 'currency' | 'isActive' | 'imageUrl' | 'organizerWhatsapp' | 'paymentEnabled'> & { ticketsSold?: number }) => Promise<string>;
   getEventById: (id: string) => Event | undefined;
   updateEvent: (id: string, event: Partial<EventDoc>) => Promise<void>;
   deleteEvent: (id: string) => Promise<void>;
@@ -71,6 +72,7 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
           imageUrl: data.imageUrl,
           ownerUid: data.ownerUid ?? user.uid,
           organizerWhatsapp: data.organizerWhatsapp,
+          paymentEnabled: data.paymentEnabled ?? false,
         };
       });
       setEvents(list);
@@ -95,6 +97,7 @@ export const EventProvider = ({ children }: { children: ReactNode }) => {
       imageUrl: evt.imageUrl,
       ownerUid: user.uid,
       organizerWhatsapp: evt.organizerWhatsapp,
+      paymentEnabled: evt.paymentEnabled ?? false,
     };
     const ref = await addDoc(eventsColRef(db, user.uid), payload);
     const link = `${window.location.origin}/event/${ref.id}`;
