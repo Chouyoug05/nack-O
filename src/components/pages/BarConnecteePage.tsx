@@ -27,7 +27,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch, deleteDoc } from "firebase/firestore";
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
 import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collections";
@@ -528,6 +528,31 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       toast({
         title: "Erreur",
         description: "Impossible d'annuler la commande.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  // Supprimer une commande annulée
+  const deleteOrder = async (orderId: string) => {
+    if (!user) return;
+    
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer définitivement cette commande annulée ? Cette action est irréversible.')) {
+      return;
+    }
+    
+    try {
+      await deleteDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId));
+      
+      toast({
+        title: "Commande supprimée",
+        description: "La commande annulée a été supprimée avec succès.",
+      });
+    } catch (error) {
+      console.error('Erreur suppression commande:', error);
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la commande.",
         variant: "destructive"
       });
     }
@@ -1089,6 +1114,18 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                             <span className="hidden sm:inline">Ticket PDF</span>
                             <span className="sm:hidden">PDF</span>
+                          </Button>
+                        )}
+                        {order.status === 'cancelled' && (
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => deleteOrder(order.id)} 
+                            className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm"
+                          >
+                            <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                            <span className="hidden sm:inline">Supprimer</span>
+                            <span className="sm:hidden">Suppr.</span>
                           </Button>
                         )}
                       </div>
