@@ -7,6 +7,7 @@ import { notificationsColRef, paymentsColRef, receiptsColRef } from "@/lib/colle
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
 import type { PaymentTransaction } from "@/types/payment";
+import type { TicketDoc } from "@/types/event";
 
 const PaymentSuccess = () => {
   const { user, profile } = useAuth();
@@ -16,9 +17,95 @@ const PaymentSuccess = () => {
 
   useEffect(() => {
     const run = async () => {
-      // Pour les paiements menu digital, l'utilisateur n'est pas nécessairement authentifié
+      // Pour les paiements menu digital et événements, l'utilisateur n'est pas nécessairement authentifié
       const reference = searchParams.get('reference') || '';
+      const paymentType = searchParams.get('type') || '';
       const isMenuDigitalPayment = reference.includes('menu-digital');
+      const isEventTicketPayment = reference.includes('event-ticket') || paymentType === 'event-ticket';
+      
+      // Gérer les paiements de billets d'événement
+      if (isEventTicketPayment) {
+        const transactionId = searchParams.get('transactionId') || '';
+        
+        if (transactionId) {
+          try {
+            // Chercher la transaction dans toutes les collections payments
+            const paymentsQuery = query(
+              collectionGroup(db, 'payments'),
+              where('transactionId', '==', transactionId)
+            );
+            const snapshot = await getDocs(paymentsQuery);
+            
+            if (!snapshot.empty) {
+              const paymentDoc = snapshot.docs[0];
+              const paymentData = paymentDoc.data() as PaymentTransaction & { ticketData?: any };
+              
+              // Vérifier si la transaction est déjà complétée
+              if (paymentData.status === 'completed') {
+                console.warn(`PaymentSuccess: Transaction ${transactionId} déjà complétée. Ignorant le traitement dupliqué.`);
+                setTimeout(() => navigate('/', { replace: true }), 2000);
+                return;
+              }
+              
+              // Mettre à jour la transaction
+              await updateDoc(paymentDoc.ref, {
+                status: 'completed',
+                paidAt: Date.now(),
+                updatedAt: Date.now(),
+              });
+              
+              // CRÉER le billet seulement après paiement réussi
+              // Les données du billet sont stockées dans ticketData de la transaction
+              if (paymentData.ticketData && paymentData.eventId && paymentData.establishmentId) {
+                const { eventTicketsColRef, eventsColRef } = await import('@/lib/collections');
+                const { increment } = await import('firebase/firestore');
+                
+                // Créer le billet avec le statut 'paid' directement
+                const ticket: TicketDoc = {
+                  customerName: paymentData.ticketData.customerName,
+                  customerEmail: paymentData.ticketData.customerEmail,
+                  customerPhone: paymentData.ticketData.customerPhone,
+                  quantity: paymentData.ticketData.quantity,
+                  totalAmount: paymentData.ticketData.totalAmount,
+                  status: 'paid',
+                  purchaseDate: Date.now(),
+                };
+                
+                const ticketsCol = eventTicketsColRef(db, paymentData.establishmentId, paymentData.eventId);
+                await addDoc(ticketsCol, ticket);
+                
+                // Mettre à jour le compteur de billets vendus
+                const evtRef = doc(eventsColRef(db, paymentData.establishmentId), paymentData.eventId);
+                await updateDoc(evtRef, { 
+                  ticketsSold: increment(paymentData.ticketData.quantity) 
+                });
+                
+                // Charger les infos de l'établissement pour l'affichage
+                const profileDoc = await getDoc(doc(db, 'profiles', paymentData.establishmentId));
+                if (profileDoc.exists()) {
+                  const profileData = profileDoc.data();
+                  setEstablishmentInfo({
+                    name: profileData.establishmentName || 'Établissement',
+                    logoUrl: profileData.logoUrl,
+                  });
+                }
+              }
+              
+              // Rediriger vers la page d'accueil après 3 secondes
+              setTimeout(() => {
+                navigate('/', { replace: true });
+              }, 3000);
+              return;
+            }
+          } catch (error) {
+            console.error('Erreur traitement paiement billet événement:', error);
+          }
+        }
+        
+        // Redirection par défaut si erreur
+        setTimeout(() => navigate('/', { replace: true }), 3000);
+        return;
+      }
       
       if (isMenuDigitalPayment) {
         // Charger les informations de l'établissement depuis la transaction
@@ -574,7 +661,9 @@ const PaymentSuccess = () => {
   }, [user, profile, navigate, searchParams]);
 
   const reference = searchParams.get('reference') || '';
+  const paymentType = searchParams.get('type') || '';
   const isMenuDigitalPayment = reference.includes('menu-digital');
+  const isEventTicketPayment = reference.includes('event-ticket') || paymentType === 'event-ticket';
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
@@ -596,11 +685,13 @@ const PaymentSuccess = () => {
           </div>
         </div>
         <h1 className="text-3xl font-bold text-gray-900">
-          {isMenuDigitalPayment ? 'Paiement confirmé !' : 'Paiement confirmé'}
+          {isMenuDigitalPayment || isEventTicketPayment ? 'Paiement confirmé !' : 'Paiement confirmé'}
         </h1>
         <p className="text-sm text-gray-600">
           {isMenuDigitalPayment 
             ? 'Votre commande a été payée avec succès. Vous allez être redirigé vers le menu...'
+            : isEventTicketPayment
+            ? 'Votre billet a été payé avec succès. Vous allez être redirigé...'
             : 'Votre abonnement a été activé. Redirection…'}
         </p>
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">

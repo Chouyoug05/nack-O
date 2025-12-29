@@ -11,9 +11,10 @@ import NackLogo from "@/components/NackLogo";
 import { generateEventTicket } from "@/utils/ticketGenerator";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { eventTicketsColRef, eventsColRef } from "@/lib/collections";
-import { addDoc, doc, increment, runTransaction, updateDoc } from "firebase/firestore";
+import { eventTicketsColRef, eventsColRef, paymentsColRef } from "@/lib/collections";
+import { addDoc, doc, getDoc, increment, orderBy, query, runTransaction, updateDoc, getDocs } from "firebase/firestore";
 import type { TicketDoc } from "@/types/event";
+import { createEventPaymentLink } from "@/lib/payments/eventPayment";
 
 interface EventPaymentDialogProps {
   event: Event | null;
@@ -61,56 +62,120 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
     setCurrentStep('payment');
   };
 
-  const simulatePayment = async () => {
+  const processPayment = async () => {
     if (!event) return;
+    if (!validateForm()) return;
+    
     setIsProcessing(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
+    
     try {
-      await runTransaction(db, async (tx) => {
-        const ownerUid = event.ownerUid || user?.uid || "";
-        const evtRef = doc(eventsColRef(db, ownerUid), event.id);
-        const evtSnap = await tx.get(evtRef);
-        if (!evtSnap.exists()) throw new Error("Événement introuvable");
-        const available = event.maxCapacity - event.ticketsSold;
-        if (formData.quantity > available) throw new Error("Plus assez de places disponibles");
-        const ticket: TicketDoc = {
-          customerName: formData.name,
-          customerEmail: formData.email,
-          customerPhone: formData.phone,
-          quantity: formData.quantity,
-          totalAmount: event.ticketPrice * formData.quantity,
-          status: 'paid',
-          purchaseDate: Date.now(),
-        };
-        const ticketsCol = eventTicketsColRef(db, ownerUid, event.id);
-        await addDoc(ticketsCol, ticket);
-        tx.update(evtRef, { ticketsSold: increment(formData.quantity) });
-      });
-
+      const ownerUid = event.ownerUid || user?.uid || "";
+      
+      // Vérifier que l'événement existe et qu'il y a assez de places
+      const evtRef = doc(eventsColRef(db, ownerUid), event.id);
+      const evtSnap = await getDoc(evtRef);
+      if (!evtSnap.exists()) {
+        throw new Error("Événement introuvable");
+      }
+      
+      const eventData = evtSnap.data();
+      const available = eventData.maxCapacity - (eventData.ticketsSold || 0);
+      if (formData.quantity > available) {
+        throw new Error("Plus assez de places disponibles");
+      }
+      
+      // Récupérer le profil du propriétaire pour obtenir le disbursementId
+      const profileRef = doc(db, 'profiles', ownerUid);
+      const profileSnap = await getDoc(profileRef);
+      if (!profileSnap.exists()) {
+        throw new Error("Profil du propriétaire introuvable");
+      }
+      
+      const profileData = profileSnap.data();
+      if (!profileData.disbursementId || profileData.disbursementStatus !== 'approved') {
+        throw new Error("Le paiement en ligne n'est pas disponible pour cet événement. Veuillez contacter l'organisateur.");
+      }
+      
+      // Calculer le montant total
+      const totalAmount = event.ticketPrice * formData.quantity;
+      
+      // Générer les URLs de redirection
+      const baseUrl = window.location.origin;
+      const transactionId = `EVT-${event.id}-${Date.now()}`;
+      const reference = `event-ticket-${event.id}-${Date.now()}`;
+      const redirectSuccess = `${baseUrl}/payment/success?reference=${encodeURIComponent(reference)}&transactionId=${transactionId}&type=event-ticket`;
+      const redirectError = `${baseUrl}/payment/error?reference=${encodeURIComponent(reference)}&transactionId=${transactionId}`;
+      
+      // Logo URL (utiliser le logo de l'établissement ou un logo par défaut)
+      const logoURL = profileData.logoUrl || `${baseUrl}/logo.png`;
+      
+      // Préparer les données du billet à créer après paiement réussi
       const ticketData = {
-        id: `TKT-${Date.now()}`,
+        customerName: formData.name,
+        customerEmail: formData.email,
+        customerPhone: formData.phone,
+        quantity: formData.quantity,
+        totalAmount: totalAmount,
         eventId: event.id,
         eventTitle: event.title,
         eventDate: event.date,
         eventTime: event.time,
         eventLocation: event.location,
-        customerName: formData.name,
-        customerEmail: formData.email,
-        customerPhone: formData.phone,
-        quantity: formData.quantity,
-        totalAmount: event.ticketPrice * formData.quantity,
         currency: event.currency,
-        purchaseDate: new Date(),
-        qrCode: `NACK-${event.id}-${formData.email}-${Date.now()}`
       };
-
-      setIsProcessing(false);
-      setCurrentStep('success');
-      onPaymentSuccess(ticketData);
+      
+      // Enregistrer la transaction de paiement avec les données du billet
+      await addDoc(paymentsColRef(db, ownerUid), {
+        userId: ownerUid,
+        transactionId,
+        subscriptionType: 'event-ticket',
+        amount: totalAmount,
+        status: 'pending',
+        paymentMethod: 'airtel-money',
+        reference,
+        paymentLink: '',
+        redirectSuccess,
+        redirectError,
+        establishmentId: ownerUid,
+        disbursementId: profileData.disbursementId,
+        eventId: event.id,
+        // Stocker les données du billet dans la transaction pour création après paiement
+        ticketData: ticketData,
+        createdAt: Date.now(),
+      });
+      
+      // Créer le lien de paiement
+      const paymentLink = await createEventPaymentLink({
+        amount: totalAmount,
+        reference,
+        redirectSuccess,
+        redirectError,
+        logoURL,
+        disbursementId: profileData.disbursementId,
+      });
+      
+      // Mettre à jour la transaction avec le lien
+      const paymentsRef = paymentsColRef(db, ownerUid);
+      const paymentsQuery = query(paymentsRef, orderBy('createdAt', 'desc'));
+      const paymentsSnapshot = await getDocs(paymentsQuery);
+      if (!paymentsSnapshot.empty) {
+        const latestPayment = paymentsSnapshot.docs[0];
+        if (latestPayment.data().transactionId === transactionId) {
+          await updateDoc(doc(paymentsRef, latestPayment.id), {
+            paymentLink,
+          });
+        }
+      }
+      
+      // Rediriger vers le lien de paiement
+      window.location.href = paymentLink;
     } catch (e: unknown) {
       setIsProcessing(false);
-      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Paiement échoué", variant: "destructive" });
+      toast({ 
+        title: "Erreur", 
+        description: e instanceof Error ? e.message : "Impossible de procéder au paiement", 
+        variant: "destructive" 
+      });
     }
   };
 
@@ -260,8 +325,12 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
               <Separator className="my-2" />
               <div className="flex justify-between font-bold text-nack-red"><span>Total:</span><span>{Number(totalAmount || 0).toLocaleString()} {event.currency}</span></div>
             </div>
+            <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800 mb-4">
+              <p className="font-semibold mb-1">💳 Paiement par Airtel Money</p>
+              <p className="text-xs">Le paiement est disponible uniquement via <strong>Airtel Money</strong> pour le moment.</p>
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Button onClick={simulatePayment} disabled={isProcessing} className="w-full bg-gradient-primary text-white shadow-button">
+              <Button onClick={processPayment} disabled={isProcessing} className="w-full bg-gradient-primary text-white shadow-button">
                 {isProcessing ? (<><Loader2 className="mr-2 animate-spin" size={18} />Traitement en cours...</>) : ("Payer maintenant")}
               </Button>
               <Button variant="outline" disabled={isProcessing} onClick={saveReservationAndGenerate}>

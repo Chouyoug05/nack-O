@@ -2,7 +2,7 @@ export interface PaymentTransaction {
   id: string;
   userId: string;
   transactionId: string; // ID unique de la transaction
-  subscriptionType: 'transition' | 'transition-pro-max' | 'menu-digital';
+  subscriptionType: 'transition' | 'transition-pro-max' | 'menu-digital' | 'event-ticket';
   amount: number; // Montant en XAF
   status: 'pending' | 'completed' | 'failed' | 'cancelled';
   paymentMethod: 'airtel-money' | 'moov-money' | 'other';
@@ -19,6 +19,9 @@ export interface PaymentTransaction {
   establishmentId?: string; // ID de l'établissement
   disbursementId?: string; // Disbursement ID utilisé pour ce paiement
   orderData?: any; // Données de la commande à créer après paiement réussi (si paiement demandé)
+  // Pour les paiements d'événement
+  eventId?: string; // ID de l'événement
+  ticketData?: any; // Données du billet à créer après paiement réussi
 }
 
 export interface DisbursementRequest {
