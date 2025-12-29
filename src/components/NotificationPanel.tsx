@@ -139,7 +139,8 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
   }, [user]);
 
   const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
-  const badgeCount = unreadCount + pendingOrders;
+  // Le badge affiche uniquement les notifications non lues (pas les commandes en attente)
+  const badgeCount = unreadCount;
 
   const getIcon = (type: Notification["type"]) => {
     switch (type) {
@@ -174,8 +175,28 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
 
   const markAllAsRead = async () => {
     if (!user) return;
-    // Optimistic UI only for notifications; orders remain pending until traitées
+    
+    // Mettre à jour toutes les notifications non lues dans Firestore
+    const unreadNotifications = notifications.filter(n => !n.read);
+    
+    // Mise à jour optimiste de l'UI
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    
+    // Mettre à jour Firestore pour toutes les notifications non lues
+    try {
+      await Promise.all(
+        unreadNotifications.map(n => 
+          updateDoc(fsDoc(notificationsColRef(db, user.uid), n.id), { read: true })
+        )
+      );
+    } catch (error) {
+      console.error('Erreur lors du marquage de toutes les notifications comme lues:', error);
+      // En cas d'erreur, restaurer l'état précédent
+      setNotifications(prev => prev.map(n => {
+        const wasUnread = unreadNotifications.find(un => un.id === n.id);
+        return wasUnread ? { ...n, read: false } : n;
+      }));
+    }
   };
 
   const deleteNotification = async (id: string) => {

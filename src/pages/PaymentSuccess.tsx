@@ -106,8 +106,17 @@ const PaymentSuccess = () => {
           console.error('Erreur traitement paiement menu digital:', error);
         }
         
-        // Redirection par défaut si erreur
-        setTimeout(() => navigate('/', { replace: true }), 3000);
+        // Redirection par défaut si erreur - essayer de récupérer l'établissement depuis l'URL
+        const establishmentIdFromUrl = searchParams.get('establishmentId');
+        if (establishmentIdFromUrl) {
+          setTimeout(() => navigate(`/commande/${establishmentIdFromUrl}`, { 
+            replace: true,
+            state: { paymentSuccess: true }
+          }), 3000);
+        } else {
+          // Si on ne peut pas récupérer l'établissement, rediriger vers la page d'accueil
+          setTimeout(() => navigate('/', { replace: true }), 3000);
+        }
         return;
       }
       

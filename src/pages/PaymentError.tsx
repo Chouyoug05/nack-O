@@ -80,11 +80,20 @@ const PaymentError = () => {
       }
       
       // Redirection par défaut
-      const redirectPath = isMenuDigitalPayment && establishmentInfo?.id 
-        ? `/commande/${establishmentInfo.id}`
-        : user ? '/dashboard' : '/';
-      const t = setTimeout(() => navigate(redirectPath, { replace: true }), 3000);
-      return () => clearTimeout(t);
+      if (isMenuDigitalPayment) {
+        // Pour les paiements menu digital, toujours essayer de rediriger vers le menu
+        const establishmentIdFromUrl = searchParams.get('establishmentId');
+        const redirectPath = establishmentInfo?.id || establishmentIdFromUrl
+          ? `/commande/${establishmentInfo?.id || establishmentIdFromUrl}`
+          : '/';
+        const t = setTimeout(() => navigate(redirectPath, { replace: true }), 3000);
+        return () => clearTimeout(t);
+      } else {
+        // Pour les autres paiements, rediriger vers dashboard si authentifié
+        const redirectPath = user ? '/dashboard' : '/';
+        const t = setTimeout(() => navigate(redirectPath, { replace: true }), 3000);
+        return () => clearTimeout(t);
+      }
     };
     run();
   }, [navigate, user, searchParams, establishmentInfo]);

@@ -440,8 +440,8 @@ const PublicOrderingPage = () => {
           const transactionId = `TXN-MENU-${establishmentId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
           const base = (import.meta.env.VITE_PUBLIC_BASE_URL as string || window.location.origin).replace(/\/+$/, '');
           const reference = `menu-digital-${orderNumberValue}`;
-          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&orderId=${orderDocRef.id}`;
-          const redirectError = `${base}/payment/error?reference=${reference}&transactionId=${transactionId}`;
+          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&orderId=${orderDocRef.id}&establishmentId=${establishmentId}`;
+          const redirectError = `${base}/payment/error?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`;
           // Utiliser le logo de l'établissement, ou un logo par défaut
           const logoURL = establishment?.logoUrl || `${base}/favicon.png`;
 
