@@ -27,7 +27,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
-import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch, deleteDoc, updateDoc } from "firebase/firestore";
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
 import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collections";
@@ -53,9 +53,12 @@ interface BarOrder {
     price: number;
   }>;
   total: number;
-  status: 'pending' | 'confirmed' | 'served' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'served' | 'cancelled' | 'paid';
   createdAt: number;
-  receiptNumber: string;
+  receiptNumber?: string;
+  isDelivery?: boolean;
+  paidAt?: number;
+  paymentMethod?: string;
 }
 
 interface BarConnecteePageProps {
@@ -196,10 +199,19 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
       const unsubscribeOrders = onSnapshot(q, (snapshot) => {
         try {
-          const ordersData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as BarOrder[];
+          const ordersData = snapshot.docs.map(doc => {
+            const data = doc.data();
+            // Corriger les anciennes commandes 'paid' sur place : elles doivent être 'pending'
+            // Les commandes 'paid' doivent être uniquement pour les livraisons
+            if (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison') {
+              // Mettre à jour automatiquement dans Firestore
+              updateDoc(doc.ref, { status: 'pending' }).catch(err => 
+                console.error('Erreur correction statut commande:', err)
+              );
+              return { ...data, status: 'pending' } as BarOrder;
+            }
+            return { ...data } as BarOrder;
+          });
           
           // Vérifier s'il y a de nouvelles commandes
           const newOrders = ordersData.filter(order => 
@@ -655,6 +667,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         return <Badge variant="outline" className="text-blue-600 border-blue-600"><CheckCircle className="w-3 h-3 mr-1" />Confirmée</Badge>;
       case 'served':
         return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" />Servie & Payée</Badge>;
+      case 'paid':
+        return <Badge variant="outline" className="text-purple-600 border-purple-600"><CreditCard className="w-3 h-3 mr-1" />Payée</Badge>;
       case 'cancelled':
         return <Badge variant="outline" className="text-red-600 border-red-600"><X className="w-3 h-3 mr-1" />Annulée</Badge>;
       default:
@@ -1109,7 +1123,21 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             </Button>
                           </>
                         )}
-                        {order.status !== 'cancelled' && (
+                        {/* Commandes payées (livraisons) - affichage en lecture seule */}
+                        {order.status === 'paid' && (
+                          <div className="text-sm text-muted-foreground">
+                            {order.isDelivery ? 'Livraison payée' : 'Commande payée'}
+                            {order.paymentMethod && ` - ${order.paymentMethod === 'airtel-money' ? 'Airtel Money' : order.paymentMethod}`}
+                          </div>
+                        )}
+                        {order.status !== 'cancelled' && order.status !== 'paid' && (
+                          <Button variant="outline" size="sm" onClick={() => downloadOrderTicket(order)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                            <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
+                            <span className="hidden sm:inline">Ticket PDF</span>
+                            <span className="sm:hidden">PDF</span>
+                          </Button>
+                        )}
+                        {order.status === 'paid' && (
                           <Button variant="outline" size="sm" onClick={() => downloadOrderTicket(order)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
                             <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                             <span className="hidden sm:inline">Ticket PDF</span>
