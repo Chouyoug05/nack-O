@@ -175,14 +175,30 @@ const PaymentSuccess = () => {
                 const isDelivery = paymentData.orderData.isDelivery === true;
                 const orderStatus = isDelivery ? 'paid' : 'pending';
                 
-                // Créer la commande avec le statut approprié
-                const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId), {
-                  ...paymentData.orderData,
+                // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
+                const cleanedOrderData: any = {
+                  orderNumber: paymentData.orderData.orderNumber,
+                  receiptNumber: paymentData.orderData.receiptNumber,
+                  tableZone: paymentData.orderData.tableZone,
+                  items: paymentData.orderData.items,
+                  total: paymentData.orderData.total,
                   status: orderStatus,
+                  createdAt: paymentData.orderData.createdAt,
+                  isDelivery: paymentData.orderData.isDelivery || false,
+                  deliveryPrice: paymentData.orderData.deliveryPrice || 0,
+                  customerInfo: paymentData.orderData.customerInfo,
                   paidAt: Date.now(),
                   paymentMethod: 'airtel-money',
                   paymentTransactionId: transactionId,
-                });
+                };
+                
+                // Ajouter deliveryAddress seulement si défini et non undefined
+                if (paymentData.orderData.deliveryAddress !== undefined && paymentData.orderData.deliveryAddress !== null) {
+                  cleanedOrderData.deliveryAddress = paymentData.orderData.deliveryAddress;
+                }
+                
+                // Créer la commande avec le statut approprié
+                const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId), cleanedOrderData);
                 
                 // Mettre à jour la transaction avec l'ID de la commande créée
                 await updateDoc(paymentDoc.ref, {
@@ -471,14 +487,30 @@ const PaymentSuccess = () => {
               const isDelivery = paymentData.orderData.isDelivery === true;
               const orderStatus = isDelivery ? 'paid' : 'pending';
               
-              // Créer la commande avec le statut approprié
-              const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId), {
-                ...paymentData.orderData,
+              // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
+              const cleanedOrderData: any = {
+                orderNumber: paymentData.orderData.orderNumber,
+                receiptNumber: paymentData.orderData.receiptNumber,
+                tableZone: paymentData.orderData.tableZone,
+                items: paymentData.orderData.items,
+                total: paymentData.orderData.total,
                 status: orderStatus,
+                createdAt: paymentData.orderData.createdAt,
+                isDelivery: paymentData.orderData.isDelivery || false,
+                deliveryPrice: paymentData.orderData.deliveryPrice || 0,
+                customerInfo: paymentData.orderData.customerInfo,
                 paidAt: now,
                 paymentMethod: 'airtel-money',
                 paymentTransactionId: transactionId,
-              });
+              };
+              
+              // Ajouter deliveryAddress seulement si défini et non undefined
+              if (paymentData.orderData.deliveryAddress !== undefined && paymentData.orderData.deliveryAddress !== null) {
+                cleanedOrderData.deliveryAddress = paymentData.orderData.deliveryAddress;
+              }
+              
+              // Créer la commande avec le statut approprié
+              const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId), cleanedOrderData);
               
               // Mettre à jour la transaction avec l'ID de la commande créée
               await updateDoc(doc(paymentsRef, paymentTransaction.id), {

@@ -448,6 +448,13 @@ const PublicOrderingPage = () => {
           if (isDelivery && deliveryAddress) {
             orderData.deliveryAddress = deliveryAddress;
           }
+          
+          // Créer une copie nettoyée de orderData pour la transaction (supprimer les undefined)
+          const cleanedOrderDataForPayment: any = { ...orderData };
+          // Supprimer deliveryAddress si undefined
+          if (cleanedOrderDataForPayment.deliveryAddress === undefined) {
+            delete cleanedOrderDataForPayment.deliveryAddress;
+          }
 
           // Enregistrer la transaction de paiement avec les données de commande
           // IMPORTANT: Le montant 'total' correspond au total de la commande (articles du panier),
@@ -467,7 +474,7 @@ const PublicOrderingPage = () => {
             establishmentId,
             disbursementId: establishment.disbursementId,
             // Stocker les données de commande dans la transaction pour création après paiement
-            orderData: orderData,
+            orderData: cleanedOrderDataForPayment,
             createdAt: Date.now(),
           });
 
