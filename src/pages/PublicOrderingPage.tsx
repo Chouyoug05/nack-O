@@ -428,7 +428,7 @@ const PublicOrderingPage = () => {
 
           // Préparer les données de commande à stocker dans la transaction
           // La commande sera créée seulement après paiement réussi
-          const orderData = {
+          const orderData: any = {
             orderNumber: orderNumberValue,
             receiptNumber,
             tableZone: isDelivery ? 'Livraison' : selectedTable,
@@ -437,13 +437,17 @@ const PublicOrderingPage = () => {
             status: 'pending',
             createdAt: Date.now(),
             isDelivery: isDelivery || false,
-            deliveryAddress: isDelivery ? deliveryAddress : undefined,
             deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
             customerInfo: {
               userAgent: navigator.userAgent,
               timestamp: Date.now()
             }
           };
+          
+          // Ajouter deliveryAddress seulement si c'est une livraison (éviter undefined)
+          if (isDelivery && deliveryAddress) {
+            orderData.deliveryAddress = deliveryAddress;
+          }
 
           // Enregistrer la transaction de paiement avec les données de commande
           // IMPORTANT: Le montant 'total' correspond au total de la commande (articles du panier),
@@ -502,7 +506,7 @@ const PublicOrderingPage = () => {
 
       // Si pas de paiement, créer la commande immédiatement dans barOrders
       // IMPORTANT: Les commandes sur place doivent arriver dans les commandes clients
-      const orderData = {
+      const orderData: any = {
         orderNumber: orderNumberValue,
         receiptNumber,
         tableZone: isDelivery ? 'Livraison' : selectedTable,
@@ -511,13 +515,17 @@ const PublicOrderingPage = () => {
         status: 'pending', // Statut pending pour apparaître dans les commandes clients
         createdAt: Date.now(),
         isDelivery: isDelivery || false,
-        deliveryAddress: isDelivery ? deliveryAddress : undefined,
         deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
         customerInfo: {
           userAgent: navigator.userAgent,
           timestamp: Date.now()
         }
       };
+      
+      // Ajouter deliveryAddress seulement si c'est une livraison (éviter undefined)
+      if (isDelivery && deliveryAddress) {
+        orderData.deliveryAddress = deliveryAddress;
+      }
 
       // Créer la commande dans barOrders pour qu'elle arrive chez le gérant
       if (establishmentId) {
