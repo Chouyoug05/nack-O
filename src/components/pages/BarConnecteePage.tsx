@@ -521,7 +521,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const cancelOrder = async (orderId: string) => {
     if (!user) return;
     
-    if (!window.confirm('Êtes-vous sûr de vouloir annuler cette commande ?')) {
+    // Utiliser setTimeout pour éviter les problèmes de timing avec React DOM
+    const confirmed = await new Promise<boolean>((resolve) => {
+      setTimeout(() => {
+        resolve(window.confirm('Êtes-vous sûr de vouloir annuler cette commande ?'));
+      }, 0);
+    });
+    
+    if (!confirmed) {
       return;
     }
     
@@ -549,7 +556,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const deleteOrder = async (orderId: string) => {
     if (!user) return;
     
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer définitivement cette commande annulée ? Cette action est irréversible.')) {
+    // Utiliser setTimeout pour éviter les problèmes de timing avec React DOM
+    const confirmed = await new Promise<boolean>((resolve) => {
+      setTimeout(() => {
+        resolve(window.confirm('Êtes-vous sûr de vouloir supprimer définitivement cette commande annulée ? Cette action est irréversible.'));
+      }, 0);
+    });
+    
+    if (!confirmed) {
       return;
     }
     

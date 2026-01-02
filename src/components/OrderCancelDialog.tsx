@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,6 +31,23 @@ export const OrderCancelDialog = ({
   const [reason, setReason] = useState("");
   const [refundRequired, setRefundRequired] = useState(false);
   const [error, setError] = useState("");
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Réinitialiser le formulaire quand le dialog s'ouvre
+  useEffect(() => {
+    if (isOpen) {
+      setReason("");
+      setRefundRequired(false);
+      setError("");
+    }
+  }, [isOpen]);
 
   const handleConfirm = () => {
     // Validation : raison obligatoire, min 5 caractères
@@ -46,16 +63,31 @@ export const OrderCancelDialog = ({
   };
 
   const handleClose = () => {
-    setReason("");
-    setRefundRequired(false);
-    setError("");
-    onClose();
+    if (!isMountedRef.current) return;
+    
+    // Utiliser requestAnimationFrame pour éviter les problèmes de timing avec React DOM
+    requestAnimationFrame(() => {
+      if (!isMountedRef.current) return;
+      setReason("");
+      setRefundRequired(false);
+      setError("");
+      // Petit délai supplémentaire pour laisser React terminer ses mises à jour
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          onClose();
+        }
+      }, 0);
+    });
   };
 
   const isNonCashPayment = paymentMethod && paymentMethod !== 'cash';
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        handleClose();
+      }
+    }}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

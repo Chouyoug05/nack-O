@@ -544,7 +544,14 @@ const OrderManagement = ({
       {cancelDialogOrder && (
         <OrderCancelDialog
           isOpen={!!cancelDialogOrder}
-          onClose={() => setCancelDialogOrder(null)}
+          onClose={() => {
+            // Utiliser requestAnimationFrame pour éviter les problèmes de timing avec React DOM
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                setCancelDialogOrder(null);
+              }, 0);
+            });
+          }}
           onConfirm={handleConfirmCancel}
           orderNumber={String(cancelDialogOrder.orderNumber)}
           orderTotal={cancelDialogOrder.total}
