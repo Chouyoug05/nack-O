@@ -199,19 +199,27 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
       const unsubscribeOrders = onSnapshot(q, (snapshot) => {
         try {
-          const ordersData = snapshot.docs.map(doc => {
-            const data = doc.data();
-            // Corriger les anciennes commandes 'paid' sur place : elles doivent être 'pending'
-            // Les commandes 'paid' doivent être uniquement pour les livraisons
-            if (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison') {
-              // Mettre à jour automatiquement dans Firestore
-              updateDoc(doc.ref, { status: 'pending' }).catch(err => 
-                console.error('Erreur correction statut commande:', err)
-              );
-              return { ...data, status: 'pending' } as BarOrder;
-            }
-            return { ...data } as BarOrder;
-          });
+          const ordersData = snapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              // S'assurer que l'ID est présent
+              if (!doc.id) {
+                console.warn('Commande sans ID trouvée:', data);
+                return null;
+              }
+              
+              // Corriger les anciennes commandes 'paid' sur place : elles doivent être 'pending'
+              // Les commandes 'paid' doivent être uniquement pour les livraisons
+              if (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison') {
+                // Mettre à jour automatiquement dans Firestore
+                updateDoc(doc.ref, { status: 'pending' }).catch(err => 
+                  console.error('Erreur correction statut commande:', err)
+                );
+                return { id: doc.id, ...data, status: 'pending' } as BarOrder;
+              }
+              return { id: doc.id, ...data } as BarOrder;
+            })
+            .filter((order): order is BarOrder => order !== null && !!order.id);
           
           // Vérifier s'il y a de nouvelles commandes
           const newOrders = ordersData.filter(order => 
@@ -495,7 +503,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
   // Confirmer une commande
   const confirmOrder = async (orderId: string) => {
-    if (!user) return;
+    if (!user || !orderId || !user.uid) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de confirmer la commande : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
@@ -519,7 +534,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
   // Marquer comme servie (avec paiement, diminution stock et intégration ventes)
   const cancelOrder = async (orderId: string) => {
-    if (!user) return;
+    if (!user || !orderId || !user.uid) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'annuler la commande : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Utiliser setTimeout pour éviter les problèmes de timing avec React DOM
     const confirmed = await new Promise<boolean>((resolve) => {
@@ -554,7 +576,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
   // Supprimer une commande annulée
   const deleteOrder = async (orderId: string) => {
-    if (!user) return;
+    if (!user || !orderId) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la commande : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     // Utiliser setTimeout pour éviter les problèmes de timing avec React DOM
     const confirmed = await new Promise<boolean>((resolve) => {
@@ -568,6 +597,9 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     }
     
     try {
+      if (!user.uid || !orderId) {
+        throw new Error('UID utilisateur ou ID commande manquant');
+      }
       await deleteDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId));
       
       toast({
@@ -585,7 +617,14 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   };
 
   const markAsServed = async (orderId: string) => {
-    if (!user || !profile) return;
+    if (!user || !profile || !orderId || !user.uid) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer la commande comme servie : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     try {
       // Trouver la commande
@@ -605,7 +644,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       for (const item of order.items) {
         // Trouver le produit dans la liste des produits
         const product = products.find(p => p.name === item.name);
-        if (product) {
+        if (product && product.id) {
           const newStock = (product.quantity || product.stock || 0) - item.quantity;
           if (newStock < 0) {
             toast({
@@ -1111,27 +1150,27 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                       </div>
 
                       <div className="flex flex-wrap gap-2 w-full">
-                        {order.status === 'pending' && (
+                        {order.status === 'pending' && order.id && (
                           <>
-                            <Button size="sm" onClick={() => confirmOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                            <Button size="sm" onClick={() => order.id && confirmOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
                               <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                               <span className="hidden sm:inline">Confirmer</span>
                               <span className="sm:hidden">Conf.</span>
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                            <Button size="sm" variant="destructive" onClick={() => order.id && cancelOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
                               <X className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                               <span className="truncate">Annuler</span>
                             </Button>
                           </>
                         )}
-                        {order.status === 'confirmed' && (
+                        {order.status === 'confirmed' && order.id && (
                           <>
-                            <Button size="sm" onClick={() => markAsServed(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[120px] text-xs sm:text-sm">
+                            <Button size="sm" onClick={() => order.id && markAsServed(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[120px] text-xs sm:text-sm">
                               <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                               <span className="hidden sm:inline">Servir & Payer</span>
                               <span className="sm:hidden">Servir</span>
                             </Button>
-                            <Button size="sm" variant="destructive" onClick={() => cancelOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
+                            <Button size="sm" variant="destructive" onClick={() => order.id && cancelOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
                               <X className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
                               <span className="truncate">Annuler</span>
                             </Button>
@@ -1158,11 +1197,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             <span className="sm:hidden">PDF</span>
                           </Button>
                         )}
-                        {order.status === 'cancelled' && (
+                        {order.status === 'cancelled' && order.id && (
                           <Button 
                             variant="destructive" 
                             size="sm" 
-                            onClick={() => deleteOrder(order.id)} 
+                            onClick={() => order.id && deleteOrder(order.id)} 
                             className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm"
                           >
                             <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
