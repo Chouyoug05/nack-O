@@ -169,10 +169,16 @@ const PaymentSuccess = () => {
               if (paymentData.orderData && paymentData.establishmentId) {
                 const { barOrdersColRef } = await import('@/lib/collections');
                 
-                // Créer la commande avec le statut 'paid' directement
+                // Différencier les commandes sur place et les livraisons
+                // - Sur place (avec table) : status 'pending' pour apparaître dans les commandes clients
+                // - Livraison : status 'paid' car déjà payée et livrée
+                const isDelivery = paymentData.orderData.isDelivery === true;
+                const orderStatus = isDelivery ? 'paid' : 'pending';
+                
+                // Créer la commande avec le statut approprié
                 const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId), {
                   ...paymentData.orderData,
-                  status: 'paid', // Commande payée directement
+                  status: orderStatus,
                   paidAt: Date.now(),
                   paymentMethod: 'airtel-money',
                   paymentTransactionId: transactionId,
@@ -459,10 +465,16 @@ const PaymentSuccess = () => {
             try {
               const { barOrdersColRef } = await import('@/lib/collections');
               
-              // Créer la commande avec le statut 'paid' directement
+              // Différencier les commandes sur place et les livraisons
+              // - Sur place (avec table) : status 'pending' pour apparaître dans les commandes clients
+              // - Livraison : status 'paid' car déjà payée et livrée
+              const isDelivery = paymentData.orderData.isDelivery === true;
+              const orderStatus = isDelivery ? 'paid' : 'pending';
+              
+              // Créer la commande avec le statut approprié
               const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId), {
                 ...paymentData.orderData,
-                status: 'paid', // Commande payée directement
+                status: orderStatus,
                 paidAt: now,
                 paymentMethod: 'airtel-money',
                 paymentTransactionId: transactionId,

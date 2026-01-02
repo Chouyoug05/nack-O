@@ -13,7 +13,7 @@ import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
-import { paymentsColRef } from "@/lib/collections";
+import { paymentsColRef, barOrdersColRef } from "@/lib/collections";
 
 interface Product {
   id: string;
@@ -500,7 +500,30 @@ const PublicOrderingPage = () => {
         }
       }
 
-      // Si pas de paiement, créer la commande immédiatement
+      // Si pas de paiement, créer la commande immédiatement dans barOrders
+      // IMPORTANT: Les commandes sur place doivent arriver dans les commandes clients
+      const orderData = {
+        orderNumber: orderNumberValue,
+        receiptNumber,
+        tableZone: isDelivery ? 'Livraison' : selectedTable,
+        items: cart,
+        total,
+        status: 'pending', // Statut pending pour apparaître dans les commandes clients
+        createdAt: Date.now(),
+        isDelivery: isDelivery || false,
+        deliveryAddress: isDelivery ? deliveryAddress : undefined,
+        deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
+        customerInfo: {
+          userAgent: navigator.userAgent,
+          timestamp: Date.now()
+        }
+      };
+
+      // Créer la commande dans barOrders pour qu'elle arrive chez le gérant
+      if (establishmentId) {
+        await addDoc(barOrdersColRef(db, establishmentId), orderData);
+      }
+
       const receiptData = {
         orderNumber: orderNumberValue,
         receiptNumber,
