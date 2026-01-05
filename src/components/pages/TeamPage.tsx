@@ -25,8 +25,8 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { teamColRef, agentTokensTopColRef } from "@/lib/collections";
-import { addDoc, deleteDoc, doc as fsDoc, onSnapshot, updateDoc, setDoc, doc } from "firebase/firestore";
+import { teamColRef, agentTokensTopColRef, profileDocRef } from "@/lib/collections";
+import { addDoc, deleteDoc, doc as fsDoc, onSnapshot, updateDoc, setDoc, doc, getDoc } from "firebase/firestore";
 import type { TeamMemberDoc, TeamRole } from "@/types/team";
 import { useNavigate } from "react-router-dom";
 
@@ -63,44 +63,68 @@ const TeamPage = () => {
   });
   
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [isAddingMember, setIsAddingMember] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(teamColRef(db, user.uid), (snap) => {
-      const list: TeamMember[] = snap.docs.map((d) => {
-        const data = d.data() as TeamMemberDoc;
-        return {
-          id: d.id,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email || "",
-          phone: data.phone,
-          role: data.role,
-          status: data.status,
-          agentCode: data.agentCode,
-          dashboardLink: data.dashboardLink,
-          lastConnection: data.lastConnection ? new Date(data.lastConnection) : undefined,
-          agentToken: data.agentToken,
-        };
-      });
-      setTeamMembers(list);
-      (async () => {
-        for (const m of list) {
-          if (m.agentToken) {
-            try {
-              await setDoc(doc(agentTokensTopColRef(db), m.agentToken), {
-                ownerUid: user.uid,
-                agentCode: m.agentCode,
-                firstName: m.firstName,
-                lastName: m.lastName,
-                role: m.role,
-                updatedAt: Date.now(),
-              }, { merge: true });
-            } catch { /* ignore */ }
-          }
+    if (!user || !user.uid) return;
+    const unsub = onSnapshot(
+      teamColRef(db, user.uid),
+      (snap) => {
+        try {
+          const list: TeamMember[] = snap.docs.map((d) => {
+            const data = d.data() as TeamMemberDoc;
+            return {
+              id: d.id,
+              firstName: data.firstName,
+              lastName: data.lastName,
+              email: data.email || "",
+              phone: data.phone,
+              role: data.role,
+              status: data.status,
+              agentCode: data.agentCode,
+              dashboardLink: data.dashboardLink,
+              lastConnection: data.lastConnection ? new Date(data.lastConnection) : undefined,
+              agentToken: data.agentToken,
+            };
+          });
+          setTeamMembers(list);
+          (async () => {
+            for (const m of list) {
+              if (m.agentToken) {
+                try {
+                  await setDoc(doc(agentTokensTopColRef(db), m.agentToken), {
+                    ownerUid: user.uid,
+                    agentCode: m.agentCode,
+                    firstName: m.firstName,
+                    lastName: m.lastName,
+                    role: m.role,
+                    updatedAt: Date.now(),
+                  }, { merge: true });
+                } catch (tokenError) {
+                  console.error('Erreur lors de la mise à jour du token mapping:', tokenError);
+                  // Ne pas bloquer le chargement si le token mapping échoue
+                }
+              }
+            }
+          })();
+        } catch (error) {
+          console.error('Erreur lors du traitement des membres de l\'équipe:', error);
+          toast({
+            title: "Erreur",
+            description: "Impossible de charger les membres de l'équipe.",
+            variant: "destructive"
+          });
         }
-      })();
-    });
+      },
+      (error) => {
+        console.error('Erreur lors de l\'écoute des membres de l\'équipe:', error);
+        toast({
+          title: "Erreur",
+          description: error.message || "Impossible de charger les membres de l'équipe. Vérifiez vos permissions.",
+          variant: "destructive"
+        });
+      }
+    );
     return () => unsub();
   }, [user]);
 
@@ -158,57 +182,191 @@ const TeamPage = () => {
   };
 
   const handleAddMember = async () => {
-    if (!user) return;
-    if (!newMember.firstName || !newMember.lastName || !newMember.phone || !selectedRole) {
+    // Empêcher les double-clics
+    if (isAddingMember) {
+      return;
+    }
+
+    if (!user || !user.uid) {
       toast({
         title: "Erreur",
-        description: "Veuillez remplir tous les champs obligatoires",
+        description: "Vous devez être connecté pour ajouter un membre",
         variant: "destructive"
       });
       return;
     }
 
-    const agentCode = generateAgentCode();
-    const agentToken = generateAgentToken();
-    const dashboardLink = generateDashboardLink(selectedRole, agentToken);
-    
-    const payload: TeamMemberDoc = {
-      firstName: newMember.firstName,
-      lastName: newMember.lastName,
-      email: newMember.email || undefined,
-      phone: newMember.phone,
-      role: selectedRole,
-      status: "active",
-      agentCode,
-      dashboardLink,
-      agentToken,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+    // Valider et nettoyer les champs
+    const trimmedFirstName = newMember.firstName?.trim() || "";
+    const trimmedLastName = newMember.lastName?.trim() || "";
+    const trimmedPhone = newMember.phone?.trim() || "";
+    const trimmedEmail = newMember.email?.trim() || "";
 
-    const teamDocRef = await addDoc(teamColRef(db, user.uid), payload);
-    try {
-      await setDoc(doc(agentTokensTopColRef(db), agentToken), {
-        ownerUid: user.uid,
-        agentCode,
-        firstName: payload.firstName,
-        lastName: payload.lastName,
-        role: payload.role,
-        createdAt: Date.now(),
+    // Validation stricte après trim
+    if (!trimmedFirstName || trimmedFirstName.length < 2) {
+      toast({
+        title: "Erreur",
+        description: "Le prénom doit contenir au moins 2 caractères",
+        variant: "destructive"
       });
-    } catch { /* ignore token mapping errors */ }
+      return;
+    }
 
-    setNewMember({ firstName: "", lastName: "", email: "", phone: "" });
-    setSelectedRole(null);
-    setIsAddModalOpen(false);
+    if (!trimmedLastName || trimmedLastName.length < 2) {
+      toast({
+        title: "Erreur",
+        description: "Le nom de famille doit contenir au moins 2 caractères",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    const fullLink = `${window.location.origin}${dashboardLink}`;
-    navigator.clipboard.writeText(fullLink);
-    
-    toast({
-      title: "Agent ajouté avec succès",
-      description: `${payload.firstName} ${payload.lastName} ajouté. Le lien sécurisé a été copié.`,
-    });
+    if (!trimmedPhone || trimmedPhone.length < 8) {
+      toast({
+        title: "Erreur",
+        description: "Le numéro de téléphone doit contenir au moins 8 caractères",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!selectedRole) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez sélectionner un rôle",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validation email optionnel si fourni
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      toast({
+        title: "Erreur",
+        description: "L'adresse email n'est pas valide",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAddingMember(true);
+
+    try {
+      // Vérifier que le profil existe, sinon créer un profil minimal
+      const profileRef = profileDocRef(db, user.uid);
+      const profileSnap = await getDoc(profileRef);
+      
+      if (!profileSnap.exists()) {
+        // Créer un profil minimal si il n'existe pas
+        const now = Date.now();
+        const sevenDays = 7 * 24 * 60 * 60 * 1000;
+        await setDoc(profileRef, {
+          uid: user.uid,
+          establishmentName: "",
+          establishmentType: "",
+          ownerName: "",
+          email: user.email || "",
+          phone: "",
+          plan: 'trial',
+          trialEndsAt: now + sevenDays,
+          tutorialCompleted: false,
+          tutorialStep: 'stock',
+          createdAt: now,
+          updatedAt: now,
+        }, { merge: true });
+      }
+
+      const agentCode = generateAgentCode();
+      const agentToken = generateAgentToken();
+      const dashboardLink = generateDashboardLink(selectedRole, agentToken);
+      
+      // Construire le payload avec les valeurs nettoyées
+      const payload: TeamMemberDoc = {
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
+        phone: trimmedPhone,
+        role: selectedRole,
+        status: "active",
+        agentCode,
+        dashboardLink,
+        agentToken,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      // Ajouter email seulement s'il est défini et valide
+      if (trimmedEmail) {
+        payload.email = trimmedEmail;
+      }
+
+      // Vérifier que le payload est valide avant l'envoi
+      if (!payload.firstName || !payload.lastName || !payload.phone || !payload.role || !payload.agentCode || !payload.agentToken) {
+        throw new Error("Données invalides : certains champs obligatoires sont manquants");
+      }
+
+      await addDoc(teamColRef(db, user.uid), payload);
+      
+      try {
+        await setDoc(doc(agentTokensTopColRef(db), agentToken), {
+          ownerUid: user.uid,
+          agentCode,
+          firstName: payload.firstName,
+          lastName: payload.lastName,
+          role: payload.role,
+          createdAt: Date.now(),
+        });
+      } catch (tokenError) {
+        console.error('Erreur lors de la création du token mapping:', tokenError);
+        // Ne pas bloquer l'ajout si le token mapping échoue, mais informer l'utilisateur
+        toast({
+          title: "Avertissement",
+          description: "L'agent a été ajouté mais le token d'accès n'a pas pu être créé. Veuillez régénérer les codes.",
+          variant: "default"
+        });
+      }
+
+      // Réinitialiser le formulaire
+      setNewMember({ firstName: "", lastName: "", email: "", phone: "" });
+      setSelectedRole(null);
+      setIsAddModalOpen(false);
+
+      // Copier le lien dans le presse-papier
+      const fullLink = `${window.location.origin}${dashboardLink}`;
+      try {
+        await navigator.clipboard.writeText(fullLink);
+      } catch (clipboardError) {
+        console.error('Erreur lors de la copie dans le presse-papier:', clipboardError);
+        // Ne pas bloquer si la copie échoue
+      }
+      
+      toast({
+        title: "Agent ajouté avec succès",
+        description: `${payload.firstName} ${payload.lastName} ajouté. Le lien sécurisé a été copié.`,
+      });
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout du membre:', error);
+      
+      let errorMessage = "Impossible d'ajouter le membre. Veuillez réessayer.";
+      
+      if (error instanceof Error) {
+        // Messages d'erreur plus spécifiques selon le type d'erreur
+        if (error.message.includes('permission')) {
+          errorMessage = "Vous n'avez pas les permissions nécessaires pour ajouter un membre.";
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = "Erreur de connexion. Vérifiez votre connexion internet et réessayez.";
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      toast({
+        title: "Erreur",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingMember(false);
+    }
   };
 
   const copyDashboardLink = (link: string, name: string) => {
@@ -221,27 +379,86 @@ const TeamPage = () => {
   };
 
   const toggleMemberStatus = async (id: string) => {
-    if (!user) return;
+    if (!user || !user.uid || !id) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le statut : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     const member = teamMembers.find(m => m.id === id);
-    if (!member) return;
-    const newStatus = member.status === 'active' ? 'inactive' : 'active';
-    await updateDoc(fsDoc(teamColRef(db, user.uid), id), { status: newStatus, updatedAt: Date.now() });
+    if (!member) {
+      toast({
+        title: "Erreur",
+        description: "Membre introuvable.",
+        variant: "destructive"
+      });
+      return;
+    }
+    try {
+      const newStatus = member.status === 'active' ? 'inactive' : 'active';
+      await updateDoc(fsDoc(teamColRef(db, user.uid), id), { status: newStatus, updatedAt: Date.now() });
+    } catch (error) {
+      console.error('Erreur lors de la modification du statut:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de modifier le statut.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleDeleteMember = async (id: string, name: string) => {
-    if (!user) return;
+    if (!user || !user.uid || !id) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le membre : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     const member = teamMembers.find(m => m.id === id);
-    await deleteDoc(fsDoc(teamColRef(db, user.uid), id));
+    if (!member) {
+      toast({
+        title: "Erreur",
+        description: "Membre introuvable.",
+        variant: "destructive"
+      });
+      return;
+    }
     try {
-      if (member?.agentToken) await deleteDoc(doc(agentTokensTopColRef(db), member.agentToken));
-    } catch { /* ignore */ }
-    toast({ title: "Agent supprimé", description: `${name} a été retiré de l'équipe.` });
-    setIsBottomSheetOpen(false);
-    setSelectedMember(null);
+      await deleteDoc(fsDoc(teamColRef(db, user.uid), id));
+      try {
+        if (member.agentToken) {
+          await deleteDoc(doc(agentTokensTopColRef(db), member.agentToken));
+        }
+      } catch (tokenError) {
+        console.error('Erreur lors de la suppression du token:', tokenError);
+        // Ne pas bloquer la suppression si le token n'existe pas
+      }
+      toast({ title: "Agent supprimé", description: `${name} a été retiré de l'équipe.` });
+      setIsBottomSheetOpen(false);
+      setSelectedMember(null);
+    } catch (error) {
+      console.error('Erreur lors de la suppression du membre:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer le membre.",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleRegenerateCodes = async (member: TeamMember) => {
-    if (!user) return;
+    if (!user || !user.uid || !member || !member.id) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de régénérer le code : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
     const newCode = generateAgentCode();
     const newToken = generateAgentToken();
     const newLink = generateDashboardLink(member.role as TeamRole, newToken);
@@ -253,7 +470,12 @@ const TeamPage = () => {
         updatedAt: Date.now(),
       });
       if (member.agentToken) {
-        try { await deleteDoc(doc(agentTokensTopColRef(db), member.agentToken)); } catch { /* ignore */ }
+        try {
+          await deleteDoc(doc(agentTokensTopColRef(db), member.agentToken));
+        } catch (tokenError) {
+          console.error('Erreur lors de la suppression de l\'ancien token:', tokenError);
+          // Ne pas bloquer si l'ancien token n'existe pas
+        }
       }
       await setDoc(doc(agentTokensTopColRef(db), newToken), {
         ownerUid: user.uid,
@@ -264,10 +486,19 @@ const TeamPage = () => {
         createdAt: Date.now(),
       });
       const full = `${window.location.origin}${newLink}`;
-      navigator.clipboard.writeText(full);
+      try {
+        await navigator.clipboard.writeText(full);
+      } catch (clipboardError) {
+        console.error('Erreur lors de la copie dans le presse-papier:', clipboardError);
+      }
       toast({ title: "Codes régénérés", description: `Nouveau code: ${newCode}. Lien copié.` });
-    } catch {
-      toast({ title: "Erreur", description: "Impossible de régénérer le code.", variant: "destructive" });
+    } catch (error) {
+      console.error('Erreur lors de la régénération des codes:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de régénérer le code.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -296,8 +527,15 @@ const TeamPage = () => {
   };
 
   const handleUpdateMember = async () => {
-    if (!user || !selectedMember) return;
-    if (!editingMember.firstName || !editingMember.lastName || !editingMember.phone) {
+    if (!user || !user.uid || !selectedMember || !selectedMember.id) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier le membre : identifiant manquant.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (!editingMember.firstName?.trim() || !editingMember.lastName?.trim() || !editingMember.phone?.trim()) {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs obligatoires",
@@ -307,32 +545,49 @@ const TeamPage = () => {
     }
 
     try {
-      await updateDoc(fsDoc(teamColRef(db, user.uid), selectedMember.id), {
-        firstName: editingMember.firstName,
-        lastName: editingMember.lastName,
-        email: editingMember.email || undefined,
-        phone: editingMember.phone,
+      // Construire l'objet de mise à jour en évitant les valeurs undefined
+      const updateData: {
+        firstName: string;
+        lastName: string;
+        phone: string;
+        updatedAt: number;
+        email?: string;
+      } = {
+        firstName: editingMember.firstName.trim(),
+        lastName: editingMember.lastName.trim(),
+        phone: editingMember.phone.trim(),
         updatedAt: Date.now(),
-      });
+      };
+
+      // Ajouter email seulement s'il est défini et non vide
+      if (editingMember.email?.trim()) {
+        updateData.email = editingMember.email.trim();
+      }
+
+      await updateDoc(fsDoc(teamColRef(db, user.uid), selectedMember.id), updateData);
 
       // Mettre à jour aussi dans agentTokens si le token existe
       if (selectedMember.agentToken) {
         try {
           await setDoc(doc(agentTokensTopColRef(db), selectedMember.agentToken), {
-            firstName: editingMember.firstName,
-            lastName: editingMember.lastName,
+            firstName: updateData.firstName,
+            lastName: updateData.lastName,
             updatedAt: Date.now(),
           }, { merge: true });
-        } catch { /* ignore */ }
+        } catch (tokenError) {
+          console.error('Erreur lors de la mise à jour du token:', tokenError);
+          // Ne pas bloquer la mise à jour si le token n'existe pas
+        }
       }
 
       toast({
         title: "Membre modifié",
-        description: `${editingMember.firstName} ${editingMember.lastName} a été mis à jour.`,
+        description: `${updateData.firstName} ${updateData.lastName} a été mis à jour.`,
       });
       setIsEditDialogOpen(false);
       setSelectedMember(null);
     } catch (error: unknown) {
+      console.error('Erreur lors de la modification du membre:', error);
       toast({
         title: "Erreur",
         description: error instanceof Error ? error.message : "Impossible de modifier le membre",
@@ -356,23 +611,25 @@ const TeamPage = () => {
     <div className="relative flex h-auto min-h-screen w-full flex-col bg-background">
       {/* Top App Bar */}
       <div className="sticky top-0 z-10 flex items-center bg-background p-4 pb-2 justify-between border-b border-gray-200">
-        <button
-          type="button"
-          onClick={() => navigate('/dashboard')}
-          className="text-[#181411] dark:text-white flex size-12 shrink-0 items-center justify-center"
-          aria-label="Retour"
-        >
-          <ChevronLeft size={24} />
-        </button>
-        <h2 className="text-[#181411] dark:text-white text-xl font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
-          Équipe
-        </h2>
-        <div className="size-12 shrink-0"></div>
+        <div className="max-w-7xl mx-auto w-full flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="text-[#181411] dark:text-white flex size-12 shrink-0 items-center justify-center"
+            aria-label="Retour"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <h2 className="text-[#181411] dark:text-white text-xl md:text-2xl font-bold leading-tight tracking-[-0.015em] flex-1 text-center">
+            Équipe
+          </h2>
+          <div className="size-12 shrink-0"></div>
+        </div>
       </div>
 
       {/* Image Grid */}
-      <main className="flex-grow p-4">
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4">
+      <main className="flex-grow p-4 max-w-7xl mx-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 md:gap-4">
           {teamMembers.map((member) => {
             const RoleIcon = getRoleIcon(member.role);
             const initials = `${member.firstName[0]}${member.lastName[0]}`;
@@ -380,23 +637,23 @@ const TeamPage = () => {
               <div
                 key={member.id}
                 onClick={() => handleMemberClick(member)}
-                className="flex flex-col gap-2 text-center pb-3 items-center bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm hover:shadow-lg transition-shadow cursor-pointer"
+                className="flex flex-col gap-1.5 md:gap-2 text-center pb-2 md:pb-3 items-center bg-white dark:bg-gray-800 rounded-lg md:rounded-xl p-2 md:p-3 shadow-sm hover:shadow-md md:hover:shadow-lg transition-shadow cursor-pointer"
               >
-                <div className="relative w-28 h-28">
+                <div className="relative w-16 h-16 md:w-20 md:h-20 lg:w-24 lg:h-24">
                   <div className="w-full h-full bg-center bg-no-repeat aspect-square bg-cover rounded-full bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
-                    <span className="text-3xl font-bold text-primary">
+                    <span className="text-xl md:text-2xl lg:text-3xl font-bold text-primary">
                       {initials}
                     </span>
                   </div>
-                  <div className="absolute -bottom-1 -right-1 flex items-center justify-center size-9 bg-gray-200 dark:bg-gray-700 rounded-full border-2 border-white dark:border-gray-800">
-                    <RoleIcon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                  <div className="absolute -bottom-0.5 -right-0.5 md:-bottom-1 md:-right-1 flex items-center justify-center size-6 md:size-7 lg:size-8 bg-gray-200 dark:bg-gray-700 rounded-full border-2 border-white dark:border-gray-800">
+                    <RoleIcon className="w-3 h-3 md:w-4 md:h-4 lg:w-5 lg:h-5 text-gray-700 dark:text-gray-300" />
                   </div>
                 </div>
-                <div>
-                  <p className="text-[#181411] dark:text-white text-lg font-bold leading-normal">
+                <div className="w-full">
+                  <p className="text-[#181411] dark:text-white text-sm md:text-base font-semibold md:font-bold leading-tight truncate px-1">
                     {member.firstName}
                   </p>
-                  <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-xs mt-1">
+                  <Badge variant={member.status === 'active' ? 'default' : 'secondary'} className="text-[10px] md:text-xs mt-0.5 md:mt-1">
                     {member.status === 'active' ? 'Actif' : 'Inactif'}
                   </Badge>
                 </div>
@@ -415,10 +672,10 @@ const TeamPage = () => {
       <div className="fixed bottom-6 right-6 z-20">
         <button
           onClick={openAddModalFromFAB}
-          className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-16 w-16 bg-primary text-white shadow-lg hover:bg-blue-600 transition-colors"
+          className="flex max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-14 w-14 md:h-16 md:w-16 bg-primary text-white shadow-lg hover:bg-blue-600 transition-colors"
           aria-label="Ajouter un membre"
         >
-          <Plus size={32} />
+          <Plus size={28} className="md:w-8 md:h-8" />
         </button>
       </div>
 
@@ -562,7 +819,17 @@ const TeamPage = () => {
       )}
 
       {/* Add Member Modal */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+      <Dialog 
+        open={isAddModalOpen} 
+        onOpenChange={(open) => {
+          if (!open && !isAddingMember) {
+            setIsAddModalOpen(false);
+            setNewMember({ firstName: "", lastName: "", email: "", phone: "" });
+            setSelectedRole(null);
+            setIsAddingMember(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -653,11 +920,33 @@ const TeamPage = () => {
           )}
 
           <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setIsAddModalOpen(false)} className="w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                if (!isAddingMember) {
+                  setIsAddModalOpen(false);
+                  setNewMember({ firstName: "", lastName: "", email: "", phone: "" });
+                  setSelectedRole(null);
+                }
+              }} 
+              className="w-full sm:w-auto"
+              disabled={isAddingMember}
+            >
               Annuler
             </Button>
-            <Button onClick={handleAddMember} className="bg-gradient-primary text-white w-full sm:w-auto">
-              Ajouter l'agent
+            <Button 
+              onClick={handleAddMember} 
+              className="bg-gradient-primary text-white w-full sm:w-auto"
+              disabled={isAddingMember}
+            >
+              {isAddingMember ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Ajout en cours...
+                </>
+              ) : (
+                "Ajouter l'agent"
+              )}
             </Button>
           </div>
         </DialogContent>
