@@ -54,6 +54,7 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
   const nif = data.nifNumber || '';
   const table = data.tableZone && data.tableZone !== 'Caisse' ? data.tableZone.toUpperCase() : '';
   const customMsg = data.ticketFooterMessage || data.customMessage || 'MERCI ❤️';
+  const logoUrl = data.ticketLogoUrl || data.establishmentLogo;
 
   // Formatage des produits en colonnes : ARTICLE, QTE, PRIX
   // Largeur ticket 80mm = ~48 caractères en police monospace 9px
@@ -143,6 +144,20 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
     .header {
       text-align: center;
       margin: 3px 0;
+    }
+    
+    .logo-container {
+      text-align: center;
+      margin: 3px 0;
+    }
+    
+    .logo {
+      max-width: 60mm;
+      max-height: 20mm;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      filter: grayscale(100%) contrast(1.2);
     }
     
     .company-name {
@@ -245,6 +260,12 @@ export function generateThermalTicketHTML(data: ThermalTicketData): string {
 <body>
   <div class="ticket">
     <div class="separator">${SEPARATOR}</div>
+    
+    ${logoUrl ? `
+    <div class="logo-container">
+      <img src="${logoUrl}" alt="Logo" class="logo" onerror="this.style.display='none'" />
+    </div>
+    ` : ''}
     
     <div class="header">
       <div class="company-name">${displayName}</div>

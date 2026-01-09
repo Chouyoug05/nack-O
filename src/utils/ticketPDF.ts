@@ -87,6 +87,34 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   separator(y);
   y += 3;
 
+  // ===== LOGO =====
+  const logoUrl = ticketData.ticketLogoUrl || ticketData.establishmentLogo;
+  if (logoUrl) {
+    try {
+      const response = await fetch(logoUrl);
+      if (response.ok) {
+        const img = await response.blob();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = reject;
+          reader.readAsDataURL(img);
+        });
+        // Détecter le format de l'image
+        const format = img.type.includes('jpeg') || img.type.includes('jpg') ? 'JPEG' : 'PNG';
+        // Logo centré, taille adaptée au format ticket (max 20mm de largeur)
+        const logoWidth = 20;
+        const logoHeight = 20;
+        const logoX = (pageWidth - logoWidth) / 2;
+        doc.addImage(dataUrl, format, logoX, y, logoWidth, logoHeight);
+        y += logoHeight + 2;
+      }
+    } catch (error) {
+      console.error('Erreur chargement logo pour ticket PDF:', error);
+      // Continuer sans logo
+    }
+  }
+
   // ===== EN-TÊTE =====
   const displayName = (ticketData.companyName || ticketData.establishmentName).toUpperCase();
   text(displayName, pageWidth / 2, y, 11, true, 'center');

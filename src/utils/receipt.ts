@@ -17,18 +17,29 @@ export async function generateSubscriptionReceiptPDF(profile: Pick<
   let y = 48;
 
   // Header
-  if (profile.logoUrl) {
+  const logoUrl = profile.logoUrl;
+  if (logoUrl) {
     try {
-      const img = await fetch(profile.logoUrl).then((r) => r.blob());
+      const response = await fetch(logoUrl);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const img = await response.blob();
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result));
-        reader.onerror = reject;
+        reader.onerror = (error) => {
+          console.error('Erreur lecture logo:', error);
+          reject(error);
+        };
         reader.readAsDataURL(img);
       });
-      doc.addImage(dataUrl, "PNG", 40, y - 10, 48, 48);
-    } catch {
-      // ignore logo load errors
+      // Détecter le format de l'image
+      const format = img.type.includes('jpeg') || img.type.includes('jpg') ? 'JPEG' : 'PNG';
+      doc.addImage(dataUrl, format, 40, y - 10, 48, 48);
+    } catch (error) {
+      console.error('Erreur chargement logo pour reçu:', error);
+      // Continuer sans logo plutôt que d'ignorer silencieusement
     }
   }
   doc.setFontSize(18);
