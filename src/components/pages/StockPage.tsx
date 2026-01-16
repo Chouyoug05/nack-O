@@ -199,6 +199,19 @@ const StockPage = () => {
   const [isSearchingImage, setIsSearchingImage] = useState(false);
   const [showImageSelectionDialog, setShowImageSelectionDialog] = useState(false);
   const [foundImages, setFoundImages] = useState<string[]>([]);
+  const [pendingImages, setPendingImages] = useState<string[]>([]);
+
+  // Gérer l'ouverture du Dialog de sélection d'image de manière sûre
+  useEffect(() => {
+    if (pendingImages.length > 0 && !showImageSelectionDialog) {
+      setFoundImages(pendingImages);
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
+      requestAnimationFrame(() => {
+        setShowImageSelectionDialog(true);
+        setPendingImages([]);
+      });
+    }
+  }, [pendingImages, showImageSelectionDialog]);
 
   const [lossData, setLossData] = useState({
     productId: "",
@@ -366,8 +379,8 @@ const StockPage = () => {
       // Rechercher des images via Google Images (scraping direct)
       const images = await searchGoogleImages(newProduct.name, newProduct.category);
       if (images && images.length > 0) {
-        setFoundImages(images);
-        setShowImageSelectionDialog(true);
+        // Utiliser pendingImages pour gérer l'ouverture du Dialog de manière sûre
+        setPendingImages(images);
       } else {
         toast({
           title: "Aucune image trouvée",
@@ -2149,7 +2162,16 @@ const StockPage = () => {
       </Dialog>
 
       {/* Dialog de sélection d'image depuis Google Images */}
-      <Dialog open={showImageSelectionDialog} onOpenChange={setShowImageSelectionDialog}>
+      <Dialog 
+        open={showImageSelectionDialog} 
+        onOpenChange={(open) => {
+          setShowImageSelectionDialog(open);
+          if (!open) {
+            // Réinitialiser les images quand le Dialog se ferme
+            setFoundImages([]);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Choisir une image pour "{newProduct.name}"</DialogTitle>
@@ -2158,16 +2180,17 @@ const StockPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
-            {foundImages.map((imageUrl, index) => (
+            {foundImages.map((imageUrl) => (
               <div
-                key={index}
+                key={imageUrl}
                 className="relative group cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-all"
                 onClick={() => handleSelectImage(imageUrl)}
               >
                 <img
                   src={imageUrl}
-                  alt={`Option ${index + 1}`}
+                  alt={`Option d'image`}
                   className="w-full h-48 object-cover"
+                  loading="lazy"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = 'none';
                   }}
