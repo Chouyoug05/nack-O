@@ -907,79 +907,89 @@ const AdminDashboard = () => {
     }
     
     // Si on n'a pas de profils, restaurer depuis le cache si disponible
+    // Mais ne pas arrêter le chargement si le cache est vide - on attendra que les profils arrivent
     if (allProfiles.length === 0) {
       prevProfilesLengthRef.current = 0;
-      // Restaurer les données depuis le cache pour la vue active et arrêter le chargement
+      // Restaurer les données depuis le cache pour la vue active
       switch (activeView) {
         case 'products':
           if (dataCacheRef.current.products.length > 0) {
             setAllProducts(dataCacheRef.current.products);
+            setIsLoadingProducts(false);
           }
-          setIsLoadingProducts(false);
+          // Si le cache est vide, on garde isLoadingProducts à true pour attendre les profils
           break;
         case 'orders':
           if (dataCacheRef.current.orders.length > 0) {
             setAllOrders(dataCacheRef.current.orders);
+            setIsLoadingOrders(false);
           }
-          setIsLoadingOrders(false);
           break;
         case 'events':
           if (dataCacheRef.current.events.length > 0) {
             setAllEvents(dataCacheRef.current.events);
+            setIsLoadingEvents(false);
           }
-          setIsLoadingEvents(false);
           break;
         case 'ratings':
           if (dataCacheRef.current.ratings.length > 0) {
             setAllRatings(dataCacheRef.current.ratings);
+            setIsLoadingRatings(false);
           }
-          setIsLoadingRatings(false);
           break;
         case 'menu':
           if (dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) {
             setGlobalStats(dataCacheRef.current.globalStats);
+            setIsLoadingGlobalStats(false);
           }
-          setIsLoadingGlobalStats(false);
           if (dataCacheRef.current.payments.length > 0) {
             setAllPayments(dataCacheRef.current.payments);
+            setIsLoadingPayments(false);
           }
-          setIsLoadingPayments(false);
           break;
         case 'users':
           // Les utilisateurs sont déjà chargés via onSnapshot
           break;
       }
+      // Ne pas return ici - on attend que les profils arrivent pour charger les données
+      // Si le cache est vide, on garde le chargement actif
+      if (activeView === 'users') {
+        return; // Pour les utilisateurs, on peut return car ils sont chargés via onSnapshot
+      }
+      // Pour les autres vues, on attend que les profils arrivent
       return;
     }
     
-    // Charger les données selon la vue
-    if (activeView === 'menu') {
-      loadGlobalStats();
-      loadAllPayments();
-      loadedViewsRef.current.add('menu');
-    } else {
-    switch (activeView) {
-      case 'products':
-        loadAllProducts();
-          loadedViewsRef.current.add('products');
-        break;
-      case 'orders':
-        loadAllOrders();
-          loadedViewsRef.current.add('orders');
-        break;
-      case 'events':
-        loadAllEvents();
-          loadedViewsRef.current.add('events');
-        break;
-      case 'ratings':
-        loadAllRatings();
-          loadedViewsRef.current.add('ratings');
-        break;
-      case 'users':
-        // Les utilisateurs sont déjà chargés via onSnapshot
-          loadedViewsRef.current.add('users');
-        break;
-    }
+    // Charger les données selon la vue seulement si on a des profils
+    if (allProfiles.length > 0) {
+      if (activeView === 'menu') {
+        loadGlobalStats();
+        loadAllPayments();
+        loadedViewsRef.current.add('menu');
+      } else {
+        switch (activeView) {
+          case 'products':
+            loadAllProducts();
+            loadedViewsRef.current.add('products');
+            break;
+          case 'orders':
+            loadAllOrders();
+            loadedViewsRef.current.add('orders');
+            break;
+          case 'events':
+            loadAllEvents();
+            loadedViewsRef.current.add('events');
+            break;
+          case 'ratings':
+            loadAllRatings();
+            loadedViewsRef.current.add('ratings');
+            break;
+          case 'users':
+            // Les utilisateurs sont déjà chargés via onSnapshot
+            loadedViewsRef.current.add('users');
+            break;
+        }
+      }
     }
     
     prevProfilesLengthRef.current = allProfiles.length;
@@ -1959,7 +1969,8 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          <div className="border rounded-md overflow-x-auto">
+          {/* Version Desktop - Tableau */}
+          <div className="hidden md:block border rounded-md overflow-x-auto">
             <Table className="min-w-[800px]">
               <TableHeader>
                   <TableRow>
@@ -2071,6 +2082,94 @@ const AdminDashboard = () => {
               </TableBody>
             </Table>
           </div>
+
+          {/* Version Mobile - Cartes */}
+          <div className="md:hidden space-y-3">
+            {filtered.map((p) => {
+              const isExpired = (p.plan === 'expired') || (typeof p.subscriptionEndsAt === 'number' ? p.subscriptionEndsAt < now : false);
+              const status = p.plan === 'active' && !isExpired ? 'active' : p.plan === 'trial' ? 'trial' : 'expired';
+              const hasTicketInfo = !!(p.companyName || p.rcsNumber || p.nifNumber || p.businessPhone || p.fullAddress);
+              return (
+                <Card key={p.uid} className="border shadow-sm">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <input type="checkbox" checked={selectedUids.has(p.uid)} onChange={() => toggleSelect(p.uid)} className="mt-1" />
+                          <h3 className="font-semibold text-base">{p.ownerName || p.email}</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">{p.email}</p>
+                        <p className="text-sm font-medium mt-1">{p.establishmentName || "—"}</p>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        {status === 'active' && <Badge className="bg-green-100 text-green-700 text-xs" variant="secondary">Actif</Badge>}
+                        {status === 'trial' && <Badge className="bg-amber-100 text-amber-700 text-xs" variant="secondary">Essai</Badge>}
+                        {status === 'expired' && <Badge className="bg-red-100 text-red-700 text-xs" variant="secondary">Expiré</Badge>}
+                        {status === 'active' && p.subscriptionType && (
+                          <Badge className="bg-blue-100 text-blue-700 text-xs" variant="secondary">
+                            {p.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Fin d'abonnement:</span>
+                        <p className="font-medium">{p.subscriptionEndsAt ? new Date(p.subscriptionEndsAt).toLocaleDateString() : "—"}</p>
+                        {p.plan === 'active' && p.subscriptionEndsAt && p.subscriptionEndsAt > now && (
+                          <p className="text-xs text-muted-foreground">
+                            {Math.floor((p.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000))} jours restants
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Tickets:</span>
+                        <div className="mt-1">
+                          {hasTicketInfo ? (
+                            <Badge className="bg-green-100 text-green-700 text-xs" variant="secondary">✓ Configuré</Badge>
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-700 text-xs" variant="secondary">⚠ Non configuré</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 pt-2 border-t">
+                      {status === 'active' && p.subscriptionType && (
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => openChangeSubscriptionDialog(p)}
+                          className="text-xs"
+                        >
+                          <Settings size={12} className="mr-1"/> Plan
+                        </Button>
+                      )}
+                      <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays, activationType)} className="text-xs">
+                        <Gift size={12} className="mr-1"/> Activer
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => navigate(`/admin/client/${p.uid}`)}
+                        className="text-xs"
+                      >
+                        <Eye size={12} className="mr-1"/> Voir
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="destructive" 
+                        onClick={() => handleDeleteClient(p.uid, p.establishmentName || p.ownerName || p.email || 'Client')}
+                        disabled={deletingUid === p.uid}
+                        className="text-xs"
+                      >
+                        {deletingUid === p.uid ? "..." : <><Trash2 size={12} className="mr-1"/> Supprimer</>}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
     </div>
@@ -2106,65 +2205,113 @@ const AdminDashboard = () => {
           ) : allProducts.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucun produit trouvé</div>
           ) : (
-            <div className="border rounded-md overflow-x-auto">
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Produit</TableHead>
-                    <TableHead>Catégorie</TableHead>
-                    <TableHead>Prix</TableHead>
-                    <TableHead>Quantité</TableHead>
-                    <TableHead>Établissement</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allProducts.map((product) => (
-                    <TableRow key={`${product.userId}-${product.id}`}>
-                      <TableCell className="font-medium">{product.name}</TableCell>
-                      <TableCell><Badge variant="secondary">{product.category}</Badge></TableCell>
-                      <TableCell>{product.price.toLocaleString()} XAF</TableCell>
-                      <TableCell>{product.quantity}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{product.establishmentName || product.userName || 'N/A'}</span>
-                          {product.userName && product.establishmentName && (
-                            <span className="text-xs text-muted-foreground">{product.userName}</span>
-                          )}
-              </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => setEditingProduct({ id: product.id, userId: product.userId, name: product.name, category: product.category, price: product.price, quantity: product.quantity })}
-                            title="Modifier le produit"
-                          >
-                            <Edit size={14} className="mr-2"/> Modifier
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            onClick={() => handleDeleteProduct(product.id, product.userId)}
-                            disabled={deletingProductId === product.id}
-                            title="Supprimer le produit"
-                          >
-                            {deletingProductId === product.id ? (
-                              <>...</>
-                            ) : (
-                              <>
-                                <Trash2 size={14} className="mr-2"/> Supprimer
-                              </>
-                            )}
-                          </Button>
-              </div>
-                      </TableCell>
+            <>
+              {/* Version Desktop - Tableau */}
+              <div className="hidden md:block border rounded-md overflow-x-auto">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Produit</TableHead>
+                      <TableHead>Catégorie</TableHead>
+                      <TableHead>Prix</TableHead>
+                      <TableHead>Quantité</TableHead>
+                      <TableHead>Établissement</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {allProducts.map((product) => (
+                      <TableRow key={`${product.userId}-${product.id}`}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell><Badge variant="secondary">{product.category}</Badge></TableCell>
+                        <TableCell>{product.price.toLocaleString()} XAF</TableCell>
+                        <TableCell>{product.quantity}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{product.establishmentName || product.userName || 'N/A'}</span>
+                            {product.userName && product.establishmentName && (
+                              <span className="text-xs text-muted-foreground">{product.userName}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              onClick={() => setEditingProduct({ id: product.id, userId: product.userId, name: product.name, category: product.category, price: product.price, quantity: product.quantity })}
+                              title="Modifier le produit"
+                            >
+                              <Edit size={14} className="mr-2"/> Modifier
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              onClick={() => handleDeleteProduct(product.id, product.userId)}
+                              disabled={deletingProductId === product.id}
+                              title="Supprimer le produit"
+                            >
+                              {deletingProductId === product.id ? (
+                                <>...</>
+                              ) : (
+                                <>
+                                  <Trash2 size={14} className="mr-2"/> Supprimer
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
+
+              {/* Version Mobile - Cartes */}
+              <div className="md:hidden space-y-3">
+                {allProducts.map((product) => (
+                  <Card key={`${product.userId}-${product.id}`} className="border shadow-sm">
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base">{product.name}</h3>
+                          <Badge variant="secondary" className="mt-1">{product.category}</Badge>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">{product.price.toLocaleString()} XAF</p>
+                          <p className="text-sm text-muted-foreground">Stock: {product.quantity}</p>
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t">
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Établissement:</span>{" "}
+                          <span className="font-medium">{product.establishmentName || product.userName || 'N/A'}</span>
+                        </p>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <Button 
+                          size="sm" 
+                          variant="outline" 
+                          onClick={() => setEditingProduct({ id: product.id, userId: product.userId, name: product.name, category: product.category, price: product.price, quantity: product.quantity })}
+                          className="flex-1 text-xs"
+                        >
+                          <Edit size={12} className="mr-1"/> Modifier
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          onClick={() => handleDeleteProduct(product.id, product.userId)}
+                          disabled={deletingProductId === product.id}
+                          className="flex-1 text-xs"
+                        >
+                          {deletingProductId === product.id ? "..." : <><Trash2 size={12} className="mr-1"/> Supprimer</>}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
             </CardContent>
           </Card>
@@ -2201,77 +2348,138 @@ const AdminDashboard = () => {
           ) : allOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucune commande trouvée</div>
           ) : (
-            <div className="border rounded-md overflow-x-auto">
-              <Table className="min-w-[900px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>N° Commande</TableHead>
-                    <TableHead>Table</TableHead>
-                    <TableHead>Montant</TableHead>
-                    <TableHead>Statut</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Établissement</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {allOrders.map((order) => (
-                    <TableRow key={`${order.userId}-${order.id}`}>
-                      <TableCell className="font-medium">#{order.orderNumber}</TableCell>
-                      <TableCell>{order.tableNumber}</TableCell>
-                      <TableCell className="font-semibold">{order.total.toLocaleString()} XAF</TableCell>
-                      <TableCell>
-                        {order.status === 'pending' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">En attente</Badge>}
-                        {order.status === 'sent' && <Badge className="bg-green-100 text-green-700" variant="secondary">Envoyée</Badge>}
-                        {order.status === 'cancelled' && <Badge className="bg-red-100 text-red-700" variant="secondary">Annulée</Badge>}
-                        {!['pending', 'sent', 'cancelled'].includes(order.status) && <Badge variant="secondary">{order.status}</Badge>}
-                      </TableCell>
-                      <TableCell>{new Date(order.createdAt).toLocaleString('fr-FR')}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{order.establishmentName || order.userName || 'N/A'}</span>
-                          {order.userName && order.establishmentName && (
-                            <span className="text-xs text-muted-foreground">{order.userName}</span>
-                          )}
-            </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end flex-wrap">
-                          <Select 
-                            value={order.status} 
-                            onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
-                          >
-                            <SelectTrigger className="w-32">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">En attente</SelectItem>
-                              <SelectItem value="sent">Envoyée</SelectItem>
-                              <SelectItem value="cancelled">Annulée</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
-                            onClick={() => handleDeleteOrder(order.id, order.userId)}
-                            disabled={deletingOrderId === order.id}
-                            title="Supprimer la commande"
-                          >
-                            {deletingOrderId === order.id ? (
-                              <>...</>
-                            ) : (
-                              <>
-                                <Trash2 size={14} className="mr-2"/> Supprimer
-                              </>
-                            )}
-                          </Button>
-            </div>
-                      </TableCell>
+            <>
+              {/* Version Desktop - Tableau */}
+              <div className="hidden md:block border rounded-md overflow-x-auto">
+                <Table className="min-w-[900px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>N° Commande</TableHead>
+                      <TableHead>Table</TableHead>
+                      <TableHead>Montant</TableHead>
+                      <TableHead>Statut</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Établissement</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {allOrders.map((order) => (
+                      <TableRow key={`${order.userId}-${order.id}`}>
+                        <TableCell className="font-medium">#{order.orderNumber}</TableCell>
+                        <TableCell>{order.tableNumber}</TableCell>
+                        <TableCell className="font-semibold">{order.total.toLocaleString()} XAF</TableCell>
+                        <TableCell>
+                          {order.status === 'pending' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">En attente</Badge>}
+                          {order.status === 'sent' && <Badge className="bg-green-100 text-green-700" variant="secondary">Envoyée</Badge>}
+                          {order.status === 'cancelled' && <Badge className="bg-red-100 text-red-700" variant="secondary">Annulée</Badge>}
+                          {!['pending', 'sent', 'cancelled'].includes(order.status) && <Badge variant="secondary">{order.status}</Badge>}
+                        </TableCell>
+                        <TableCell>{new Date(order.createdAt).toLocaleString('fr-FR')}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{order.establishmentName || order.userName || 'N/A'}</span>
+                            {order.userName && order.establishmentName && (
+                              <span className="text-xs text-muted-foreground">{order.userName}</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end flex-wrap">
+                            <Select 
+                              value={order.status} 
+                              onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
+                            >
+                              <SelectTrigger className="w-32">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pending">En attente</SelectItem>
+                                <SelectItem value="sent">Envoyée</SelectItem>
+                                <SelectItem value="cancelled">Annulée</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button 
+                              size="sm" 
+                              variant="destructive" 
+                              onClick={() => handleDeleteOrder(order.id, order.userId)}
+                              disabled={deletingOrderId === order.id}
+                              title="Supprimer la commande"
+                            >
+                              {deletingOrderId === order.id ? (
+                                <>...</>
+                              ) : (
+                                <>
+                                  <Trash2 size={14} className="mr-2"/> Supprimer
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Version Mobile - Cartes */}
+              <div className="md:hidden space-y-3">
+                {allOrders.map((order) => (
+                  <Card key={`${order.userId}-${order.id}`} className="border shadow-sm">
+                    <CardContent className="p-4 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base">Commande #{order.orderNumber}</h3>
+                          <p className="text-sm text-muted-foreground">Table: {order.tableNumber}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg">{order.total.toLocaleString()} XAF</p>
+                          {order.status === 'pending' && <Badge className="bg-amber-100 text-amber-700 text-xs mt-1" variant="secondary">En attente</Badge>}
+                          {order.status === 'sent' && <Badge className="bg-green-100 text-green-700 text-xs mt-1" variant="secondary">Envoyée</Badge>}
+                          {order.status === 'cancelled' && <Badge className="bg-red-100 text-red-700 text-xs mt-1" variant="secondary">Annulée</Badge>}
+                          {!['pending', 'sent', 'cancelled'].includes(order.status) && <Badge variant="secondary" className="text-xs mt-1">{order.status}</Badge>}
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t space-y-1">
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Date:</span>{" "}
+                          <span>{new Date(order.createdAt).toLocaleString('fr-FR')}</span>
+                        </p>
+                        <p className="text-sm">
+                          <span className="text-muted-foreground">Établissement:</span>{" "}
+                          <span className="font-medium">{order.establishmentName || order.userName || 'N/A'}</span>
+                        </p>
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <Select 
+                          value={order.status} 
+                          onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
+                          className="flex-1"
+                        >
+                          <SelectTrigger className="w-full text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pending">En attente</SelectItem>
+                            <SelectItem value="sent">Envoyée</SelectItem>
+                            <SelectItem value="cancelled">Annulée</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button 
+                          size="sm" 
+                          variant="destructive" 
+                          onClick={() => handleDeleteOrder(order.id, order.userId)}
+                          disabled={deletingOrderId === order.id}
+                          className="text-xs"
+                        >
+                          {deletingOrderId === order.id ? "..." : <Trash2 size={12} />}
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
           </CardContent>
         </Card>
