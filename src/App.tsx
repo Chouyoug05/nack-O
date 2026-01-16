@@ -33,6 +33,7 @@ import TeamPage from "@/components/pages/TeamPage";
 import CustomerDetailsPage from "@/components/pages/CustomerDetailsPage";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import PublicOrderingPage from "./pages/PublicOrderingPage";
+import ConfigureTickets from "./pages/ConfigureTickets";
 
 const queryClient = new QueryClient();
 
@@ -113,6 +114,7 @@ const router = createBrowserRouter([
       { path: "register", element: <Register /> },
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "complete-profile", element: <RequireAuth><CompleteProfile /></RequireAuth> },
+      { path: "configure-tickets", element: <RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth> },
       { path: "dashboard", element: <RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "team", element: <RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "customer/:customerId", element: <RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth> },

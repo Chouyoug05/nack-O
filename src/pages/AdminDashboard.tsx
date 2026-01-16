@@ -1968,6 +1968,7 @@ const AdminDashboard = () => {
                   <TableHead>Établissement</TableHead>
                   <TableHead>Plan</TableHead>
                   <TableHead>Fin d'abonnement</TableHead>
+                  <TableHead>Tickets</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -1975,6 +1976,8 @@ const AdminDashboard = () => {
                 {filtered.map((p) => {
                   const isExpired = (p.plan === 'expired') || (typeof p.subscriptionEndsAt === 'number' ? p.subscriptionEndsAt < now : false);
                   const status = p.plan === 'active' && !isExpired ? 'active' : p.plan === 'trial' ? 'trial' : 'expired';
+                  // Vérifier si les informations de tickets sont configurées
+                  const hasTicketInfo = !!(p.companyName || p.rcsNumber || p.nifNumber || p.businessPhone || p.fullAddress);
                   return (
                     <TableRow key={p.uid}>
                       <TableCell>
@@ -2010,6 +2013,17 @@ const AdminDashboard = () => {
                             )}
                           </div>
                         ) : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {hasTicketInfo ? (
+                          <Badge className="bg-green-100 text-green-700" variant="secondary" title="Informations de tickets configurées">
+                            ✓ Configuré
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-700" variant="secondary" title="Informations de tickets non configurées (optionnel)">
+                            ⚠ Non configuré
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end flex-wrap">

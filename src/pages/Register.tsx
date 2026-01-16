@@ -288,7 +288,8 @@ const Register = () => {
         locationAsked: true,
       });
       toast({ title: "Inscription réussie !", description: "Bienvenue sur NACK!" });
-      navigate("/dashboard");
+      // Rediriger vers la configuration des tickets (optionnelle)
+      navigate("/configure-tickets");
     } catch (error: unknown) {
       toast({ title: "Inscription échouée", description: "Une erreur est survenue. Réessayez.", variant: "destructive" });
     } finally {
