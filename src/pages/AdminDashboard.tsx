@@ -861,12 +861,14 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (!isAdmin) return;
     
-    const profilesJustLoaded = prevProfilesLengthRef.current === 0 && allProfiles.length > 0;
     const prevView = prevViewsRef.current;
     const viewChanged = prevView !== activeView;
+    const profilesJustLoaded = prevProfilesLengthRef.current === 0 && allProfiles.length > 0;
     
     // Si on change de vue, réinitialiser les états de chargement des autres vues
     if (viewChanged) {
+      // Réinitialiser le chargement pour la nouvelle vue
+      loadedViewsRef.current.delete(activeView);
       // Arrêter le chargement des vues non actives
       if (activeView !== 'products') setIsLoadingProducts(false);
       if (activeView !== 'orders') setIsLoadingOrders(false);
@@ -878,36 +880,7 @@ const AdminDashboard = () => {
       }
     }
     
-    const viewAlreadyLoaded = loadedViewsRef.current.has(activeView);
-    
-    // Si la vue est déjà chargée et que les profils n'ont pas changé, s'assurer que le chargement est arrêté
-    if (viewAlreadyLoaded && !profilesJustLoaded && !viewChanged) {
-      // S'assurer que les états de chargement sont à false pour la vue active
-      switch (activeView) {
-        case 'products':
-          setIsLoadingProducts(false);
-          break;
-        case 'orders':
-          setIsLoadingOrders(false);
-          break;
-        case 'events':
-          setIsLoadingEvents(false);
-          break;
-        case 'ratings':
-          setIsLoadingRatings(false);
-          break;
-        case 'menu':
-          setIsLoadingGlobalStats(false);
-          setIsLoadingPayments(false);
-          break;
-      }
-      prevProfilesLengthRef.current = allProfiles.length;
-      prevViewsRef.current = activeView;
-      return;
-    }
-    
     // Si on n'a pas de profils, restaurer depuis le cache si disponible
-    // Mais ne pas arrêter le chargement si le cache est vide - on attendra que les profils arrivent
     if (allProfiles.length === 0) {
       prevProfilesLengthRef.current = 0;
       // Restaurer les données depuis le cache pour la vue active
@@ -916,52 +889,78 @@ const AdminDashboard = () => {
           if (dataCacheRef.current.products.length > 0) {
             setAllProducts(dataCacheRef.current.products);
             setIsLoadingProducts(false);
+          } else {
+            // Si pas de cache, activer le chargement pour attendre les profils
+            setIsLoadingProducts(true);
           }
-          // Si le cache est vide, on garde isLoadingProducts à true pour attendre les profils
           break;
         case 'orders':
           if (dataCacheRef.current.orders.length > 0) {
             setAllOrders(dataCacheRef.current.orders);
             setIsLoadingOrders(false);
+          } else {
+            setIsLoadingOrders(true);
           }
           break;
         case 'events':
           if (dataCacheRef.current.events.length > 0) {
             setAllEvents(dataCacheRef.current.events);
             setIsLoadingEvents(false);
+          } else {
+            setIsLoadingEvents(true);
           }
           break;
         case 'ratings':
           if (dataCacheRef.current.ratings.length > 0) {
             setAllRatings(dataCacheRef.current.ratings);
             setIsLoadingRatings(false);
+          } else {
+            setIsLoadingRatings(true);
           }
           break;
         case 'menu':
           if (dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) {
             setGlobalStats(dataCacheRef.current.globalStats);
             setIsLoadingGlobalStats(false);
+          } else {
+            setIsLoadingGlobalStats(true);
           }
           if (dataCacheRef.current.payments.length > 0) {
             setAllPayments(dataCacheRef.current.payments);
             setIsLoadingPayments(false);
+          } else {
+            setIsLoadingPayments(true);
           }
           break;
         case 'users':
           // Les utilisateurs sont déjà chargés via onSnapshot
           break;
       }
-      // Ne pas return ici - on attend que les profils arrivent pour charger les données
-      // Si le cache est vide, on garde le chargement actif
-      if (activeView === 'users') {
-        return; // Pour les utilisateurs, on peut return car ils sont chargés via onSnapshot
+      // Ne pas charger si on n'a pas de profils (sauf pour users)
+      // Mais on garde le chargement actif pour attendre les profils
+      if (activeView !== 'users') {
+        prevViewsRef.current = activeView;
+        return;
       }
-      // Pour les autres vues, on attend que les profils arrivent
-      return;
     }
     
-    // Charger les données selon la vue seulement si on a des profils
-    if (allProfiles.length > 0) {
+    // Charger les données selon la vue si on a des profils
+    // Toujours charger si :
+    // - La vue a changé
+    // - Les profils viennent d'arriver (après un refresh)
+    // - La vue n'a pas encore été chargée
+    const shouldLoad = allProfiles.length > 0 && (
+      viewChanged || 
+      profilesJustLoaded || 
+      !loadedViewsRef.current.has(activeView)
+    );
+    
+    if (shouldLoad) {
+      // Si les profils viennent d'arriver, réinitialiser le cache de chargement pour forcer le rechargement
+      if (profilesJustLoaded) {
+        loadedViewsRef.current.clear();
+      }
+      
       if (activeView === 'menu') {
         loadGlobalStats();
         loadAllPayments();
@@ -1130,7 +1129,17 @@ const AdminDashboard = () => {
   };
 
   const activateForDays = async (uid: string, days: number, subscriptionType: 'transition' | 'transition-pro-max' = 'transition') => {
-    const ms = Math.max(1, days) * 24 * 60 * 60 * 1000;
+    // Validation : maximum 90 jours (3 mois)
+    if (days < 1 || days > 90) {
+      toast({ 
+        title: "Erreur", 
+        description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
+    const ms = Math.max(1, Math.min(90, days)) * 24 * 60 * 60 * 1000;
     const until = Date.now() + ms;
     try {
       const updateData: {
@@ -1146,13 +1155,17 @@ const AdminDashboard = () => {
         updatedAt: Date.now(),
       };
       
-      // Si c'est un abonnement de 30 jours, enregistrer le paiement pour les revenus
-      if (days === 30) {
+      // Si c'est un abonnement de 30 jours (ou multiple de 30), enregistrer le paiement pour les revenus
+      if (days === 30 || days === 60 || days === 90) {
         updateData.lastPaymentAt = Date.now();
       }
       
       await updateDoc(doc(db, "profiles", uid), updateData);
-      toast({ title: "Succès", description: `Abonnement ${subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'} activé pour ${days} jours` });
+      const monthsText = days >= 30 ? ` (${Math.round(days / 30 * 10) / 10} mois)` : '';
+      toast({ 
+        title: "Succès", 
+        description: `Abonnement ${subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'} activé pour ${days} jours${monthsText}` 
+      });
     } catch (error) {
       console.error('Erreur activation abonnement:', error);
       toast({ title: "Erreur", description: "Impossible d'activer l'abonnement", variant: "destructive" });
@@ -1952,7 +1965,51 @@ const AdminDashboard = () => {
               </SelectContent>
             </Select>
             <div className="ml-auto flex items-center gap-2 flex-wrap">
-              <Input type="number" className="w-28" min={1} value={activationDays} onChange={e => setActivationDays(Number(e.target.value || 0))} />
+              <div className="flex items-center gap-1">
+                <Input 
+                  type="number" 
+                  className="w-20" 
+                  min={1} 
+                  max={90}
+                  value={activationDays} 
+                  onChange={e => {
+                    const val = Number(e.target.value || 0);
+                    if (val >= 1 && val <= 90) {
+                      setActivationDays(val);
+                    }
+                  }}
+                  placeholder="Jours"
+                />
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {activationDays >= 30 ? `(${Math.round(activationDays / 30 * 10) / 10} mois)` : ''}
+                </span>
+              </div>
+              <div className="flex gap-1">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setActivationDays(30)}
+                  className={activationDays === 30 ? "bg-primary/10" : ""}
+                >
+                  1M
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setActivationDays(60)}
+                  className={activationDays === 60 ? "bg-primary/10" : ""}
+                >
+                  2M
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setActivationDays(90)}
+                  className={activationDays === 90 ? "bg-primary/10" : ""}
+                >
+                  3M
+                </Button>
+              </div>
               <Select value={activationType} onValueChange={(v) => setActivationType(v as 'transition' | 'transition-pro-max')}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Type" />
@@ -1962,10 +2019,26 @@ const AdminDashboard = () => {
                   <SelectItem value="transition-pro-max">Pro Max (7500 XAF)</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={async () => {
-                const uids = Array.from(selectedUids);
-                for (const uid of uids) await activateForDays(uid, activationDays, activationType);
-              }}><Gift size={16} className="mr-2"/>Activer {activationDays} j</Button>
+              <Button 
+                variant="outline" 
+                onClick={async () => {
+                  if (activationDays < 1 || activationDays > 90) {
+                    toast({ 
+                      title: "Erreur", 
+                      description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
+                      variant: "destructive" 
+                    });
+                    return;
+                  }
+                  const uids = Array.from(selectedUids);
+                  for (const uid of uids) await activateForDays(uid, activationDays, activationType);
+                }}
+                disabled={activationDays < 1 || activationDays > 90}
+              >
+                <Gift size={16} className="mr-2"/>
+                Activer {activationDays} j
+                {activationDays >= 30 && ` (${Math.round(activationDays / 30 * 10) / 10} mois)`}
+              </Button>
             </div>
           </div>
 
@@ -2048,8 +2121,25 @@ const AdminDashboard = () => {
                               <Settings size={14} className="mr-2"/> Changer plan
                             </Button>
                           )}
-                          <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays, activationType)}>
-                            <Gift size={14} className="mr-2"/> Activer {activationDays} j ({activationType === 'transition' ? '2500 XAF' : '7500 XAF'})
+                          <Button 
+                            size="sm" 
+                            variant="outline" 
+                            onClick={() => {
+                              if (activationDays < 1 || activationDays > 90) {
+                                toast({ 
+                                  title: "Erreur", 
+                                  description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
+                                  variant: "destructive" 
+                                });
+                                return;
+                              }
+                              activateForDays(p.uid, activationDays, activationType);
+                            }}
+                            disabled={activationDays < 1 || activationDays > 90}
+                          >
+                            <Gift size={14} className="mr-2"/> 
+                            Activer {activationDays} j
+                            {activationDays >= 30 && ` (${Math.round(activationDays / 30 * 10) / 10} mois)`}
                           </Button>
                           <Button 
                             size="sm" 
@@ -2144,8 +2234,25 @@ const AdminDashboard = () => {
                           <Settings size={12} className="mr-1"/> Plan
                         </Button>
                       )}
-                      <Button size="sm" variant="outline" onClick={() => activateForDays(p.uid, activationDays, activationType)} className="text-xs">
-                        <Gift size={12} className="mr-1"/> Activer
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => {
+                          if (activationDays < 1 || activationDays > 90) {
+                            toast({ 
+                              title: "Erreur", 
+                              description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
+                              variant: "destructive" 
+                            });
+                            return;
+                          }
+                          activateForDays(p.uid, activationDays, activationType);
+                        }}
+                        disabled={activationDays < 1 || activationDays > 90}
+                        className="text-xs"
+                      >
+                        <Gift size={12} className="mr-1"/> 
+                        Activer {activationDays}j
                       </Button>
                       <Button 
                         size="sm" 
