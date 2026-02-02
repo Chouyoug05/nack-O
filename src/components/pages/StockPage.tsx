@@ -71,6 +71,8 @@ interface Product {
     rawMaterials: Array<{ name: string; unitCost: number }>;
     productionCosts: Array<{ type: string; amount: number }>;
   };
+  /** Si true, le produit apparaît sur le menu digital (menu du jour) */
+  showOnMenuDigital?: boolean;
 }
 
 const StockPage = () => {
@@ -134,6 +136,7 @@ const StockPage = () => {
             rawMaterials: foodCost.rawMaterials || [],
             productionCosts: foodCost.productionCosts || []
           } : undefined,
+          showOnMenuDigital: raw.showOnMenuDigital === true,
         } as Product;
       });
       
@@ -192,7 +195,8 @@ const StockPage = () => {
     formulaUnits: "",
     formulaPrice: "",
     rawMaterials: [] as Array<{ name: string; unitCost: string }>,
-    productionCosts: [] as Array<{ type: string; amount: string }>
+    productionCosts: [] as Array<{ type: string; amount: string }>,
+    showOnMenuDigital: false,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -513,25 +517,27 @@ const StockPage = () => {
           }
         } : {}),
         ...(foodCostData ? { foodCost: foodCostData } : {}),
+        ...(newProduct.showOnMenuDigital ? { showOnMenuDigital: true } : {}),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
 
       await addDoc(productsColRef(db, user.uid), payload as ProductDoc);
 
-    setNewProduct({ 
-      name: "", 
-      category: "", 
-      price: "", 
-      quantity: "", 
-      cost: "", 
+    setNewProduct({
+      name: "",
+      category: "",
+      price: "",
+      quantity: "",
+      cost: "",
       description: "",
       icon: "",
       imageUrl: "",
       formulaUnits: "",
       formulaPrice: "",
       rawMaterials: [],
-      productionCosts: []
+      productionCosts: [],
+      showOnMenuDigital: false,
     });
     setImageFile(null);
     setIsAddModalOpen(false);
@@ -562,12 +568,27 @@ const StockPage = () => {
       formulaPrice: product.formula?.price ? String(product.formula.price) : "",
       rawMaterials: product.foodCost?.rawMaterials.map(m => ({ name: m.name, unitCost: String(m.unitCost) })) || [],
       productionCosts: product.foodCost?.productionCosts.map(c => ({ type: c.type, amount: String(c.amount) })) || [],
+      showOnMenuDigital: product.showOnMenuDigital === true,
     });
     setIsAddModalOpen(true);
   };
 
   const handleEditProduct = (product: Product) => {
     requireManagerAuth(() => openEditProductUnsafe(product));
+  };
+
+  const handleToggleMenuDigital = async (productId: string, currentValue: boolean) => {
+    if (!user) return;
+    try {
+      const ref = fsDoc(productsColRef(db, user.uid), productId);
+      await updateDoc(ref, { showOnMenuDigital: !currentValue, updatedAt: Date.now() });
+      toast({
+        title: !currentValue ? "Ajouté au menu digital" : "Retiré du menu digital",
+        description: !currentValue ? "Le produit sera visible sur le menu digital (menu du jour)" : "Le produit ne sera plus affiché sur le menu digital",
+      });
+    } catch (e: unknown) {
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible de mettre à jour", variant: "destructive" });
+    }
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -756,6 +777,7 @@ const StockPage = () => {
           }
         } : {}),
         ...(foodCostData ? { foodCost: foodCostData } : {}),
+        showOnMenuDigital: newProduct.showOnMenuDigital === true,
         updatedAt: Date.now(),
       };
       await updateDoc(productRef, payload);
@@ -775,7 +797,8 @@ const StockPage = () => {
         formulaUnits: "",
         formulaPrice: "",
         rawMaterials: [],
-        productionCosts: []
+        productionCosts: [],
+        showOnMenuDigital: false,
       });
       toast({ title: "Produit modifié", description: "Le produit a été mis à jour" });
     } catch (e: unknown) {
@@ -1548,6 +1571,17 @@ const StockPage = () => {
                           <p className="text-center text-sm text-muted-foreground mt-2">Laisser vide si non vendu.</p>
                         </div>
 
+                        <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
+                          <div>
+                            <Label className="text-base font-semibold">Menu digital (menu du jour)</Label>
+                            <p className="text-sm text-muted-foreground">Afficher ce produit sur le menu digital pour les clients</p>
+                          </div>
+                          <Switch
+                            checked={newProduct.showOnMenuDigital === true}
+                            onCheckedChange={(checked) => setNewProduct({ ...newProduct, showOnMenuDigital: !!checked })}
+                          />
+                        </div>
+
                         {!isFoodCategory(newProduct.category) && (
                         <div>
                           <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
@@ -1878,11 +1912,14 @@ const StockPage = () => {
                       )}
                     </div>
                     <div className="flex flex-1 flex-col justify-center">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-lg font-medium leading-normal text-[#181411]">
                           {product.name}
                         </p>
-                        <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 w-7 p-0">
+                        {product.showOnMenuDigital && (
+                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">Menu digital</Badge>
+                        )}
+                        <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 w-7 p-0" title="Modifier">
                           <Edit size={14} />
                         </Button>
                         <Button 
@@ -1890,9 +1927,16 @@ const StockPage = () => {
                           size="sm" 
                           onClick={() => handleDeleteProduct(product.id)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
+                          title="Supprimer"
                         >
                           <Trash2 size={14} />
                         </Button>
+                        <Switch
+                          checked={product.showOnMenuDigital === true}
+                          onCheckedChange={() => handleToggleMenuDigital(product.id, product.showOnMenuDigital === true)}
+                          title={product.showOnMenuDigital ? "Retirer du menu digital" : "Afficher sur le menu digital"}
+                        />
+                        <span className="text-xs text-muted-foreground hidden sm:inline">Menu du jour</span>
                       </div>
                       <p className="text-sm font-normal leading-normal text-[#8a7260]">
                         {product.category}

@@ -27,6 +27,8 @@ interface Product {
   rating?: number;
   ratingCount?: number;
   description?: string;
+  /** Si true, le produit fait partie du menu du jour (visible sur le menu digital) */
+  showOnMenuDigital?: boolean;
 }
 
 interface TableZone {
@@ -109,7 +111,8 @@ const PublicOrderingPage = () => {
 
   // Vérifier si on revient d'un paiement réussi
   useEffect(() => {
-    if (location.state && (location.state as any).paymentSuccess) {
+    const state = location.state as { paymentSuccess?: boolean } | null;
+    if (state?.paymentSuccess) {
       setShowPaymentSuccess(true);
       setCart([]); // Vider le panier après paiement réussi
       // Masquer le message après 5 secondes
@@ -142,13 +145,13 @@ const PublicOrderingPage = () => {
     if (unsubscribeProductsRef.current) {
       try {
         unsubscribeProductsRef.current();
-      } catch (e) {}
+      } catch { /* ignore */ }
       unsubscribeProductsRef.current = null;
     }
     if (unsubscribeTablesRef.current) {
       try {
         unsubscribeTablesRef.current();
-      } catch (e) {}
+      } catch { /* ignore */ }
       unsubscribeTablesRef.current = null;
     }
 
@@ -157,13 +160,13 @@ const PublicOrderingPage = () => {
       if (unsubscribeProductsRef.current) {
         try {
           unsubscribeProductsRef.current();
-        } catch (e) {}
+        } catch { /* ignore */ }
         unsubscribeProductsRef.current = null;
       }
       if (unsubscribeTablesRef.current) {
         try {
           unsubscribeTablesRef.current();
-        } catch (e) {}
+        } catch { /* ignore */ }
         unsubscribeTablesRef.current = null;
       }
     };
@@ -229,6 +232,7 @@ const PublicOrderingPage = () => {
           imageUrl: (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') 
             ? data.imageUrl.trim() 
             : undefined,
+          showOnMenuDigital: data.showOnMenuDigital === true,
         } as Product;
       });
       
@@ -361,7 +365,13 @@ const PublicOrderingPage = () => {
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(product => {
+    // Menu du jour : si au moins un produit est marqué "sur le menu digital", n'afficher que ceux-là
+    const hasMenuDuJour = products.some(p => p.showOnMenuDigital === true);
+    const menuProducts = hasMenuDuJour
+      ? products.filter(p => p.showOnMenuDigital === true)
+      : products;
+    
+    return menuProducts.filter(product => {
       const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = activeCategoryTab === "all" || product.category === activeCategoryTab;
       return matchesSearch && matchesCategory;
@@ -428,7 +438,7 @@ const PublicOrderingPage = () => {
 
           // Préparer les données de commande à stocker dans la transaction
           // La commande sera créée seulement après paiement réussi
-          const orderData: any = {
+          const orderData: Record<string, unknown> = {
             orderNumber: orderNumberValue,
             receiptNumber,
             tableZone: isDelivery ? 'Livraison' : selectedTable,
@@ -450,7 +460,7 @@ const PublicOrderingPage = () => {
           }
           
           // Créer une copie nettoyée de orderData pour la transaction (supprimer les undefined)
-          const cleanedOrderDataForPayment: any = { ...orderData };
+          const cleanedOrderDataForPayment: Record<string, unknown> = { ...orderData };
           // Supprimer deliveryAddress si undefined
           if (cleanedOrderDataForPayment.deliveryAddress === undefined) {
             delete cleanedOrderDataForPayment.deliveryAddress;
@@ -513,7 +523,7 @@ const PublicOrderingPage = () => {
 
       // Si pas de paiement, créer la commande immédiatement dans barOrders
       // IMPORTANT: Les commandes sur place doivent arriver dans les commandes clients
-      const orderData: any = {
+      const orderData: Record<string, unknown> = {
         orderNumber: orderNumberValue,
         receiptNumber,
         tableZone: isDelivery ? 'Livraison' : selectedTable,
