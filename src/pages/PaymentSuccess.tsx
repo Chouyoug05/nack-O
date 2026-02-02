@@ -38,7 +38,7 @@ const PaymentSuccess = () => {
             
             if (!snapshot.empty) {
               const paymentDoc = snapshot.docs[0];
-              const paymentData = paymentDoc.data() as PaymentTransaction & { ticketData?: any };
+              const paymentData = paymentDoc.data() as PaymentTransaction;
               
               // Vérifier si la transaction est déjà complétée
               if (paymentData.status === 'completed') {
@@ -59,25 +59,28 @@ const PaymentSuccess = () => {
               if (paymentData.ticketData && paymentData.eventId && paymentData.establishmentId) {
                 const { eventTicketsColRef, eventsColRef } = await import('@/lib/collections');
                 const { increment } = await import('firebase/firestore');
-                
+
+                const td = paymentData.ticketData as { customerName?: string; customerEmail?: string; customerPhone?: string; quantity?: number; totalAmount?: number };
+                const qty = Number(td.quantity ?? 0);
+
                 // Créer le billet avec le statut 'paid' directement
                 const ticket: TicketDoc = {
-                  customerName: paymentData.ticketData.customerName,
-                  customerEmail: paymentData.ticketData.customerEmail,
-                  customerPhone: paymentData.ticketData.customerPhone,
-                  quantity: paymentData.ticketData.quantity,
-                  totalAmount: paymentData.ticketData.totalAmount,
+                  customerName: String(td.customerName ?? ''),
+                  customerEmail: String(td.customerEmail ?? ''),
+                  customerPhone: String(td.customerPhone ?? ''),
+                  quantity: qty,
+                  totalAmount: Number(td.totalAmount ?? 0),
                   status: 'paid',
                   purchaseDate: Date.now(),
                 };
-                
+
                 const ticketsCol = eventTicketsColRef(db, paymentData.establishmentId, paymentData.eventId);
                 await addDoc(ticketsCol, ticket);
-                
+
                 // Mettre à jour le compteur de billets vendus
                 const evtRef = doc(eventsColRef(db, paymentData.establishmentId), paymentData.eventId);
-                await updateDoc(evtRef, { 
-                  ticketsSold: increment(paymentData.ticketData.quantity) 
+                await updateDoc(evtRef, {
+                  ticketsSold: increment(qty)
                 });
                 
                 // Charger les infos de l'établissement pour l'affichage
@@ -155,7 +158,7 @@ const PaymentSuccess = () => {
             
             if (!snapshot.empty) {
               const paymentDoc = snapshot.docs[0];
-              const paymentData = paymentDoc.data() as PaymentTransaction & { orderData?: any };
+              const paymentData = paymentDoc.data() as PaymentTransaction;
               
               // Mettre à jour la transaction
               await updateDoc(paymentDoc.ref, {
@@ -176,29 +179,30 @@ const PaymentSuccess = () => {
                 const orderStatus = isDelivery ? 'paid' : 'pending';
                 
                 // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
-                const cleanedOrderData: any = {
-                  orderNumber: paymentData.orderData.orderNumber,
-                  receiptNumber: paymentData.orderData.receiptNumber,
-                  tableZone: paymentData.orderData.tableZone,
-                  items: paymentData.orderData.items,
-                  total: paymentData.orderData.total,
+                const cleanedOrderData: Record<string, unknown> = {
+                  orderNumber: paymentData.orderData?.orderNumber,
+                  receiptNumber: paymentData.orderData?.receiptNumber,
+                  tableZone: paymentData.orderData?.tableZone,
+                  items: paymentData.orderData?.items,
+                  total: paymentData.orderData?.total,
                   status: orderStatus,
-                  createdAt: paymentData.orderData.createdAt,
-                  isDelivery: paymentData.orderData.isDelivery || false,
-                  deliveryPrice: paymentData.orderData.deliveryPrice || 0,
-                  customerInfo: paymentData.orderData.customerInfo,
+                  createdAt: paymentData.orderData?.createdAt,
+                  isDelivery: (paymentData.orderData as Record<string, unknown>)?.isDelivery === true,
+                  deliveryPrice: (paymentData.orderData as Record<string, unknown>)?.deliveryPrice ?? 0,
+                  customerInfo: (paymentData.orderData as Record<string, unknown>)?.customerInfo,
                   paidAt: Date.now(),
                   paymentMethod: 'airtel-money',
                   paymentTransactionId: transactionId,
                 };
                 
                 // Ajouter deliveryAddress seulement si défini et non undefined
-                if (paymentData.orderData.deliveryAddress !== undefined && paymentData.orderData.deliveryAddress !== null) {
-                  cleanedOrderData.deliveryAddress = paymentData.orderData.deliveryAddress;
+                const od = paymentData.orderData as Record<string, unknown> | undefined;
+                if (od?.deliveryAddress !== undefined && od?.deliveryAddress !== null) {
+                  cleanedOrderData.deliveryAddress = od.deliveryAddress;
                 }
-                
+
                 // Créer la commande avec le statut approprié
-                const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId), cleanedOrderData);
+                const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId!), cleanedOrderData);
                 
                 // Mettre à jour la transaction avec l'ID de la commande créée
                 await updateDoc(paymentDoc.ref, {
@@ -473,7 +477,7 @@ const PaymentSuccess = () => {
         
         // Gérer les paiements Menu Digital différemment
         if (isMenuDigitalPayment && paymentTransaction) {
-          const paymentData = paymentTransaction as PaymentTransaction & { orderData?: any };
+          const paymentData = paymentTransaction as PaymentTransaction;
           
           // Mettre à jour la transaction de paiement
           await updateDoc(doc(paymentsRef, paymentTransaction.id), {
@@ -495,29 +499,30 @@ const PaymentSuccess = () => {
               const orderStatus = isDelivery ? 'paid' : 'pending';
               
               // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
-              const cleanedOrderData: any = {
-                orderNumber: paymentData.orderData.orderNumber,
-                receiptNumber: paymentData.orderData.receiptNumber,
-                tableZone: paymentData.orderData.tableZone,
-                items: paymentData.orderData.items,
-                total: paymentData.orderData.total,
+              const cleanedOrderData: Record<string, unknown> = {
+                orderNumber: paymentData.orderData?.orderNumber,
+                receiptNumber: paymentData.orderData?.receiptNumber,
+                tableZone: paymentData.orderData?.tableZone,
+                items: paymentData.orderData?.items,
+                total: paymentData.orderData?.total,
                 status: orderStatus,
-                createdAt: paymentData.orderData.createdAt,
-                isDelivery: paymentData.orderData.isDelivery || false,
-                deliveryPrice: paymentData.orderData.deliveryPrice || 0,
-                customerInfo: paymentData.orderData.customerInfo,
+                createdAt: paymentData.orderData?.createdAt,
+                isDelivery: (paymentData.orderData as Record<string, unknown>)?.isDelivery === true,
+                deliveryPrice: (paymentData.orderData as Record<string, unknown>)?.deliveryPrice ?? 0,
+                customerInfo: (paymentData.orderData as Record<string, unknown>)?.customerInfo,
                 paidAt: now,
                 paymentMethod: 'airtel-money',
                 paymentTransactionId: transactionId,
               };
               
               // Ajouter deliveryAddress seulement si défini et non undefined
-              if (paymentData.orderData.deliveryAddress !== undefined && paymentData.orderData.deliveryAddress !== null) {
-                cleanedOrderData.deliveryAddress = paymentData.orderData.deliveryAddress;
+              const od2 = paymentData.orderData as Record<string, unknown> | undefined;
+              if (od2?.deliveryAddress !== undefined && od2?.deliveryAddress !== null) {
+                cleanedOrderData.deliveryAddress = od2.deliveryAddress;
               }
-              
+
               // Créer la commande avec le statut approprié
-              const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId), cleanedOrderData);
+              const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId!), cleanedOrderData);
               
               // Mettre à jour la transaction avec l'ID de la commande créée
               await updateDoc(doc(paymentsRef, paymentTransaction.id), {
