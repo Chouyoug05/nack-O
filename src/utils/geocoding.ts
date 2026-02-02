@@ -102,7 +102,7 @@ export async function searchAddresses(query: string, limit: number = 5): Promise
     }
 
     const data = await response.json();
-    return data.map((item: any) => ({
+    return data.map((item: { display_name?: string; lat?: string; lon?: string }) => ({
       display_name: item.display_name,
       lat: item.lat,
       lon: item.lon

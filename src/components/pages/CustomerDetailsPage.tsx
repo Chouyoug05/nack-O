@@ -144,7 +144,7 @@ const CustomerDetailsPage = () => {
             stock: 0,
           })),
           total: Number(data.total || 0),
-          status: (data.status || 'pending') as any,
+          status: (data.status || 'pending') as string,
           createdAt: new Date(createdAtMs),
           agentCode: '',
         };

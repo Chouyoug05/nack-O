@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import React from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,7 +86,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const [orders, setOrders] = useState<BarOrder[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
-  const [products, setProducts] = useState<any[]>([]);
+  const [products, setProducts] = useState<Array<{ id: string; name?: string; quantity?: number; stock?: number; price?: number }>>([]);
   const [newTableName, setNewTableName] = useState("");
   const [newTableType, setNewTableType] = useState<'table' | 'zone'>('table');
   const [newTableCapacity, setNewTableCapacity] = useState<number>(0);
@@ -97,27 +97,151 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const [isSavingTheme, setIsSavingTheme] = useState(false);
 
   // Fonction utilitaire pour obtenir l'URL publique
-  const getPublicUrl = () => {
+  const getPublicUrl = useCallback(() => {
     if (!user) return '';
-    
-    // Détecter l'environnement
     const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    
-    // Utiliser l'URL appropriée selon l'environnement
     const baseUrl = isDevelopment ? 'https://nack.pro' : window.location.origin;
     const basePath = import.meta.env.BASE_URL || '';
-    
-    // Nettoyer le basePath pour éviter les doubles barres obliques
-    const cleanBasePath = basePath.replace(/\/+$/, ''); // Supprimer les barres obliques en fin
-    
-    // Construire l'URL finale en évitant les doubles barres obliques
+    const cleanBasePath = basePath.replace(/\/+$/, '');
     const finalUrl = `${baseUrl}${cleanBasePath}/commande/${user.uid}`;
-    
-    // Nettoyer les doubles barres obliques dans l'URL finale
-    const cleanUrl = finalUrl.replace(/\/+/g, '/').replace(':/', '://');
-    
-    return cleanUrl;
-  };
+    return finalUrl.replace(/\/+/g, '/').replace(':/', '://');
+  }, [user]);
+
+  // Charger toutes les données (hooks avant tout return)
+  useEffect(() => {
+    if (!user) return;
+
+    setIsLoading(false);
+    try {
+      const tablesRef = collection(db, `profiles/${user.uid}/tables`);
+      const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
+        try {
+          const tablesData = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as TableZone[];
+          setTables(tablesData);
+        } catch (error) {
+          console.error('Erreur traitement tables:', error);
+        }
+      }, (error) => {
+        console.error('Erreur snapshot tables:', error);
+      });
+
+      const ordersRef = collection(db, `profiles/${user.uid}/barOrders`);
+      const q = query(ordersRef, orderBy('createdAt', 'desc'));
+      const unsubscribeOrders = onSnapshot(q, (snapshot) => {
+        try {
+          const ordersData = snapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              if (!doc.id) return null;
+              if (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison') {
+                updateDoc(doc.ref, { status: 'pending' }).catch(err => console.error('Erreur correction statut commande:', err));
+                return { id: doc.id, ...data, status: 'pending' } as BarOrder;
+              }
+              return { id: doc.id, ...data } as BarOrder;
+            })
+            .filter((order): order is BarOrder => order !== null && !!order.id);
+
+          const newOrders = ordersData.filter(order =>
+            order.status === 'pending' && order.createdAt > (Date.now() - 60000)
+          );
+          newOrders.forEach(async (order) => {
+            try {
+              await addDoc(notificationsColRef(db, user.uid), {
+                title: "Nouvelle commande Menu Digital",
+                message: `Commande #${order.orderNumber} - ${order.tableZone} - ${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`,
+                type: "info",
+                createdAt: Date.now(),
+                read: false,
+              });
+            } catch (error) {
+              console.error('Erreur création notification:', error);
+            }
+          });
+          setOrders(ordersData);
+        } catch (error) {
+          console.error('Erreur traitement commandes:', error);
+        }
+      }, (error) => {
+        console.error('Erreur snapshot commandes:', error);
+      });
+
+      const productsRef = collection(db, `profiles/${user.uid}/products`);
+      const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
+        try {
+          const allProducts = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          const productsInStock = allProducts.filter(product => {
+            const stock = product.quantity || product.stock || 0;
+            let priceValue = 0;
+            if (typeof product.price === 'number' && !isNaN(product.price)) {
+              priceValue = product.price;
+            } else if (typeof product.price === 'string' && product.price.trim() !== '') {
+              const parsed = parseFloat(product.price.trim());
+              priceValue = isNaN(parsed) ? 0 : parsed;
+            }
+            return priceValue > 0;
+          });
+          setProducts(productsInStock);
+        } catch (error) {
+          console.error('Erreur traitement produits:', error);
+        }
+      }, (error) => {
+        console.error('Erreur snapshot produits:', error);
+      });
+
+      return () => {
+        unsubscribeTables();
+        unsubscribeOrders();
+        unsubscribeProducts();
+      };
+    } catch (error) {
+      console.error('Erreur chargement données:', error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const loadExistingQRCode = async () => {
+      try {
+        const configDoc = await getDoc(doc(db, `profiles/${user.uid}/barConnectee`, 'config'));
+        if (configDoc.exists()) {
+          const config = configDoc.data();
+          if (config?.qrCodeGenerated) {
+            const publicUrl = config.publicUrl || getPublicUrl();
+            const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
+              width: 300,
+              margin: 2,
+              color: { dark: '#000000', light: '#FFFFFF' }
+            });
+            setQrCodeUrl(qrCodeDataUrl);
+          }
+        }
+      } catch (error) {
+        console.error('Erreur chargement QR Code:', error);
+      }
+    };
+    loadExistingQRCode();
+  }, [user, getPublicUrl]);
+
+  useEffect(() => {
+    if (!user) return;
+    const loadTheme = async () => {
+      try {
+        const themeDoc = await getDoc(doc(db, `profiles/${user.uid}/menuDigital`, 'theme'));
+        if (themeDoc.exists()) {
+          setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
+        }
+      } catch (error) {
+        console.error('Erreur chargement thème:', error);
+      }
+    };
+    loadTheme();
+  }, [user]);
 
   // Vérifier que l'utilisateur est connecté
   if (!user) {
@@ -169,180 +293,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   //     </div>
   //   );
   // }
-
-  // Charger toutes les données
-  useEffect(() => {
-    if (!user) return;
-    
-    // Désactiver le chargement immédiatement
-    setIsLoading(false);
-    
-    // Charger les tables (avec gestion d'erreur de permissions)
-    try {
-      const tablesRef = collection(db, `profiles/${user.uid}/tables`);
-      const unsubscribeTables = onSnapshot(tablesRef, (snapshot) => {
-        try {
-          const tablesData = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          })) as TableZone[];
-          setTables(tablesData);
-        } catch (error) {
-          console.error('Erreur traitement tables:', error);
-        }
-      }, (error) => {
-        console.error('Erreur snapshot tables:', error);
-      });
-
-      // Charger les commandes (avec gestion d'erreur de permissions)
-      const ordersRef = collection(db, `profiles/${user.uid}/barOrders`);
-      const q = query(ordersRef, orderBy('createdAt', 'desc'));
-      const unsubscribeOrders = onSnapshot(q, (snapshot) => {
-        try {
-          const ordersData = snapshot.docs
-            .map(doc => {
-              const data = doc.data();
-              // S'assurer que l'ID est présent
-              if (!doc.id) {
-                console.warn('Commande sans ID trouvée:', data);
-                return null;
-              }
-              
-              // Corriger les anciennes commandes 'paid' sur place : elles doivent être 'pending'
-              // Les commandes 'paid' doivent être uniquement pour les livraisons
-              if (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison') {
-                // Mettre à jour automatiquement dans Firestore
-                updateDoc(doc.ref, { status: 'pending' }).catch(err => 
-                  console.error('Erreur correction statut commande:', err)
-                );
-                return { id: doc.id, ...data, status: 'pending' } as BarOrder;
-              }
-              return { id: doc.id, ...data } as BarOrder;
-            })
-            .filter((order): order is BarOrder => order !== null && !!order.id);
-          
-          // Vérifier s'il y a de nouvelles commandes
-          const newOrders = ordersData.filter(order => 
-            order.status === 'pending' && 
-            order.createdAt > (Date.now() - 60000)
-          );
-          
-          // Créer des notifications pour les nouvelles commandes
-          newOrders.forEach(async (order) => {
-            try {
-              await addDoc(notificationsColRef(db, user.uid), {
-                title: "Nouvelle commande Menu Digital",
-                message: `Commande #${order.orderNumber} - ${order.tableZone} - ${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`,
-                type: "info",
-                createdAt: Date.now(),
-                read: false,
-              });
-            } catch (error) {
-              console.error('Erreur création notification:', error);
-            }
-          });
-          
-          setOrders(ordersData);
-        } catch (error) {
-          console.error('Erreur traitement commandes:', error);
-        }
-      }, (error) => {
-        console.error('Erreur snapshot commandes:', error);
-      });
-
-      // Charger tous les produits d'abord pour diagnostic
-      const productsRef = collection(db, `profiles/${user.uid}/products`);
-      const unsubscribeProducts = onSnapshot(productsRef, (snapshot) => {
-        try {
-          const allProducts = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-          }));
-          
-          // Filtrer les produits avec prix > 0 (le stock n'est pas requis pour les menus/plats)
-          const productsInStock = allProducts.filter(product => {
-            const stock = product.quantity || product.stock || 0;
-            // Vérifier le prix de manière très stricte (gérer string, number, null, undefined, NaN, chaînes vides)
-            let priceValue = 0;
-            if (typeof product.price === 'number' && !isNaN(product.price)) {
-              priceValue = product.price;
-            } else if (typeof product.price === 'string' && product.price.trim() !== '') {
-              const parsed = parseFloat(product.price.trim());
-              priceValue = isNaN(parsed) ? 0 : parsed;
-            }
-            // Inclure les produits avec prix > 0 (stock peut être 0 pour les menus/plats)
-            return priceValue > 0;
-          });
-          
-          setProducts(productsInStock);
-        } catch (error) {
-          console.error('Erreur traitement produits:', error);
-        }
-      }, (error) => {
-        console.error('Erreur snapshot produits:', error);
-      });
-
-      return () => {
-        unsubscribeTables();
-        unsubscribeOrders();
-        unsubscribeProducts();
-      };
-    } catch (error) {
-      console.error('Erreur chargement données:', error);
-    }
-  }, [user]);
-
-  // Charger le QR Code existant
-  useEffect(() => {
-    if (!user) return;
-    
-    const loadExistingQRCode = async () => {
-      try {
-        const configDoc = await getDoc(doc(db, `profiles/${user.uid}/barConnectee`, 'config'));
-        
-        if (configDoc.exists()) {
-          const config = configDoc.data();
-          
-          if (config.qrCodeGenerated) {
-            // Utiliser l'URL sauvegardée ou générer une nouvelle
-            const publicUrl = config.publicUrl || getPublicUrl();
-            
-            const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
-              width: 300,
-              margin: 2,
-              color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-              }
-            });
-            setQrCodeUrl(qrCodeDataUrl);
-          }
-        }
-      } catch (error) {
-        console.error('Erreur chargement QR Code:', error);
-      }
-    };
-
-    loadExistingQRCode();
-  }, [user]);
-
-  // Charger le thème du menu
-  useEffect(() => {
-    if (!user) return;
-
-    const loadTheme = async () => {
-      try {
-        const themeDoc = await getDoc(doc(db, `profiles/${user.uid}/menuDigital`, 'theme'));
-        if (themeDoc.exists()) {
-          setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
-        }
-      } catch (error) {
-        console.error('Erreur chargement thème:', error);
-      }
-    };
-
-    loadTheme();
-  }, [user]);
 
   // Sauvegarder le thème
   const saveTheme = async () => {

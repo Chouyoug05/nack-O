@@ -27,7 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { SUBSCRIPTION_PLANS, type SubscriptionFeatures } from "@/utils/subscription";
+import { SUBSCRIPTION_PLANS, AFFILIATE_COMMISSION_STANDARD, AFFILIATE_COMMISSION_PRO, type SubscriptionFeatures } from "@/utils/subscription";
 import { 
   exportUsersPdf, 
   exportUsersCsv, 
@@ -191,7 +191,7 @@ const AdminDashboard = () => {
     events: false,
   });
   const [isLoadingPlans, setIsLoadingPlans] = useState(false);
-  const [planPrice, setPlanPrice] = useState<number>(2500);
+  const [planPrice, setPlanPrice] = useState<number>(5000);
   const [planEventsLimit, setPlanEventsLimit] = useState<number>(5);
   const [planEventsExtraPrice, setPlanEventsExtraPrice] = useState<number>(1500);
 
@@ -704,18 +704,37 @@ const AdminDashboard = () => {
       const snap = await getDocs(affiliatesColRef(db));
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AffiliateDoc & { id: string }));
       setAffiliates(list);
-      // Mettre à jour referralCount sur chaque doc pour que la page publique affilié puisse l'afficher
       const now = Date.now();
       for (const aff of list) {
-        const count = allProfiles.filter(p => (p.referredBy || '').toUpperCase() === (aff.code || '').toUpperCase()).length;
-        if (aff.referralCount !== count) {
+        const referredProfiles = allProfiles.filter(p => (p.referredBy || '').toUpperCase() === (aff.code || '').toUpperCase());
+        const count = referredProfiles.length;
+        let totalEarned = 0;
+        for (const profile of referredProfiles) {
           try {
-            await updateDoc(doc(db, 'affiliates', aff.id!), { referralCount: count, updatedAt: now });
+            const paymentsSnap = await getDocs(query(
+              paymentsColRef(db, profile.uid),
+              where('status', '==', 'completed')
+            ));
+            paymentsSnap.docs.forEach(payDoc => {
+              const data = payDoc.data() as PaymentTransaction;
+              if (data.subscriptionType === 'transition') totalEarned += AFFILIATE_COMMISSION_STANDARD;
+              else if (data.subscriptionType === 'transition-pro-max') totalEarned += AFFILIATE_COMMISSION_PRO;
+            });
           } catch (e) {
-            console.warn('Update referralCount failed for', aff.code, e);
+            console.warn('Erreur chargement paiements affilié', aff.code, profile.uid, e);
           }
         }
+        try {
+          await updateDoc(doc(db, 'affiliates', aff.id!), {
+            referralCount: count,
+            totalEarned,
+            updatedAt: now,
+          });
+        } catch (e) {
+          console.warn('Update affiliate failed for', aff.code, e);
+        }
       }
+      setAffiliates(await getDocs(affiliatesColRef(db)).then(s => s.docs.map(d => ({ id: d.id, ...d.data() } as AffiliateDoc & { id: string }))));
     } catch (error) {
       console.error('Erreur chargement affiliés:', error);
       toast({ title: "Erreur", description: "Impossible de charger les affiliés", variant: "destructive" });
@@ -747,6 +766,7 @@ const AdminDashboard = () => {
         name,
         email: newAffiliateEmail.trim() || undefined,
         referralCount: 0,
+        totalEarned: 0,
         createdAt: Date.now(),
         createdBy: user.uid,
       });
@@ -1128,7 +1148,7 @@ const AdminDashboard = () => {
         // Seulement si c'est un abonnement de 30 jours
         if (daysRemaining >= 29 && daysRemaining <= 31) {
           const planType = p.subscriptionType || 'transition';
-          const planPrice = subscriptionPlans[planType]?.price || 2500;
+          const planPrice = subscriptionPlans[planType]?.price || 5000;
           monthlyRevenue += planPrice;
         }
       }
@@ -2118,8 +2138,8 @@ const AdminDashboard = () => {
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="transition">Transition (2500 XAF)</SelectItem>
-                  <SelectItem value="transition-pro-max">Pro Max (7500 XAF)</SelectItem>
+                  <SelectItem value="transition">Transition (5000 XAF)</SelectItem>
+                  <SelectItem value="transition-pro-max">Pro Max (15000 XAF)</SelectItem>
                 </SelectContent>
               </Select>
               <Button 
@@ -3230,7 +3250,7 @@ const AdminDashboard = () => {
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Affiliation</h1>
           <p className="text-sm text-muted-foreground">
-            Créer des codes affiliés et suivre les inscriptions parrainées. Les affiliés peuvent se connecter via le lien pour voir leurs stats.
+            Créer des codes affiliés et suivre les inscriptions parrainées. Commission : 1 000 XAF par paiement abo standard, 2 000 XAF par abo pro — vous versez l'affilié à la date du paiement de l'établissement.
           </p>
         </div>
         <Dialog open={showNewAffiliateDialog} onOpenChange={setShowNewAffiliateDialog}>
@@ -3285,6 +3305,7 @@ const AdminDashboard = () => {
                     <TableHead>Nom</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Établissements parrainés</TableHead>
+                    <TableHead>Revenus (XAF)</TableHead>
                     <TableHead>Lien inscription</TableHead>
                     <TableHead>QR code</TableHead>
                     <TableHead>Tableau de bord affilié</TableHead>
@@ -3302,6 +3323,9 @@ const AdminDashboard = () => {
                         <TableCell>{aff.email || "-"}</TableCell>
                         <TableCell>
                           <Badge variant="secondary">{referralCount}</Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold text-green-600">
+                          {(aff.totalEarned ?? 0).toLocaleString()} XAF
                         </TableCell>
                         <TableCell>
                           <a href={registerUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm truncate block max-w-[200px]">
@@ -3392,7 +3416,7 @@ const AdminDashboard = () => {
                 type="number"
                 value={planPrice}
                 onChange={(e) => setPlanPrice(Number(e.target.value))}
-                placeholder="2500"
+                placeholder="5000"
               />
             </div>
             
@@ -3534,13 +3558,13 @@ const AdminDashboard = () => {
                 <SelectContent>
                   <SelectItem value="transition">
                     <div className="flex flex-col">
-                      <span className="font-medium">Transition (2500 XAF)</span>
+                      <span className="font-medium">Transition (5000 XAF)</span>
                       <span className="text-xs text-muted-foreground">Produits, Ventes, Stock, Rapports</span>
                     </div>
                   </SelectItem>
                   <SelectItem value="transition-pro-max">
                     <div className="flex flex-col">
-                      <span className="font-medium">Transition Pro Max (7500 XAF)</span>
+                      <span className="font-medium">Transition Pro Max (15000 XAF)</span>
                       <span className="text-xs text-muted-foreground">Toutes les fonctionnalités : Équipe, Bar Connectée, Événements</span>
                     </div>
                   </SelectItem>

@@ -187,7 +187,7 @@ const CuisineInterface = () => {
           items,
           foodItems,
           total: Number(data.total ?? 0),
-          status: (data.status ?? 'pending') as any,
+          status: (data.status ?? 'pending') as string,
           kitchenStatus: (data.kitchenStatus ?? 'en-attente') as KitchenStatus,
           createdAt: new Date(createdAtMs),
           agentCode: data.agentCode ?? data.agentMemberId ?? '—',

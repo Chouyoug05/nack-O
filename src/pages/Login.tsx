@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, EyeOff, Smartphone, Loader2, Users, Shield, Clock, UtensilsCrossed, Wallet, QrCode, User } from "lucide-react";
+import { Eye, EyeOff, Smartphone, Loader2, Users, Shield, Clock, UtensilsCrossed, Wallet, QrCode, User, Gift } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +13,7 @@ import { db } from "@/lib/firebase";
 import { agentTokensTopColRef } from "@/lib/collections";
 import { getDoc, doc, collectionGroup, query, where, limit, getDocs } from "firebase/firestore";
 
-type LoginType = 'manager' | 'team';
+type LoginType = 'manager' | 'team' | 'affiliate';
 type TeamRole = 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
 
 const Login = () => {
@@ -171,32 +171,44 @@ const Login = () => {
           <p className="text-muted-foreground text-sm">Plateforme de gestion gabonaise</p>
         </div>
 
-        {/* Sélecteur Gérant / Membre d'équipe */}
+        {/* Sélecteur Gérant / Équipe / Affilié */}
         <div className="mb-6">
-          <div className="grid grid-cols-2 gap-2 p-1 bg-white rounded-lg border border-gray-200">
+          <div className="grid grid-cols-3 gap-2 p-1 bg-white rounded-lg border border-gray-200">
             <button
               type="button"
               onClick={() => setLoginType('manager')}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-md transition-all ${
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${
                 loginType === 'manager'
                   ? 'bg-nack-red text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <User size={18} />
-              <span className="font-medium">Gérant</span>
+              <span className="font-medium text-sm">Gérant</span>
             </button>
             <button
               type="button"
               onClick={() => setLoginType('team')}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-md transition-all ${
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${
                 loginType === 'team'
                   ? 'bg-nack-red text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-50'
               }`}
             >
               <Users size={18} />
-              <span className="font-medium">Équipe</span>
+              <span className="font-medium text-sm">Équipe</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginType('affiliate')}
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${
+                loginType === 'affiliate'
+                  ? 'bg-nack-red text-white shadow-md'
+                  : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <Gift size={18} />
+              <span className="font-medium text-sm">Affilié</span>
             </button>
           </div>
         </div>
@@ -205,17 +217,34 @@ const Login = () => {
         <Card className="shadow-card border-0">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl font-bold">
-              {loginType === 'manager' ? 'Se connecter' : 'Connexion équipe'}
+              {loginType === 'manager' ? 'Se connecter' : loginType === 'team' ? 'Connexion équipe' : 'Espace affilié'}
             </CardTitle>
             <CardDescription className="text-base">
-              {loginType === 'manager' 
+              {loginType === 'manager'
                 ? 'Accédez à votre espace de gestion'
-                : 'Connectez-vous avec votre code d\'agent'}
+                : loginType === 'team'
+                  ? 'Connectez-vous avec votre code d\'agent'
+                  : 'Consultez vos statistiques et revenus parrainage'}
             </CardDescription>
           </CardHeader>
-          
+
           <CardContent>
-            {loginType === 'manager' ? (
+            {loginType === 'affiliate' ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  Vous êtes partenaire affilié Nack ? Accédez à votre tableau de bord pour voir le nombre d'établissements parrainés et vos revenus (commission versée par l'admin à chaque paiement d'abonnement).
+                </p>
+                <Button
+                  variant="nack"
+                  size="lg"
+                  className="w-full h-12"
+                  onClick={() => navigate('/affiliate')}
+                >
+                  <Gift size={18} className="mr-2" />
+                  Accéder à mon espace affilié
+                </Button>
+              </div>
+            ) : loginType === 'manager' ? (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
@@ -370,6 +399,10 @@ const Login = () => {
             <div className="flex items-start gap-2">
               <span className="font-bold">Membre d'équipe :</span>
               <span>Sélectionnez "Équipe", choisissez votre rôle et entrez votre code d'agent (donné par votre gérant)</span>
+            </div>
+            <div className="flex items-start gap-2">
+              <span className="font-bold">Affilié :</span>
+              <span>Sélectionnez "Affilié" puis accédez à votre espace avec votre code affilié pour voir vos statistiques et revenus</span>
             </div>
             <div className="mt-3 pt-2 border-t border-blue-300">
               <p className="text-xs font-medium text-blue-900">

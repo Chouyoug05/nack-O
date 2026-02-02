@@ -81,13 +81,6 @@ const AdminCheck = () => {
     );
   }
 
-  // Si connecté et admin, rediriger vers le tableau de bord admin
-  useEffect(() => {
-    if (user && !isAdminLoading && isAdmin) {
-      navigate('/admin', { replace: true });
-    }
-  }, [user, isAdmin, isAdminLoading, navigate]);
-
   // Si connecté mais pas admin, afficher un message
   if (user && !isAdmin) {
     return (

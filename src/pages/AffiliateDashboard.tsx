@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, QrCode, Users, Loader2, Copy } from "lucide-react";
+import { Building2, QrCode, Users, Loader2, Copy, Wallet } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import QRCode from "qrcode";
 
@@ -144,6 +144,7 @@ const AffiliateDashboard = () => {
 
   const registerUrl = `${baseUrl}/register?ref=${encodeURIComponent(affiliate.code)}`;
   const count = affiliate.referralCount ?? 0;
+  const totalEarned = affiliate.totalEarned ?? 0;
 
   return (
     <div className="min-h-screen bg-gradient-secondary p-4 md:p-6">
@@ -174,6 +175,13 @@ const AffiliateDashboard = () => {
               <div>
                 <p className="text-2xl font-bold">{count}</p>
                 <p className="text-sm text-muted-foreground">établissement(s) inscrit(s) avec votre code</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 p-4 rounded-lg bg-green-50 border border-green-200 mt-3">
+              <Wallet size={32} className="text-green-600" />
+              <div>
+                <p className="text-2xl font-bold text-green-700">{totalEarned.toLocaleString()} XAF</p>
+                <p className="text-sm text-muted-foreground">Revenus (commission : 1 000 XAF / abo standard, 2 000 XAF / abo pro). L'admin vous verse à la date du paiement de l'établissement.</p>
               </div>
             </div>
           </CardContent>

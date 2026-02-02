@@ -18,10 +18,10 @@ export interface PaymentTransaction {
   orderId?: string; // ID de la commande associée (créée après paiement réussi)
   establishmentId?: string; // ID de l'établissement
   disbursementId?: string; // Disbursement ID utilisé pour ce paiement
-  orderData?: any; // Données de la commande à créer après paiement réussi (si paiement demandé)
+  orderData?: Record<string, unknown>; // Données de la commande à créer après paiement réussi (si paiement demandé)
   // Pour les paiements d'événement
   eventId?: string; // ID de l'événement
-  ticketData?: any; // Données du billet à créer après paiement réussi
+  ticketData?: Record<string, unknown>; // Données du billet à créer après paiement réussi
 }
 
 export interface DisbursementRequest {

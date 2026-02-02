@@ -62,6 +62,8 @@ export interface AffiliateDoc {
   name: string;
   email?: string;
   referralCount?: number; // Nombre d'établissements parrainés (mis à jour par l'admin)
+  /** Commission totale gagnée (1000 XAF par paiement standard, 2000 par pro) – versée par l'admin à la date du paiement */
+  totalEarned?: number;
   createdAt: number;
   createdBy: string; // uid admin
 } 

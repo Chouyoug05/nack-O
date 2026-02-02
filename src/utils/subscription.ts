@@ -20,7 +20,7 @@ export interface SubscriptionFeatures {
 export const SUBSCRIPTION_PLANS = {
   transition: {
     name: 'Transition',
-    price: 2500,
+    price: 5000,
     features: {
       products: true,
       sales: true,
@@ -33,7 +33,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   'transition-pro-max': {
     name: 'Transition Pro Max',
-    price: 7500,
+    price: 15000,
     features: {
       products: true,
       sales: true,
@@ -47,6 +47,10 @@ export const SUBSCRIPTION_PLANS = {
     } as SubscriptionFeatures,
   },
 } as const;
+
+/** Commission affilié par type d'abonnement payé (versée par l'admin à la date du paiement) */
+export const AFFILIATE_COMMISSION_STANDARD = 1000; // XAF par paiement abo Transition
+export const AFFILIATE_COMMISSION_PRO = 2000;      // XAF par paiement abo Pro Max
 
 export const EVENT_PRICE_STANDALONE = 1500; // Prix pour 1 événement avec agent (offre Transition standalone)
 

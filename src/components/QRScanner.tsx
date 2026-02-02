@@ -59,6 +59,20 @@ const QRScanner: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string>('');
 
+  // Nettoyage du scanner au démontage (doit être appelé inconditionnellement)
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        try {
+          scannerRef.current.clear().catch(() => {});
+        } catch {
+          // Ignorer les erreurs de nettoyage
+        }
+        scannerRef.current = null;
+      }
+    };
+  }, []);
+
   // Vérifier que l'utilisateur est connecté
   if (!user) {
     return (
@@ -129,18 +143,19 @@ const QRScanner: React.FC = () => {
             }
           }
         );
-      } catch (error: any) {
-        console.error('Erreur lors de l\'initialisation du scanner:', error);
+      } catch (err: unknown) {
+        console.error('Erreur lors de l\'initialisation du scanner:', err);
         setIsScanning(false);
         
         let errorMessage = "Impossible de démarrer le scanner.";
-        if (error?.message) {
-          if (error.message.includes('camera') || error.message.includes('permission')) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (msg) {
+          if (msg.includes('camera') || msg.includes('permission')) {
             errorMessage = "Accès à la caméra refusé. Veuillez autoriser l'accès à la caméra dans les paramètres de votre navigateur.";
-          } else if (error.message.includes('not found') || error.message.includes('not available')) {
+          } else if (msg.includes('not found') || msg.includes('not available')) {
             errorMessage = "Aucune caméra détectée. Veuillez connecter une caméra et réessayer.";
           } else {
-            errorMessage = `Erreur: ${error.message}`;
+            errorMessage = `Erreur: ${msg}`;
           }
         }
         
@@ -321,19 +336,6 @@ const QRScanner: React.FC = () => {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (scannerRef.current) {
-        try {
-          scannerRef.current.clear().catch(() => {});
-        } catch (e) {
-          // Ignorer les erreurs de nettoyage
-        }
-        scannerRef.current = null;
-      }
-    };
-  }, []);
 
   return (
     <div className="space-y-4">

@@ -81,7 +81,7 @@ export const useTutorialProgress = () => {
     window.addEventListener('nack:report:downloaded', onReportDownloaded as EventListener);
 
     return () => {
-      try { unsubscribers.forEach(u => u()); } catch {}
+      try { unsubscribers.forEach(u => u()); } catch { /* ignore */ }
       window.removeEventListener('nack:report:downloaded', onReportDownloaded as EventListener);
     };
   }, [user, profile, saveProfile]);
