@@ -1,4 +1,4 @@
-﻿import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -28,6 +28,7 @@ import PaymentSuccess from "./pages/PaymentSuccess";
 import PaymentError from "./pages/PaymentError";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminCheck from "./pages/AdminCheck";
+import AffiliateDashboard from "./pages/AffiliateDashboard";
 import ClientDetailsPage from "./pages/ClientDetailsPage";
 import TeamPage from "@/components/pages/TeamPage";
 import CustomerDetailsPage from "@/components/pages/CustomerDetailsPage";
@@ -91,6 +92,7 @@ const RootLayout = () => {
   const location = useLocation();
   const isPublicPage = location.pathname.startsWith('/event/') || 
                        location.pathname.startsWith('/commande/') ||
+                       location.pathname.startsWith('/affiliate') ||
                        location.pathname === '/admin-check' ||
                        location.pathname === '/mon-uid';
   return (
@@ -120,6 +122,7 @@ const router = createBrowserRouter([
       { path: "customer/:customerId", element: <RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "admin-check", element: <AdminCheck /> },
       { path: "mon-uid", element: <AdminCheck /> },
+      { path: "affiliate", element: <AffiliateDashboard /> },
       { path: "admin", element: <RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth> },
       { path: "admin/client/:uid", element: <RequireAuth><RequireAdmin><ClientDetailsPage /></RequireAdmin></RequireAuth> },
       { path: "serveur/:agentCode", element: <ServeurInterface /> },

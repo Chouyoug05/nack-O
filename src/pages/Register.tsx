@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +41,8 @@ const Register = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const refCode = searchParams.get("ref")?.trim() || undefined;
   const { toast } = useToast();
   const { signUpWithEmail, saveProfile } = useAuth();
 
@@ -286,6 +288,7 @@ const Register = () => {
         longitude: formData.longitude,
         address: formData.address || undefined,
         locationAsked: true,
+        referredBy: refCode,
       });
       toast({ title: "Inscription réussie !", description: "Bienvenue sur NACK!" });
       // Rediriger vers la configuration des tickets (optionnelle)
@@ -313,6 +316,9 @@ const Register = () => {
             <CardDescription className="text-base">
               Étape {formStep} sur 4
             </CardDescription>
+            {refCode && (
+              <p className="text-xs text-muted-foreground mt-1">Inscription avec le code parrain : <strong>{refCode}</strong></p>
+            )}
             {/* Barre de progression */}
             <div className="flex gap-2 mt-4">
               <div className={`h-2 flex-1 rounded-full ${formStep >= 1 ? 'bg-green-500' : 'bg-gray-200'}`} />

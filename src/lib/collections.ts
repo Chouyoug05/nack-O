@@ -59,4 +59,9 @@ export const barOrdersColRef = (db: Firestore, uid: string): CollectionReference
   collection(db, "profiles", uid, "barOrders") as CollectionReference;
 
 export const disbursementRequestsColRef = (db: Firestore): CollectionReference =>
-  collection(db, "disbursementRequests") as CollectionReference; 
+  collection(db, "disbursementRequests") as CollectionReference;
+
+export const affiliatesColRef = (db: Firestore): CollectionReference =>
+  collection(db, "affiliates") as CollectionReference;
+
+export const affiliateDocRef = (db: Firestore, code: string) => doc(db, "affiliates", code.toUpperCase()); 

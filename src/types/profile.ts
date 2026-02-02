@@ -49,6 +49,19 @@ export interface UserProfile {
   // Livraison
   deliveryEnabled?: boolean; // Activer la livraison
   deliveryPrice?: number; // Prix de livraison en XAF
+  // Affiliation (parrainage)
+  referredBy?: string; // Code affilié utilisé à l'inscription
   createdAt: number;
   updatedAt: number;
+}
+
+/** Document affilié (collection affiliates) – créé par l'admin. Id du doc = code (pour lecture publique par code) */
+export interface AffiliateDoc {
+  id?: string;
+  code: string; // Code unique (ex: AFF001)
+  name: string;
+  email?: string;
+  referralCount?: number; // Nombre d'établissements parrainés (mis à jour par l'admin)
+  createdAt: number;
+  createdBy: string; // uid admin
 } 

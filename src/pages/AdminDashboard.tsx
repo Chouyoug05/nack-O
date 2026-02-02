@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"; // us
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef, subscriptionPlansColRef, subscriptionPlanDocRef, customersColRef, disbursementRequestsColRef } from "@/lib/collections";
+import { profilesColRef, notificationsColRef, paymentsColRef, productsColRef, ordersColRef, eventsColRef, teamColRef, subscriptionPlansColRef, subscriptionPlanDocRef, customersColRef, disbursementRequestsColRef, affiliatesColRef, affiliateDocRef } from "@/lib/collections";
 import { addDoc, collection, doc, getDocs, onSnapshot, orderBy, query, updateDoc, where, collectionGroup, deleteDoc, getDoc, setDoc } from "firebase/firestore";
-import type { UserProfile } from "@/types/profile";
+import type { UserProfile, AffiliateDoc } from "@/types/profile";
 import type { PaymentTransaction } from "@/types/payment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,7 +43,16 @@ import {
   exportCustomersPdf
 } from "@/utils/exportAdminData";
 import type { DisbursementRequest } from "@/types/payment";
-import { disbursementRequestsColRef } from "@/lib/collections";
+import QRCode from "qrcode";
+
+function AffiliateQRCell({ url }: { url: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    QRCode.toDataURL(url, { width: 80, margin: 1 }).then(setSrc).catch(() => setSrc(null));
+  }, [url]);
+  if (!src) return <span className="text-muted-foreground text-xs">...</span>;
+  return <img src={src} alt="QR inscription" className="w-16 h-16 rounded border" />;
+}
 
 interface NotificationForm {
   title: string;
@@ -53,7 +62,7 @@ interface NotificationForm {
 }
 
 const AdminDashboard = () => {
-  const { isAdmin, isAdminLoading } = useAuth();
+  const { user, isAdmin, isAdminLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -119,6 +128,13 @@ const AdminDashboard = () => {
   const [disbursementRequests, setDisbursementRequests] = useState<Array<DisbursementRequest & { userEmail?: string }>>([]);
   const [isLoadingDisbursements, setIsLoadingDisbursements] = useState(false);
   const [editingDisbursement, setEditingDisbursement] = useState<{ id: string; disbursementId: string } | null>(null);
+  const [affiliates, setAffiliates] = useState<Array<AffiliateDoc & { id: string }>>([]);
+  const [isLoadingAffiliates, setIsLoadingAffiliates] = useState(false);
+  const [newAffiliateName, setNewAffiliateName] = useState("");
+  const [newAffiliateEmail, setNewAffiliateEmail] = useState("");
+  const [newAffiliateCode, setNewAffiliateCode] = useState("");
+  const [isCreatingAffiliate, setIsCreatingAffiliate] = useState(false);
+  const [showNewAffiliateDialog, setShowNewAffiliateDialog] = useState(false);
   
   // Cache des données pour éviter qu'elles disparaissent
   const dataCacheRef = useRef<{
@@ -182,7 +198,7 @@ const AdminDashboard = () => {
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
     const viewParam = searchParams.get('view');
-    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements'].includes(viewParam)) {
+    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam)) {
       setActiveView(viewParam as typeof activeView);
     }
   }, [searchParams]);
@@ -295,6 +311,7 @@ const AdminDashboard = () => {
     } finally {
       setIsLoadingPayments(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on purpose: reload only when allProfiles change
   }, [allProfiles, toast]);
 
   const loadGlobalStats = useCallback(async () => {
@@ -380,6 +397,7 @@ const AdminDashboard = () => {
     } finally {
       setIsLoadingGlobalStats(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on purpose: reload only when allProfiles change
   }, [allProfiles]);
 
   const loadAllProducts = useCallback(async () => {
@@ -430,6 +448,7 @@ const AdminDashboard = () => {
     } finally {
       setIsLoadingProducts(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on purpose: reload only when allProfiles change
   }, [allProfiles, toast]);
 
   const loadAllOrders = useCallback(async () => {
@@ -503,6 +522,7 @@ const AdminDashboard = () => {
     } finally {
       setIsLoadingOrders(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on purpose: reload only when allProfiles change
   }, [allProfiles, toast]);
 
   const loadAllEvents = useCallback(async () => {
@@ -562,6 +582,7 @@ const AdminDashboard = () => {
     } finally {
       setIsLoadingEvents(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on purpose: reload only when allProfiles change
   }, [allProfiles, toast]);
 
   const loadAllCustomers = useCallback(async () => {
@@ -656,7 +677,7 @@ const AdminDashboard = () => {
         requests.push({
           ...data,
           id: docSnap.id,
-          userEmail: profile?.email || data.userEmail,
+          userEmail: profile?.email,
         });
       }
       
@@ -675,6 +696,79 @@ const AdminDashboard = () => {
       loadDisbursementRequests();
     }
   }, [isAdmin, allProfiles.length, loadDisbursementRequests]);
+
+  const loadAffiliates = useCallback(async () => {
+    if (!isAdmin) return;
+    setIsLoadingAffiliates(true);
+    try {
+      const snap = await getDocs(affiliatesColRef(db));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as AffiliateDoc & { id: string }));
+      setAffiliates(list);
+      // Mettre à jour referralCount sur chaque doc pour que la page publique affilié puisse l'afficher
+      const now = Date.now();
+      for (const aff of list) {
+        const count = allProfiles.filter(p => (p.referredBy || '').toUpperCase() === (aff.code || '').toUpperCase()).length;
+        if (aff.referralCount !== count) {
+          try {
+            await updateDoc(doc(db, 'affiliates', aff.id!), { referralCount: count, updatedAt: now });
+          } catch (e) {
+            console.warn('Update referralCount failed for', aff.code, e);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Erreur chargement affiliés:', error);
+      toast({ title: "Erreur", description: "Impossible de charger les affiliés", variant: "destructive" });
+    } finally {
+      setIsLoadingAffiliates(false);
+    }
+  }, [isAdmin, allProfiles, toast]);
+
+  const createAffiliate = async () => {
+    const name = newAffiliateName.trim();
+    if (!name) {
+      toast({ title: "Erreur", description: "Le nom est obligatoire", variant: "destructive" });
+      return;
+    }
+    if (!user?.uid) {
+      toast({ title: "Erreur", description: "Non connecté", variant: "destructive" });
+      return;
+    }
+    const code = newAffiliateCode.trim() || `AFF${Date.now().toString(36).toUpperCase().slice(-6)}`;
+    const existing = affiliates.find(a => a.code.toUpperCase() === code.toUpperCase());
+    if (existing) {
+      toast({ title: "Erreur", description: "Ce code existe déjà", variant: "destructive" });
+      return;
+    }
+    setIsCreatingAffiliate(true);
+    try {
+      await setDoc(affiliateDocRef(db, code.toUpperCase()), {
+        code: code.toUpperCase(),
+        name,
+        email: newAffiliateEmail.trim() || undefined,
+        referralCount: 0,
+        createdAt: Date.now(),
+        createdBy: user.uid,
+      });
+      toast({ title: "Affilié créé", description: `Code: ${code.toUpperCase()}` });
+      setShowNewAffiliateDialog(false);
+      setNewAffiliateName("");
+      setNewAffiliateEmail("");
+      setNewAffiliateCode("");
+      loadAffiliates();
+    } catch (error) {
+      console.error('Erreur création affilié:', error);
+      toast({ title: "Erreur", description: "Impossible de créer l'affilié", variant: "destructive" });
+    } finally {
+      setIsCreatingAffiliate(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin && activeView === 'affiliates') {
+      loadAffiliates();
+    }
+  }, [isAdmin, activeView, loadAffiliates]);
 
   // Approuver une demande de Disbursement ID
   const approveDisbursement = async (requestId: string, userId: string, disbursementId: string, notes?: string) => {
@@ -800,6 +894,7 @@ const AdminDashboard = () => {
     } finally {
       setIsLoadingRatings(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- on purpose: reload only when allProfiles change
   }, [allProfiles, toast]);
 
   // Suivre les vues déjà chargées pour éviter les rechargements inutiles
@@ -1875,6 +1970,14 @@ const AdminDashboard = () => {
             {disbursementRequests.filter(r => r.status === 'pending').length} en attente
           </p>
         </button>
+        <button
+          onClick={() => navigate('/admin?view=affiliates')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <QrCode size={48} className="text-teal-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Affiliation</h2>
+          <p className="text-sm text-muted-foreground">{affiliates.length} affiliés</p>
+        </button>
       </div>
 
       {/* Paiements récents */}
@@ -1911,7 +2014,7 @@ const AdminDashboard = () => {
                   <div className="text-right">
                     <div className="font-bold text-green-600">{payment.amount?.toLocaleString() || 0} XAF</div>
                     <Badge variant="outline" className="text-xs">
-                      {payment.planType || "N/A"}
+                      {payment.subscriptionType || "N/A"}
                     </Badge>
                   </div>
                 </div>
@@ -2558,20 +2661,21 @@ const AdminDashboard = () => {
                         </p>
                       </div>
                       <div className="flex gap-2 pt-2">
-                        <Select 
-                          value={order.status} 
-                          onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
-                          className="flex-1"
-                        >
-                          <SelectTrigger className="w-full text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pending">En attente</SelectItem>
-                            <SelectItem value="sent">Envoyée</SelectItem>
-                            <SelectItem value="cancelled">Annulée</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex-1">
+                          <Select 
+                            value={order.status} 
+                            onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
+                          >
+                            <SelectTrigger className="w-full text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pending">En attente</SelectItem>
+                              <SelectItem value="sent">Envoyée</SelectItem>
+                              <SelectItem value="cancelled">Annulée</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <Button 
                           size="sm" 
                           variant="destructive" 
@@ -3114,6 +3218,116 @@ const AdminDashboard = () => {
     );
   };
 
+  const baseUrl = typeof window !== 'undefined' ? `${window.location.origin}${(import.meta.env?.BASE_URL || '').replace(/\/$/, '')}` : '';
+
+  // Vue Affiliation
+  const renderAffiliatesView = () => (
+    <div className="p-4 md:p-6 lg:p-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
+          <ArrowLeft size={16} className="mr-2"/> Retour
+        </Button>
+        <div className="flex-1">
+          <h1 className="text-2xl font-bold">Affiliation</h1>
+          <p className="text-sm text-muted-foreground">
+            Créer des codes affiliés et suivre les inscriptions parrainées. Les affiliés peuvent se connecter via le lien pour voir leurs stats.
+          </p>
+        </div>
+        <Dialog open={showNewAffiliateDialog} onOpenChange={setShowNewAffiliateDialog}>
+          <DialogTrigger asChild>
+            <Button className="flex items-center gap-2">
+              <Gift size={16}/> Créer un affilié
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nouvel affilié</DialogTitle>
+              <DialogDescription>Le code sera généré automatiquement si laissé vide.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="aff-name">Nom *</Label>
+                <Input id="aff-name" value={newAffiliateName} onChange={(e) => setNewAffiliateName(e.target.value)} placeholder="Nom de l'affilié" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="aff-email">Email (optionnel)</Label>
+                <Input id="aff-email" type="email" value={newAffiliateEmail} onChange={(e) => setNewAffiliateEmail(e.target.value)} placeholder="email@exemple.com" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="aff-code">Code (optionnel, sinon auto)</Label>
+                <Input id="aff-code" value={newAffiliateCode} onChange={(e) => setNewAffiliateCode(e.target.value)} placeholder="Ex: AFF001" className="font-mono" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowNewAffiliateDialog(false)}>Annuler</Button>
+              <Button onClick={createAffiliate} disabled={isCreatingAffiliate || !newAffiliateName.trim()}>
+                {isCreatingAffiliate ? "Création..." : "Créer"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        <Button variant="outline" size="sm" onClick={loadAffiliates} disabled={isLoadingAffiliates}>
+          {isLoadingAffiliates ? "Chargement..." : "Actualiser"}
+        </Button>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardContent className="pt-6">
+          {isLoadingAffiliates ? (
+            <div className="text-center py-8 text-muted-foreground">Chargement des affiliés...</div>
+          ) : affiliates.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">Aucun affilié. Créez-en un pour générer des codes et QR codes d'inscription.</div>
+          ) : (
+            <div className="border rounded-md overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Nom</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Établissements parrainés</TableHead>
+                    <TableHead>Lien inscription</TableHead>
+                    <TableHead>QR code</TableHead>
+                    <TableHead>Tableau de bord affilié</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {affiliates.map((aff) => {
+                    const registerUrl = `${baseUrl}/register?ref=${encodeURIComponent(aff.code)}`;
+                    const dashboardUrl = `${baseUrl}/affiliate?code=${encodeURIComponent(aff.code)}`;
+                    const referralCount = allProfiles.filter(p => (p.referredBy || '').toUpperCase() === aff.code.toUpperCase()).length;
+                    return (
+                      <TableRow key={aff.id}>
+                        <TableCell className="font-mono font-medium">{aff.code}</TableCell>
+                        <TableCell>{aff.name}</TableCell>
+                        <TableCell>{aff.email || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{referralCount}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <a href={registerUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm truncate block max-w-[200px]">
+                            {registerUrl}
+                          </a>
+                        </TableCell>
+                        <TableCell>
+                          <AffiliateQRCell url={registerUrl} />
+                        </TableCell>
+                        <TableCell>
+                          <a href={dashboardUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
+                            Voir stats
+                          </a>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+
   // Vue Abonnements
   const renderSubscriptionsView = () => (
     <div className="p-4 md:p-6 lg:p-8">
@@ -3293,6 +3507,7 @@ const AdminDashboard = () => {
       {activeView === "ratings" && renderRatingsView()}
       {activeView === "customers" && renderCustomersView()}
       {activeView === "disbursements" && renderDisbursementsView()}
+      {activeView === "affiliates" && renderAffiliatesView()}
       {activeView === "subscriptions" && renderSubscriptionsView()}
       {activeView === "notifications" && renderNotificationsView()}
 
