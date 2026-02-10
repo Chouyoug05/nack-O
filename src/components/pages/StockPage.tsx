@@ -209,13 +209,13 @@ const StockPage = () => {
   useEffect(() => {
     if (pendingImages.length > 0 && !showImageSelectionDialog) {
       setFoundImages(pendingImages);
-      // Utiliser requestAnimationFrame pour s'assurer que le DOM est prêt
-      requestAnimationFrame(() => {
-        setShowImageSelectionDialog(true);
-        setPendingImages([]);
-      });
+      setShowImageSelectionDialog(true);
+      setPendingImages([]);
     }
   }, [pendingImages, showImageSelectionDialog]);
+
+  // Ajouter un état pour suivre les images qui ont échoué
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   const [lossData, setLossData] = useState({
     productId: "",
@@ -1138,7 +1138,7 @@ const StockPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" translate="no">
       {/* Header Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="shadow-card border-0">
@@ -1390,7 +1390,7 @@ const StockPage = () => {
 
       {/* Dialog pour Ajouter/Modifier produit */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" onOpenAutoFocus={() => setFormStep(1)}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" onOpenAutoFocus={() => setFormStep(1)} translate="no">
           <DialogHeader className="pb-4">
             <DialogTitle className="text-2xl font-bold text-center">{editingProduct ? "Modifier le produit" : "Ajouter un produit"}</DialogTitle>
             <DialogDescription className="text-base text-center">
@@ -1491,15 +1491,15 @@ const StockPage = () => {
                         title="Rechercher automatiquement une image basée sur le nom du produit"
                       >
                         {isSearchingImage ? (
-                          <>
+                          <span className="flex items-center">
                             <Sparkles className="w-5 h-5 mr-2 animate-spin" />
                             Recherche...
-                          </>
+                          </span>
                         ) : (
-                          <>
+                          <span className="flex items-center">
                             <ImageIcon className="w-5 h-5 mr-2" />
                             Trouver une image
-                          </>
+                          </span>
                         )}
                       </Button>
                     </div>
@@ -1822,11 +1822,11 @@ const StockPage = () => {
               </Button>
             )}
           </div>
-        </DialogContent >
-      </Dialog >
+        </DialogContent>
+      </Dialog>
 
       {/* Products List Card */}
-      < Card className="shadow-card border-0" >
+      <Card className="shadow-card border-0">
         <CardContent>
           {/* Sélection multiple - Toujours visible si des produits existent */}
           {products.length > 0 && (
@@ -2216,7 +2216,7 @@ const StockPage = () => {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[600px]" translate="no">
           <DialogHeader>
             <DialogTitle>Choisir une image pour "{newProduct.name}"</DialogTitle>
             <DialogDescription>
@@ -2224,7 +2224,7 @@ const StockPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
-            {foundImages.map((imageUrl, idx) => (
+            {foundImages.filter(img => !failedImages.has(img)).map((imageUrl, idx) => (
               <div
                 key={`${imageUrl}-${idx}`}
                 className="relative group cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-all"
@@ -2235,8 +2235,8 @@ const StockPage = () => {
                   alt={`Option d'image ${idx}`}
                   className="w-full h-48 object-cover"
                   loading="lazy"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
+                  onError={() => {
+                    setFailedImages(prev => new Set(prev).add(imageUrl));
                   }}
                 />
                 <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-center justify-center">
@@ -2265,8 +2265,8 @@ const StockPage = () => {
             </Button>
           </div>
         </DialogContent>
-      </Dialog >
-    </div >
+      </Dialog>
+    </div>
   );
 };
 

@@ -857,7 +857,7 @@ const EventsPage = () => {
           setSelectedEvent(null);
           setActiveTab('participants');
         }}>
-          <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogContent className="max-w-[95vw] sm:max-w-[4xl] h-[90vh] p-0 overflow-hidden flex flex-col" translate="no">
             <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2">
               <DialogTitle className="text-lg sm:text-xl">{selectedEvent.title}</DialogTitle>
               <DialogDescription className="text-xs sm:text-sm">
@@ -870,8 +870,8 @@ const EventsPage = () => {
               <button
                 onClick={() => setActiveTab('participants')}
                 className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${activeTab === 'participants'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
               >
                 <div className="flex items-center justify-center gap-2">
@@ -882,8 +882,8 @@ const EventsPage = () => {
               <button
                 onClick={() => setActiveTab('finance')}
                 className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${activeTab === 'finance'
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground'
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
                   }`}
               >
                 <div className="flex items-center justify-center gap-2">
