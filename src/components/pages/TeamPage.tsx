@@ -5,11 +5,11 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Plus, 
-  UserCheck, 
-  UserX, 
-  Edit, 
+import {
+  Plus,
+  UserCheck,
+  UserX,
+  Edit,
   Link,
   Copy,
   Mail,
@@ -61,7 +61,7 @@ const TeamPage = () => {
     email: "",
     phone: ""
   });
-  
+
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isAddingMember, setIsAddingMember] = useState(false);
 
@@ -255,7 +255,7 @@ const TeamPage = () => {
       // Vérifier que le profil existe, sinon créer un profil minimal
       const profileRef = profileDocRef(db, user.uid);
       const profileSnap = await getDoc(profileRef);
-      
+
       if (!profileSnap.exists()) {
         // Créer un profil minimal si il n'existe pas
         const now = Date.now();
@@ -279,7 +279,7 @@ const TeamPage = () => {
       const agentCode = generateAgentCode();
       const agentToken = generateAgentToken();
       const dashboardLink = generateDashboardLink(selectedRole, agentToken);
-      
+
       // Construire le payload avec les valeurs nettoyées
       const payload: TeamMemberDoc = {
         firstName: trimmedFirstName,
@@ -305,7 +305,7 @@ const TeamPage = () => {
       }
 
       await addDoc(teamColRef(db, user.uid), payload);
-      
+
       try {
         await setDoc(doc(agentTokensTopColRef(db), agentToken), {
           ownerUid: user.uid,
@@ -338,16 +338,16 @@ const TeamPage = () => {
         console.error('Erreur lors de la copie dans le presse-papier:', clipboardError);
         // Ne pas bloquer si la copie échoue
       }
-      
+
       toast({
         title: "Agent ajouté avec succès",
         description: `${payload.firstName} ${payload.lastName} ajouté. Le lien sécurisé a été copié.`,
       });
     } catch (error) {
       console.error('Erreur lors de l\'ajout du membre:', error);
-      
+
       let errorMessage = "Impossible d'ajouter le membre. Veuillez réessayer.";
-      
+
       if (error instanceof Error) {
         // Messages d'erreur plus spécifiques selon le type d'erreur
         if (error.message.includes('permission')) {
@@ -358,7 +358,7 @@ const TeamPage = () => {
           errorMessage = error.message;
         }
       }
-      
+
       toast({
         title: "Erreur",
         description: errorMessage,
@@ -763,64 +763,78 @@ const TeamPage = () => {
             >
               <div className="h-1.5 w-10 rounded-full bg-gray-300 dark:bg-gray-600"></div>
             </button>
-            <div className="flex p-4 justify-center">
-              <div className="flex w-full flex-col gap-4 items-center">
+            <div className="flex px-4 py-6 justify-center">
+              <div className="flex w-full flex-col gap-3 items-center">
                 <div className="flex gap-4 flex-col items-center">
-                  <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full min-h-32 w-32 shadow-md bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
-                    <span className="text-5xl font-bold text-primary">
+                  <div className="bg-center bg-no-repeat aspect-square bg-cover rounded-full min-h-24 w-24 md:min-h-28 md:w-28 shadow-md bg-gradient-to-br from-primary/20 via-primary/10 to-primary/5 flex items-center justify-center">
+                    <span className="text-3xl md:text-4xl font-bold text-primary">
                       {`${selectedMember.firstName[0]}${selectedMember.lastName[0]}`}
                     </span>
                   </div>
-                  <div className="flex flex-col items-center justify-center">
-                    <p className="text-[#181411] dark:text-white text-3xl font-bold leading-tight tracking-[-0.015em] text-center">
+                  <div className="flex flex-col items-center justify-center gap-1">
+                    <p className="text-[#181411] dark:text-white text-2xl md:text-3xl font-bold leading-tight tracking-[-0.015em] text-center">
                       {selectedMember.firstName} {selectedMember.lastName}
                     </p>
-                    <p className="text-[#8a7260] dark:text-gray-400 text-lg font-normal leading-normal text-center flex items-center gap-2">
+                    <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-full">
                       {(() => {
                         const RoleIcon = getRoleIcon(selectedMember.role);
-                        return <RoleIcon className="w-5 h-5" />;
+                        return <RoleIcon className="w-4 h-4 text-gray-600 dark:text-gray-400" />;
                       })()}
-                      {getRoleLabel(selectedMember.role)}
-                    </p>
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                        {getRoleLabel(selectedMember.role)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
             {/* Contextual Actions */}
-            <div className="grid grid-cols-3 gap-4 p-4 pb-6">
-              <button
-                onClick={() => handleEditClick(selectedMember)}
-                className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-gray-200/50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-300/50 dark:hover:bg-gray-600/50 transition"
-              >
-                <Edit className="w-8 h-8 text-primary" />
-                <span className="text-xs font-medium">Modifier</span>
-              </button>
-              <button
-                onClick={() => handleInfoClick(selectedMember)}
-                className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-gray-200/50 dark:bg-gray-700/50 rounded-xl hover:bg-gray-300/50 dark:hover:bg-gray-600/50 transition"
-              >
-                <Calendar className="w-8 h-8 text-primary" />
-                <span className="text-xs font-medium">Infos</span>
-              </button>
+            <div className="flex flex-col gap-3 p-4 pb-8">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleEditClick(selectedMember)}
+                  className="flex items-center justify-center gap-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition w-full"
+                >
+                  <Edit className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-medium">Modifier</span>
+                </button>
+                <button
+                  onClick={() => handleInfoClick(selectedMember)}
+                  className="flex items-center justify-center gap-2 p-3 bg-gray-100 dark:bg-gray-800 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 transition w-full"
+                >
+                  <Calendar className="w-5 h-5 text-primary" />
+                  <span className="text-sm font-medium">Infos</span>
+                </button>
+              </div>
+
               <button
                 onClick={() => {
                   if (selectedMember) {
                     handleDeleteMember(selectedMember.id, `${selectedMember.firstName} ${selectedMember.lastName}`);
                   }
                 }}
-                className="flex flex-col items-center justify-center gap-2 p-3 aspect-square bg-destructive/10 dark:bg-destructive/20 rounded-xl hover:bg-destructive/20 dark:hover:bg-destructive/30 transition"
+                className="flex items-center justify-center gap-2 p-3 bg-destructive/5 dark:bg-destructive/10 rounded-xl hover:bg-destructive/10 dark:hover:bg-destructive/20 transition w-full text-destructive"
               >
-                <Trash2 className="w-8 h-8 text-destructive" />
-                <span className="text-xs font-medium">Supprimer</span>
+                <Trash2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Supprimer de l'équipe</span>
               </button>
+
+              <Button
+                variant="outline"
+                onClick={() => setIsBottomSheetOpen(false)}
+                className="w-full h-12 rounded-xl mt-2 flex items-center justify-center gap-2 border-2"
+              >
+                <ChevronLeft className="w-5 h-5" />
+                Retour
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {/* Add Member Modal */}
-      <Dialog 
-        open={isAddModalOpen} 
+      <Dialog
+        open={isAddModalOpen}
         onOpenChange={(open) => {
           if (!open && !isAddingMember) {
             setIsAddModalOpen(false);
@@ -847,7 +861,7 @@ const TeamPage = () => {
               <Input
                 id="firstName"
                 value={newMember.firstName}
-                onChange={(e) => setNewMember({...newMember, firstName: e.target.value})}
+                onChange={(e) => setNewMember({ ...newMember, firstName: e.target.value })}
                 placeholder="Marie"
               />
             </div>
@@ -856,7 +870,7 @@ const TeamPage = () => {
               <Input
                 id="lastName"
                 value={newMember.lastName}
-                onChange={(e) => setNewMember({...newMember, lastName: e.target.value})}
+                onChange={(e) => setNewMember({ ...newMember, lastName: e.target.value })}
                 placeholder="Mvondo"
               />
             </div>
@@ -865,7 +879,7 @@ const TeamPage = () => {
               <Input
                 id="phone"
                 value={newMember.phone}
-                onChange={(e) => setNewMember({...newMember, phone: e.target.value})}
+                onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
                 placeholder="+241 01 23 45 67"
               />
             </div>
@@ -875,12 +889,12 @@ const TeamPage = () => {
                 id="email"
                 type="email"
                 value={newMember.email}
-                onChange={(e) => setNewMember({...newMember, email: e.target.value})}
+                onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
                 placeholder="marie.mvondo@gmail.com"
               />
             </div>
           </div>
-          
+
           {newMember.firstName && newMember.lastName && selectedRole && (
             <div className="bg-nack-beige-light p-4 rounded-lg space-y-3">
               <div>
@@ -895,24 +909,24 @@ const TeamPage = () => {
                   {window.location.origin}{generateDashboardLink(selectedRole, generateAgentToken())}
                 </code>
               </div>
-               <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400">
-                 <p className="text-xs text-blue-800 font-medium mb-1">
-                   {selectedRole === 'serveur' ? '🛎️ Interface Serveur' : 
-                    selectedRole === 'caissier' ? '💰 Interface Caisse' : 
-                    selectedRole === 'cuisinier' ? '👨‍🍳 Interface Cuisine' :
-                    '📱 Interface Agent Événement'}
-                 </p>
-                 <p className="text-xs text-blue-700">
-                   {selectedRole === 'serveur' 
-                     ? 'L\'agent aura accès aux produits et pourra prendre les commandes'
-                     : selectedRole === 'caissier'
-                     ? 'L\'agent aura accès à la feuille de caisse pour enregistrer les paiements'
-                     : selectedRole === 'cuisinier'
-                     ? 'L\'agent aura accès uniquement aux commandes contenant de la nourriture pour gérer leur préparation'
-                     : 'L\'agent aura accès uniquement au scanner QR pour valider les billets d\'événements'
-                   }
-                 </p>
-               </div>
+              <div className="bg-blue-50 p-3 rounded-lg border-l-4 border-blue-400">
+                <p className="text-xs text-blue-800 font-medium mb-1">
+                  {selectedRole === 'serveur' ? '🛎️ Interface Serveur' :
+                    selectedRole === 'caissier' ? '💰 Interface Caisse' :
+                      selectedRole === 'cuisinier' ? '👨‍🍳 Interface Cuisine' :
+                        '📱 Interface Agent Événement'}
+                </p>
+                <p className="text-xs text-blue-700">
+                  {selectedRole === 'serveur'
+                    ? 'L\'agent aura accès aux produits et pourra prendre les commandes'
+                    : selectedRole === 'caissier'
+                      ? 'L\'agent aura accès à la feuille de caisse pour enregistrer les paiements'
+                      : selectedRole === 'cuisinier'
+                        ? 'L\'agent aura accès uniquement aux commandes contenant de la nourriture pour gérer leur préparation'
+                        : 'L\'agent aura accès uniquement au scanner QR pour valider les billets d\'événements'
+                  }
+                </p>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Le lien sera automatiquement copié dans le presse-papier après l'ajout de l'agent.
               </p>
@@ -920,22 +934,22 @@ const TeamPage = () => {
           )}
 
           <div className="flex flex-col sm:flex-row justify-end gap-2 pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => {
                 if (!isAddingMember) {
                   setIsAddModalOpen(false);
                   setNewMember({ firstName: "", lastName: "", email: "", phone: "" });
                   setSelectedRole(null);
                 }
-              }} 
+              }}
               className="w-full sm:w-auto"
               disabled={isAddingMember}
             >
               Annuler
             </Button>
-            <Button 
-              onClick={handleAddMember} 
+            <Button
+              onClick={handleAddMember}
               className="bg-gradient-primary text-white w-full sm:w-auto"
               disabled={isAddingMember}
             >
@@ -1083,7 +1097,7 @@ const TeamPage = () => {
               <Input
                 id="editFirstName"
                 value={editingMember.firstName}
-                onChange={(e) => setEditingMember({...editingMember, firstName: e.target.value})}
+                onChange={(e) => setEditingMember({ ...editingMember, firstName: e.target.value })}
                 placeholder="Marie"
               />
             </div>
@@ -1092,7 +1106,7 @@ const TeamPage = () => {
               <Input
                 id="editLastName"
                 value={editingMember.lastName}
-                onChange={(e) => setEditingMember({...editingMember, lastName: e.target.value})}
+                onChange={(e) => setEditingMember({ ...editingMember, lastName: e.target.value })}
                 placeholder="Mvondo"
               />
             </div>
@@ -1101,7 +1115,7 @@ const TeamPage = () => {
               <Input
                 id="editPhone"
                 value={editingMember.phone}
-                onChange={(e) => setEditingMember({...editingMember, phone: e.target.value})}
+                onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
                 placeholder="+241 01 23 45 67"
               />
             </div>
@@ -1111,7 +1125,7 @@ const TeamPage = () => {
                 id="editEmail"
                 type="email"
                 value={editingMember.email}
-                onChange={(e) => setEditingMember({...editingMember, email: e.target.value})}
+                onChange={(e) => setEditingMember({ ...editingMember, email: e.target.value })}
                 placeholder="marie.mvondo@gmail.com"
               />
             </div>

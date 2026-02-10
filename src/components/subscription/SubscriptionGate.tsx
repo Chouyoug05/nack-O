@@ -124,7 +124,7 @@ const SubscriptionGate = ({ children }: Props) => {
           userId: user.uid,
           transactionId,
           subscriptionType: 'transition',
-          amount: 2500,
+          amount: SUBSCRIPTION_PLANS.transition.price,
           status: 'pending',
           paymentMethod: 'airtel-money',
           reference,
@@ -138,7 +138,7 @@ const SubscriptionGate = ({ children }: Props) => {
       }
       
       const link = await createSubscriptionPaymentLink({
-        amount: 2500,
+        amount: SUBSCRIPTION_PLANS.transition.price,
         reference: `${reference}-${transactionId.substring(0, 8)}`,
         redirectSuccess,
         redirectError,
@@ -201,7 +201,7 @@ const SubscriptionGate = ({ children }: Props) => {
 
             <div className="space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2">Transition - 2 500 XAF/mois</h3>
+                <h3 className="font-semibold text-blue-900 mb-2">Transition - {SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF/mois</h3>
                 <ul className="text-sm text-blue-800 space-y-1 mb-3">
                   <li>✓ Gestion des produits</li>
                   <li>✓ Point de vente</li>
@@ -236,7 +236,7 @@ const SubscriptionGate = ({ children }: Props) => {
                           userId: user.uid,
                           transactionId,
                           subscriptionType: 'transition',
-                          amount: 2500,
+                          amount: SUBSCRIPTION_PLANS.transition.price,
                           status: 'pending',
                           paymentMethod: 'airtel-money',
                           reference,
@@ -250,7 +250,7 @@ const SubscriptionGate = ({ children }: Props) => {
                       }
                       
                       const link = await createSubscriptionPaymentLink({
-                        amount: 2500,
+                        amount: SUBSCRIPTION_PLANS.transition.price,
                         reference: `${reference}-${transactionId.substring(0, 8)}`,
                         redirectSuccess,
                         redirectError,
@@ -285,12 +285,12 @@ const SubscriptionGate = ({ children }: Props) => {
                   variant="outline"
                   className="w-full"
                 >
-                  {creatingLink ? 'Chargement...' : 'S\'abonner - Transition (2 500 XAF)'}
+                  {creatingLink ? 'Chargement...' : `S'abonner - Transition (${SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF)`}
                 </Button>
               </div>
 
               <div className="bg-gradient-to-r from-red-600 to-red-700 border border-red-800 rounded-lg p-4">
-                <h3 className="font-semibold text-white mb-2">Transition Pro Max - 7 500 XAF/mois</h3>
+                <h3 className="font-semibold text-white mb-2">Transition Pro Max - {SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF/mois</h3>
                 <ul className="text-sm text-red-100 space-y-1 mb-3">
                   <li>✓ Toutes les fonctionnalités Transition</li>
                   <li>✓ Gestion des équipiers</li>
@@ -325,7 +325,7 @@ const SubscriptionGate = ({ children }: Props) => {
                           userId: user.uid,
                           transactionId,
                           subscriptionType: 'transition-pro-max',
-                          amount: 7500,
+                          amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
                           status: 'pending',
                           paymentMethod: 'airtel-money',
                           reference,
@@ -339,7 +339,7 @@ const SubscriptionGate = ({ children }: Props) => {
                       }
                       
                       const link = await createSubscriptionPaymentLink({
-                        amount: 7500,
+                        amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
                         reference: `${reference}-${transactionId.substring(0, 8)}`,
                         redirectSuccess,
                         redirectError,
@@ -373,7 +373,7 @@ const SubscriptionGate = ({ children }: Props) => {
                   disabled={creatingLink}
                   className="w-full bg-white text-red-600 hover:bg-red-50"
                 >
-                  {creatingLink ? 'Chargement...' : 'S\'abonner - Pro Max (7 500 XAF)'}
+                  {creatingLink ? 'Chargement...' : `S'abonner - Pro Max (${SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF)`}
                 </Button>
               </div>
             </div>
@@ -445,7 +445,7 @@ const SubscriptionGate = ({ children }: Props) => {
                             userId: user.uid,
                             transactionId,
                             subscriptionType: 'transition',
-                            amount: 2500,
+                            amount: SUBSCRIPTION_PLANS.transition.price,
                             status: 'pending',
                             paymentMethod: 'airtel-money',
                             reference,
@@ -459,7 +459,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         }
                         
                         const link = await createSubscriptionPaymentLink({
-                          amount: 2500,
+                          amount: SUBSCRIPTION_PLANS.transition.price,
                           reference: `${reference}-${transactionId.substring(0, 8)}`,
                           redirectSuccess,
                           redirectError,
@@ -494,7 +494,7 @@ const SubscriptionGate = ({ children }: Props) => {
                     variant="outline"
                     className="w-full"
                   >
-                    Transition (2500 XAF)
+                    Transition ({SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF)
                   </Button>
                   <Button
                     onClick={async () => {
@@ -524,7 +524,7 @@ const SubscriptionGate = ({ children }: Props) => {
                             userId: user.uid,
                             transactionId,
                             subscriptionType: 'transition-pro-max',
-                            amount: 7500,
+                            amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
                             status: 'pending',
                             paymentMethod: 'airtel-money',
                             reference,
@@ -538,7 +538,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         }
                         
                         const link = await createSubscriptionPaymentLink({
-                          amount: 7500,
+                          amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
                           reference: `${reference}-${transactionId.substring(0, 8)}`,
                           redirectSuccess,
                           redirectError,
@@ -572,7 +572,7 @@ const SubscriptionGate = ({ children }: Props) => {
                     disabled={creatingLink}
                     className="w-full bg-gradient-primary text-white"
                   >
-                    Pro Max (7500 XAF)
+                    Pro Max ({SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF)
                   </Button>
                 </div>
                 <p className="text-xs text-center text-muted-foreground">

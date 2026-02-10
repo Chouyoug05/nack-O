@@ -8,11 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Settings, 
-  CreditCard, 
-  Building, 
-  Shield, 
+import {
+  Settings,
+  CreditCard,
+  Building,
+  Shield,
   Database,
   Bell,
   Upload,
@@ -44,10 +44,10 @@ import type { CollectionReference } from "firebase/firestore";
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "0 jour";
-  const d = Math.floor(ms / (24*60*60*1000));
+  const d = Math.floor(ms / (24 * 60 * 60 * 1000));
   // Afficher seulement les jours pour plus de clarté
   if (d === 0) {
-    const h = Math.floor((ms % (24*60*60*1000)) / (60*60*1000));
+    const h = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
     return h > 0 ? `${h} heure${h > 1 ? 's' : ''}` : "Moins d'une heure";
   }
   return `${d} jour${d > 1 ? 's' : ''}`;
@@ -56,7 +56,7 @@ function formatCountdown(ms: number) {
 const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) => {
   const { toast } = useToast();
   const { profile, saveProfile, user } = useAuth();
-  
+
   const [establishmentInfo, setEstablishmentInfo] = useState({
     name: profile?.establishmentName || "Mon Établissement",
     address: "",
@@ -122,11 +122,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       });
       return;
     }
-    
+
     const confirmMessage = "⚠️ ATTENTION : Cette action est irréversible !\n\nCela supprimera TOUTES vos données :\n- Tous les produits\n- Toutes les ventes\n- Toute l'équipe\n- Tous les événements\n- Toutes les commandes\n- Toutes les notifications\n- Tous les paiements et reçus\n\nSeuls vos paramètres de base (nom, email, logo) seront conservés.\n\nÊtes-vous ABSOLUMENT sûr de vouloir continuer ?";
-    
+
     if (!window.confirm(confirmMessage)) return;
-    
+
     // Double confirmation
     if (!window.confirm("Dernière confirmation : Voulez-vous vraiment supprimer TOUTES vos données ?")) return;
 
@@ -139,34 +139,34 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       const deleteCollection = async (colRef: CollectionReference, collectionName: string) => {
         let deleted = 0;
         let hasMore = true;
-        
+
         while (hasMore) {
           const batch = writeBatch(db);
           let batchCount = 0;
-          
+
           const snapshot = await getDocs(colRef);
           if (snapshot.empty) {
             hasMore = false;
             break;
           }
-          
+
           for (const doc of snapshot.docs) {
             if (batchCount >= BATCH_LIMIT) break;
             batch.delete(doc.ref);
             batchCount++;
             deleted++;
           }
-          
+
           if (batchCount > 0) {
             await batch.commit();
             totalDeleted += batchCount;
           }
-          
+
           if (snapshot.docs.length < BATCH_LIMIT) {
             hasMore = false;
           }
         }
-        
+
         return deleted;
       };
 
@@ -226,10 +226,10 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   };
 
   const currentPlan = getCurrentPlan(profile);
-  const planLabel = currentPlan === 'trial' ? 'Essai (7 jours)' 
-    : currentPlan === 'transition' ? 'Transition' 
-    : currentPlan === 'transition-pro-max' ? 'Transition Pro Max'
-    : 'Expiré';
+  const planLabel = currentPlan === 'trial' ? 'Essai (7 jours)'
+    : currentPlan === 'transition' ? 'Transition'
+      : currentPlan === 'transition-pro-max' ? 'Transition Pro Max'
+        : 'Expiré';
   const now = Date.now();
   const remaining = profile?.plan === 'trial' && profile.trialEndsAt ? (profile.trialEndsAt - now) : (profile?.plan === 'active' && profile.subscriptionEndsAt ? (profile.subscriptionEndsAt - now) : 0);
   const eventsCount = getCurrentEventsCount(profile);
@@ -241,26 +241,26 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       // Créer un ID unique pour cette transaction
       const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const now = Date.now();
-      
+
       // Utiliser la même méthode que SubscriptionGate pour garantir la cohérence
       const base = (
         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
         || window.location.origin
       ).replace(/\/+$/, '');
-      
+
       const plan = SUBSCRIPTION_PLANS[planType];
       const reference = `abonnement-${planType}`;
       const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
       const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
       const logoURL = `${base}/favicon.png`;
-      
+
       // Enregistrer la transaction en attente
       try {
         const { paymentsColRef } = await import('@/lib/collections');
         const { db } = await import('@/lib/firebase');
         const { addDoc } = await import('firebase/firestore');
         const paymentsRef = paymentsColRef(db, user.uid);
-        
+
         await addDoc(paymentsRef, {
           userId: user.uid,
           transactionId,
@@ -278,7 +278,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         console.error('Erreur enregistrement transaction pending:', error);
         // Continuer même si l'enregistrement échoue
       }
-      
+
       // Générer le lien de paiement
       const link = await createSubscriptionPaymentLink({
         amount: plan.price,
@@ -288,7 +288,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         logoURL,
         isTransfer: false,
       });
-      
+
       // Mettre à jour la transaction avec le lien généré
       try {
         const { paymentsColRef } = await import('@/lib/collections');
@@ -303,14 +303,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       } catch (error) {
         console.error('Erreur mise à jour lien paiement:', error);
       }
-      
+
       window.location.href = link;
     } catch (error) {
       console.error('Erreur création lien paiement:', error);
-      toast({ 
-        title: "Paiement indisponible", 
-        description: "Réessayez dans quelques instants.", 
-        variant: "destructive" 
+      toast({
+        title: "Paiement indisponible",
+        description: "Réessayez dans quelques instants.",
+        variant: "destructive"
       });
     }
   };
@@ -366,7 +366,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
   const downloadReceipt = async (receipt?: { transactionId: string; amount: number; paidAt: number; reference: string; subscriptionType: string }) => {
     if (!profile || !user) return;
-    
+
     // Si un reçu spécifique est fourni, l'utiliser
     if (receipt) {
       await generateSubscriptionReceiptPDF({
@@ -390,13 +390,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       });
       return;
     }
-    
+
     // Sinon, utiliser le dernier paiement depuis le profil
     if (!profile.lastPaymentAt) {
       toast({ title: "Aucun reçu", description: "Aucun paiement trouvé", variant: "destructive" });
       return;
     }
-    
+
     // Essayer de trouver le paiement correspondant
     try {
       const paymentsRef = paymentsColRef(db, user.uid);
@@ -492,9 +492,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       {currentPlan === 'trial' ? (
                         <p className="text-2xl font-bold text-nack-red">Gratuit (7 jours)</p>
                       ) : currentPlan === 'transition' ? (
-                        <p className="text-2xl font-bold text-nack-red">2,500 XAF / 30 jours</p>
+                        <p className="text-2xl font-bold text-nack-red">{SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF / 30 jours</p>
                       ) : currentPlan === 'transition-pro-max' ? (
-                        <p className="text-2xl font-bold text-nack-red">7,500 XAF / 30 jours</p>
+                        <p className="text-2xl font-bold text-nack-red">{SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF / 30 jours</p>
                       ) : (
                         <p className="text-2xl font-bold text-red-600">Expiré</p>
                       )}
@@ -679,9 +679,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                               {receipt.subscriptionType === 'transition-pro-max' ? 'Transition Pro Max' : 'Transition'}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                              {new Date(receipt.paidAt).toLocaleDateString('fr-FR', { 
-                                day: 'numeric', 
-                                month: 'long', 
+                              {new Date(receipt.paidAt).toLocaleDateString('fr-FR', {
+                                day: 'numeric',
+                                month: 'long',
                                 year: 'numeric',
                                 hour: '2-digit',
                                 minute: '2-digit'
@@ -739,7 +739,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       <Input
                         id="logoUrl"
                         value={establishmentInfo.logoUrl}
-                        onChange={(e) => setEstablishmentInfo({...establishmentInfo, logoUrl: e.target.value})}
+                        onChange={(e) => setEstablishmentInfo({ ...establishmentInfo, logoUrl: e.target.value })}
                         placeholder="https://.../logo.png"
                       />
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -792,7 +792,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Input
                       id="establishment-name"
                       value={establishmentInfo.name}
-                      onChange={(e) => setEstablishmentInfo({...establishmentInfo, name: e.target.value})}
+                      onChange={(e) => setEstablishmentInfo({ ...establishmentInfo, name: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -800,7 +800,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Input
                       id="establishment-phone"
                       value={establishmentInfo.phone}
-                      onChange={(e) => setEstablishmentInfo({...establishmentInfo, phone: e.target.value})}
+                      onChange={(e) => setEstablishmentInfo({ ...establishmentInfo, phone: e.target.value })}
                     />
                   </div>
                   <div className="space-y-2">
@@ -809,7 +809,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       id="establishment-whatsapp"
                       type="tel"
                       value={establishmentInfo.whatsapp}
-                      onChange={(e) => setEstablishmentInfo({...establishmentInfo, whatsapp: e.target.value})}
+                      onChange={(e) => setEstablishmentInfo({ ...establishmentInfo, whatsapp: e.target.value })}
                       placeholder="+241 XX XX XX XX"
                       className={establishmentInfo.whatsapp && !validateWhatsApp(establishmentInfo.whatsapp) ? "border-red-500" : ""}
                     />
@@ -826,7 +826,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       id="establishment-email"
                       type="email"
                       value={establishmentInfo.email}
-                      onChange={(e) => setEstablishmentInfo({...establishmentInfo, email: e.target.value})}
+                      onChange={(e) => setEstablishmentInfo({ ...establishmentInfo, email: e.target.value })}
                     />
                   </div>
                   <Button onClick={async () => {
@@ -893,7 +893,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Input
                       id="company-name"
                       value={ticketCustomization.companyName}
-                      onChange={(e) => setTicketCustomization({...ticketCustomization, companyName: e.target.value})}
+                      onChange={(e) => setTicketCustomization({ ...ticketCustomization, companyName: e.target.value })}
                       placeholder="Ex: Restaurant NACK SARL"
                     />
                   </div>
@@ -903,7 +903,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       <Input
                         id="rcs-number"
                         value={ticketCustomization.rcsNumber}
-                        onChange={(e) => setTicketCustomization({...ticketCustomization, rcsNumber: e.target.value})}
+                        onChange={(e) => setTicketCustomization({ ...ticketCustomization, rcsNumber: e.target.value })}
                         placeholder="Ex: RCS-LB-2024-A-1234"
                       />
                     </div>
@@ -912,7 +912,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       <Input
                         id="nif-number"
                         value={ticketCustomization.nifNumber}
-                        onChange={(e) => setTicketCustomization({...ticketCustomization, nifNumber: e.target.value})}
+                        onChange={(e) => setTicketCustomization({ ...ticketCustomization, nifNumber: e.target.value })}
                         placeholder="Ex: 1234567890"
                       />
                     </div>
@@ -923,7 +923,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       id="business-phone"
                       type="tel"
                       value={ticketCustomization.businessPhone}
-                      onChange={(e) => setTicketCustomization({...ticketCustomization, businessPhone: e.target.value})}
+                      onChange={(e) => setTicketCustomization({ ...ticketCustomization, businessPhone: e.target.value })}
                       placeholder="+241 XX XX XX XX"
                     />
                   </div>
@@ -932,7 +932,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Input
                       id="full-address"
                       value={ticketCustomization.fullAddress}
-                      onChange={(e) => setTicketCustomization({...ticketCustomization, fullAddress: e.target.value})}
+                      onChange={(e) => setTicketCustomization({ ...ticketCustomization, fullAddress: e.target.value })}
                       placeholder="Ex: Avenue Léon Mba, Libreville, Gabon"
                     />
                   </div>
@@ -941,7 +941,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Input
                       id="custom-message"
                       value={ticketCustomization.customMessage}
-                      onChange={(e) => setTicketCustomization({...ticketCustomization, customMessage: e.target.value})}
+                      onChange={(e) => setTicketCustomization({ ...ticketCustomization, customMessage: e.target.value })}
                       placeholder="Ex: Merci pour votre confiance ❤️"
                     />
                   </div>
@@ -950,7 +950,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Textarea
                       id="legal-mentions"
                       value={ticketCustomization.legalMentions}
-                      onChange={(e) => setTicketCustomization({...ticketCustomization, legalMentions: e.target.value})}
+                      onChange={(e) => setTicketCustomization({ ...ticketCustomization, legalMentions: e.target.value })}
                       placeholder="Ex: SIRET: 12345678901234 - TVA: FR12345678901"
                       rows={3}
                     />
@@ -966,9 +966,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Label htmlFor="ticket-logo">Logo noir et blanc pour tickets</Label>
                     <div className="flex items-center gap-4">
                       {ticketCustomization.ticketLogoUrl && (
-                        <img 
-                          src={ticketCustomization.ticketLogoUrl} 
-                          alt="Logo ticket" 
+                        <img
+                          src={ticketCustomization.ticketLogoUrl}
+                          alt="Logo ticket"
                           className="w-16 h-16 object-contain border rounded"
                           style={{ filter: 'grayscale(100%) contrast(1.2)' }}
                         />
@@ -984,7 +984,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                               setTicketLogoFile(file);
                               try {
                                 const uploadedUrl = await uploadImageToCloudinary(file, "ticket-logos");
-                                setTicketCustomization({...ticketCustomization, ticketLogoUrl: uploadedUrl});
+                                setTicketCustomization({ ...ticketCustomization, ticketLogoUrl: uploadedUrl });
                                 toast({ title: "Logo téléversé", description: "Le logo a été converti en noir et blanc" });
                               } catch (error) {
                                 toast({ title: "Erreur", description: "Impossible de téléverser le logo", variant: "destructive" });
@@ -1010,7 +1010,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       <Switch
                         id="show-delivery"
                         checked={ticketCustomization.showDeliveryMention}
-                        onCheckedChange={(checked) => setTicketCustomization({...ticketCustomization, showDeliveryMention: checked})}
+                        onCheckedChange={(checked) => setTicketCustomization({ ...ticketCustomization, showDeliveryMention: checked })}
                       />
                     </div>
                     <div className="flex items-center justify-between">
@@ -1021,7 +1021,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       <Switch
                         id="show-css"
                         checked={ticketCustomization.showCSSMention}
-                        onCheckedChange={(checked) => setTicketCustomization({...ticketCustomization, showCSSMention: checked})}
+                        onCheckedChange={(checked) => setTicketCustomization({ ...ticketCustomization, showCSSMention: checked })}
                       />
                     </div>
                     {ticketCustomization.showCSSMention && (
@@ -1034,7 +1034,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                           max="100"
                           step="0.1"
                           value={ticketCustomization.cssPercentage}
-                          onChange={(e) => setTicketCustomization({...ticketCustomization, cssPercentage: parseFloat(e.target.value) || 1})}
+                          onChange={(e) => setTicketCustomization({ ...ticketCustomization, cssPercentage: parseFloat(e.target.value) || 1 })}
                           placeholder="1"
                           className="w-24"
                         />
@@ -1048,7 +1048,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <Input
                       id="ticket-footer-message"
                       value={ticketCustomization.ticketFooterMessage}
-                      onChange={(e) => setTicketCustomization({...ticketCustomization, ticketFooterMessage: e.target.value})}
+                      onChange={(e) => setTicketCustomization({ ...ticketCustomization, ticketFooterMessage: e.target.value })}
                       placeholder="Ex: Merci de votre visite !"
                     />
                     <p className="text-xs text-muted-foreground">
@@ -1109,7 +1109,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </div>
                     <Switch
                       checked={notificationSettings.lowStock}
-                      onCheckedChange={(checked) => setNotificationSettings({...notificationSettings, lowStock: checked})}
+                      onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, lowStock: checked })}
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -1119,7 +1119,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </div>
                     <Switch
                       checked={notificationSettings.dailyReport}
-                      onCheckedChange={(checked) => setNotificationSettings({...notificationSettings, dailyReport: checked})}
+                      onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, dailyReport: checked })}
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -1129,7 +1129,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </div>
                     <Switch
                       checked={notificationSettings.newSales}
-                      onCheckedChange={(checked) => setNotificationSettings({...notificationSettings, newSales: checked})}
+                      onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, newSales: checked })}
                     />
                   </div>
                   <div className="flex items-center justify-between">
@@ -1139,14 +1139,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </div>
                     <Switch
                       checked={notificationSettings.teamUpdates}
-                      onCheckedChange={(checked) => setNotificationSettings({...notificationSettings, teamUpdates: checked})}
+                      onCheckedChange={(checked) => setNotificationSettings({ ...notificationSettings, teamUpdates: checked })}
                     />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
-          
+
           {/* Team Management Section */}
           <Card className="shadow-card border-0 mt-6">
             <CardHeader>
@@ -1183,14 +1183,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="bg-gradient-to-r from-nack-red/10 to-nack-beige-light p-4 rounded-lg">
                     <h3 className="font-semibold text-lg mb-2">Notre histoire</h3>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Nack! est née d'une demande suite aux lourdes commandes d'un bar. 
-                      Face aux défis de gestion des stocks, des ventes et de l'équipe, 
-                      nous avons créé une solution complète et intuitive pour tous les 
+                      Nack! est née d'une demande suite aux lourdes commandes d'un bar.
+                      Face aux défis de gestion des stocks, des ventes et de l'équipe,
+                      nous avons créé une solution complète et intuitive pour tous les
                       établissements du Gabon.
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Aujourd'hui, Nack! accompagne des dizaines d'établissements dans 
-                      leur gestion quotidienne, leur permettant de se concentrer sur 
+                      Aujourd'hui, Nack! accompagne des dizaines d'établissements dans
+                      leur gestion quotidienne, leur permettant de se concentrer sur
                       l'essentiel : servir leurs clients.
                     </p>
                   </div>
@@ -1218,7 +1218,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   </div>
 
                   <div className="pt-2">
-                    <Button 
+                    <Button
                       onClick={() => window.open("http://wa.me/24104746847", "_blank")}
                       className="w-full bg-green-600 hover:bg-green-700 text-white"
                     >
@@ -1259,8 +1259,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Consultez les conditions générales d'utilisation de NACK!, incluant les informations sur 
-                      l'utilisation de vos données à des fins d'études de marché et d'amélioration des services 
+                      Consultez les conditions générales d'utilisation de NACK!, incluant les informations sur
+                      l'utilisation de vos données à des fins d'études de marché et d'amélioration des services
                       pour le bien-être de la population gabonaise.
                     </p>
                   </div>
@@ -1275,7 +1275,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         Sécurisé
                       </Badge>
                     </div>
-                    
+
                     <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                       <div>
                         <p className="font-medium">Sauvegarde automatique</p>
@@ -1298,9 +1298,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   </div>
 
                   <div className="pt-2">
-                    <Button 
+                    <Button
                       onClick={() => window.open("https://chouyoug.netlify.app/", "_blank")}
-                      variant="outline" 
+                      variant="outline"
                       className="w-full"
                     >
                       <ExternalLink className="mr-2 h-4 w-4" />
@@ -1336,7 +1336,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         Sauvegarder
                       </Button>
                     </div>
-                    
+
                     <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                       <div>
                         <p className="font-medium">Export des données</p>
@@ -1348,7 +1348,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
                     <p className="text-sm font-medium text-yellow-800">Configuration système</p>
                     <div className="mt-2 space-y-1 text-sm text-yellow-700">
@@ -1374,8 +1374,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <p className="text-sm text-red-600 mb-3">
                       Supprime toutes les données (ventes, stock, équipe) sauf les paramètres de base.
                     </p>
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="text-red-600 border-red-600 hover:bg-red-50"
                       onClick={handleResetData}
                       disabled={isSaving}
@@ -1383,7 +1383,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       {isSaving ? "Suppression en cours..." : "Réinitialiser les données"}
                     </Button>
                   </div>
-                  
+
                   <div className="border border-red-200 p-4 rounded-lg">
                     <h4 className="font-medium text-red-800 mb-2">Supprimer le compte</h4>
                     <p className="text-sm text-red-600 mb-3">
