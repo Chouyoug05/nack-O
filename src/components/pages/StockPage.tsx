@@ -10,12 +10,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Package, 
-  Plus, 
-  Search, 
-  Edit, 
-  Trash2, 
+import {
+  Package,
+  Plus,
+  Search,
+  Edit,
+  Trash2,
   AlertTriangle,
   TrendingDown,
   DollarSign,
@@ -92,7 +92,7 @@ const StockPage = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [importPreview, setImportPreview] = useState<Array<Partial<Product>>>([]);
   const [isDeletingMultiple, setIsDeletingMultiple] = useState(false);
-  
+
   const [products, setProducts] = useState<Product[]>([]);
 
   const productsInitializedRef = useRef<string>('');
@@ -100,9 +100,9 @@ const StockPage = () => {
 
   useEffect(() => {
     if (!user) return;
-    
+
     const userKey = user.uid;
-    
+
     // Réinitialiser uniquement si l'utilisateur change
     if (productsInitializedRef.current !== userKey) {
       productsInitializedRef.current = '';
@@ -139,37 +139,37 @@ const StockPage = () => {
           showOnMenuDigital: raw.showOnMenuDigital === true,
         } as Product;
       });
-      
+
       // Marquer qu'on a reçu des données valides si le snapshot contient des données
       if (list.length > 0) {
         hasReceivedValidProductsRef.current = true;
       }
-      
+
       // Toujours accepter les snapshots du serveur (source de vérité)
       // Mais ignorer les snapshots vides du cache une fois qu'on a reçu des données valides
       const isFromServer = !snap.metadata.fromCache;
-      
+
       // Utiliser une fonction de mise à jour pour préserver les données si nécessaire
       setProducts(prev => {
         // Si c'est du serveur, toujours accepter (source de vérité)
         if (isFromServer) {
           return list;
         }
-        
+
         // Si c'est du cache et qu'on n'a jamais eu de données valides, accepter
         if (!hasReceivedValidProductsRef.current) {
           return list;
         }
-        
+
         // Si c'est du cache, on a déjà des données valides, et le nouveau snapshot est vide : conserver les données précédentes
         if (list.length === 0 && prev.length > 0) {
           return prev;
         }
-        
+
         // Sinon, accepter les nouvelles données
         return list;
       });
-      
+
       if (!productsInitialized) {
         productsInitialized = true;
         if (productsInitializedRef.current !== userKey) {
@@ -179,7 +179,7 @@ const StockPage = () => {
     }, (error) => {
       console.error('Erreur snapshot products:', error);
     });
-    
+
     return () => unsub();
   }, [user]);
 
@@ -334,12 +334,12 @@ const StockPage = () => {
   };
 
   const categories = ["Boisson alcoolisée", "Boisson non alcoolisée", "Plat / Repas", "Snack", "Dessert", "Entrée", "Autre"];
-  
+
   // Catégories alimentaires qui nécessitent le module Food Cost
   const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
-  
+
   const isFoodCategory = (category: string) => foodCategories.includes(category);
-  
+
   const availableIcons = [
     { name: "Beer", icon: Beer, label: "Bière" },
     { name: "Wine", icon: Wine, label: "Vin/Alcool" },
@@ -461,48 +461,48 @@ const StockPage = () => {
 
     setIsSavingProduct(true);
     try {
-    let finalImageUrl: string | undefined = newProduct.imageUrl || undefined;
-    let finalDeleteToken: string | undefined;
-    if (imageFile) {
-      try {
-        const up = await uploadImageToCloudinaryDetailed(imageFile, "products");
-        finalImageUrl = up.url;
-        finalDeleteToken = up.deleteToken;
-      } catch (e: unknown) {
+      let finalImageUrl: string | undefined = newProduct.imageUrl || undefined;
+      let finalDeleteToken: string | undefined;
+      if (imageFile) {
+        try {
+          const up = await uploadImageToCloudinaryDetailed(imageFile, "products");
+          finalImageUrl = up.url;
+          finalDeleteToken = up.deleteToken;
+        } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : "Échec de l'upload";
           // Ne pas bloquer l'ajout du produit si Cloudinary n'est pas configuré ou si l'upload échoue
           toast({ title: "Image non ajoutée", description: msg + ". Le produit sera ajouté sans image.", variant: "destructive" });
+        }
       }
-    }
 
-    // Préparer les données Food Cost si catégorie alimentaire
-    let foodCostData: FoodCost | undefined = undefined;
-    if (isFoodCategory(newProduct.category)) {
-      const rawMaterials = newProduct.rawMaterials
-        .filter(m => m.name.trim() && m.unitCost)
-        .map(m => ({
-          name: m.name.trim(),
-          unitCost: Number(m.unitCost) || 0
-        }));
-      
-      const productionCosts = newProduct.productionCosts
-        .filter(c => c.type.trim() && c.amount)
-        .map(c => ({
-          type: c.type.trim(),
-          amount: Number(c.amount) || 0
-        }));
-      
-      if (rawMaterials.length > 0 || productionCosts.length > 0) {
-        foodCostData = {
-          rawMaterials,
-          productionCosts
-        };
+      // Préparer les données Food Cost si catégorie alimentaire
+      let foodCostData: FoodCost | undefined = undefined;
+      if (isFoodCategory(newProduct.category)) {
+        const rawMaterials = newProduct.rawMaterials
+          .filter(m => m.name.trim() && m.unitCost)
+          .map(m => ({
+            name: m.name.trim(),
+            unitCost: Number(m.unitCost) || 0
+          }));
+
+        const productionCosts = newProduct.productionCosts
+          .filter(c => c.type.trim() && c.amount)
+          .map(c => ({
+            type: c.type.trim(),
+            amount: Number(c.amount) || 0
+          }));
+
+        if (rawMaterials.length > 0 || productionCosts.length > 0) {
+          foodCostData = {
+            rawMaterials,
+            productionCosts
+          };
+        }
       }
-    }
 
-    const payload: ProductDoc = {
-      name: newProduct.name,
-      category: newProduct.category,
+      const payload: ProductDoc = {
+        name: newProduct.name,
+        category: newProduct.category,
         price: priceNum,
         quantity: qtyNum,
         cost: costNum,
@@ -512,35 +512,35 @@ const StockPage = () => {
         ...(finalDeleteToken ? { imageDeleteToken: finalDeleteToken } : {}),
         ...(newProduct.formulaUnits && newProduct.formulaPrice ? {
           formula: {
-        units: Number(newProduct.formulaUnits),
-        price: Number(newProduct.formulaPrice)
+            units: Number(newProduct.formulaUnits),
+            price: Number(newProduct.formulaPrice)
           }
         } : {}),
         ...(foodCostData ? { foodCost: foodCostData } : {}),
         ...(newProduct.showOnMenuDigital ? { showOnMenuDigital: true } : {}),
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
 
       await addDoc(productsColRef(db, user.uid), payload as ProductDoc);
 
-    setNewProduct({
-      name: "",
-      category: "",
-      price: "",
-      quantity: "",
-      cost: "",
-      description: "",
-      icon: "",
-      imageUrl: "",
-      formulaUnits: "",
-      formulaPrice: "",
-      rawMaterials: [],
-      productionCosts: [],
-      showOnMenuDigital: false,
-    });
-    setImageFile(null);
-    setIsAddModalOpen(false);
+      setNewProduct({
+        name: "",
+        category: "",
+        price: "",
+        quantity: "",
+        cost: "",
+        description: "",
+        icon: "",
+        imageUrl: "",
+        formulaUnits: "",
+        formulaPrice: "",
+        rawMaterials: [],
+        productionCosts: [],
+        showOnMenuDigital: false,
+      });
+      setImageFile(null);
+      setIsAddModalOpen(false);
       toast({ title: "Produit ajouté", description: `${payload.name} a été ajouté au stock avec succès` });
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Erreur inconnue";
@@ -631,7 +631,7 @@ const StockPage = () => {
 
   const handleDeleteSelected = async () => {
     if (!user || selectedProducts.size === 0) return;
-    
+
     const confirmMessage = `Êtes-vous sûr de vouloir supprimer ${selectedProducts.size} produit(s) ? Cette action est irréversible.`;
     if (!window.confirm(confirmMessage)) return;
 
@@ -657,17 +657,17 @@ const StockPage = () => {
           errorCount++;
         }
       }
-      
+
       setSelectedProducts(new Set());
-      toast({ 
-        title: "Suppression terminée", 
-        description: `${successCount} produit(s) supprimé(s)${errorCount > 0 ? `. ${errorCount} erreur(s).` : '.'}` 
+      toast({
+        title: "Suppression terminée",
+        description: `${successCount} produit(s) supprimé(s)${errorCount > 0 ? `. ${errorCount} erreur(s).` : '.'}`
       });
     } catch (e: unknown) {
-      toast({ 
-        title: "Erreur", 
-        description: e instanceof Error ? e.message : "Suppression échouée", 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: e instanceof Error ? e.message : "Suppression échouée",
+        variant: "destructive"
       });
     } finally {
       setIsDeletingMultiple(false);
@@ -697,11 +697,11 @@ const StockPage = () => {
 
     try {
       const productRef = fsDoc(productsColRef(db, user.uid), editingProduct.id);
-      
+
       // Gérer l'upload de la nouvelle image si un fichier est sélectionné
       let finalImageUrl: string | undefined = newProduct.imageUrl || editingProduct.imageUrl || undefined;
       let finalDeleteToken: string | undefined;
-      
+
       if (imageFile) {
         try {
           // Supprimer l'ancienne image si elle existe
@@ -710,31 +710,31 @@ const StockPage = () => {
             if (currentDoc.exists()) {
               const currentData = currentDoc.data() as ProductDoc;
               if (currentData.imageDeleteToken) {
-                try { 
-                  await deleteImageByToken(currentData.imageDeleteToken); 
-                } catch (e) { 
+                try {
+                  await deleteImageByToken(currentData.imageDeleteToken);
+                } catch (e) {
                   console.warn('Erreur suppression ancienne image:', e);
                 }
               }
             }
           }
-          
+
           // Uploader la nouvelle image
           const up = await uploadImageToCloudinaryDetailed(imageFile, "products");
           finalImageUrl = up.url;
           finalDeleteToken = up.deleteToken;
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : "Échec de l'upload";
-          toast({ 
-            title: "Image non mise à jour", 
-            description: msg + ". Le produit sera mis à jour sans changer l'image.", 
-            variant: "destructive" 
+          toast({
+            title: "Image non mise à jour",
+            description: msg + ". Le produit sera mis à jour sans changer l'image.",
+            variant: "destructive"
           });
           // Garder l'ancienne image en cas d'échec
           finalImageUrl = editingProduct.imageUrl || newProduct.imageUrl || undefined;
         }
       }
-      
+
       // Préparer les données Food Cost si catégorie alimentaire
       let foodCostData: FoodCost | undefined = undefined;
       if (isFoodCategory(newProduct.category)) {
@@ -744,14 +744,14 @@ const StockPage = () => {
             name: m.name.trim(),
             unitCost: Number(m.unitCost) || 0
           }));
-        
+
         const productionCosts = newProduct.productionCosts
           .filter(c => c.type.trim() && c.amount)
           .map(c => ({
             type: c.type.trim(),
             amount: Number(c.amount) || 0
           }));
-        
+
         if (rawMaterials.length > 0 || productionCosts.length > 0) {
           foodCostData = {
             rawMaterials,
@@ -759,7 +759,7 @@ const StockPage = () => {
           };
         }
       }
-      
+
       const payload: Partial<ProductDoc> = {
         name: newProduct.name,
         category: newProduct.category,
@@ -811,16 +811,16 @@ const StockPage = () => {
   const parseCSV = (text: string): Array<Partial<Product>> => {
     const lines = text.split('\n').filter(line => line.trim());
     if (lines.length === 0) return [];
-    
+
     // Fonction pour parser une ligne CSV en tenant compte des guillemets
     const parseCSVLine = (line: string): string[] => {
       const result: string[] = [];
       let current = '';
       let inQuotes = false;
-      
+
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        
+
         if (char === '"') {
           if (inQuotes && line[i + 1] === '"') {
             // Guillemet échappé
@@ -838,49 +838,49 @@ const StockPage = () => {
           current += char;
         }
       }
-      
+
       // Ajouter le dernier champ
       result.push(current.trim());
       return result;
     };
-    
+
     // Détecter l'en-tête (première ligne)
     const firstLine = parseCSVLine(lines[0]).map(h => h.trim().replace(/^"|"$/g, ''));
     const header = firstLine.map(h => h.toLowerCase());
-    
+
     // Détection flexible des colonnes avec plusieurs variantes
-    const nameIdx = header.findIndex(h => 
-      h.includes('nom') || h.includes('name') || h.includes('produit') || 
+    const nameIdx = header.findIndex(h =>
+      h.includes('nom') || h.includes('name') || h.includes('produit') ||
       h.includes('libellé') || h.includes('libelle') || h.includes('article') ||
       h === 'nom' || h === 'name' || h === 'produit' || h === 'article'
     );
-    const categoryIdx = header.findIndex(h => 
+    const categoryIdx = header.findIndex(h =>
       h.includes('catégorie') || h.includes('category') || h.includes('categorie') ||
       h.includes('type') || h === 'catégorie' || h === 'category' || h === 'type'
     );
-    const priceIdx = header.findIndex(h => 
+    const priceIdx = header.findIndex(h =>
       h.includes('prix') || h.includes('price') || h.includes('tarif') ||
       h === 'prix' || h === 'price' || h === 'tarif'
     );
-    const quantityIdx = header.findIndex(h => 
-      h.includes('quantité') || h.includes('quantity') || h.includes('quantite') || 
+    const quantityIdx = header.findIndex(h =>
+      h.includes('quantité') || h.includes('quantity') || h.includes('quantite') ||
       h.includes('stock') || h.includes('qte') || h.includes('qty') ||
       h === 'quantité' || h === 'quantity' || h === 'stock' || h === 'qte'
     );
-    const costIdx = header.findIndex(h => 
+    const costIdx = header.findIndex(h =>
       h.includes('coût') || h.includes('cost') || h.includes('cout') ||
       h.includes('prix d\'achat') || h.includes('prix achat') ||
       h === 'coût' || h === 'cost' || h === 'cout'
     );
-    const descriptionIdx = header.findIndex(h => 
+    const descriptionIdx = header.findIndex(h =>
       h.includes('description') || h.includes('desc') || h.includes('détail') ||
       h === 'description' || h === 'desc'
     );
-    
+
     // Si pas d'en-tête détecté, essayer un format sans en-tête (colonnes par position)
     const hasHeader = nameIdx >= 0 || (header.length > 0 && isNaN(parseFloat(header[0])));
     let startRow = 1;
-    
+
     // Si pas de colonne nom trouvée, essayer format sans en-tête
     if (nameIdx < 0 && lines.length > 1) {
       // Essayer de détecter si la première ligne est un en-tête ou des données
@@ -891,13 +891,13 @@ const StockPage = () => {
         console.log('Format CSV sans en-tête détecté, utilisation de l\'ordre: Nom, Catégorie, Prix, Quantité');
       }
     }
-    
+
     const products: Array<Partial<Product>> = [];
-    
+
     // Parser les lignes de données
     for (let i = startRow; i < lines.length; i++) {
       const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, ''));
-      
+
       // Si format sans en-tête, utiliser les positions par défaut
       let name = '';
       let category = 'Autres';
@@ -905,7 +905,7 @@ const StockPage = () => {
       let quantity = 0;
       let cost = 0;
       let description: string | undefined = undefined;
-      
+
       if (nameIdx >= 0) {
         // Format avec en-tête
         name = values[nameIdx] || '';
@@ -923,16 +923,16 @@ const StockPage = () => {
         cost = values[4] ? parseFloat(values[4]) : 0;
         description = values[5];
       }
-      
+
       // Nettoyer le nom et vérifier qu'il n'est pas vide
       name = name.trim();
-      
+
       if (name && name.length > 0) {
         // Si quantité n'est pas spécifiée, mettre 0 (sera modifiable après)
         const finalQuantity = isNaN(quantity) ? 0 : Math.max(0, Math.floor(quantity));
         const finalPrice = isNaN(price) ? 0 : Math.max(0, price);
         const finalCost = isNaN(cost) ? 0 : Math.max(0, cost);
-        
+
         products.push({
           name,
           category: category.trim() || 'Autres',
@@ -943,14 +943,14 @@ const StockPage = () => {
         });
       }
     }
-    
+
     // Debug: afficher les colonnes détectées
     if (products.length === 0 && lines.length > 0) {
       console.log('Colonnes détectées:', header);
       console.log('Indices:', { nameIdx, categoryIdx, priceIdx, quantityIdx, costIdx });
       console.log('Première ligne de données:', parseCSVLine(lines[startRow] || lines[0]));
     }
-    
+
     return products;
   };
 
@@ -966,9 +966,9 @@ const StockPage = () => {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
+
     setImportFile(file);
-    
+
     // Détecter le type de fichier
     if (file.name.endsWith('.csv') || file.type === 'text/csv') {
       setImportType('csv');
@@ -976,7 +976,7 @@ const StockPage = () => {
         const text = await file.text();
         const parsed = parseCSV(text);
         setImportPreview(parsed);
-        
+
         if (parsed.length === 0) {
           toast({
             title: "Aucun produit détecté",
@@ -1028,11 +1028,11 @@ const StockPage = () => {
   // Importer les produits
   const handleImportProducts = async () => {
     if (!user || !importPreview.length) return;
-    
+
     setIsImporting(true);
     let successCount = 0;
     let errorCount = 0;
-    
+
     try {
       for (const product of importPreview) {
         // Accepter les produits même avec quantité 0 (sera modifiable après)
@@ -1040,12 +1040,12 @@ const StockPage = () => {
           errorCount++;
           continue;
         }
-        
+
         // Si quantité n'est pas définie, mettre 0 par défaut
         if (product.quantity === undefined) {
           product.quantity = 0;
         }
-        
+
         try {
           const payload: ProductDoc = {
             name: product.name,
@@ -1057,7 +1057,7 @@ const StockPage = () => {
             createdAt: Date.now(),
             updatedAt: Date.now(),
           };
-          
+
           await addDoc(productsColRef(db, user.uid), payload as ProductDoc);
           successCount++;
         } catch (error) {
@@ -1065,12 +1065,12 @@ const StockPage = () => {
           errorCount++;
         }
       }
-      
+
       toast({
         title: "Import terminé",
         description: `${successCount} produit(s) importé(s) avec succès${errorCount > 0 ? `. ${errorCount} erreur(s).` : '.'} Vous pouvez maintenant les modifier et ajouter des images comme les autres produits.`
       });
-      
+
       setIsImportModalOpen(false);
       setImportFile(null);
       setImportPreview([]);
@@ -1198,635 +1198,635 @@ const StockPage = () => {
               <CardTitle>Gestion du Stock</CardTitle>
               <CardDescription>Gérez vos produits et surveillez les stocks</CardDescription>
             </div>
-             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
-               <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                 <DialogTrigger asChild>
-                   <Button 
-                     className="w-full sm:w-auto bg-gradient-primary text-white shadow-button hover:shadow-elegant"
-                     onClick={() => {
-                       requireManagerAuth(() => {
-                         setEditingProduct(null);
-                         setNewProduct({
-                           name: "", category: "", price: "", quantity: "", cost: "",
-                           description: "", icon: "", imageUrl: "", formulaUnits: "", formulaPrice: "",
-                           rawMaterials: [], productionCosts: []
-                         });
-                         setIsAddModalOpen(true);
-                       });
-                     }}
-                   >
-                     <Plus className="mr-2" size={18} />
-                     Ajouter un produit
-                   </Button>
-                 </DialogTrigger>
-               </Dialog>
-               
-               {/* Bouton Import */}
-               <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
-                 <DialogTrigger asChild>
-                   <Button 
-                     variant="outline"
-                     className="w-full sm:w-auto"
-                     onClick={() => {
-                       setImportFile(null);
-                       setImportPreview([]);
-                       setImportType(null);
-                       setIsImportModalOpen(true);
-                     }}
-                   >
-                     <Upload className="mr-2" size={18} />
-                     Importer
-                   </Button>
-                 </DialogTrigger>
-                   <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-                     <DialogHeader>
-                       <DialogTitle className="text-2xl font-bold">Importer des produits</DialogTitle>
-                       <DialogDescription>
-                         Importez vos produits depuis un fichier CSV ou PDF. Les produits importés peuvent être modifiés et complétés (images, icônes, etc.) comme les produits créés manuellement.
-                       </DialogDescription>
-                     </DialogHeader>
-                     <div className="space-y-6 py-4">
-                       <div>
-                         <Label htmlFor="importFile" className="text-lg font-semibold mb-3 block">
-                           Sélectionner un fichier
-                         </Label>
-                         <Input
-                           id="importFile"
-                           type="file"
-                           accept=".csv,.pdf,text/csv,application/pdf"
-                           onChange={handleFileChange}
-                           className="h-14 text-lg"
-                         />
-                         <p className="text-sm text-muted-foreground mt-2">
-                           Formats supportés: CSV, PDF. Pour CSV, utilisez les colonnes: <strong>Nom</strong>, <strong>Catégorie</strong>, <strong>Prix</strong>, <strong>Quantité</strong>, Coût (optionnel), Description (optionnel)
-                         </p>
-                         <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                           <p className="text-xs font-semibold text-blue-900 mb-1">Exemple de format CSV (avec en-tête):</p>
-                           <pre className="text-xs text-blue-800 overflow-x-auto whitespace-pre-wrap">
-{`Nom,Catégorie,Prix,Quantité,Coût,Description
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
+              <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    className="w-full sm:w-auto bg-gradient-primary text-white shadow-button hover:shadow-elegant"
+                    onClick={() => {
+                      requireManagerAuth(() => {
+                        setEditingProduct(null);
+                        setNewProduct({
+                          name: "", category: "", price: "", quantity: "", cost: "",
+                          description: "", icon: "", imageUrl: "", formulaUnits: "", formulaPrice: "",
+                          rawMaterials: [], productionCosts: []
+                        });
+                        setIsAddModalOpen(true);
+                      });
+                    }}
+                  >
+                    <Plus className="mr-2" size={18} />
+                    Ajouter un produit
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
+
+              {/* Bouton Import */}
+              <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={() => {
+                      setImportFile(null);
+                      setImportPreview([]);
+                      setImportType(null);
+                      setIsImportModalOpen(true);
+                    }}
+                  >
+                    <Upload className="mr-2" size={18} />
+                    Importer
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-bold">Importer des produits</DialogTitle>
+                    <DialogDescription>
+                      Importez vos produits depuis un fichier CSV ou PDF. Les produits importés peuvent être modifiés et complétés (images, icônes, etc.) comme les produits créés manuellement.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-6 py-4">
+                    <div>
+                      <Label htmlFor="importFile" className="text-lg font-semibold mb-3 block">
+                        Sélectionner un fichier
+                      </Label>
+                      <Input
+                        id="importFile"
+                        type="file"
+                        accept=".csv,.pdf,text/csv,application/pdf"
+                        onChange={handleFileChange}
+                        className="h-14 text-lg"
+                      />
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Formats supportés: CSV, PDF. Pour CSV, utilisez les colonnes: <strong>Nom</strong>, <strong>Catégorie</strong>, <strong>Prix</strong>, <strong>Quantité</strong>, Coût (optionnel), Description (optionnel)
+                      </p>
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-xs font-semibold text-blue-900 mb-1">Exemple de format CSV (avec en-tête):</p>
+                        <pre className="text-xs text-blue-800 overflow-x-auto whitespace-pre-wrap">
+                          {`Nom,Catégorie,Prix,Quantité,Coût,Description
 "Bière 33cl","Boissons",1500,50,1000,"Bière locale"
 "Vin rouge","Alcools",5000,20,3500,"Vin importé"`}
-                           </pre>
-                           <p className="text-xs font-semibold text-blue-900 mb-1 mt-3">Ou sans en-tête (ordre: Nom, Catégorie, Prix, Quantité):</p>
-                           <pre className="text-xs text-blue-800 overflow-x-auto whitespace-pre-wrap">
-{`"Bière 33cl","Boissons",1500,50
+                        </pre>
+                        <p className="text-xs font-semibold text-blue-900 mb-1 mt-3">Ou sans en-tête (ordre: Nom, Catégorie, Prix, Quantité):</p>
+                        <pre className="text-xs text-blue-800 overflow-x-auto whitespace-pre-wrap">
+                          {`"Bière 33cl","Boissons",1500,50
 "Vin rouge","Alcools",5000,20`}
-                           </pre>
-                           <p className="text-xs text-blue-700 mt-2">
-                             💡 Les noms de colonnes acceptés: Nom/Name/Produit, Catégorie/Category/Type, Prix/Price/Tarif, Quantité/Quantity/Stock/Qte
-                           </p>
-                         </div>
-                       </div>
-                       
-                       {importFile && importPreview.length === 0 && importType === 'csv' && (
-                         <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                           <p className="text-sm font-semibold text-yellow-900 mb-2">⚠️ Aucun produit détecté</p>
-                           <p className="text-xs text-yellow-800 mb-2">
-                             Vérifiez que votre CSV contient au moins une colonne avec le nom du produit.
-                             Ouvrez la console du navigateur (F12) pour voir les détails de détection.
-                           </p>
-                           <p className="text-xs text-yellow-800">
-                             <strong>Format attendu:</strong> Colonne "Nom" ou "Name" ou "Produit" (ou format sans en-tête: première colonne = nom)
-                           </p>
-                         </div>
-                       )}
-                       
-                       {importPreview.length > 0 && (
-                         <div>
-                           <Label className="text-lg font-semibold mb-3 block">
-                             Aperçu ({importPreview.length} produit(s) détecté(s))
-                           </Label>
-                           <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
-                             {importPreview.slice(0, 10).map((product, idx) => (
-                               <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded">
-                                 <div>
-                                   <p className="font-medium">{product.name || 'Sans nom'}</p>
-                                   <p className="text-sm text-muted-foreground">
-                                     {product.category || 'Autres'} • Qté: {product.quantity || 0} • Prix: {product.price || 0} XAF
-                                   </p>
-                                 </div>
-                                 {(!product.name || product.quantity === undefined) && (
-                                   <Badge variant="destructive">Incomplet</Badge>
-                                 )}
-                               </div>
-                             ))}
-                             {importPreview.length > 10 && (
-                               <p className="text-sm text-muted-foreground text-center">
-                                 ... et {importPreview.length - 10} autre(s) produit(s)
-                               </p>
-                             )}
-                           </div>
-                         </div>
-                       )}
-                     </div>
-                     <div className="flex justify-end gap-3 pt-4 border-t">
-                       <Button 
-                         variant="outline" 
-                         onClick={() => {
-                           setIsImportModalOpen(false);
-                           setImportFile(null);
-                           setImportPreview([]);
-                           setImportType(null);
-                         }}
-                         className="h-11 px-6"
-                       >
-                         Annuler
-                       </Button>
-                       <Button 
-                         onClick={handleImportProducts}
-                         disabled={isImporting || importPreview.length === 0}
-                         className="bg-gradient-primary text-white h-11 px-6"
-                       >
-                         {isImporting ? 'Import en cours...' : `Importer ${importPreview.length} produit(s)`}
-                       </Button>
-                     </div>
-                   </DialogContent>
-                 </Dialog>
-                 
-                 {/* Bouton Sécurité */}
-                 <Button 
-                   variant="outline"
-                   onClick={() => setIsSecurityDialogOpen(true)}
-                   className="w-full sm:w-auto"
-                 >
-                   Sécurité
-                 </Button>
+                        </pre>
+                        <p className="text-xs text-blue-700 mt-2">
+                          💡 Les noms de colonnes acceptés: Nom/Name/Produit, Catégorie/Category/Type, Prix/Price/Tarif, Quantité/Quantity/Stock/Qte
+                        </p>
+                      </div>
                     </div>
-             </div>
-           </CardHeader>
-           <CardContent>
-             <div className="flex flex-col md:flex-row gap-4 mb-4">
-               <div className="relative flex-1">
-                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
-                 <Input
-                   placeholder="Rechercher un produit..."
-                   value={searchTerm}
-                   onChange={(e) => setSearchTerm(e.target.value)}
-                   className="pl-10"
-                 />
-               </div>
-               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                 <SelectTrigger className="w-full md:w-[200px]">
-                   <SelectValue placeholder="Catégorie" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="all">Toutes les catégories</SelectItem>
-                   {categories.map(cat => (
-                     <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                   ))}
-                 </SelectContent>
-               </Select>
-               <div className="flex items-center gap-2">
-                 <Label htmlFor="showZero" className="text-sm whitespace-nowrap">Afficher stock 0</Label>
-                 <Switch
-                   id="showZero"
-                   checked={showZeroStock}
-                   onCheckedChange={setShowZeroStock}
-                 />
-               </div>
-             </div>
-           </CardContent>
-         </Card>
 
-         {/* Dialog pour Ajouter/Modifier produit */}
-         <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                 <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" onOpenAutoFocus={() => setFormStep(1)}>
-                  <DialogHeader className="pb-4">
-                    <DialogTitle className="text-2xl font-bold text-center">{editingProduct ? "Modifier le produit" : "Ajouter un produit"}</DialogTitle>
-                    <DialogDescription className="text-base text-center">
-                      Étape {formStep} sur 3
-                    </DialogDescription>
-                    {/* Barre de progression */}
-                    <div className="flex gap-2 mt-4">
-                      <div className={`h-2 flex-1 rounded-full ${formStep >= 1 ? 'bg-green-500' : 'bg-gray-200'}`} />
-                      <div className={`h-2 flex-1 rounded-full ${formStep >= 2 ? 'bg-green-500' : 'bg-gray-200'}`} />
-                      <div className={`h-2 flex-1 rounded-full ${formStep >= 3 ? 'bg-green-500' : 'bg-gray-200'}`} />
-                    </div>
-                  </DialogHeader>
-                  <div className="space-y-6 py-4 min-h-[400px]">
-                    {/* ÉTAPE 1: Choisir la catégorie */}
-                    {formStep === 1 && (
-                      <div className="space-y-6">
-                        <h3 className="text-2xl font-bold text-center">Qu'est-ce que c'est ?</h3>
-                        <p className="text-center text-muted-foreground text-lg">Choisissez le type de produit</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {[
-                            { cat: "Boisson alcoolisée", icon: Wine, color: "bg-purple-50 border-purple-200 hover:bg-purple-100" },
-                            { cat: "Boisson non alcoolisée", icon: GlassWater, color: "bg-blue-50 border-blue-200 hover:bg-blue-100" },
-                            { cat: "Plat / Repas", icon: Pizza, color: "bg-orange-50 border-orange-200 hover:bg-orange-100" },
-                            { cat: "Snack", icon: Cookie, color: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" },
-                            { cat: "Dessert", icon: IceCream, color: "bg-pink-50 border-pink-200 hover:bg-pink-100" },
-                            { cat: "Entrée", icon: Utensils, color: "bg-green-50 border-green-200 hover:bg-green-100" },
-                            { cat: "Autre", icon: Package, color: "bg-slate-50 border-slate-200 hover:bg-slate-100" }
-                          ].map(({ cat, icon: Icon, color }) => (
-                            <button
-                              key={cat}
-                              type="button"
-                              onClick={() => {
-                                setNewProduct({...newProduct, category: cat});
-                                setFormStep(2);
-                              }}
-                              className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 p-6 transition-all ${color} ${newProduct.category === cat ? 'ring-4 ring-green-500' : ''}`}
-                            >
-                              <Icon size={48} className="text-gray-700" />
-                              <span className="text-lg font-semibold">{cat}</span>
-                            </button>
-                          ))}
-                        </div>
+                    {importFile && importPreview.length === 0 && importType === 'csv' && (
+                      <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p className="text-sm font-semibold text-yellow-900 mb-2">⚠️ Aucun produit détecté</p>
+                        <p className="text-xs text-yellow-800 mb-2">
+                          Vérifiez que votre CSV contient au moins une colonne avec le nom du produit.
+                          Ouvrez la console du navigateur (F12) pour voir les détails de détection.
+                        </p>
+                        <p className="text-xs text-yellow-800">
+                          <strong>Format attendu:</strong> Colonne "Nom" ou "Name" ou "Produit" (ou format sans en-tête: première colonne = nom)
+                        </p>
                       </div>
                     )}
 
-                    {/* ÉTAPE 2: Nom et Icône */}
-                    {formStep === 2 && (
-                      <div className="space-y-6">
-                        <h3 className="text-2xl font-bold text-center">Comment ça s'appelle ?</h3>
-                        <p className="text-center text-muted-foreground">Catégorie : <strong>{newProduct.category}</strong></p>
-                        
-                        <div>
-                          <Label htmlFor="name" className="text-xl font-semibold mb-3 block text-center">Nom du produit</Label>
-                          <Input
-                            id="name"
-                            value={newProduct.name}
-                            onChange={(e) => setNewProduct({...newProduct, name: e.target.value})}
-                            className="w-full h-16 text-2xl text-center font-semibold"
-                            placeholder="Tapez le nom ici..."
-                            autoFocus
-                          />
-                        </div>
-
-                        <div>
-                          <Label className="text-xl font-semibold mb-3 block text-center">Choisir une icône</Label>
-                          <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
-                            {availableIcons.map(({ name, icon: Icon, label }) => (
-                              <button
-                                key={name}
-                                type="button"
-                                onClick={() => setNewProduct({...newProduct, icon: name})}
-                                className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 p-4 transition-all hover:bg-gray-50 ${newProduct.icon === name ? 'ring-4 ring-green-500 bg-green-50' : 'bg-white'}`}
-                                title={label}
-                              >
-                                <Icon size={32} />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <Label htmlFor="productImage" className="text-lg font-semibold mb-3 block text-center">Photo (optionnel)</Label>
-                          <div className="space-y-3">
-                            <div className="flex gap-2">
-                              <Input 
-                                id="productImage" 
-                                type="file" 
-                                accept="image/*" 
-                                onChange={(e) => setImageFile(e.target.files?.[0] || null)} 
-                                className="h-14 text-lg flex-1" 
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleSearchImage}
-                                disabled={isSearchingImage || !newProduct.name}
-                                className="h-14 px-4"
-                                title="Rechercher automatiquement une image basée sur le nom du produit"
-                              >
-                                {isSearchingImage ? (
-                                  <>
-                                    <Sparkles className="w-5 h-5 mr-2 animate-spin" />
-                                    Recherche...
-                                  </>
-                                ) : (
-                                  <>
-                                    <ImageIcon className="w-5 h-5 mr-2" />
-                                    Trouver une image
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                            {newProduct.imageUrl && (
-                              <div className="mt-3">
-                                <p className="text-sm text-muted-foreground mb-2">Image trouvée :</p>
-                                <img 
-                                  src={newProduct.imageUrl} 
-                                  alt={newProduct.name}
-                                  className="w-full h-48 object-cover rounded-lg border"
-                                  onError={() => {
-                                    setNewProduct({ ...newProduct, imageUrl: "" });
-                                    toast({
-                                      title: "Image invalide",
-                                      description: "L'image trouvée n'a pas pu être chargée",
-                                      variant: "destructive"
-                                    });
-                                  }}
-                                />
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setNewProduct({ ...newProduct, imageUrl: "" })}
-                                  className="mt-2 text-red-600 hover:text-red-700"
-                                >
-                                  Supprimer l'image
-                                </Button>
+                    {importPreview.length > 0 && (
+                      <div>
+                        <Label className="text-lg font-semibold mb-3 block">
+                          Aperçu ({importPreview.length} produit(s) détecté(s))
+                        </Label>
+                        <div className="max-h-60 overflow-y-auto border rounded-lg p-4 space-y-2">
+                          {importPreview.slice(0, 10).map((product, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-2 bg-muted rounded">
+                              <div>
+                                <p className="font-medium">{product.name || 'Sans nom'}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {product.category || 'Autres'} • Qté: {product.quantity || 0} • Prix: {product.price || 0} XAF
+                                </p>
                               </div>
-                            )}
-                            <p className="text-xs text-muted-foreground text-center">
-                              Vous pouvez télécharger une image ou utiliser le bouton pour en trouver une automatiquement
+                              {(!product.name || product.quantity === undefined) && (
+                                <Badge variant="destructive">Incomplet</Badge>
+                              )}
+                            </div>
+                          ))}
+                          {importPreview.length > 10 && (
+                            <p className="text-sm text-muted-foreground text-center">
+                              ... et {importPreview.length - 10} autre(s) produit(s)
                             </p>
-                          </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-
-                    {/* ÉTAPE 3: Quantité et Prix */}
-                    {formStep === 3 && (
-                      <div className="space-y-6">
-                        <h3 className="text-2xl font-bold text-center">Prix et Quantité</h3>
-                        <p className="text-center text-lg"><strong>{newProduct.name}</strong></p>
-
-                        <div>
-                          <Label htmlFor="quantity" className="text-xl font-semibold mb-3 block text-center">Combien vous en avez ?</Label>
-                          <Input
-                            id="quantity"
-                            type="number"
-                            value={newProduct.quantity}
-                            onChange={(e) => setNewProduct({...newProduct, quantity: e.target.value})}
-                            className="w-full h-20 text-4xl text-center font-bold"
-                            placeholder=""
-                            min="0"
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="price" className="text-xl font-semibold mb-3 block text-center">Prix de vente (XAF)</Label>
-                          <Input
-                            id="price"
-                            type="number"
-                            value={newProduct.price}
-                            onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
-                            className="w-full h-20 text-4xl text-center font-bold"
-                            placeholder=""
-                            min="0"
-                          />
-                          <p className="text-center text-sm text-muted-foreground mt-2">Laisser vide si non vendu.</p>
-                        </div>
-
-                        <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
-                          <div>
-                            <Label className="text-base font-semibold">Menu digital (menu du jour)</Label>
-                            <p className="text-sm text-muted-foreground">Afficher ce produit sur le menu digital pour les clients</p>
-                          </div>
-                          <Switch
-                            checked={newProduct.showOnMenuDigital === true}
-                            onCheckedChange={(checked) => setNewProduct({ ...newProduct, showOnMenuDigital: !!checked })}
-                          />
-                        </div>
-
-                        {!isFoodCategory(newProduct.category) && (
-                        <div>
-                          <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
-                          <Input
-                            id="cost"
-                            type="number"
-                            value={newProduct.cost}
-                            onChange={(e) => setNewProduct({...newProduct, cost: e.target.value})}
-                            className="w-full h-16 text-2xl text-center font-semibold"
-                            placeholder=""
-                            min="0"
-                          />
-                        </div>
-                        )}
-
-                        {/* Module Food Cost - Affiché uniquement pour les catégories alimentaires */}
-                        {isFoodCategory(newProduct.category) && (
-                          <div className="space-y-6 border-t pt-6">
-                            <h4 className="text-xl font-bold text-center">Food Cost / Coût de Production</h4>
-                            
-                            {/* Matières premières */}
-                            <div className="space-y-3">
-                              <Label className="text-lg font-semibold">A. Matières premières</Label>
-                              {newProduct.rawMaterials.map((material, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Label className="text-sm">Nom de l'ingrédient</Label>
-                                    <Input
-                                      value={material.name}
-                                      onChange={(e) => {
-                                        const updated = [...newProduct.rawMaterials];
-                                        updated[index] = { ...updated[index], name: e.target.value };
-                                        setNewProduct({...newProduct, rawMaterials: updated});
-                                      }}
-                                      placeholder="Ex: Riz, Poulet, etc."
-                                    />
-                                  </div>
-                                  <div className="w-32">
-                                    <Label className="text-sm">Coût unitaire</Label>
-                                    <Input
-                                      type="number"
-                                      value={material.unitCost}
-                                      onChange={(e) => {
-                                        const updated = [...newProduct.rawMaterials];
-                                        updated[index] = { ...updated[index], unitCost: e.target.value };
-                                        setNewProduct({...newProduct, rawMaterials: updated});
-                                      }}
-                                      placeholder="XAF"
-                                      min="0"
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      const updated = newProduct.rawMaterials.filter((_, i) => i !== index);
-                                      setNewProduct({...newProduct, rawMaterials: updated});
-                                    }}
-                                    className="mb-0"
-                                  >
-                                    <Trash2 size={16} />
-                                  </Button>
-                                </div>
-                              ))}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                  setNewProduct({
-                                    ...newProduct,
-                                    rawMaterials: [...newProduct.rawMaterials, { name: "", unitCost: "" }]
-                                  });
-                                }}
-                                className="w-full"
-                              >
-                                <Plus size={16} className="mr-2" />
-                                Ajouter une ligne
-                              </Button>
-                            </div>
-
-                            {/* Coûts de production */}
-                            <div className="space-y-3">
-                              <Label className="text-lg font-semibold">B. Coûts de production</Label>
-                              {newProduct.productionCosts.map((cost, index) => (
-                                <div key={index} className="flex gap-2 items-end">
-                                  <div className="flex-1">
-                                    <Label className="text-sm">Type de coût</Label>
-                                    <Input
-                                      value={cost.type}
-                                      onChange={(e) => {
-                                        const updated = [...newProduct.productionCosts];
-                                        updated[index] = { ...updated[index], type: e.target.value };
-                                        setNewProduct({...newProduct, productionCosts: updated});
-                                      }}
-                                      placeholder="Ex: Main d'œuvre, Gaz, Eau, Condiments, etc."
-                                    />
-                                  </div>
-                                  <div className="w-32">
-                                    <Label className="text-sm">Montant</Label>
-                                    <Input
-                                      type="number"
-                                      value={cost.amount}
-                                      onChange={(e) => {
-                                        const updated = [...newProduct.productionCosts];
-                                        updated[index] = { ...updated[index], amount: e.target.value };
-                                        setNewProduct({...newProduct, productionCosts: updated});
-                                      }}
-                                      placeholder="XAF"
-                                      min="0"
-                                    />
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      const updated = newProduct.productionCosts.filter((_, i) => i !== index);
-                                      setNewProduct({...newProduct, productionCosts: updated});
-                                    }}
-                                    className="mb-0"
-                                  >
-                                    <Trash2 size={16} />
-                                  </Button>
-                                </div>
-                              ))}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => {
-                                  setNewProduct({
-                                    ...newProduct,
-                                    productionCosts: [...newProduct.productionCosts, { type: "", amount: "" }]
-                                  });
-                                }}
-                                className="w-full"
-                              >
-                                <Plus size={16} className="mr-2" />
-                                Ajouter une ligne
-                              </Button>
-                            </div>
-
-                            {/* Résumé des coûts - Calculs automatiques */}
-                            {(() => {
-                              const rawMaterialsTotal = newProduct.rawMaterials.reduce((sum, m) => {
-                                const cost = Number(m.unitCost) || 0;
-                                return sum + cost;
-                              }, 0);
-                              
-                              const productionCostsTotal = newProduct.productionCosts.reduce((sum, c) => {
-                                const amount = Number(c.amount) || 0;
-                                return sum + amount;
-                              }, 0);
-                              
-                              const totalCost = rawMaterialsTotal + productionCostsTotal;
-                              const sellingPrice = Number(newProduct.price) || 0;
-                              const grossMargin = sellingPrice - totalCost;
-                              const foodCostPercent = sellingPrice > 0 ? (totalCost / sellingPrice) * 100 : 0;
-                              const marginPercent = sellingPrice > 0 ? (grossMargin / sellingPrice) * 100 : 0;
-                              
-                              return (
-                                <div className="space-y-3 border-t pt-4 bg-gray-50 p-4 rounded-lg">
-                                  <h5 className="text-lg font-bold">Résumé des coûts</h5>
-                                  <div className="grid grid-cols-2 gap-3 text-sm">
-                                    <div>
-                                      <span className="text-muted-foreground">Coût des matières premières:</span>
-                                      <p className="font-semibold">{rawMaterialsTotal.toLocaleString()} XAF</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Coût de production:</span>
-                                      <p className="font-semibold">{productionCostsTotal.toLocaleString()} XAF</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Coût réel total:</span>
-                                      <p className="font-semibold text-blue-600">{totalCost.toLocaleString()} XAF</p>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Marge brute:</span>
-                                      <p className={`font-semibold ${grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                        {grossMargin.toLocaleString()} XAF
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Food cost (%):</span>
-                                      <p className={`font-semibold ${foodCostPercent <= 30 ? 'text-green-600' : foodCostPercent <= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                        {foodCostPercent.toFixed(1)}%
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <span className="text-muted-foreground">Taux de marge (%):</span>
-                                      <p className={`font-semibold ${marginPercent >= 30 ? 'text-green-600' : marginPercent >= 20 ? 'text-yellow-600' : 'text-red-600'}`}>
-                                        {marginPercent.toFixed(1)}%
-                                      </p>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        )}
                       </div>
                     )}
                   </div>
-                  <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t">
-                    {formStep > 1 ? (
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setFormStep(formStep - 1)}
-                        className="h-14 px-8 text-lg font-semibold"
-                      >
-                        Retour
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setIsAddModalOpen(false)}
-                        className="h-14 px-8 text-lg"
-                      >
-                        Annuler
-                      </Button>
-                    )}
-                    
-                    {formStep < 3 ? (
-                      <Button 
-                        onClick={() => setFormStep(formStep + 1)}
-                        disabled={formStep === 1 && !newProduct.category}
-                        className="bg-gradient-primary text-white h-14 px-8 text-lg font-semibold"
-                      >
-                        Suivant
-                      </Button>
-                    ) : (
-                      <Button 
-                        onClick={editingProduct ? handleUpdateProduct : handleAddProduct} 
-                        disabled={isSavingProduct || !newProduct.name || !newProduct.quantity}
-                        className="bg-green-600 hover:bg-green-700 text-white h-14 px-8 text-lg font-bold"
-                      >
-                        {isSavingProduct ? 'Sauvegarde...' : 'Enregistrer'}
-                      </Button>
-                    )}
+                  <div className="flex justify-end gap-3 pt-4 border-t">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsImportModalOpen(false);
+                        setImportFile(null);
+                        setImportPreview([]);
+                        setImportType(null);
+                      }}
+                      className="h-11 px-6"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={handleImportProducts}
+                      disabled={isImporting || importPreview.length === 0}
+                      className="bg-gradient-primary text-white h-11 px-6"
+                    >
+                      {isImporting ? 'Import en cours...' : `Importer ${importPreview.length} produit(s)`}
+                    </Button>
                   </div>
                 </DialogContent>
               </Dialog>
 
+              {/* Bouton Sécurité */}
+              <Button
+                variant="outline"
+                onClick={() => setIsSecurityDialogOpen(true)}
+                className="w-full sm:w-auto"
+              >
+                Sécurité
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col md:flex-row gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={16} />
+              <Input
+                placeholder="Rechercher un produit..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="w-full md:w-[200px]">
+                <SelectValue placeholder="Catégorie" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes les catégories</SelectItem>
+                {categories.map(cat => (
+                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="showZero" className="text-sm whitespace-nowrap">Afficher stock 0</Label>
+              <Switch
+                id="showZero"
+                checked={showZeroStock}
+                onCheckedChange={setShowZeroStock}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Dialog pour Ajouter/Modifier produit */}
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto" onOpenAutoFocus={() => setFormStep(1)}>
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-2xl font-bold text-center">{editingProduct ? "Modifier le produit" : "Ajouter un produit"}</DialogTitle>
+            <DialogDescription className="text-base text-center">
+              Étape {formStep} sur 3
+            </DialogDescription>
+            {/* Barre de progression */}
+            <div className="flex gap-2 mt-4">
+              <div className={`h-2 flex-1 rounded-full ${formStep >= 1 ? 'bg-green-500' : 'bg-gray-200'}`} />
+              <div className={`h-2 flex-1 rounded-full ${formStep >= 2 ? 'bg-green-500' : 'bg-gray-200'}`} />
+              <div className={`h-2 flex-1 rounded-full ${formStep >= 3 ? 'bg-green-500' : 'bg-gray-200'}`} />
+            </div>
+          </DialogHeader>
+          <div className="space-y-6 py-4 min-h-[400px]">
+            {/* ÉTAPE 1: Choisir la catégorie */}
+            {formStep === 1 && (
+              <div className="space-y-6">
+                <h3 className="text-2xl font-bold text-center">Qu'est-ce que c'est ?</h3>
+                <p className="text-center text-muted-foreground text-lg">Choisissez le type de produit</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {[
+                    { cat: "Boisson alcoolisée", icon: Wine, color: "bg-purple-50 border-purple-200 hover:bg-purple-100" },
+                    { cat: "Boisson non alcoolisée", icon: GlassWater, color: "bg-blue-50 border-blue-200 hover:bg-blue-100" },
+                    { cat: "Plat / Repas", icon: Pizza, color: "bg-orange-50 border-orange-200 hover:bg-orange-100" },
+                    { cat: "Snack", icon: Cookie, color: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" },
+                    { cat: "Dessert", icon: IceCream, color: "bg-pink-50 border-pink-200 hover:bg-pink-100" },
+                    { cat: "Entrée", icon: Utensils, color: "bg-green-50 border-green-200 hover:bg-green-100" },
+                    { cat: "Autre", icon: Package, color: "bg-slate-50 border-slate-200 hover:bg-slate-100" }
+                  ].map(({ cat, icon: Icon, color }) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => {
+                        setNewProduct({ ...newProduct, category: cat });
+                        setFormStep(2);
+                      }}
+                      className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 p-6 transition-all ${color} ${newProduct.category === cat ? 'ring-4 ring-green-500' : ''}`}
+                    >
+                      <Icon size={48} className="text-gray-700" />
+                      <span className="text-lg font-semibold">{cat}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ÉTAPE 2: Nom et Icône */}
+            {formStep === 2 && (
+              <div className="space-y-6">
+                <h3 className="text-2xl font-bold text-center">Comment ça s'appelle ?</h3>
+                <p className="text-center text-muted-foreground">Catégorie : <strong>{newProduct.category}</strong></p>
+
+                <div>
+                  <Label htmlFor="name" className="text-xl font-semibold mb-3 block text-center">Nom du produit</Label>
+                  <Input
+                    id="name"
+                    value={newProduct.name}
+                    onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                    className="w-full h-16 text-2xl text-center font-semibold"
+                    placeholder="Tapez le nom ici..."
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <Label className="text-xl font-semibold mb-3 block text-center">Choisir une icône</Label>
+                  <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                    {availableIcons.map(({ name, icon: Icon, label }) => (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => setNewProduct({ ...newProduct, icon: name })}
+                        className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 p-4 transition-all hover:bg-gray-50 ${newProduct.icon === name ? 'ring-4 ring-green-500 bg-green-50' : 'bg-white'}`}
+                        title={label}
+                      >
+                        <Icon size={32} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="productImage" className="text-lg font-semibold mb-3 block text-center">Photo (optionnel)</Label>
+                  <div className="space-y-3">
+                    <div className="flex gap-2">
+                      <Input
+                        id="productImage"
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                        className="h-14 text-lg flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSearchImage}
+                        disabled={isSearchingImage || !newProduct.name}
+                        className="h-14 px-4"
+                        title="Rechercher automatiquement une image basée sur le nom du produit"
+                      >
+                        {isSearchingImage ? (
+                          <>
+                            <Sparkles className="w-5 h-5 mr-2 animate-spin" />
+                            Recherche...
+                          </>
+                        ) : (
+                          <>
+                            <ImageIcon className="w-5 h-5 mr-2" />
+                            Trouver une image
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                    {newProduct.imageUrl && (
+                      <div className="mt-3">
+                        <p className="text-sm text-muted-foreground mb-2">Image trouvée :</p>
+                        <img
+                          src={newProduct.imageUrl}
+                          alt={newProduct.name}
+                          className="w-full h-48 object-cover rounded-lg border"
+                          onError={() => {
+                            setNewProduct({ ...newProduct, imageUrl: "" });
+                            toast({
+                              title: "Image invalide",
+                              description: "L'image trouvée n'a pas pu être chargée",
+                              variant: "destructive"
+                            });
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setNewProduct({ ...newProduct, imageUrl: "" })}
+                          className="mt-2 text-red-600 hover:text-red-700"
+                        >
+                          Supprimer l'image
+                        </Button>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground text-center">
+                      Vous pouvez télécharger une image ou utiliser le bouton pour en trouver une automatiquement
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ÉTAPE 3: Quantité et Prix */}
+            {formStep === 3 && (
+              <div className="space-y-6">
+                <h3 className="text-2xl font-bold text-center">Prix et Quantité</h3>
+                <p className="text-center text-lg"><strong>{newProduct.name}</strong></p>
+
+                <div>
+                  <Label htmlFor="quantity" className="text-xl font-semibold mb-3 block text-center">Combien vous en avez ?</Label>
+                  <Input
+                    id="quantity"
+                    type="number"
+                    value={newProduct.quantity}
+                    onChange={(e) => setNewProduct({ ...newProduct, quantity: e.target.value })}
+                    className="w-full h-20 text-4xl text-center font-bold"
+                    placeholder=""
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="price" className="text-xl font-semibold mb-3 block text-center">Prix de vente (XAF)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    value={newProduct.price}
+                    onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                    className="w-full h-20 text-4xl text-center font-bold"
+                    placeholder=""
+                    min="0"
+                  />
+                  <p className="text-center text-sm text-muted-foreground mt-2">Laisser vide si non vendu.</p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
+                  <div>
+                    <Label className="text-base font-semibold">Menu digital (menu du jour)</Label>
+                    <p className="text-sm text-muted-foreground">Afficher ce produit sur le menu digital pour les clients</p>
+                  </div>
+                  <Switch
+                    checked={newProduct.showOnMenuDigital === true}
+                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, showOnMenuDigital: !!checked })}
+                  />
+                </div>
+
+                {!isFoodCategory(newProduct.category) && (
+                  <div>
+                    <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
+                    <Input
+                      id="cost"
+                      type="number"
+                      value={newProduct.cost}
+                      onChange={(e) => setNewProduct({ ...newProduct, cost: e.target.value })}
+                      className="w-full h-16 text-2xl text-center font-semibold"
+                      placeholder=""
+                      min="0"
+                    />
+                  </div>
+                )}
+
+                {/* Module Food Cost - Affiché uniquement pour les catégories alimentaires */}
+                {isFoodCategory(newProduct.category) && (
+                  <div className="space-y-6 border-t pt-6">
+                    <h4 className="text-xl font-bold text-center">Food Cost / Coût de Production</h4>
+
+                    {/* Matières premières */}
+                    <div className="space-y-3">
+                      <Label className="text-lg font-semibold">A. Matières premières</Label>
+                      {newProduct.rawMaterials.map((material, index) => (
+                        <div key={index} className="flex gap-2 items-end">
+                          <div className="flex-1">
+                            <Label className="text-sm">Nom de l'ingrédient</Label>
+                            <Input
+                              value={material.name}
+                              onChange={(e) => {
+                                const updated = [...newProduct.rawMaterials];
+                                updated[index] = { ...updated[index], name: e.target.value };
+                                setNewProduct({ ...newProduct, rawMaterials: updated });
+                              }}
+                              placeholder="Ex: Riz, Poulet, etc."
+                            />
+                          </div>
+                          <div className="w-32">
+                            <Label className="text-sm">Coût unitaire</Label>
+                            <Input
+                              type="number"
+                              value={material.unitCost}
+                              onChange={(e) => {
+                                const updated = [...newProduct.rawMaterials];
+                                updated[index] = { ...updated[index], unitCost: e.target.value };
+                                setNewProduct({ ...newProduct, rawMaterials: updated });
+                              }}
+                              placeholder="XAF"
+                              min="0"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const updated = newProduct.rawMaterials.filter((_, i) => i !== index);
+                              setNewProduct({ ...newProduct, rawMaterials: updated });
+                            }}
+                            className="mb-0"
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setNewProduct({
+                            ...newProduct,
+                            rawMaterials: [...newProduct.rawMaterials, { name: "", unitCost: "" }]
+                          });
+                        }}
+                        className="w-full"
+                      >
+                        <Plus size={16} className="mr-2" />
+                        Ajouter une ligne
+                      </Button>
+                    </div>
+
+                    {/* Coûts de production */}
+                    <div className="space-y-3">
+                      <Label className="text-lg font-semibold">B. Coûts de production</Label>
+                      {newProduct.productionCosts.map((cost, index) => (
+                        <div key={index} className="flex gap-2 items-end">
+                          <div className="flex-1">
+                            <Label className="text-sm">Type de coût</Label>
+                            <Input
+                              value={cost.type}
+                              onChange={(e) => {
+                                const updated = [...newProduct.productionCosts];
+                                updated[index] = { ...updated[index], type: e.target.value };
+                                setNewProduct({ ...newProduct, productionCosts: updated });
+                              }}
+                              placeholder="Ex: Main d'œuvre, Gaz, Eau, Condiments, etc."
+                            />
+                          </div>
+                          <div className="w-32">
+                            <Label className="text-sm">Montant</Label>
+                            <Input
+                              type="number"
+                              value={cost.amount}
+                              onChange={(e) => {
+                                const updated = [...newProduct.productionCosts];
+                                updated[index] = { ...updated[index], amount: e.target.value };
+                                setNewProduct({ ...newProduct, productionCosts: updated });
+                              }}
+                              placeholder="XAF"
+                              min="0"
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const updated = newProduct.productionCosts.filter((_, i) => i !== index);
+                              setNewProduct({ ...newProduct, productionCosts: updated });
+                            }}
+                            className="mb-0"
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setNewProduct({
+                            ...newProduct,
+                            productionCosts: [...newProduct.productionCosts, { type: "", amount: "" }]
+                          });
+                        }}
+                        className="w-full"
+                      >
+                        <Plus size={16} className="mr-2" />
+                        Ajouter une ligne
+                      </Button>
+                    </div>
+
+                    {/* Résumé des coûts - Calculs automatiques */}
+                    {(() => {
+                      const rawMaterialsTotal = newProduct.rawMaterials.reduce((sum, m) => {
+                        const cost = Number(m.unitCost) || 0;
+                        return sum + cost;
+                      }, 0);
+
+                      const productionCostsTotal = newProduct.productionCosts.reduce((sum, c) => {
+                        const amount = Number(c.amount) || 0;
+                        return sum + amount;
+                      }, 0);
+
+                      const totalCost = rawMaterialsTotal + productionCostsTotal;
+                      const sellingPrice = Number(newProduct.price) || 0;
+                      const grossMargin = sellingPrice - totalCost;
+                      const foodCostPercent = sellingPrice > 0 ? (totalCost / sellingPrice) * 100 : 0;
+                      const marginPercent = sellingPrice > 0 ? (grossMargin / sellingPrice) * 100 : 0;
+
+                      return (
+                        <div className="space-y-3 border-t pt-4 bg-gray-50 p-4 rounded-lg">
+                          <h5 className="text-lg font-bold">Résumé des coûts</h5>
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Coût des matières premières:</span>
+                              <p className="font-semibold">{rawMaterialsTotal.toLocaleString()} XAF</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Coût de production:</span>
+                              <p className="font-semibold">{productionCostsTotal.toLocaleString()} XAF</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Coût réel total:</span>
+                              <p className="font-semibold text-blue-600">{totalCost.toLocaleString()} XAF</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Marge brute:</span>
+                              <p className={`font-semibold ${grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {grossMargin.toLocaleString()} XAF
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Food cost (%):</span>
+                              <p className={`font-semibold ${foodCostPercent <= 30 ? 'text-green-600' : foodCostPercent <= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {foodCostPercent.toFixed(1)}%
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Taux de marge (%):</span>
+                              <p className={`font-semibold ${marginPercent >= 30 ? 'text-green-600' : marginPercent >= 20 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                {marginPercent.toFixed(1)}%
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t">
+            {formStep > 1 ? (
+              <Button
+                variant="outline"
+                onClick={() => setFormStep(formStep - 1)}
+                className="h-14 px-8 text-lg font-semibold"
+              >
+                Retour
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setIsAddModalOpen(false)}
+                className="h-14 px-8 text-lg"
+              >
+                Annuler
+              </Button>
+            )}
+
+            {formStep < 3 ? (
+              <Button
+                onClick={() => setFormStep(formStep + 1)}
+                disabled={formStep === 1 && !newProduct.category}
+                className="bg-gradient-primary text-white h-14 px-8 text-lg font-semibold"
+              >
+                Suivant
+              </Button>
+            ) : (
+              <Button
+                onClick={editingProduct ? handleUpdateProduct : handleAddProduct}
+                disabled={isSavingProduct || !newProduct.name || !newProduct.quantity}
+                className="bg-green-600 hover:bg-green-700 text-white h-14 px-8 text-lg font-bold"
+              >
+                {isSavingProduct ? 'Sauvegarde...' : 'Enregistrer'}
+              </Button>
+            )}
+          </div>
+        </DialogContent >
+      </Dialog >
+
       {/* Products List Card */}
-      <Card className="shadow-card border-0">
+      < Card className="shadow-card border-0" >
         <CardContent>
           {/* Sélection multiple - Toujours visible si des produits existent */}
           {products.length > 0 && (
@@ -1838,8 +1838,8 @@ const StockPage = () => {
                   onCheckedChange={handleSelectAll}
                   disabled={filteredProducts.length === 0}
                 />
-                <label 
-                  htmlFor="select-all" 
+                <label
+                  htmlFor="select-all"
                   className="text-sm font-semibold cursor-pointer flex-1 text-blue-900"
                 >
                   {filteredProducts.length > 0 ? (
@@ -1877,12 +1877,12 @@ const StockPage = () => {
                     const c = (product.category || '').toLowerCase();
                     const color = c.includes('vin') || c.includes('alcool') ? 'bg-red-500'
                       : c.includes('biere') || c.includes('boisson') ? 'bg-yellow-500'
-                      : c.includes('cafe') ? 'bg-purple-500'
-                      : c.includes('eau') ? 'bg-blue-500'
-                      : c.includes('jus') ? 'bg-orange-500'
-                      : c.includes('soda') ? 'bg-green-500'
-                      : c.includes('dessert') || c.includes('glace') ? 'bg-pink-500'
-                      : 'bg-gray-200';
+                        : c.includes('cafe') ? 'bg-purple-500'
+                          : c.includes('eau') ? 'bg-blue-500'
+                            : c.includes('jus') ? 'bg-orange-500'
+                              : c.includes('soda') ? 'bg-green-500'
+                                : c.includes('dessert') || c.includes('glace') ? 'bg-pink-500'
+                                  : 'bg-gray-200';
                     return <div className={`absolute left-0 top-0 h-1 w-full rounded-t-2xl ${color}`} />;
                   })()}
                   {/* Product Header */}
@@ -1922,9 +1922,9 @@ const StockPage = () => {
                         <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 w-7 p-0" title="Modifier">
                           <Edit size={14} />
                         </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleDeleteProduct(product.id)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
                           title="Supprimer"
@@ -1955,7 +1955,7 @@ const StockPage = () => {
                         const grossMargin = sellingPrice - totalCost;
                         const foodCostPercent = sellingPrice > 0 ? (totalCost / sellingPrice) * 100 : 0;
                         const marginPercent = sellingPrice > 0 ? (grossMargin / sellingPrice) * 100 : 0;
-                        
+
                         return (
                           <div className="mt-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
                             <p className="text-xs font-semibold text-gray-700 mb-1">Résumé des coûts</p>
@@ -1979,28 +1979,28 @@ const StockPage = () => {
 
                   {/* Stock Controls - Masqué pour les plats (nourriture) */}
                   {product.category?.toLowerCase() !== 'plats' && (
-                  <div className="flex items-center gap-4">
-                    <div className="flex flex-1 flex-col gap-2">
-                      {/* Progress Bar */}
-                      <div className="h-2 rounded-full bg-[#e6dfdb]">
-                        <div
-                          className="h-2 rounded-full transition-all"
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-1 flex-col gap-2">
+                        {/* Progress Bar */}
+                        <div className="h-2 rounded-full bg-[#e6dfdb]">
+                          <div
+                            className="h-2 rounded-full transition-all"
+                            style={{
+                              width: `${stockPercentage}%`,
+                              backgroundColor: stockColor,
+                            }}
+                          />
+                        </div>
+                        {/* Quantity */}
+                        <p
+                          className="text-right text-lg font-bold"
                           style={{
-                            width: `${stockPercentage}%`,
-                            backgroundColor: stockColor,
+                            color: isLowStock ? stockColor : "#181411",
                           }}
-                        />
+                        >
+                          {product.quantity}
+                        </p>
                       </div>
-                      {/* Quantity */}
-                      <p
-                        className="text-right text-lg font-bold"
-                        style={{
-                          color: isLowStock ? stockColor : "#181411",
-                        }}
-                      >
-                        {product.quantity}
-                      </p>
-                    </div>
 
                       {/* Bouton + pour ajouter le nombre d'articles sur un produit */}
                       <button
@@ -2026,20 +2026,20 @@ const StockPage = () => {
                       <Badge className="bg-green-500 text-white px-3 py-1">
                         Disponible
                       </Badge>
-                  </div>
+                    </div>
                   )}
                 </div>
               );
             })}
           </div>
         </CardContent>
-      </Card>
+      </Card >
 
       {/* Dialog pour Perte */}
-      <Dialog open={isLossModalOpen} onOpenChange={setIsLossModalOpen}>
+      < Dialog open={isLossModalOpen} onOpenChange={setIsLossModalOpen} >
         <DialogTrigger asChild>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="w-full sm:w-auto border-red-200 text-red-600 hover:bg-red-50 hidden"
             onClick={() => {
               setIsLossModalOpen(true);
@@ -2061,7 +2061,7 @@ const StockPage = () => {
               <Label htmlFor="product" className="text-sm font-medium mb-2 block">Produit concerné *</Label>
               <Select
                 value={lossData.productId}
-                onValueChange={(value) => setLossData({...lossData, productId: value})}
+                onValueChange={(value) => setLossData({ ...lossData, productId: value })}
               >
                 <SelectTrigger className="w-full h-11 text-base bg-background">
                   <SelectValue placeholder="Sélectionner un produit" />
@@ -2085,7 +2085,7 @@ const StockPage = () => {
                 id="lossQuantity"
                 type="number"
                 value={lossData.quantity}
-                onChange={(e) => setLossData({...lossData, quantity: e.target.value})}
+                onChange={(e) => setLossData({ ...lossData, quantity: e.target.value })}
                 className="w-full h-11 text-base"
                 placeholder="Nombre d'unités perdues"
                 min="1"
@@ -2096,7 +2096,7 @@ const StockPage = () => {
               <Label htmlFor="reason" className="text-sm font-medium mb-2 block">Raison de la perte *</Label>
               <Select
                 value={lossData.reason}
-                onValueChange={(value) => setLossData({...lossData, reason: value})}
+                onValueChange={(value) => setLossData({ ...lossData, reason: value })}
               >
                 <SelectTrigger className="w-full h-11 text-base bg-background">
                   <SelectValue placeholder="Sélectionner une raison" />
@@ -2127,21 +2127,21 @@ const StockPage = () => {
                 id="date"
                 type="date"
                 value={lossData.date}
-                onChange={(e) => setLossData({...lossData, date: e.target.value})}
+                onChange={(e) => setLossData({ ...lossData, date: e.target.value })}
                 className="w-full h-11 text-base"
               />
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setIsLossModalOpen(false)}
               className="h-11 px-6 text-base"
             >
               Annuler
             </Button>
-            <Button 
-              onClick={handleRecordLoss} 
+            <Button
+              onClick={handleRecordLoss}
               variant="destructive"
               className="h-11 px-6 text-base font-medium"
             >
@@ -2149,15 +2149,15 @@ const StockPage = () => {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Manager Auth Dialog (Optionnel) */}
-      <Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen}>
+      < Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen} >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
             <DialogTitle>Vérification du gérant</DialogTitle>
             <DialogDescription>
-              Saisissez votre <strong>code gérant</strong> pour autoriser l'ajout/la modification du stock.<br/>
+              Saisissez votre <strong>code gérant</strong> pour autoriser l'ajout/la modification du stock.<br />
               Ce code n’est <strong>pas</strong> votre mot de passe de compte. Il est <strong>optionnel</strong> et utile si vous partagez le compte gérant.
             </DialogDescription>
           </DialogHeader>
@@ -2172,10 +2172,10 @@ const StockPage = () => {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Security Code Dialog */}
-      <Dialog open={isSecurityDialogOpen} onOpenChange={setIsSecurityDialogOpen}>
+      < Dialog open={isSecurityDialogOpen} onOpenChange={setIsSecurityDialogOpen} >
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>Sécuriser le stock (code gérant)</DialogTitle>
@@ -2203,11 +2203,11 @@ const StockPage = () => {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
+      </Dialog >
 
       {/* Dialog de sélection d'image depuis Google Images */}
-      <Dialog 
-        open={showImageSelectionDialog} 
+      < Dialog
+        open={showImageSelectionDialog}
         onOpenChange={(open) => {
           setShowImageSelectionDialog(open);
           if (!open) {
@@ -2224,15 +2224,15 @@ const StockPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 py-4">
-            {foundImages.map((imageUrl) => (
+            {foundImages.map((imageUrl, idx) => (
               <div
-                key={imageUrl}
+                key={`${imageUrl}-${idx}`}
                 className="relative group cursor-pointer border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 transition-all"
                 onClick={() => handleSelectImage(imageUrl)}
               >
                 <img
                   src={imageUrl}
-                  alt={`Option d'image`}
+                  alt={`Option d'image ${idx}`}
                   className="w-full h-48 object-cover"
                   loading="lazy"
                   onError={(e) => {
@@ -2265,8 +2265,8 @@ const StockPage = () => {
             </Button>
           </div>
         </DialogContent>
-      </Dialog>
-    </div>
+      </Dialog >
+    </div >
   );
 };
 
