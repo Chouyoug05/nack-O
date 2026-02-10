@@ -48,7 +48,7 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 2; // Marges très faibles
   const contentWidth = pageWidth - (margin * 2);
-  
+
   let y = margin;
 
   // Fonction helper pour texte simple
@@ -63,7 +63,7 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
     doc.setFontSize(size);
     doc.setFont('courier', bold ? 'bold' : 'normal');
     doc.setTextColor(BLACK[0], BLACK[1], BLACK[2]);
-    
+
     let xPos = x;
     if (align === 'center') {
       const textWidth = doc.getTextWidth(textStr);
@@ -72,7 +72,7 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
       const textWidth = doc.getTextWidth(textStr);
       xPos = pageWidth - margin - textWidth;
     }
-    
+
     doc.text(textStr, xPos, yPos);
   };
 
@@ -88,7 +88,7 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   y += 3;
 
   // ===== LOGO =====
-  const logoUrl = ticketData.ticketLogoUrl || ticketData.establishmentLogo;
+  const logoUrl = ticketData.ticketLogoUrl || ticketData.establishmentLogo || "/Design sans titre.svg";
   if (logoUrl) {
     try {
       const response = await fetch(logoUrl);
@@ -190,18 +190,18 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
     const itemTotal = Math.round(Number(item.price) * Number(item.quantity));
     // Formatage simple sans séparateurs : 3000 au lieu de 3,000
     const priceText = itemTotal.toString();
-    
+
     // Tronquer le nom si nécessaire (max 25 caractères)
     let productName = item.name || 'Produit';
     if (productName.length > 25) {
       productName = productName.substring(0, 22) + '...';
     }
-    
+
     // Alignement en colonnes
     text(productName, margin, y, 9, false);
     text(item.quantity.toString(), margin + 42, y, 9, false);
     text(priceText, pageWidth - margin, y, 9, false, 'right');
-    
+
     y += 3;
   });
 

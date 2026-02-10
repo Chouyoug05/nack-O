@@ -17,7 +17,7 @@ export async function generateSubscriptionReceiptPDF(profile: Pick<
   let y = 48;
 
   // Header
-  const logoUrl = profile.logoUrl;
+  const logoUrl = profile.logoUrl || "/Design sans titre.svg";
   if (logoUrl) {
     try {
       const response = await fetch(logoUrl);
@@ -47,32 +47,32 @@ export async function generateSubscriptionReceiptPDF(profile: Pick<
   const displayName = profile.companyName || profile.establishmentName || "Mon Établissement";
   doc.text(displayName, 100, y + 10);
   doc.setFontSize(11);
-  
+
   // Adresse (si renseignée)
   if (profile.fullAddress) {
     y += 16;
     doc.text(profile.fullAddress, 100, y + 10);
   }
-  
+
   // Téléphone professionnel (ou téléphone par défaut)
   const displayPhone = profile.businessPhone || profile.phone;
   if (displayPhone) {
     y += 16;
     doc.text(displayPhone, 100, y + 10);
   }
-  
+
   // Numéro RCS (si renseigné)
   if (profile.rcsNumber) {
     y += 16;
     doc.text(`RCS: ${profile.rcsNumber}`, 100, y + 10);
   }
-  
+
   // Numéro NIF (si renseigné)
   if (profile.nifNumber) {
     y += 16;
     doc.text(`NIF: ${profile.nifNumber}`, 100, y + 10);
   }
-  
+
   // Email (si pas déjà affiché)
   if (profile.email && !displayPhone) {
     y += 16;
@@ -128,7 +128,7 @@ export async function generateSubscriptionReceiptPDF(profile: Pick<
   doc.text(footerMessage, 40, y);
 
   // Save
-  const fileName = `recu-abonnement-${new Date(opts.paidAt).toISOString().slice(0,10)}.pdf`;
+  const fileName = `recu-abonnement-${new Date(opts.paidAt).toISOString().slice(0, 10)}.pdf`;
   doc.save(fileName);
 }
 

@@ -74,9 +74,10 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   let y = 40;
 
   // Header avec logo et établissement
-  if (org.logoUrl) {
+  const logoUrl = org.logoUrl || "/Design sans titre.svg";
+  if (logoUrl) {
     try {
-      const dataUrl = await loadImageAsDataURL(org.logoUrl);
+      const dataUrl = await loadImageAsDataURL(logoUrl);
       doc.addImage(dataUrl, "PNG", 40, y - 10, 48, 48);
     } catch {
       void 0; // ignore logo load errors
@@ -119,11 +120,11 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   doc.rect(40, tableStartY, tableWidth, rowHeight, 'F');
   doc.setDrawColor(200, 200, 200);
   doc.rect(40, tableStartY, tableWidth, rowHeight);
-  
+
   // Lignes verticales pour les colonnes
   doc.line(40 + col1Width, tableStartY, 40 + col1Width, tableStartY + rowHeight);
   doc.line(40 + col1Width + col2Width, tableStartY, 40 + col1Width + col2Width, tableStartY + rowHeight);
-  
+
   // Texte des en-têtes
   doc.text("Métrique", 50, tableStartY + 16);
   doc.text("Valeur", 40 + col1Width + 10, tableStartY + 16);
@@ -132,10 +133,10 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   // Données du tableau
   doc.setFont(undefined, 'normal');
   doc.setFillColor(255, 255, 255);
-  
+
   tableData.forEach((row, index) => {
     const rowY = tableStartY + rowHeight + (index * rowHeight);
-    
+
     // Fond alterné pour les lignes
     if (index % 2 === 0) {
       doc.setFillColor(250, 250, 250);
@@ -144,13 +145,13 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.setFillColor(255, 255, 255);
       doc.rect(40, rowY, tableWidth, rowHeight, 'F');
     }
-    
+
     // Bordures du tableau
     doc.setDrawColor(200, 200, 200);
     doc.rect(40, rowY, tableWidth, rowHeight);
     doc.line(40 + col1Width, rowY, 40 + col1Width, rowY + rowHeight);
     doc.line(40 + col1Width + col2Width, rowY, 40 + col1Width + col2Width, rowY + rowHeight);
-    
+
     // Texte des données
     doc.setFontSize(11);
     doc.text(row.metric, 50, rowY + 16);
@@ -162,7 +163,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
 
   // Commandes détaillées
   doc.setFontSize(14); doc.text("Détail des Commandes", 40, y); y += 18;
-  
+
   if (orders.length === 0) {
     doc.setFontSize(11);
     doc.text("Aucune commande pour cette période", 40, y); y += 14;
@@ -184,13 +185,13 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
     doc.rect(40, ordersTableStartY, ordersTableWidth, ordersRowHeight, 'F');
     doc.setDrawColor(200, 200, 200);
     doc.rect(40, ordersTableStartY, ordersTableWidth, ordersRowHeight);
-    
+
     // Lignes verticales
     doc.line(40 + ordersCol1Width, ordersTableStartY, 40 + ordersCol1Width, ordersTableStartY + ordersRowHeight);
     doc.line(40 + ordersCol1Width + ordersCol2Width, ordersTableStartY, 40 + ordersCol1Width + ordersCol2Width, ordersTableStartY + ordersRowHeight);
     doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, ordersTableStartY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, ordersTableStartY + ordersRowHeight);
     doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, ordersTableStartY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, ordersTableStartY + ordersRowHeight);
-    
+
     // Texte des en-têtes
     doc.text("Date", 45, ordersTableStartY + 13);
     doc.text("Table", 40 + ordersCol1Width + 5, ordersTableStartY + 13);
@@ -202,14 +203,14 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
     doc.setFont(undefined, 'normal');
     orders.forEach((order, index) => {
       const rowY = ordersTableStartY + ordersRowHeight + (index * ordersRowHeight);
-      
+
       // Vérifier si on dépasse la page
       if (rowY > 750) {
         doc.addPage();
         y = 40;
         return;
       }
-      
+
       // Fond alterné
       if (index % 2 === 0) {
         doc.setFillColor(250, 250, 250);
@@ -218,7 +219,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
         doc.setFillColor(255, 255, 255);
         doc.rect(40, rowY, ordersTableWidth, ordersRowHeight, 'F');
       }
-      
+
       // Bordures
       doc.setDrawColor(200, 200, 200);
       doc.rect(40, rowY, ordersTableWidth, ordersRowHeight);
@@ -226,12 +227,12 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.line(40 + ordersCol1Width + ordersCol2Width, rowY, 40 + ordersCol1Width + ordersCol2Width, rowY + ordersRowHeight);
       doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, rowY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width, rowY + ordersRowHeight);
       doc.line(40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, rowY, 40 + ordersCol1Width + ordersCol2Width + ordersCol3Width + ordersCol4Width, rowY + ordersRowHeight);
-      
+
       // Texte des données
       doc.setFontSize(9);
       const date = new Date(order.createdAt).toLocaleDateString();
       const agent = order.agentName ? `${order.agentName}${order.agentCode ? ` (${order.agentCode})` : ''}` : (order.agentCode || "");
-      
+
       doc.text(date, 45, rowY + 13);
       doc.text(order.tableNumber || '-', 40 + ordersCol1Width + 5, rowY + 13);
       doc.text(agent || '-', 40 + ordersCol1Width + ordersCol2Width + 5, rowY + 13);
@@ -244,7 +245,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
 
   // Ventes détaillées (format reçu)
   doc.setFontSize(14); doc.text("Détail des Ventes", 40, y); y += 18;
-  
+
   if (sales.length === 0) {
     doc.setFontSize(11);
     doc.text("Aucune vente pour cette période", 40, y); y += 14;
@@ -255,19 +256,19 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
         doc.addPage();
         y = 40;
       }
-      
+
       // En-tête du reçu
       doc.setFontSize(12);
       doc.setFont(undefined, 'bold');
       doc.text(`Reçu #${saleIndex + 1}`, 40, y);
       doc.setFont(undefined, 'normal');
       doc.setFontSize(10);
-      
+
       const saleDate = new Date(sale.createdAt).toLocaleString('fr-FR');
       doc.text(`Date: ${saleDate}`, 40, y + 12);
       doc.text(`Méthode: ${sale.paymentMethod || 'Non spécifiée'}`, 40, y + 24);
       y += 40;
-      
+
       // Tableau des produits
       const productsTableStartY = y;
       const productsTableWidth = 515;
@@ -284,12 +285,12 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.rect(40, productsTableStartY, productsTableWidth, productsRowHeight, 'F');
       doc.setDrawColor(200, 200, 200);
       doc.rect(40, productsTableStartY, productsTableWidth, productsRowHeight);
-      
+
       // Lignes verticales
       doc.line(40 + productsCol1Width, productsTableStartY, 40 + productsCol1Width, productsTableStartY + productsRowHeight);
       doc.line(40 + productsCol1Width + productsCol2Width, productsTableStartY, 40 + productsCol1Width + productsCol2Width, productsTableStartY + productsRowHeight);
       doc.line(40 + productsCol1Width + productsCol2Width + productsCol3Width, productsTableStartY, 40 + productsCol1Width + productsCol2Width + productsCol3Width, productsTableStartY + productsRowHeight);
-      
+
       // Texte des en-têtes
       doc.text("Produit", 45, productsTableStartY + 12);
       doc.text("Qté", 40 + productsCol1Width + 5, productsTableStartY + 12);
@@ -300,7 +301,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.setFont(undefined, 'normal');
       sale.items.forEach((item, itemIndex) => {
         const itemRowY = productsTableStartY + productsRowHeight + (itemIndex * productsRowHeight);
-        
+
         // Fond alterné
         if (itemIndex % 2 === 0) {
           doc.setFillColor(250, 250, 250);
@@ -309,19 +310,19 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
           doc.setFillColor(255, 255, 255);
           doc.rect(40, itemRowY, productsTableWidth, productsRowHeight, 'F');
         }
-        
+
         // Bordures
         doc.setDrawColor(200, 200, 200);
         doc.rect(40, itemRowY, productsTableWidth, productsRowHeight);
         doc.line(40 + productsCol1Width, itemRowY, 40 + productsCol1Width, itemRowY + productsRowHeight);
         doc.line(40 + productsCol1Width + productsCol2Width, itemRowY, 40 + productsCol1Width + productsCol2Width, itemRowY + productsRowHeight);
         doc.line(40 + productsCol1Width + productsCol2Width + productsCol3Width, itemRowY, 40 + productsCol1Width + productsCol2Width + productsCol3Width, itemRowY + productsRowHeight);
-        
+
         // Texte des données
         doc.setFontSize(8);
         const unitPrice = Number(item.price || 0);
         const itemTotal = unitPrice * Number(item.quantity || 0);
-        
+
         doc.text(item.name || 'Produit inconnu', 45, itemRowY + 11);
         doc.text(`${item.quantity || 0}`, 40 + productsCol1Width + 5, itemRowY + 11);
         doc.text(`${unitPrice.toLocaleString('fr-FR', { useGrouping: false })} XAF`, 40 + productsCol1Width + productsCol2Width + 5, itemRowY + 11);
@@ -336,10 +337,10 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
       doc.rect(40, totalRowY, productsTableWidth, productsRowHeight, 'F');
       doc.setDrawColor(200, 200, 200);
       doc.rect(40, totalRowY, productsTableWidth, productsRowHeight);
-      
+
       doc.text("TOTAL", 40 + productsCol1Width + productsCol2Width + productsCol3Width - 50, totalRowY + 12);
       doc.text(`${Number(sale.total).toLocaleString('fr-FR', { useGrouping: false })} XAF`, 40 + productsCol1Width + productsCol2Width + productsCol3Width + 5, totalRowY + 12);
-      
+
       y = totalRowY + productsRowHeight + 20;
     });
   }

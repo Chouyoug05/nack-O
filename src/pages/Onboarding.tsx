@@ -59,7 +59,7 @@ const Onboarding = () => {
       </div>
 
       {/* Logo Header - Responsive positioning */}
-      <div className="absolute top-4 md:top-8 left-1/2 transform -translate-x-1/2 z-10">
+      <div className="absolute top-12 md:top-20 left-1/2 transform -translate-x-1/2 z-10">
         <NackLogo size="md" className="drop-shadow-lg" />
       </div>
 
