@@ -10,12 +10,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useEvents, Event } from "@/contexts/EventContext";
 import { canCreateEvent, getCurrentEventsCount } from "@/utils/subscription";
-import { 
-  Calendar, 
-  Plus, 
-  MapPin, 
-  Clock, 
-  Users, 
+import {
+  Calendar,
+  Plus,
+  MapPin,
+  Clock,
+  Users,
   Share2,
   Ticket,
   Edit,
@@ -25,7 +25,11 @@ import {
   Mic,
   Music,
   DollarSign,
-  Settings
+  Settings,
+  ShieldCheck,
+  RefreshCw,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -135,21 +139,21 @@ const EventsPage = () => {
     if (!isEditingEvent) {
       const eventCheck = canCreateEvent(profile);
       if (!eventCheck.allowed) {
-        toast({ 
-          title: "Événement non disponible", 
+        toast({
+          title: "Événement non disponible",
           description: eventCheck.reason || "Vous n'avez pas accès à cette fonctionnalité",
-          variant: "destructive" 
+          variant: "destructive"
         });
         return;
       }
-      
+
       // Si paiement nécessaire pour événement supplémentaire
       if (eventCheck.needsPayment && eventCheck.extraPrice) {
         const confirm = window.confirm(
           `Vous avez atteint la limite d'événements inclus. Cet événement supplémentaire coûtera ${eventCheck.extraPrice.toLocaleString()} XAF. Continuer ?`
         );
         if (!confirm) return;
-        
+
         // Créer un lien de paiement pour l'événement supplémentaire
         try {
           if (!user) {
@@ -176,24 +180,24 @@ const EventsPage = () => {
           // Créer un ID unique pour cette transaction
           const transactionId = `EVT-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
           const now = Date.now();
-          
+
           const base = (
             (import.meta.env.VITE_PUBLIC_BASE_URL as string)
             || window.location.origin
           ).replace(/\/+$/, '');
-          
+
           const reference = 'evenement-supplementaire';
           const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&type=event`;
           const redirectError = `${base}/payment/error?transactionId=${transactionId}&type=event`;
           const logoURL = `${base}/favicon.png`;
-          
+
           // Enregistrer la transaction en attente
           try {
             const { paymentsColRef } = await import('@/lib/collections');
             const { db } = await import('@/lib/firebase');
             const { addDoc } = await import('firebase/firestore');
             const paymentsRef = paymentsColRef(db, user.uid);
-            
+
             await addDoc(paymentsRef, {
               userId: user.uid,
               transactionId,
@@ -210,7 +214,7 @@ const EventsPage = () => {
           } catch (error) {
             console.error('Erreur enregistrement transaction pending:', error);
           }
-          
+
           // Générer le lien de paiement
           const link = await createSubscriptionPaymentLink({
             amount: eventCheck.extraPrice,
@@ -220,7 +224,7 @@ const EventsPage = () => {
             logoURL,
             isTransfer: false,
           });
-          
+
           // Mettre à jour la transaction avec le lien généré
           try {
             const { paymentsColRef } = await import('@/lib/collections');
@@ -235,21 +239,21 @@ const EventsPage = () => {
           } catch (error) {
             console.error('Erreur mise à jour lien paiement:', error);
           }
-          
-          toast({ 
-            title: "Redirection vers le paiement", 
-            description: "Vous allez être redirigé pour effectuer le paiement" 
+
+          toast({
+            title: "Redirection vers le paiement",
+            description: "Vous allez être redirigé pour effectuer le paiement"
           });
-          
+
           // Rediriger vers le paiement
           window.location.href = link;
           return; // Ne pas continuer avec la création de l'événement
         } catch (error) {
           console.error('Erreur création lien paiement:', error);
-          toast({ 
-            title: "Paiement indisponible", 
-            description: "Impossible de créer le lien de paiement. Réessayez dans quelques instants.", 
-            variant: "destructive" 
+          toast({
+            title: "Paiement indisponible",
+            description: "Impossible de créer le lien de paiement. Réessayez dans quelques instants.",
+            variant: "destructive"
           });
           return;
         }
@@ -299,17 +303,17 @@ const EventsPage = () => {
         toast({ title: "Événement modifié", description: `${data.title} a été mis à jour avec succès` });
       } else {
         await addEvent(data);
-        
+
         // Mettre à jour le compteur d'événements dans le profil
         if (user && profile) {
           const currentCount = getCurrentEventsCount(profile);
           const eventsResetAt = profile.eventsResetAt ?? profile.subscriptionEndsAt ?? Date.now();
           const now = Date.now();
-          
+
           // Si on est dans une nouvelle période, réinitialiser
           let newCount = 1;
           let newEventsResetAt = eventsResetAt;
-          
+
           if (eventsResetAt && now > eventsResetAt) {
             // Nouvelle période
             const oneMonth = 30 * 24 * 60 * 60 * 1000;
@@ -319,7 +323,7 @@ const EventsPage = () => {
             // Même période, incrémenter
             newCount = currentCount + 1;
           }
-          
+
           try {
             await updateDoc(doc(db, 'profiles', user.uid), {
               eventsCount: newCount,
@@ -330,7 +334,7 @@ const EventsPage = () => {
             console.error('Erreur mise à jour compteur événements:', e);
           }
         }
-        
+
         toast({ title: "Événement créé", description: `${data.title} a été créé avec succès` });
       }
       setNewEvent({ title: "", description: "", date: "", time: "", location: "", maxCapacity: "", ticketPrice: "", currency: "XAF", imageUrl: "", organizerWhatsapp: "", paymentEnabled: false });
@@ -402,6 +406,68 @@ const EventsPage = () => {
     setReserveForm({ name: "", email: "", phone: "", quantity: 1 });
   };
 
+  // --- Manager authentication (PIN) logic copied from StockPage ---
+  const [isManagerAuthOpen, setIsManagerAuthOpen] = useState(false);
+  const [managerCode, setManagerCode] = useState("");
+  const [isAuthChecking, setIsAuthChecking] = useState(false);
+  const [postAuthActionRefState] = useState<null | (() => void)>(null);
+  const postAuthActionRef = { current: postAuthActionRefState as undefined | (() => void) } as { current: undefined | (() => void) };
+  const [authValidUntil, setAuthValidUntil] = useState<number>(() => {
+    try {
+      const raw = sessionStorage.getItem('nack_manager_auth_until');
+      return raw ? Number(raw) : 0;
+    } catch { return 0; }
+  });
+
+  const rememberAuthWindow = (ms: number) => {
+    const until = Date.now() + ms;
+    setAuthValidUntil(until);
+    try { sessionStorage.setItem('nack_manager_auth_until', String(until)); } catch { /* ignore */ }
+  };
+
+  const requireManagerAuth = (action: () => void) => {
+    if (!profile?.managerPinHash) { action(); return; }
+    if (Date.now() < authValidUntil) { action(); return; }
+    postAuthActionRef.current = action;
+    setManagerCode("");
+    setIsManagerAuthOpen(true);
+  };
+
+  const digestSha256Hex = async (text: string): Promise<string> => {
+    const data = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest('SHA-256', data);
+    const bytes = Array.from(new Uint8Array(buf));
+    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+  };
+
+  const submitManagerAuth = async () => {
+    if (!profile?.managerPinHash) {
+      setIsManagerAuthOpen(false);
+      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
+      return;
+    }
+    if (!managerCode) {
+      toast({ title: "Code requis", description: "Veuillez saisir votre code gérant.", variant: "destructive" });
+      return;
+    }
+    setIsAuthChecking(true);
+    try {
+      const hash = await digestSha256Hex(managerCode);
+      if (hash !== profile.managerPinHash) throw new Error('bad');
+      rememberAuthWindow(10 * 60 * 1000); // 10 minutes
+      setIsManagerAuthOpen(false);
+      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
+      toast({ title: "Vérification réussie", description: "Action autorisée pendant 10 minutes." });
+    } catch {
+      toast({ title: "Code incorrect", description: "Le code gérant ne correspond pas.", variant: "destructive" });
+    } finally {
+      setIsAuthChecking(false);
+    }
+  };
+
+  const [showPin, setShowPin] = useState(false);
+
+
   const totalRevenue = events.reduce((total, event) => {
     return total + (event.ticketsSold * event.ticketPrice);
   }, 0);
@@ -464,14 +530,14 @@ const EventsPage = () => {
               <div className={`flex items-center gap-4 p-4 ${colors.bg}`}>
                 <div className={`flex items-center justify-center size-12 rounded-full ${colors.iconBg}`}>
                   <Icon className={`text-3xl ${colors.iconColor}`} size={32} />
-              </div>
+                </div>
                 <div className="flex-grow">
                   <h2 className="text-lg font-bold leading-tight tracking-tight text-gray-900 dark:text-white">{event.title}</h2>
                   <div className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 mt-1">
                     <Calendar size={14} />
                     <p>{formatEventDate(event.date, event.time)}</p>
-              </div>
-            </div>
+                  </div>
+                </div>
               </div>
 
               {/* Event Actions */}
@@ -487,7 +553,7 @@ const EventsPage = () => {
                   >
                     <div className="flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 p-2.5">
                       <Users className="text-xl text-gray-700 dark:text-gray-300" size={20} />
-              </div>
+                    </div>
                     <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Participants</p>
                   </button>
                   <button
@@ -500,7 +566,7 @@ const EventsPage = () => {
                   >
                     <div className="flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 p-2.5">
                       <DollarSign className="text-xl text-gray-700 dark:text-gray-300" size={20} />
-              </div>
+                    </div>
                     <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Finances</p>
                   </button>
                   <button
@@ -529,7 +595,7 @@ const EventsPage = () => {
                   >
                     <div className="flex items-center justify-center rounded-full bg-gray-100 dark:bg-gray-700 p-2.5">
                       <Settings className="text-xl text-gray-700 dark:text-gray-300" size={20} />
-            </div>
+                    </div>
                     <p className="text-sm font-medium leading-normal text-gray-800 dark:text-gray-200">Modifier</p>
                   </button>
                   <button
@@ -543,43 +609,43 @@ const EventsPage = () => {
                   >
                     <div className="flex items-center justify-center rounded-full bg-red-100 dark:bg-red-900/50 p-2.5">
                       <Trash2 className="text-xl text-red-600 dark:text-red-400" size={20} />
-              </div>
+                    </div>
                     <p className="text-sm font-medium leading-normal text-red-600 dark:text-red-400">Supprimer</p>
                   </button>
-              </div>
-              
-              {/* Lien de partage */}
-              <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                  <div className="flex-1 min-w-0">
-                    <Label className="text-xs text-muted-foreground mb-1 block">Lien de partage :</Label>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        value={event.shareableLink || `${window.location.origin}/event/${event.id}`}
-                        readOnly
-                        className="text-xs font-mono flex-1 min-w-0 truncate"
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleCopyLink(event.shareableLink || `${window.location.origin}/event/${event.id}`)}
-                        className="shrink-0"
-                      >
-                        <Copy size={14} className="mr-1" />
-                        Copier
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => window.open(event.shareableLink || `${window.location.origin}/event/${event.id}`, '_blank')}
-                        className="shrink-0"
-                      >
-                        <ExternalLink size={14} />
-                      </Button>
+                </div>
+
+                {/* Lien de partage */}
+                <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                    <div className="flex-1 min-w-0">
+                      <Label className="text-xs text-muted-foreground mb-1 block">Lien de partage :</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={event.shareableLink || `${window.location.origin}/event/${event.id}`}
+                          readOnly
+                          className="text-xs font-mono flex-1 min-w-0 truncate"
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCopyLink(event.shareableLink || `${window.location.origin}/event/${event.id}`)}
+                          className="shrink-0"
+                        >
+                          <Copy size={14} className="mr-1" />
+                          Copier
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(event.shareableLink || `${window.location.origin}/event/${event.id}`, '_blank')}
+                          className="shrink-0"
+                        >
+                          <ExternalLink size={14} />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
               </div>
             </div>
           );
@@ -591,7 +657,7 @@ const EventsPage = () => {
             <Calendar className="text-6xl text-gray-300 dark:text-gray-600" size={64} />
             <h3 className="mt-4 text-lg font-semibold text-gray-800 dark:text-gray-200">Aucun événement à venir</h3>
             <p className="mt-1 text-gray-500 dark:text-gray-400">Créez-en un pour commencer !</p>
-      </div>
+          </div>
         )}
       </main>
 
@@ -608,7 +674,7 @@ const EventsPage = () => {
           }
         }}>
           <DialogTrigger asChild>
-            <button 
+            <button
               onClick={() => {
                 setIsEditingEvent(false);
                 setSelectedEvent(null);
@@ -622,168 +688,168 @@ const EventsPage = () => {
               <span className="truncate">Ajouter un événement</span>
             </button>
           </DialogTrigger>
-              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>{isEditingEvent ? "Modifier l'événement" : "Créer un nouvel événement"}</DialogTitle>
-                  <DialogDescription>
-                    Remplissez les informations de votre événement
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="title">Titre de l'événement *</Label>
-                    <Input
-                      id="title"
-                      value={newEvent.title}
-                      onChange={(e) => setNewEvent({...newEvent, title: e.target.value})}
-                      placeholder="Ex: Soirée Jazz"
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={newEvent.description}
-                      onChange={(e) => setNewEvent({...newEvent, description: e.target.value})}
-                      placeholder="Décrivez votre événement..."
-                      rows={3}
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="imageUpload">Image de l'événement</Label>
-                    <div className="space-y-3">
-                      <Input
-                        id="imageUpload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gradient-secondary file:text-nack-red hover:file:bg-nack-red/10"
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{isEditingEvent ? "Modifier l'événement" : "Créer un nouvel événement"}</DialogTitle>
+              <DialogDescription>
+                Remplissez les informations de votre événement
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="title">Titre de l'événement *</Label>
+                <Input
+                  id="title"
+                  value={newEvent.title}
+                  onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })}
+                  placeholder="Ex: Soirée Jazz"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={newEvent.description}
+                  onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })}
+                  placeholder="Décrivez votre événement..."
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="imageUpload">Image de l'événement</Label>
+                <div className="space-y-3">
+                  <Input
+                    id="imageUpload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gradient-secondary file:text-nack-red hover:file:bg-nack-red/10"
+                  />
+                  {imagePreview && (
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="Aperçu de l'événement"
+                        className="w-full h-32 object-cover rounded-lg border"
                       />
-                      {imagePreview && (
-                        <div className="relative">
-                          <img 
-                            src={imagePreview} 
-                            alt="Aperçu de l'événement" 
-                            className="w-full h-32 object-cover rounded-lg border"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedImage(null);
-                              setImagePreview(null);
-                            }}
-                            className="absolute top-2 right-2"
-                          >
-                            ×
-                          </Button>
-                        </div>
-                      )}
-                      <div className="text-sm text-muted-foreground">
-                        Ou utilisez une URL d'image :
-                      </div>
-                      <Input
-                        id="imageUrl"
-                        value={newEvent.imageUrl}
-                        onChange={(e) => setNewEvent({...newEvent, imageUrl: e.target.value})}
-                        placeholder="https://exemple.com/image-evenement.jpg"
-                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setImagePreview(null);
+                        }}
+                        className="absolute top-2 right-2"
+                      >
+                        ×
+                      </Button>
                     </div>
+                  )}
+                  <div className="text-sm text-muted-foreground">
+                    Ou utilisez une URL d'image :
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date *</Label>
-                    <Input
-                      id="date"
-                      type="date"
-                      value={newEvent.date}
-                      onChange={(e) => setNewEvent({...newEvent, date: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="time">Heure *</Label>
-                    <Input
-                      id="time"
-                      type="time"
-                      value={newEvent.time}
-                      onChange={(e) => setNewEvent({...newEvent, time: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="location">Lieu</Label>
-                    <Input
-                      id="location"
-                      value={newEvent.location}
-                      onChange={(e) => setNewEvent({...newEvent, location: e.target.value})}
-                      placeholder="Restaurant NACK - Salle principale"
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="organizerWhatsapp">Numéro WhatsApp (organisateur)</Label>
-                    <Input
-                      id="organizerWhatsapp"
-                      value={newEvent.organizerWhatsapp}
-                      onChange={(e) => setNewEvent({...newEvent, organizerWhatsapp: e.target.value})}
-                      placeholder="Ex: +241 6XX XX XX XX"
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <div className="flex items-center space-x-2 p-3 border rounded-lg bg-muted/30">
-                      <Checkbox
-                        id="paymentEnabled"
-                        checked={newEvent.paymentEnabled}
-                        onCheckedChange={(checked) => setNewEvent({...newEvent, paymentEnabled: checked === true})}
-                      />
-                      <Label htmlFor="paymentEnabled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
-                        Activer le paiement en ligne (Airtel Money)
-                      </Label>
-                    </div>
-                    {newEvent.paymentEnabled && (
-                      <p className="text-xs text-muted-foreground ml-6">
-                        Les clients pourront payer leurs billets directement en ligne. Assurez-vous d'avoir configuré votre Disbursement ID dans les paramètres.
-                      </p>
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="capacity">Capacité maximale</Label>
-                    <Input
-                      id="capacity"
-                      type="number"
-                      value={newEvent.maxCapacity}
-                      onChange={(e) => setNewEvent({...newEvent, maxCapacity: e.target.value})}
-                      placeholder="50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="price">Prix du billet (XAF) *</Label>
-                    <Input
-                      id="price"
-                      type="number"
-                      value={newEvent.ticketPrice}
-                      onChange={(e) => setNewEvent({...newEvent, ticketPrice: e.target.value})}
-                      placeholder="15000"
-                    />
-                  </div>
+                  <Input
+                    id="imageUrl"
+                    value={newEvent.imageUrl}
+                    onChange={(e) => setNewEvent({ ...newEvent, imageUrl: e.target.value })}
+                    placeholder="https://exemple.com/image-evenement.jpg"
+                  />
                 </div>
-                <div className="flex flex-col sm:flex-row justify-end gap-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setIsCreateModalOpen(false);
-                      setIsEditingEvent(false);
-                      setSelectedEvent(null);
-                    }} 
-                    className="w-full sm:w-auto"
-                  >
-                    Annuler
-                  </Button>
-                  <Button onClick={handleCreateEvent} className="bg-gradient-primary text-white w-full sm:w-auto">
-                    {isEditingEvent ? "Enregistrer" : "Créer l'événement"}
-                  </Button>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date">Date *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={newEvent.date}
+                  onChange={(e) => setNewEvent({ ...newEvent, date: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="time">Heure *</Label>
+                <Input
+                  id="time"
+                  type="time"
+                  value={newEvent.time}
+                  onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="location">Lieu</Label>
+                <Input
+                  id="location"
+                  value={newEvent.location}
+                  onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })}
+                  placeholder="Restaurant NACK - Salle principale"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <Label htmlFor="organizerWhatsapp">Numéro WhatsApp (organisateur)</Label>
+                <Input
+                  id="organizerWhatsapp"
+                  value={newEvent.organizerWhatsapp}
+                  onChange={(e) => setNewEvent({ ...newEvent, organizerWhatsapp: e.target.value })}
+                  placeholder="Ex: +241 6XX XX XX XX"
+                />
+              </div>
+              <div className="space-y-2 sm:col-span-2">
+                <div className="flex items-center space-x-2 p-3 border rounded-lg bg-muted/30">
+                  <Checkbox
+                    id="paymentEnabled"
+                    checked={newEvent.paymentEnabled}
+                    onCheckedChange={(checked) => setNewEvent({ ...newEvent, paymentEnabled: checked === true })}
+                  />
+                  <Label htmlFor="paymentEnabled" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                    Activer le paiement en ligne (Airtel Money)
+                  </Label>
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+                {newEvent.paymentEnabled && (
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Les clients pourront payer leurs billets directement en ligne. Assurez-vous d'avoir configuré votre Disbursement ID dans les paramètres.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="capacity">Capacité maximale</Label>
+                <Input
+                  id="capacity"
+                  type="number"
+                  value={newEvent.maxCapacity}
+                  onChange={(e) => setNewEvent({ ...newEvent, maxCapacity: e.target.value })}
+                  placeholder="50"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="price">Prix du billet (XAF) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  value={newEvent.ticketPrice}
+                  onChange={(e) => setNewEvent({ ...newEvent, ticketPrice: e.target.value })}
+                  placeholder="15000"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col sm:flex-row justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsCreateModalOpen(false);
+                  setIsEditingEvent(false);
+                  setSelectedEvent(null);
+                }}
+                className="w-full sm:w-auto"
+              >
+                Annuler
+              </Button>
+              <Button onClick={handleCreateEvent} className="bg-gradient-primary text-white w-full sm:w-auto">
+                {isEditingEvent ? "Enregistrer" : "Créer l'événement"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
 
       {/* Participants & Finance Modal with Tabs */}
       {selectedEvent && (
@@ -798,16 +864,15 @@ const EventsPage = () => {
                 Gérez les participants et les finances de cet événement
               </DialogDescription>
             </DialogHeader>
-            
+
             {/* Tabs */}
             <div className="flex border-b border-border px-4 sm:px-6">
               <button
                 onClick={() => setActiveTab('participants')}
-                className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${
-                  activeTab === 'participants'
+                className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${activeTab === 'participants'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-center gap-2">
                   <Users size={16} className="sm:size-5" />
@@ -816,11 +881,10 @@ const EventsPage = () => {
               </button>
               <button
                 onClick={() => setActiveTab('finance')}
-                className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${
-                  activeTab === 'finance'
+                className={`flex-1 sm:flex-none px-4 py-3 text-sm sm:text-base font-medium border-b-2 transition-colors ${activeTab === 'finance'
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-center gap-2">
                   <DollarSign size={16} className="sm:size-5" />
@@ -832,44 +896,56 @@ const EventsPage = () => {
             {/* Tab Content */}
             <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 sm:py-6">
               {activeTab === 'participants' && (
-            <div className="space-y-4">
+                <div className="space-y-4">
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                <Card>
+                    <Card>
                       <CardContent className="p-3 sm:p-4 text-center">
                         <p className="text-xl sm:text-2xl font-bold text-nack-red">{selectedEvent.ticketsSold}</p>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">Billets vendus</p>
-                  </CardContent>
-                </Card>
-                <Card>
+                      </CardContent>
+                    </Card>
+                    <Card>
                       <CardContent className="p-3 sm:p-4 text-center">
                         <p className="text-xl sm:text-2xl font-bold text-green-600">{selectedEvent.maxCapacity - selectedEvent.ticketsSold}</p>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">Places restantes</p>
-                  </CardContent>
-                </Card>
+                      </CardContent>
+                    </Card>
                     <Card className="col-span-2 sm:col-span-1">
                       <CardContent className="p-3 sm:p-4 text-center">
                         <p className="text-xl sm:text-2xl font-bold">{(selectedEvent.ticketsSold * selectedEvent.ticketPrice).toLocaleString()} XAF</p>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">Revenus totaux</p>
-                  </CardContent>
-                </Card>
-              </div>
+                      </CardContent>
+                    </Card>
+                  </div>
 
-              <div className="rounded-lg border border-border overflow-hidden">
-                <div className="overflow-x-auto">
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-semibold">Liste des participants</h3>
+                    <Button
+                      size="sm"
+                      className="bg-nack-red hover:bg-nack-red/90 text-white gap-2"
+                      onClick={() => requireManagerAuth(() => setReserveDialogEvent(selectedEvent))}
+                    >
+                      <Plus size={16} />
+                      Ajouter un participant
+                    </Button>
+                  </div>
+
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="overflow-x-auto">
                       <table className="w-full min-w-[600px]">
-                    <thead className="bg-muted">
-                      <tr>
+                        <thead className="bg-muted">
+                          <tr>
                             <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Client</th>
                             <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold hidden sm:table-cell">Email</th>
                             <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Qté</th>
                             <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Montant</th>
                             <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Date</th>
                             <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-semibold">Statut</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getEventTickets(selectedEvent.id).map((ticket) => (
-                        <tr key={ticket.id} className="border-t border-border hover:bg-muted/50">
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {getEventTickets(selectedEvent.id).map((ticket) => (
+                            <tr key={ticket.id} className="border-t border-border hover:bg-muted/50">
                               <td className="p-2 sm:p-4 font-medium text-xs sm:text-sm">
                                 <div>{ticket.customerName}</div>
                                 <div className="text-muted-foreground sm:hidden text-xs mt-1">{ticket.customerEmail}</div>
@@ -880,22 +956,22 @@ const EventsPage = () => {
                               <td className="p-2 sm:p-4 text-xs sm:text-sm hidden md:table-cell">{ticket.purchaseDate.toLocaleDateString('fr-FR')}</td>
                               <td className="p-2 sm:p-4">
                                 <Badge variant={ticket.status === 'paid' ? 'default' : ticket.status === 'pending' ? 'secondary' : 'destructive'} className="text-xs">
-                              {ticket.status === 'paid' ? 'Payé' : ticket.status === 'pending' ? 'En attente' : 'Annulé'}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
+                                  {ticket.status === 'paid' ? 'Payé' : ticket.status === 'pending' ? 'En attente' : 'Annulé'}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
                           {getEventTickets(selectedEvent.id).length === 0 && (
-                        <tr>
+                            <tr>
                               <td colSpan={6} className="p-4 sm:p-8 text-center text-muted-foreground text-sm sm:text-base">
                                 Aucun billet pour le moment
                               </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -946,7 +1022,7 @@ const EventsPage = () => {
                       <div className="flex justify-between items-center py-2 border-b">
                         <span className="text-sm sm:text-base">Taux d'occupation</span>
                         <span className="font-semibold text-sm sm:text-base">
-                          {selectedEvent.maxCapacity > 0 
+                          {selectedEvent.maxCapacity > 0
                             ? ((selectedEvent.ticketsSold / selectedEvent.maxCapacity) * 100).toFixed(1)
                             : 0}%
                         </span>
@@ -983,55 +1059,55 @@ const EventsPage = () => {
             <div className="space-y-3 sm:space-y-4">
               <div className="space-y-1.5 sm:space-y-2">
                 <Label htmlFor="resv-name" className="text-sm sm:text-base">Nom complet *</Label>
-                <Input 
-                  id="resv-name" 
-                  value={reserveForm.name} 
+                <Input
+                  id="resv-name"
+                  value={reserveForm.name}
                   onChange={(e) => setReserveForm({ ...reserveForm, name: e.target.value })}
                   className="text-sm sm:text-base"
                 />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <Label htmlFor="resv-email" className="text-sm sm:text-base">Email *</Label>
-                <Input 
-                  id="resv-email" 
+                <Input
+                  id="resv-email"
                   type="email"
-                  value={reserveForm.email} 
+                  value={reserveForm.email}
                   onChange={(e) => setReserveForm({ ...reserveForm, email: e.target.value })}
                   className="text-sm sm:text-base"
                 />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <Label htmlFor="resv-phone" className="text-sm sm:text-base">WhatsApp *</Label>
-                <Input 
-                  id="resv-phone" 
+                <Input
+                  id="resv-phone"
                   type="tel"
-                  value={reserveForm.phone} 
+                  value={reserveForm.phone}
                   onChange={(e) => setReserveForm({ ...reserveForm, phone: e.target.value })}
                   className="text-sm sm:text-base"
                 />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <Label htmlFor="resv-qty" className="text-sm sm:text-base">Quantité</Label>
-                <Input 
-                  id="resv-qty" 
-                  type="number" 
-                  min="1" 
-                  value={reserveForm.quantity} 
+                <Input
+                  id="resv-qty"
+                  type="number"
+                  min="1"
+                  value={reserveForm.quantity}
                   onChange={(e) => setReserveForm({ ...reserveForm, quantity: Number(e.target.value) })}
                   className="text-sm sm:text-base"
                 />
               </div>
             </div>
             <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4 sm:mt-6">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setReserveDialogEvent(null)}
                 className="w-full sm:w-auto text-sm sm:text-base"
               >
                 Annuler
               </Button>
-              <Button 
-                onClick={saveReservationAndGenerate} 
+              <Button
+                onClick={saveReservationAndGenerate}
                 className="bg-gradient-primary text-white w-full sm:w-auto text-sm sm:text-base"
               >
                 Enregistrer et générer
@@ -1040,6 +1116,57 @@ const EventsPage = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Manager Auth Dialog */}
+      <Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-nack-red" />
+              Code gérant requis
+            </DialogTitle>
+            <DialogDescription>
+              Veuillez saisir votre code de sécurité pour autoriser cette action.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="manager-pin">Code de sécurité</Label>
+              <div className="relative">
+                <Input
+                  id="manager-pin"
+                  type={showPin ? "text" : "password"}
+                  value={managerCode}
+                  onChange={(e) => setManagerCode(e.target.value)}
+                  placeholder="Saisissez votre code..."
+                  autoFocus
+                  onKeyDown={(e) => e.key === 'Enter' && submitManagerAuth()}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPin(!showPin)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)} disabled={isAuthChecking}>
+              Annuler
+            </Button>
+            <Button onClick={submitManagerAuth} disabled={isAuthChecking || !managerCode} className="bg-nack-red text-white">
+              {isAuthChecking ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Vérification...
+                </>
+              ) : "Valider"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
