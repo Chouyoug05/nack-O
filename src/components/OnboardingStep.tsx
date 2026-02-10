@@ -49,8 +49,8 @@ const OnboardingStep = ({
             className={cn(
               "rounded-full transition-all duration-500 ease-out",
               isMobile ? "w-2.5 h-2.5" : "w-3 h-3",
-              index < currentStep 
-                ? "bg-nack-red scale-125 shadow-button" 
+              index < currentStep
+                ? "bg-nack-red scale-125 shadow-button"
                 : "bg-nack-beige/60 hover:bg-nack-beige transition-colors"
             )}
           />
@@ -59,23 +59,23 @@ const OnboardingStep = ({
 
       {/* Animation/Image Container - Compact design */}
       <div className={cn(
-        "mb-4 md:mb-6 relative flex items-center justify-center",
-        isMobile ? "w-24 h-24" : "w-32 h-32"
+        "mb-8 md:mb-10 relative flex items-center justify-center",
+        isMobile ? "w-64 h-64" : "w-80 h-80 md:w-96 md:h-96"
       )}>
         {type === "lottie" && animation ? (
-          <LottieAnimation 
+          <LottieAnimation
             animationData={animation}
             className="w-full h-full"
             loop={true}
             autoplay={true}
           />
         ) : type === "icon" && iconType ? (
-          <AnimatedIcon 
+          <AnimatedIcon
             type={iconType}
             className="w-full h-full"
           />
         ) : (
-          <LottieAnimation 
+          <LottieAnimation
             imageSrc={image}
             alt={title}
             className="w-full h-full"
@@ -115,7 +115,7 @@ const OnboardingStep = ({
         >
           {isLast ? "Commencer" : "Suivant"}
         </Button>
-        
+
         {onSkip && (
           <Button
             variant="nack-outline"

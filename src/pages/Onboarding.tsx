@@ -2,32 +2,25 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import OnboardingStep from "@/components/OnboardingStep";
 import NackLogo from "@/components/NackLogo";
-import AnimatedIcon from "@/components/AnimatedIcon";
 
 const onboardingData = [
   {
     title: "Gérez votre établissement",
     description: "Contrôlez facilement votre bar, snack ou boîte de nuit avec une interface moderne et intuitive.",
-    animation: undefined,
-    image: undefined,
-    type: "icon" as const,
-    iconType: "restaurant" as const
+    image: "/Manufacturing Process-rafiki.svg",
+    type: "image" as const
   },
   {
     title: "Suivez votre stock",
     description: "Gardez un œil sur vos boissons et produits en temps réel. Fini les ruptures de stock !",
-    animation: undefined,
-    image: undefined,
-    type: "icon" as const,
-    iconType: "inventory" as const
+    image: "/Supermarket workers-pana.svg",
+    type: "image" as const
   },
   {
     title: "Analysez vos performances",
     description: "Accédez à des rapports détaillés pour optimiser votre business et maximiser vos profits.",
-    animation: undefined,
-    image: undefined,
-    type: "icon" as const,
-    iconType: "analytics" as const
+    image: "/Revenue-pana.svg",
+    type: "image" as const
   }
 ];
 
