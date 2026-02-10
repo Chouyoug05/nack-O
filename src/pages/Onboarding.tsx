@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import OnboardingStep from "@/components/OnboardingStep";
 import NackLogo from "@/components/NackLogo";
@@ -27,6 +27,16 @@ const onboardingData = [
 const Onboarding = () => {
   const [currentStep, setCurrentStep] = useState(0);
   const navigate = useNavigate();
+
+  // Preload images for better performance
+  useEffect(() => {
+    onboardingData.forEach(item => {
+      if (item.image) {
+        const img = new Image();
+        img.src = item.image;
+      }
+    });
+  }, []);
 
   const handleNext = () => {
     if (currentStep < onboardingData.length - 1) {
