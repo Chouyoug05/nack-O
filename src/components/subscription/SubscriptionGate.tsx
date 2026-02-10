@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
+import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
 
 interface Props {
   children: React.ReactNode;
@@ -34,7 +35,7 @@ const SubscriptionGate = ({ children }: Props) => {
     try { return localStorage.getItem('nack_trial_popup_dismissed') !== '1'; } catch { return true; }
   });
   useEffect(() => {
-    try { if (!trialOpen) localStorage.setItem('nack_trial_popup_dismissed','1'); } catch (e) { void e; }
+    try { if (!trialOpen) localStorage.setItem('nack_trial_popup_dismissed', '1'); } catch (e) { void e; }
   }, [trialOpen]); // persist dismissal
 
   useEffect(() => {
@@ -98,28 +99,28 @@ const SubscriptionGate = ({ children }: Props) => {
     if (!user) return;
     try {
       setCreatingLink(true);
-      
+
       // Créer un ID unique pour cette transaction
       const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const now = Date.now();
-      
+
       const base = (
         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
         || window.location.origin
       ).replace(/\/+$/, '');
-      
+
       const reference = 'abonnement-transition';
       const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
       const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
       const logoURL = `${base}/favicon.png`;
-      
+
       // Enregistrer la transaction en attente
       try {
         const { paymentsColRef } = await import('@/lib/collections');
         const { db } = await import('@/lib/firebase');
         const { addDoc } = await import('firebase/firestore');
         const paymentsRef = paymentsColRef(db, user.uid);
-        
+
         await addDoc(paymentsRef, {
           userId: user.uid,
           transactionId,
@@ -136,7 +137,7 @@ const SubscriptionGate = ({ children }: Props) => {
       } catch (error) {
         console.error('Erreur enregistrement transaction pending:', error);
       }
-      
+
       const link = await createSubscriptionPaymentLink({
         amount: SUBSCRIPTION_PLANS.transition.price,
         reference: `${reference}-${transactionId.substring(0, 8)}`,
@@ -145,7 +146,7 @@ const SubscriptionGate = ({ children }: Props) => {
         logoURL,
         isTransfer: false,
       });
-      
+
       // Mettre à jour la transaction avec le lien généré
       try {
         const { paymentsColRef } = await import('@/lib/collections');
@@ -160,7 +161,7 @@ const SubscriptionGate = ({ children }: Props) => {
       } catch (error) {
         console.error('Erreur mise à jour lien paiement:', error);
       }
-      
+
       window.location.href = link;
     } catch (e) {
       console.error(e);
@@ -213,25 +214,25 @@ const SubscriptionGate = ({ children }: Props) => {
                     if (!user) return;
                     try {
                       setCreatingLink(true);
-                      
+
                       const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                       const now = Date.now();
                       const base = (
                         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
                         || window.location.origin
                       ).replace(/\/+$/, '');
-                      
+
                       const reference = 'abonnement-transition';
                       const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
                       const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
                       const logoURL = `${base}/favicon.png`;
-                      
+
                       try {
                         const { paymentsColRef } = await import('@/lib/collections');
                         const { db } = await import('@/lib/firebase');
                         const { addDoc } = await import('firebase/firestore');
                         const paymentsRef = paymentsColRef(db, user.uid);
-                        
+
                         await addDoc(paymentsRef, {
                           userId: user.uid,
                           transactionId,
@@ -248,7 +249,7 @@ const SubscriptionGate = ({ children }: Props) => {
                       } catch (error) {
                         console.error('Erreur enregistrement transaction pending:', error);
                       }
-                      
+
                       const link = await createSubscriptionPaymentLink({
                         amount: SUBSCRIPTION_PLANS.transition.price,
                         reference: `${reference}-${transactionId.substring(0, 8)}`,
@@ -257,7 +258,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         logoURL,
                         isTransfer: false,
                       });
-                      
+
                       try {
                         const { paymentsColRef } = await import('@/lib/collections');
                         const { db } = await import('@/lib/firebase');
@@ -271,7 +272,7 @@ const SubscriptionGate = ({ children }: Props) => {
                       } catch (error) {
                         console.error('Erreur mise à jour lien paiement:', error);
                       }
-                      
+
                       window.location.href = link;
                     } catch (e) {
                       console.error(e);
@@ -302,25 +303,25 @@ const SubscriptionGate = ({ children }: Props) => {
                     if (!user) return;
                     try {
                       setCreatingLink(true);
-                      
+
                       const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                       const now = Date.now();
                       const base = (
                         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
                         || window.location.origin
                       ).replace(/\/+$/, '');
-                      
+
                       const reference = 'abonnement-transition-pro-max';
                       const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
                       const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
                       const logoURL = `${base}/favicon.png`;
-                      
+
                       try {
                         const { paymentsColRef } = await import('@/lib/collections');
                         const { db } = await import('@/lib/firebase');
                         const { addDoc } = await import('firebase/firestore');
                         const paymentsRef = paymentsColRef(db, user.uid);
-                        
+
                         await addDoc(paymentsRef, {
                           userId: user.uid,
                           transactionId,
@@ -337,7 +338,7 @@ const SubscriptionGate = ({ children }: Props) => {
                       } catch (error) {
                         console.error('Erreur enregistrement transaction pending:', error);
                       }
-                      
+
                       const link = await createSubscriptionPaymentLink({
                         amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
                         reference: `${reference}-${transactionId.substring(0, 8)}`,
@@ -346,7 +347,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         logoURL,
                         isTransfer: false,
                       });
-                      
+
                       try {
                         const { paymentsColRef } = await import('@/lib/collections');
                         const { db } = await import('@/lib/firebase');
@@ -360,7 +361,7 @@ const SubscriptionGate = ({ children }: Props) => {
                       } catch (error) {
                         console.error('Erreur mise à jour lien paiement:', error);
                       }
-                      
+
                       window.location.href = link;
                     } catch (e) {
                       console.error(e);
@@ -422,25 +423,25 @@ const SubscriptionGate = ({ children }: Props) => {
                       if (!user) return;
                       try {
                         setCreatingLink(true);
-                        
+
                         const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                         const now = Date.now();
                         const base = (
                           (import.meta.env.VITE_PUBLIC_BASE_URL as string)
                           || window.location.origin
                         ).replace(/\/+$/, '');
-                        
+
                         const reference = 'abonnement-transition';
                         const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
                         const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
                         const logoURL = `${base}/favicon.png`;
-                        
+
                         try {
                           const { paymentsColRef } = await import('@/lib/collections');
                           const { db } = await import('@/lib/firebase');
                           const { addDoc } = await import('firebase/firestore');
                           const paymentsRef = paymentsColRef(db, user.uid);
-                          
+
                           await addDoc(paymentsRef, {
                             userId: user.uid,
                             transactionId,
@@ -457,7 +458,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         } catch (error) {
                           console.error('Erreur enregistrement transaction pending:', error);
                         }
-                        
+
                         const link = await createSubscriptionPaymentLink({
                           amount: SUBSCRIPTION_PLANS.transition.price,
                           reference: `${reference}-${transactionId.substring(0, 8)}`,
@@ -466,7 +467,7 @@ const SubscriptionGate = ({ children }: Props) => {
                           logoURL,
                           isTransfer: false,
                         });
-                        
+
                         try {
                           const { paymentsColRef } = await import('@/lib/collections');
                           const { db } = await import('@/lib/firebase');
@@ -480,7 +481,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         } catch (error) {
                           console.error('Erreur mise à jour lien paiement:', error);
                         }
-                        
+
                         window.location.href = link;
                       } catch (e) {
                         console.error(e);
@@ -501,25 +502,25 @@ const SubscriptionGate = ({ children }: Props) => {
                       if (!user) return;
                       try {
                         setCreatingLink(true);
-                        
+
                         const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
                         const now = Date.now();
                         const base = (
                           (import.meta.env.VITE_PUBLIC_BASE_URL as string)
                           || window.location.origin
                         ).replace(/\/+$/, '');
-                        
+
                         const reference = 'abonnement-transition-pro-max';
                         const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
                         const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
                         const logoURL = `${base}/favicon.png`;
-                        
+
                         try {
                           const { paymentsColRef } = await import('@/lib/collections');
                           const { db } = await import('@/lib/firebase');
                           const { addDoc } = await import('firebase/firestore');
                           const paymentsRef = paymentsColRef(db, user.uid);
-                          
+
                           await addDoc(paymentsRef, {
                             userId: user.uid,
                             transactionId,
@@ -536,7 +537,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         } catch (error) {
                           console.error('Erreur enregistrement transaction pending:', error);
                         }
-                        
+
                         const link = await createSubscriptionPaymentLink({
                           amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
                           reference: `${reference}-${transactionId.substring(0, 8)}`,
@@ -545,7 +546,7 @@ const SubscriptionGate = ({ children }: Props) => {
                           logoURL,
                           isTransfer: false,
                         });
-                        
+
                         try {
                           const { paymentsColRef } = await import('@/lib/collections');
                           const { db } = await import('@/lib/firebase');
@@ -559,7 +560,7 @@ const SubscriptionGate = ({ children }: Props) => {
                         } catch (error) {
                           console.error('Erreur mise à jour lien paiement:', error);
                         }
-                        
+
                         window.location.href = link;
                       } catch (e) {
                         console.error(e);
