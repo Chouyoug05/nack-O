@@ -9,6 +9,7 @@ import { EventProvider } from "@/contexts/EventContext";
 import PWAInstallButton from "@/components/PWAInstallButton";
 import WhatsAppCommunityPopup from "@/components/WhatsAppCommunityPopup";
 import LocationRequestDialog from "@/components/LocationRequestDialog";
+import NackLogo from "@/components/NackLogo";
 import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
@@ -39,20 +40,20 @@ import ConfigureTickets from "./pages/ConfigureTickets";
 const queryClient = new QueryClient();
 
 const FullscreenLoader = () => (
-  <div className="min-h-screen flex items-center justify-center">
-    <div className="animate-pulse text-sm text-muted-foreground">Chargement…</div>
+  <div className="min-h-screen flex items-center justify-center bg-background">
+    <NackLogo size="xl" pulse showAdminButton={false} />
   </div>
 );
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
-  if (loading) return <FullscreenLoader/>;
+  if (loading) return <FullscreenLoader />;
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 };
 
 const RequireProfile = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, profileLoading } = useAuth();
-  if (profileLoading) return <FullscreenLoader/>;
+  if (profileLoading) return <FullscreenLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (!profile) return <Navigate to="/complete-profile" replace />;
   return <>{children}</>;
@@ -60,7 +61,7 @@ const RequireProfile = ({ children }: { children: React.ReactNode }) => {
 
 const RequireAdmin = ({ children }: { children: React.ReactNode }) => {
   const { user, isAdmin, isAdminLoading } = useAuth();
-  if (isAdminLoading) return <FullscreenLoader/>;
+  if (isAdminLoading) return <FullscreenLoader />;
   if (!user) return <Navigate to="/login" replace />;
   if (!isAdmin) {
     // Rediriger vers admin-check pour diagnostic au lieu de dashboard
@@ -72,29 +73,29 @@ const RequireAdmin = ({ children }: { children: React.ReactNode }) => {
 // Composant pour rediriger automatiquement selon l'état de connexion
 const HomeRedirect = () => {
   const { user, profile, loading, profileLoading, isAdmin, isAdminLoading } = useAuth();
-  
+
   if (loading || profileLoading || isAdminLoading) {
-    return <FullscreenLoader/>;
+    return <FullscreenLoader />;
   }
-  
+
   if (user && (isAdmin || profile)) {
     return <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />;
   }
-  
+
   if (user && !profile && !isAdmin) {
     return <Navigate to="/complete-profile" replace />;
   }
-  
+
   return <Onboarding />;
 };
 
 const RootLayout = () => {
   const location = useLocation();
-  const isPublicPage = location.pathname.startsWith('/event/') || 
-                       location.pathname.startsWith('/commande/') ||
-                       location.pathname.startsWith('/affiliate') ||
-                       location.pathname === '/admin-check' ||
-                       location.pathname === '/mon-uid';
+  const isPublicPage = location.pathname.startsWith('/event/') ||
+    location.pathname.startsWith('/commande/') ||
+    location.pathname.startsWith('/affiliate') ||
+    location.pathname === '/admin-check' ||
+    location.pathname === '/mon-uid';
   return (
     <>
       <Outlet />
@@ -144,13 +145,13 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-      <EventProvider>
-        <OrderProvider>
-          <Toaster />
-          <Sonner />
-          <RouterProvider router={router} future={{ v7_startTransition: true }} />
-        </OrderProvider>
-      </EventProvider>
+        <EventProvider>
+          <OrderProvider>
+            <Toaster />
+            <Sonner />
+            <RouterProvider router={router} future={{ v7_startTransition: true }} />
+          </OrderProvider>
+        </EventProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
