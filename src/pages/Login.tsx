@@ -28,7 +28,7 @@ const Login = () => {
     role: '' as TeamRole | '',
     agentCode: ""
   });
-  
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const { signInWithEmail, signInWithGoogle, user, profile, profileLoading, isAdmin, isAdminLoading } = useAuth();
@@ -93,10 +93,10 @@ const Login = () => {
   const handleTeamLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teamFormData.role || !teamFormData.agentCode.trim()) {
-      toast({ 
-        title: "Champs manquants", 
-        description: "Veuillez sélectionner un rôle et entrer votre code d'agent", 
-        variant: "destructive" 
+      toast({
+        title: "Champs manquants",
+        description: "Veuillez sélectionner un rôle et entrer votre code d'agent",
+        variant: "destructive"
       });
       return;
     }
@@ -136,10 +136,10 @@ const Login = () => {
       }
 
       if (!foundToken) {
-        toast({ 
-          title: "Code invalide", 
-          description: "Le code d'agent ou le rôle ne correspond pas. Vérifiez avec votre gérant.", 
-          variant: "destructive" 
+        toast({
+          title: "Code invalide",
+          description: "Le code d'agent ou le rôle ne correspond pas. Vérifiez avec votre gérant.",
+          variant: "destructive"
         });
         return;
       }
@@ -177,11 +177,10 @@ const Login = () => {
             <button
               type="button"
               onClick={() => setLoginType('manager')}
-              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${
-                loginType === 'manager'
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${loginType === 'manager'
                   ? 'bg-nack-red text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <User size={18} />
               <span className="font-medium text-sm">Gérant</span>
@@ -189,11 +188,10 @@ const Login = () => {
             <button
               type="button"
               onClick={() => setLoginType('team')}
-              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${
-                loginType === 'team'
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${loginType === 'team'
                   ? 'bg-nack-red text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <Users size={18} />
               <span className="font-medium text-sm">Équipe</span>
@@ -201,11 +199,10 @@ const Login = () => {
             <button
               type="button"
               onClick={() => setLoginType('affiliate')}
-              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${
-                loginType === 'affiliate'
+              className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${loginType === 'affiliate'
                   ? 'bg-nack-red text-white shadow-md'
                   : 'text-gray-600 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <Gift size={18} />
               <span className="font-medium text-sm">Affilié</span>
@@ -243,65 +240,77 @@ const Login = () => {
                   <Gift size={18} className="mr-2" />
                   Accéder à mon espace affilié
                 </Button>
-              </div>
-            ) : loginType === 'manager' ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="votre@email.com"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  required
-                  className="h-12"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required
-                    className="h-12 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+
+                <div className="text-center pt-2">
+                  <p className="text-sm text-muted-foreground">
+                    Envie de rejoindre l'aventure ?{" "}
+                    <Link
+                      to="/register?mode=affiliate"
+                      className="text-nack-red hover:text-nack-red-dark font-medium underline-offset-4 hover:underline"
+                    >
+                      Devenir partenaire affilié
+                    </Link>
+                  </p>
                 </div>
               </div>
+            ) : loginType === 'manager' ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="votre@email.com"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    required
+                    className="h-12"
+                  />
+                </div>
 
-              <div className="flex items-center justify-between text-sm">
-                <Link 
-                  to="/forgot-password" 
-                  className="text-nack-red hover:text-nack-red-dark"
+                <div className="space-y-2">
+                  <Label htmlFor="password">Mot de passe</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      required
+                      className="h-12 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <Link
+                    to="/forgot-password"
+                    className="text-nack-red hover:text-nack-red-dark"
+                  >
+                    Mot de passe oublié ?
+                  </Link>
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="nack"
+                  size="lg"
+                  className="w-full h-12"
+                  disabled={isLoading}
                 >
-                  Mot de passe oublié ?
-                </Link>
-              </div>
-
-              <Button
-                type="submit"
-                variant="nack"
-                size="lg"
-                className="w-full h-12"
-                disabled={isLoading}
-              >
-                {isLoading ? "Connexion..." : "Se connecter"}
-              </Button>
-            </form>
+                  {isLoading ? "Connexion..." : "Se connecter"}
+                </Button>
+              </form>
             ) : (
               <form onSubmit={handleTeamLogin} className="space-y-4">
                 <div className="space-y-2">
@@ -373,17 +382,17 @@ const Login = () => {
             )}
 
             {loginType === 'manager' && (
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Pas encore de compte ?{" "}
-                <Link 
-                  to="/register" 
+              <div className="mt-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Pas encore de compte ?{" "}
+                  <Link
+                    to="/register"
                     className="text-nack-red hover:text-nack-red-dark font-medium transition-colors"
-                >
-                  S'inscrire
-                </Link>
-              </p>
-            </div>
+                  >
+                    S'inscrire
+                  </Link>
+                </p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -402,7 +411,7 @@ const Login = () => {
             </div>
             <div className="flex items-start gap-2">
               <span className="font-bold">Affilié :</span>
-              <span>Sélectionnez "Affilié" puis accédez à votre espace avec votre code affilié pour voir vos statistiques et revenus</span>
+              <span>Connectez-vous avec votre code pour voir vos stats, ou créez votre compte partenaire.</span>
             </div>
             <div className="mt-3 pt-2 border-t border-blue-300">
               <p className="text-xs font-medium text-blue-900">
