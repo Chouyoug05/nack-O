@@ -12,6 +12,8 @@ try {
         const regs = await navigator.serviceWorker.getRegistrations();
         if (regs.length > 0) {
           for (const reg of regs) {
+            // Ne pas désenregistrer le service worker des notifications
+            if (reg.active?.scriptURL.includes('firebase-messaging-sw.js')) continue;
             try { await reg.unregister(); } catch { /* ignore */ }
           }
           try {
@@ -31,7 +33,7 @@ try {
 try {
   if (typeof window !== 'undefined' && typeof Node !== 'undefined') {
     const originalRemoveChild: typeof Node.prototype.removeChild = Node.prototype.removeChild;
-    Node.prototype.removeChild = function<T extends Node>(child: T): T {
+    Node.prototype.removeChild = function <T extends Node>(child: T): T {
       try {
         // Supprimer seulement si le parent correspond encore
         if (child && child.parentNode === this) {

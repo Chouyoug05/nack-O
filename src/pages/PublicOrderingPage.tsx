@@ -64,6 +64,7 @@ interface Establishment {
   airtelMoneyNumber?: string; // Numéro Airtel Money
   deliveryEnabled?: boolean; // Livraison activée
   deliveryPrice?: number; // Prix de livraison en XAF
+  fcmToken?: string; // Token pour les notifications push
 }
 
 const PublicOrderingPage = () => {
@@ -202,7 +203,8 @@ const PublicOrderingPage = () => {
             airtelMoneyNumber: profileData.airtelMoneyNumber,
             deliveryEnabled: profileData.deliveryEnabled,
             deliveryPrice: profileData.deliveryPrice,
-          });
+            fcmToken: profileData.fcmToken,
+          } as Establishment);
         }
       })
       .catch(() => {
@@ -548,6 +550,26 @@ const PublicOrderingPage = () => {
       // Créer la commande dans barOrders pour qu'elle arrive chez le gérant
       if (establishmentId) {
         await addDoc(barOrdersColRef(db, establishmentId), orderData);
+
+        // Envoyer la notification push au gérant si le token est disponible
+        if (establishment?.fcmToken) {
+          try {
+            fetch('/.netlify/functions/send-notification', {
+              method: 'POST',
+              body: JSON.stringify({
+                token: establishment.fcmToken,
+                title: "Nouvelle commande",
+                body: `Commande #${orderNumberValue} - ${isDelivery ? 'Livraison' : selectedTable} - ${total.toLocaleString('fr-FR')} XAF`,
+                data: {
+                  orderNumber: orderNumberValue,
+                  type: 'NEW_ORDER'
+                }
+              })
+            }).catch(err => console.error('Erreur fetch notification:', err));
+          } catch (error) {
+            console.error('Erreur envoi notification:', error);
+          }
+        }
       }
 
       const receiptData = {

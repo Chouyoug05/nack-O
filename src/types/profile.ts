@@ -49,6 +49,7 @@ export interface UserProfile {
   // Livraison
   deliveryEnabled?: boolean; // Activer la livraison
   deliveryPrice?: number; // Prix de livraison en XAF
+  fcmToken?: string; // Token pour les notifications push
   // Affiliation (parrainage)
   referredBy?: string; // Code affilié utilisé à l'inscription
   createdAt: number;

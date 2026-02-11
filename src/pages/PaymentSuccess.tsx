@@ -204,6 +204,31 @@ const PaymentSuccess = () => {
                 // Créer la commande avec le statut approprié
                 const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId!), cleanedOrderData);
 
+                // Envoyer la notification push au gérant si le token est disponible
+                try {
+                  const profDoc = await getDoc(doc(db, 'profiles', paymentData.establishmentId!));
+                  if (profDoc.exists()) {
+                    const profData = profDoc.data();
+                    if (profData.fcmToken) {
+                      const body = `Commande PAYÉE #${cleanedOrderData.orderNumber} - ${cleanedOrderData.tableZone} - ${Number(cleanedOrderData.total).toLocaleString('fr-FR')} XAF`;
+                      fetch('/.netlify/functions/send-notification', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                          token: profData.fcmToken,
+                          title: "Nouvelle commande payée",
+                          body: body,
+                          data: {
+                            orderNumber: String(cleanedOrderData.orderNumber),
+                            type: 'NEW_PAID_ORDER'
+                          }
+                        })
+                      }).catch(err => console.error('Erreur fetch notification success:', err));
+                    }
+                  }
+                } catch (notiErr) {
+                  console.error('Erreur trigger notification payment success:', notiErr);
+                }
+
                 // Mettre à jour la transaction avec l'ID de la commande créée
                 await updateDoc(paymentDoc.ref, {
                   orderId: orderDocRef.id,

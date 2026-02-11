@@ -3,6 +3,7 @@ import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import { getAuth, setPersistence, browserLocalPersistence, type Auth, browserSessionPersistence, inMemoryPersistence } from "firebase/auth";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
+import { getMessaging, type Messaging } from "firebase/messaging";
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: "AIzaSyCHbORTw-dgJW4OWIRazYrhAemERLV68sM",
@@ -45,4 +46,5 @@ if (typeof window !== "undefined") {
 }
 
 export const db: Firestore = getFirestore(app);
-export const storage: FirebaseStorage = getStorage(app); 
+export const storage: FirebaseStorage = getStorage(app);
+export const messaging: Messaging | undefined = typeof window !== "undefined" ? getMessaging(app) : undefined;

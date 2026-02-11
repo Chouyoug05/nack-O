@@ -36,6 +36,7 @@ import CustomerDetailsPage from "@/components/pages/CustomerDetailsPage";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import PublicOrderingPage from "./pages/PublicOrderingPage";
 import ConfigureTickets from "./pages/ConfigureTickets";
+import { useNotifications } from "@/hooks/useNotifications";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,8 @@ const HomeRedirect = () => {
 };
 
 const RootLayout = () => {
+  const { user } = useAuth();
+  useNotifications(user?.uid);
   const location = useLocation();
   const isPublicPage = location.pathname.startsWith('/event/') ||
     location.pathname.startsWith('/commande/') ||
