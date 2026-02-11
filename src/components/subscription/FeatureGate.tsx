@@ -38,7 +38,7 @@ export const FeatureGate = ({ feature, children, fallback }: FeatureGateProps) =
   };
 
   const featureName = featureNames[feature] || feature;
-  
+
   // Déterminer les plans qui ont accès
   const availablePlans = Object.entries(SUBSCRIPTION_PLANS)
     .filter(([_, plan]) => plan.features[feature])
@@ -62,7 +62,7 @@ export const FeatureGate = ({ feature, children, fallback }: FeatureGateProps) =
             {availablePlans.map((plan) => (
               <li key={plan.key} className="flex items-center justify-between text-sm">
                 <span>{plan.name}</span>
-                <span className="font-bold text-nack-red">{plan.price.toLocaleString()} XAF/mois</span>
+                <span className="font-bold text-nack-red">à partir de {plan.price.toLocaleString()} XAF</span>
               </li>
             ))}
           </ul>
