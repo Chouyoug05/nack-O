@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { affiliateDocRef } from "@/lib/collections";
-import { getDoc } from "firebase/firestore";
-import type { AffiliateDoc } from "@/types/profile";
+import { affiliateDocRef, profilesColRef } from "@/lib/collections";
+import { getDoc, query, where, getDocs } from "firebase/firestore";
+import type { AffiliateDoc, UserProfile } from "@/types/profile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, QrCode, Users, Loader2, Copy, Wallet } from "lucide-react";
+import { Building2, QrCode, Users, Loader2, Copy, Wallet, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import QRCode from "qrcode";
+import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 const baseUrl = typeof window !== "undefined" ? `${window.location.origin}${(import.meta.env?.BASE_URL || "").replace(/\/$/, "")}` : "";
 
@@ -19,16 +21,29 @@ const AffiliateDashboard = () => {
   const codeParam = searchParams.get("code")?.trim().toUpperCase();
   const [inputCode, setInputCode] = useState(codeParam || "");
   const [affiliate, setAffiliate] = useState<AffiliateDoc | null>(null);
+  const [referrals, setReferrals] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(!!codeParam);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const code = codeParam || (affiliate?.code ?? "");
 
+  const fetchReferrals = async (affiliateCode: string) => {
+    try {
+      const q = query(profilesColRef(db), where("referredBy", "==", affiliateCode));
+      const snap = await getDocs(q);
+      const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile));
+      setReferrals(list);
+    } catch (err) {
+      console.error("Erreur lors de la récupération des parrainages:", err);
+    }
+  };
+
   useEffect(() => {
     if (!code) {
       setLoading(false);
       setAffiliate(null);
+      setReferrals([]);
       setError(null);
       return;
     }
@@ -38,8 +53,10 @@ const AffiliateDashboard = () => {
       .then((snap) => {
         if (snap.exists()) {
           setAffiliate({ id: snap.id, ...snap.data() } as AffiliateDoc);
+          fetchReferrals(code);
         } else {
           setAffiliate(null);
+          setReferrals([]);
           setError("Code affilié introuvable.");
         }
       })
@@ -82,7 +99,7 @@ const AffiliateDashboard = () => {
       <div className="min-h-screen bg-gradient-secondary flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
-            <NackLogo size="md" className="mb-2" />
+            <NackLogo size="md" variant="affiliate" className="mb-2" />
             <p className="text-muted-foreground text-sm">Espace affilié Nack</p>
           </div>
           <Card className="shadow-card border-0">
@@ -151,7 +168,7 @@ const AffiliateDashboard = () => {
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <NackLogo size="sm" />
+            <NackLogo size="sm" variant="affiliate" />
             <span className="text-muted-foreground text-sm">Espace affilié</span>
           </div>
           <Button variant="ghost" size="sm" onClick={() => setSearchParams({})}>
@@ -173,7 +190,7 @@ const AffiliateDashboard = () => {
             <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
               <Building2 size={32} className="text-primary" />
               <div>
-                <p className="text-2xl font-bold">{count}</p>
+                <p className="text-2xl font-bold">{referrals.length || count}</p>
                 <p className="text-sm text-muted-foreground">établissement(s) inscrit(s) avec votre code</p>
               </div>
             </div>
@@ -184,6 +201,59 @@ const AffiliateDashboard = () => {
                 <p className="text-sm text-muted-foreground">Revenus (commission : 1 000 XAF / abo standard, 2 000 XAF / abo pro). L'admin vous verse à la date du paiement de l'établissement.</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Liste des parrainages */}
+        <Card className="shadow-card border-0 mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 size={20} />
+              Établissements parrainés
+            </CardTitle>
+            <CardDescription>
+              Suivez l'état des abonnements de vos parrainages.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {referrals.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Aucun établissement n'est encore inscrit avec votre code.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {referrals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((ref) => {
+                  const isExpired = ref.plan === 'expired';
+                  const isActive = ref.plan === 'active';
+                  const isTrial = ref.plan === 'trial';
+
+                  return (
+                    <div key={ref.uid} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold truncate">{ref.establishmentName}</p>
+                        <p className="text-xs text-muted-foreground">Inscrit le {new Date(ref.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 ml-4">
+                        <Badge variant={isActive ? "success" : isTrial ? "secondary" : "destructive"} className="whitespace-nowrap">
+                          {isActive ? (
+                            <><CheckCircle2 size={12} className="mr-1" /> Payé</>
+                          ) : isTrial ? (
+                            <><Clock size={12} className="mr-1" /> Essai gratuit</>
+                          ) : (
+                            <><AlertCircle size={12} className="mr-1" /> Expiré</>
+                          )}
+                        </Badge>
+                        {ref.subscriptionEndsAt && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Expire le {new Date(ref.subscriptionEndsAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 

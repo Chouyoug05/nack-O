@@ -10,9 +10,10 @@ interface NackLogoProps {
   size?: "sm" | "md" | "lg" | "xl";
   showAdminButton?: boolean;
   pulse?: boolean;
+  variant?: "nack" | "affiliate";
 }
 
-const NackLogo = ({ className, size = "md", showAdminButton = true, pulse = false }: NackLogoProps) => {
+const NackLogo = ({ className, size = "md", showAdminButton = true, pulse = false, variant = "nack" }: NackLogoProps) => {
   const [showAdminAccess, setShowAdminAccess] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -35,7 +36,7 @@ const NackLogo = ({ className, size = "md", showAdminButton = true, pulse = fals
   return (
     <div className={cn("relative flex items-center justify-center", className)}>
       <img
-        src="/Design sans titre.svg"
+        src={variant === "affiliate" ? "/Design sans titre12.svg" : "/Design sans titre.svg"}
         alt="nack! logo"
         className={cn(
           "object-contain animate-fade-in cursor-pointer",
