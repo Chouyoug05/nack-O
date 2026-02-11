@@ -198,8 +198,12 @@ const Register = () => {
   };
 
   const handleAffiliateSubmit = async () => {
-    if (!formData.ownerName || !formData.email || !formData.whatsapp) {
+    if (!formData.ownerName || !formData.email || !formData.whatsapp || !formData.password) {
       toast({ title: "Champs manquants", variant: "destructive" });
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      toast({ title: "Mots de passe différents", variant: "destructive" });
       return;
     }
     setIsLoading(true);
@@ -215,6 +219,7 @@ const Register = () => {
         name: formData.ownerName,
         email: formData.email,
         whatsapp: formData.whatsapp,
+        password: formData.password, // Stockage du mot de passe pour la connexion simplifiée
         referralCount: 0,
         totalEarned: 0,
         createdAt: Date.now(),
@@ -261,8 +266,12 @@ const Register = () => {
           <Input name="ownerName" placeholder="Nom complet" value={formData.ownerName} onChange={handleInputChange} className="h-14" />
           <Input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} className="h-14" />
           <Input name="whatsapp" type="tel" placeholder="WhatsApp (ex: +241...)" value={formData.whatsapp} onChange={handleInputChange} className="h-14" />
+          <div className="grid grid-cols-2 gap-3">
+            <Input name="password" type="password" placeholder="Mot de passe" value={formData.password} onChange={handleInputChange} className="h-14" />
+            <Input name="confirmPassword" type="password" placeholder="Confirmer" value={formData.confirmPassword} onChange={handleInputChange} className="h-14" />
+          </div>
         </div>
-        <Button onClick={handleAffiliateSubmit} disabled={isLoading || !formData.ownerName || !formData.email || !formData.whatsapp} className="w-full h-14 bg-nack-red text-white font-bold">
+        <Button onClick={handleAffiliateSubmit} disabled={isLoading || !formData.ownerName || !formData.email || !formData.whatsapp || !formData.password || formData.password !== formData.confirmPassword} className="w-full h-14 bg-nack-red text-white font-bold">
           {isLoading ? 'Création...' : 'Créer mon compte affilié'}
         </Button>
         <div className="text-center">

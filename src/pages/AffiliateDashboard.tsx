@@ -19,14 +19,21 @@ const baseUrl = typeof window !== "undefined" ? `${window.location.origin}${(imp
 const AffiliateDashboard = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const codeParam = searchParams.get("code")?.trim().toUpperCase();
-  const [inputCode, setInputCode] = useState(codeParam || "");
+  const [inputCode, setInputCode] = useState("");
+  const [inputPassword, setInputPassword] = useState("");
   const [affiliate, setAffiliate] = useState<AffiliateDoc | null>(null);
   const [referrals, setReferrals] = useState<UserProfile[]>([]);
-  const [loading, setLoading] = useState(!!codeParam);
+  const [loading, setLoading] = useState(true);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const code = codeParam || (affiliate?.code ?? "");
+  // Session simple: on stocke le code validé en localStorage
+  const [sessionCode, setSessionCode] = useState<string | null>(() => {
+    return localStorage.getItem("nack_affiliate_session");
+  });
+
+  const activeCode = codeParam || sessionCode;
 
   const fetchReferrals = async (affiliateCode: string) => {
     try {
@@ -40,7 +47,7 @@ const AffiliateDashboard = () => {
   };
 
   useEffect(() => {
-    if (!code) {
+    if (!activeCode) {
       setLoading(false);
       setAffiliate(null);
       setReferrals([]);
@@ -49,24 +56,29 @@ const AffiliateDashboard = () => {
     }
     setLoading(true);
     setError(null);
-    getDoc(affiliateDocRef(db, code))
+    getDoc(affiliateDocRef(db, activeCode))
       .then((snap) => {
         if (snap.exists()) {
           setAffiliate({ id: snap.id, ...snap.data() } as AffiliateDoc);
-          fetchReferrals(code);
+          fetchReferrals(activeCode);
         } else {
+          // Si le code n'est pas trouvé et qu'on a une "session", on la vide
+          if (sessionCode === activeCode) {
+            setSessionCode(null);
+            localStorage.removeItem("nack_affiliate_session");
+          }
           setAffiliate(null);
           setReferrals([]);
-          setError("Code affilié introuvable.");
+          setError("Session ou code invalide.");
         }
       })
       .catch((err) => {
         console.error(err);
-        setError("Impossible de charger les données.");
+        setError("Erreur de connexion aux serveurs.");
         setAffiliate(null);
       })
       .finally(() => setLoading(false));
-  }, [code]);
+  }, [activeCode]); // Utilise activeCode (code URL ou session)
 
   useEffect(() => {
     if (!affiliate?.code) return;
@@ -76,11 +88,57 @@ const AffiliateDashboard = () => {
       .catch(() => setQrDataUrl(null));
   }, [affiliate?.code]);
 
-  const handleSubmitCode = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const c = inputCode.trim().toUpperCase();
-    if (!c) return;
-    setSearchParams({ code: c });
+    const identifier = inputCode.trim();
+    const password = inputPassword.trim();
+    if (!identifier || !password) return;
+
+    setLoginLoading(true);
+    setError(null);
+
+    try {
+      let affiliateDoc: AffiliateDoc | null = null;
+      let codeToUse = identifier.toUpperCase();
+
+      // 1. Essayer par code directement
+      const directSnap = await getDoc(affiliateDocRef(db, codeToUse));
+      if (directSnap.exists()) {
+        affiliateDoc = { id: directSnap.id, ...directSnap.data() } as AffiliateDoc;
+      } else {
+        // 2. Essayer par numéro WhatsApp
+        const { affiliatesColRef } = await import("@/lib/collections");
+        const q = query(affiliatesColRef(db), where("whatsapp", "==", identifier));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          affiliateDoc = { id: snap.docs[0].id, ...snap.docs[0].data() } as AffiliateDoc;
+          codeToUse = affiliateDoc.code;
+        }
+      }
+
+      if (affiliateDoc && (!affiliateDoc.password || affiliateDoc.password === password)) {
+        // Succès
+        localStorage.setItem("nack_affiliate_session", codeToUse);
+        setSessionCode(codeToUse);
+        setSearchParams({ code: codeToUse });
+      } else if (affiliateDoc) {
+        setError("Mot de passe incorrect.");
+      } else {
+        setError("Identifiant (code ou numéro) inconnu.");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Erreur lors de la connexion.");
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("nack_affiliate_session");
+    setSessionCode(null);
+    setSearchParams({});
+    setAffiliate(null);
   };
 
   if (loading) {
@@ -94,70 +152,65 @@ const AffiliateDashboard = () => {
     );
   }
 
-  if (!code) {
+  if (!activeCode || (!loading && !affiliate)) {
     return (
       <div className="min-h-screen bg-gradient-secondary flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           <div className="text-center mb-6">
             <NackLogo size="md" variant="affiliate" className="mb-2" />
-            <p className="text-muted-foreground text-sm">Espace affilié Nack</p>
+            <p className="text-muted-foreground text-sm font-medium">Espace Partenaire Nack</p>
           </div>
           <Card className="shadow-card border-0">
-            <CardHeader>
-              <CardTitle>Connexion affilié</CardTitle>
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl">Connexion Affilié</CardTitle>
               <CardDescription>
-                Entrez le code affilié qui vous a été communiqué pour accéder à vos statistiques.
+                Accédez à votre tableau de bord sécurisé.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmitCode} className="space-y-4">
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="code">Code affilié</Label>
+                  <Label htmlFor="id">Code ou Numéro WhatsApp</Label>
                   <Input
-                    id="code"
+                    id="id"
                     value={inputCode}
-                    onChange={(e) => setInputCode(e.target.value.toUpperCase())}
-                    placeholder="Ex: AFF001"
-                    className="font-mono uppercase"
+                    onChange={(e) => setInputCode(e.target.value)}
+                    placeholder="Ex: AFF-XXXX ou +241..."
+                    className="h-12"
                     autoFocus
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={!inputCode.trim()}>
-                  Accéder à mon espace
+                <div className="space-y-2">
+                  <Label htmlFor="pass">Mot de passe</Label>
+                  <Input
+                    id="pass"
+                    type="password"
+                    value={inputPassword}
+                    onChange={(e) => setInputPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="h-12"
+                  />
+                </div>
+                {error && <p className="text-sm text-red-500 font-medium">{error}</p>}
+                <Button type="submit" className="w-full h-12 text-base font-bold bg-nack-red hover:bg-nack-red-dark" disabled={loginLoading || !inputCode.trim() || !inputPassword.trim()}>
+                  {loginLoading ? <Loader2 className="animate-spin mr-2" /> : "Se connecter"}
                 </Button>
               </form>
             </CardContent>
           </Card>
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            <Link to="/" className="text-primary hover:underline">Retour à l'accueil</Link>
-          </p>
+          <div className="text-center space-y-3 mt-6">
+            <p className="text-sm text-muted-foreground">
+              Pas encore de compte ?{" "}
+              <Link to="/register?mode=affiliate" className="text-nack-red font-bold hover:underline">Devenir partenaire</Link>
+            </p>
+            <Link to="/" className="text-xs text-muted-foreground hover:underline block">Retour à l'accueil nack!</Link>
+          </div>
         </div>
       </div>
     );
   }
 
-  if (error || !affiliate) {
-    return (
-      <div className="min-h-screen bg-gradient-secondary flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-6">
-            <NackLogo size="md" className="mb-2" />
-          </div>
-          <Card className="shadow-card border-0">
-            <CardContent className="pt-6">
-              <p className="text-destructive text-center mb-4">{error || "Code inconnu."}</p>
-              <Button variant="outline" className="w-full" onClick={() => setSearchParams({})}>
-                Saisir un autre code
-              </Button>
-            </CardContent>
-          </Card>
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            <Link to="/" className="text-primary hover:underline">Retour à l'accueil</Link>
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Suppression du bloc d'erreur séparé car handleLogin/activeCode gèrent tout
 
   const registerUrl = `${baseUrl}/register?ref=${encodeURIComponent(affiliate.code)}`;
   const count = affiliate.referralCount ?? 0;
@@ -171,8 +224,8 @@ const AffiliateDashboard = () => {
             <NackLogo size="sm" variant="affiliate" />
             <span className="text-muted-foreground text-sm">Espace affilié</span>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => setSearchParams({})}>
-            Changer de code
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="text-muted-foreground hover:text-destructive">
+            Se déconnecter
           </Button>
         </div>
 
