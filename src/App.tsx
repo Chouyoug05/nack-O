@@ -95,7 +95,12 @@ const RootLayout = () => {
     location.pathname.startsWith('/commande/') ||
     location.pathname.startsWith('/affiliate') ||
     location.pathname === '/admin-check' ||
-    location.pathname === '/mon-uid';
+    location.pathname === '/mon-uid' ||
+    location.pathname === '/register' ||
+    location.pathname === '/complete-profile' ||
+    location.pathname === '/onboarding' ||
+    location.pathname === '/login' ||
+    location.pathname === '/configure-tickets';
   return (
     <>
       <Outlet />

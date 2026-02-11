@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
+import { geocodeAddress, searchAddresses } from "@/utils/geocoding";
+import { Search, Navigation, MapPin } from "lucide-react";
 
 const establishmentTypes = [
   { value: "bar", label: "Bar" },
@@ -34,8 +36,17 @@ const CompleteProfile = () => {
     phone: "",
     whatsapp: "",
     logoUrl: "",
+    address: "",
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
   });
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [addressInput, setAddressInput] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isGettingLocation, setIsGettingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
     // Si admin, rediriger vers /admin même sans profil
@@ -50,9 +61,66 @@ const CompleteProfile = () => {
     }
   }, [profileLoading, profile, navigate]);
 
+  const handleAddressInputChange = async (value: string) => {
+    setAddressInput(value);
+    if (value.length >= 3) {
+      setIsSearchingAddress(true);
+      const suggestions = await searchAddresses(value);
+      setAddressSuggestions(suggestions);
+      setShowSuggestions(true);
+      setIsSearchingAddress(false);
+    } else {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleSelectAddress = async (suggestion: { display_name: string; lat: string; lon: string }) => {
+    setAddressInput(suggestion.display_name);
+    setFormData({
+      ...formData,
+      latitude: parseFloat(suggestion.lat),
+      longitude: parseFloat(suggestion.lon),
+      address: suggestion.display_name
+    });
+    setShowSuggestions(false);
+  };
+
+  const getCurrentLocation = async () => {
+    if (!navigator.geolocation) {
+      setLocationError("La géolocalisation n'est pas supportée");
+      return;
+    }
+    setIsGettingLocation(true);
+    setLocationError(null);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
+      });
+      const { latitude, longitude } = position.coords;
+      setFormData({ ...formData, latitude, longitude });
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18`);
+        const data = await response.json();
+        const address = data.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        setFormData(prev => ({ ...prev, address }));
+        setAddressInput(address);
+      } catch {
+        const fallback = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+        setFormData(prev => ({ ...prev, address: fallback }));
+        setAddressInput(fallback);
+      }
+      toast({ title: "Position enregistrée" });
+    } catch {
+      setLocationError("Erreur de géolocalisation");
+    } finally {
+      setIsGettingLocation(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validation WhatsApp
     if (!formData.whatsapp.trim()) {
       toast({
@@ -62,7 +130,7 @@ const CompleteProfile = () => {
       });
       return;
     }
-    
+
     if (!validateWhatsApp(formData.whatsapp)) {
       toast({
         title: "Format WhatsApp invalide",
@@ -71,7 +139,7 @@ const CompleteProfile = () => {
       });
       return;
     }
-    
+
     try {
       let finalLogoUrl: string | undefined = formData.logoUrl || undefined;
       if (logoFile) {
@@ -95,6 +163,10 @@ const CompleteProfile = () => {
         phone: formData.phone,
         whatsapp: formData.whatsapp,
         logoUrl: finalLogoUrl,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        address: formData.address || undefined,
+        locationAsked: true,
       });
       toast({ title: "Profil enregistré", description: "Bienvenue sur NACK!" });
       navigate("/dashboard", { replace: true });
@@ -161,13 +233,13 @@ const CompleteProfile = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="whatsapp">WhatsApp <span className="text-red-500">*</span></Label>
-                <Input 
-                  id="whatsapp" 
-                  name="whatsapp" 
-                  type="tel" 
-                  value={formData.whatsapp} 
-                  onChange={handleInputChange} 
-                  required 
+                <Input
+                  id="whatsapp"
+                  name="whatsapp"
+                  type="tel"
+                  value={formData.whatsapp}
+                  onChange={handleInputChange}
+                  required
                   placeholder="+241 XX XX XX XX"
                   className={formData.whatsapp && !validateWhatsApp(formData.whatsapp) ? "border-red-500" : ""}
                 />
@@ -186,7 +258,36 @@ const CompleteProfile = () => {
                 <Input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
               </div>
 
-              <Button type="submit" variant="nack" size="lg" className="w-full">Enregistrer</Button>
+              <div className="space-y-2 border-t pt-4 mt-4">
+                <Label className="font-semibold">Localisation de l'établissement</Label>
+                <div className="relative">
+                  <Input
+                    placeholder="Chercher une adresse..."
+                    value={addressInput}
+                    onChange={(e) => handleAddressInputChange(e.target.value)}
+                    className="h-12 pr-10"
+                  />
+                  <div className="absolute right-0 top-0 h-12 w-10 flex items-center justify-center text-muted-foreground">
+                    <Search className="h-4 w-4" />
+                  </div>
+                </div>
+                {showSuggestions && addressSuggestions.length > 0 && (
+                  <div className="border rounded-md bg-white shadow-md max-h-40 overflow-y-auto z-10">
+                    {addressSuggestions.map((s, i) => (
+                      <button key={i} type="button" onClick={() => handleSelectAddress(s)} className="w-full text-left p-2 hover:bg-gray-100 text-sm border-b">{s.display_name}</button>
+                    ))}
+                  </div>
+                )}
+                <Button type="button" variant="outline" onClick={getCurrentLocation} disabled={isGettingLocation} className="w-full h-12 mt-2">
+                  <Navigation className="w-4 h-4 mr-2" /> GPS
+                </Button>
+                {locationError && <p className="text-xs text-red-500 mt-1">{locationError}</p>}
+                {formData.latitude && <p className="text-xs text-green-600 mt-1 font-medium">✓ Localisé avec succès</p>}
+              </div>
+
+              <Button type="submit" variant="nack" size="lg" className="w-full h-14 text-lg font-bold" disabled={!formData.latitude}>
+                {formData.latitude ? "Finaliser mon inscription" : "Veuillez localiser l'établissement"}
+              </Button>
             </form>
           </CardContent>
         </Card>
