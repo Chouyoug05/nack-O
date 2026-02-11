@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { agentTokensTopColRef } from "@/lib/collections";
 import { getDoc, doc, collectionGroup, query, where, limit, getDocs } from "firebase/firestore";
+import { getFriendlyErrorMessage } from "@/utils/authErrors";
 
 type LoginType = 'manager' | 'team' | 'affiliate';
 type TeamRole = 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
@@ -49,8 +50,11 @@ const Login = () => {
       toast({ title: "Connexion réussie !", description: "Bienvenue sur NACK!" });
       // La redirection est gérée par l'effet en fonction de isAdmin/profile
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Vérifiez vos identifiants.";
-      toast({ title: "Erreur de connexion", description: message, variant: "destructive" });
+      toast({
+        title: "Erreur de connexion",
+        description: getFriendlyErrorMessage(error),
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -178,8 +182,8 @@ const Login = () => {
               type="button"
               onClick={() => setLoginType('manager')}
               className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${loginType === 'manager'
-                  ? 'bg-nack-red text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-nack-red text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-50'
                 }`}
             >
               <User size={18} />
@@ -189,8 +193,8 @@ const Login = () => {
               type="button"
               onClick={() => setLoginType('team')}
               className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${loginType === 'team'
-                  ? 'bg-nack-red text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-nack-red text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-50'
                 }`}
             >
               <Users size={18} />
@@ -200,8 +204,8 @@ const Login = () => {
               type="button"
               onClick={() => setLoginType('affiliate')}
               className={`flex flex-col items-center justify-center gap-1 px-2 py-3 rounded-md transition-all ${loginType === 'affiliate'
-                  ? 'bg-nack-red text-white shadow-md'
-                  : 'text-gray-600 hover:bg-gray-50'
+                ? 'bg-nack-red text-white shadow-md'
+                : 'text-gray-600 hover:bg-gray-50'
                 }`}
             >
               <Gift size={18} />

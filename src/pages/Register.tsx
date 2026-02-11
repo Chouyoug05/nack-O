@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { validateWhatsApp } from "@/utils/whatsapp";
 import { geocodeAddress, searchAddresses } from "@/utils/geocoding";
+import { getFriendlyErrorMessage } from "@/utils/authErrors";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -185,8 +186,12 @@ const Register = () => {
       });
       toast({ title: "Inscription réussie !" });
       navigate("/configure-tickets");
-    } catch {
-      toast({ title: "Erreur", description: "Échec de l'inscription", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: getFriendlyErrorMessage(error),
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }
@@ -218,8 +223,12 @@ const Register = () => {
       setAffiliateCode(code);
       setAffiliateStep(2);
       toast({ title: "Compte créé !" });
-    } catch {
-      toast({ title: "Erreur", variant: "destructive" });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: getFriendlyErrorMessage(error),
+        variant: "destructive"
+      });
     } finally {
       setIsLoading(false);
     }

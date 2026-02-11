@@ -16,6 +16,7 @@ import { doc, getDoc, setDoc, addDoc, onSnapshot } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
 import { notificationsColRef } from "@/lib/collections";
 import { adminDocRef } from "@/lib/collections";
+import { getFriendlyErrorMessage } from "@/utils/authErrors";
 
 interface AuthContextValue {
   user: User | null;
@@ -167,7 +168,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const now = Date.now();
         const baseKey = (k: string) => `nack_sys_notif_${k}_${uid}`;
-        
+
         // Seulement les notifications importantes - suppression de la notification de bienvenue
         if (profile.plan === 'trial' && profile.trialEndsAt) {
           const msLeft = profile.trialEndsAt - now;
@@ -236,63 +237,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await setDoc(ref, removeUndefinedFields(data), { merge: true });
       setProfile(data);
     } catch (err: unknown) {
-      let message = "Inscription impossible. Réessayez.";
-      let code = '';
-      if (typeof err === 'object' && err && 'code' in err) {
-        code = (err as { code?: string }).code || '';
-      }
-      if (code === 'auth/email-already-in-use') {
-        // Tentative de connexion automatique si le compte existe déjà
-        try {
-          const login = await signInWithEmailAndPassword(auth, email, password);
-          const userUid = login.user.uid;
-          const ref = doc(db, "profiles", userUid);
-          const snap = await getDoc(ref);
-          if (!snap.exists()) {
-            const now = Date.now();
-            const sevenDays = 7 * 24 * 60 * 60 * 1000;
-            const data: UserProfile = {
-              uid: userUid,
-              establishmentName: "",
-              establishmentType: "",
-              ownerName: "",
-              email,
-              phone: "",
-              plan: 'trial',
-              trialEndsAt: now + sevenDays,
-              tutorialCompleted: false,
-              tutorialStep: 'stock',
-              createdAt: now,
-              updatedAt: now,
-            } as unknown as UserProfile;
-            await setDoc(ref, removeUndefinedFields(data), { merge: true });
-            setProfile(data);
-          } else {
-            setProfile(snap.data() as UserProfile);
-          }
-          return; // Succès: on est connecté et profil prêt/créé
-        } catch (loginErr: unknown) {
-          // Connexion impossible (ex: mauvais mot de passe): on renvoie un message simple
-          throw new Error("Cet email est déjà utilisé. Veuillez vous connecter.");
-        }
-      }
-      switch (code) {
-        case 'auth/invalid-email':
-          message = "Email invalide.";
-          break;
-        case 'auth/operation-not-allowed':
-          message = "Inscription par email/mot de passe indisponible. Contactez le support.";
-          break;
-        case 'auth/weak-password':
-          message = "Mot de passe trop faible (>= 6 caractères).";
-          break;
-        case 'auth/network-request-failed':
-          message = "Problème de réseau. Vérifiez votre connexion et réessayez.";
-          break;
-        default:
-          message = "Une erreur est survenue lors de l'inscription. Réessayez.";
-      }
-      throw new Error(message);
+      throw new Error(getFriendlyErrorMessage(err));
     }
   };
 

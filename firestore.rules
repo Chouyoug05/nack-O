@@ -91,10 +91,10 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // Affiliates: public read by code (for affiliate dashboard), admin write
+    // Affiliates: public read by code, public create (self-reg), admin update/delete
     match /affiliates/{code} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read, create: if true;
+      allow update, delete: if isAdmin();
     }
 
     // Disbursement requests: users can create, admins can read/write
