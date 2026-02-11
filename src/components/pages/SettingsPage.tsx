@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
   Settings,
@@ -41,6 +42,15 @@ import { receiptsColRef, paymentsColRef, productsColRef, salesColRef, lossesColR
 import { db } from "@/lib/firebase";
 import { getDocs, query, orderBy, deleteDoc, writeBatch, collection } from "firebase/firestore";
 import type { CollectionReference } from "firebase/firestore";
+
+const DURATIONS = [
+  { value: 'month', label: '1 Mois', discount: '' },
+  { value: 'quarter', label: '3 Mois', discount: '' },
+  { value: 'semester', label: '6 Mois', discount: '-10%' },
+  { value: 'year', label: '12 Mois', discount: '2 mois offerts' },
+] as const;
+
+type DurationType = typeof DURATIONS[number]['value'];
 
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "0 jour";
@@ -91,6 +101,19 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     newSales: false,
     teamUpdates: true
   });
+
+  const [selectedDuration, setSelectedDuration] = useState<DurationType>('month');
+
+  const calculatePrice = (planKey: 'transition' | 'transition-pro-max', duration: DurationType) => {
+    const basePrice = SUBSCRIPTION_PLANS[planKey].price;
+    switch (duration) {
+      case 'month': return basePrice;
+      case 'quarter': return basePrice * 3;
+      case 'semester': return Math.round(basePrice * 6 * 0.9); // 10% discount
+      case 'year': return basePrice * 10; // 12 for 10
+      default: return basePrice;
+    }
+  };
 
   const handleSaveEstablishment = () => {
     toast({
@@ -238,6 +261,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   const payNow = async (planType: 'transition' | 'transition-pro-max' = 'transition') => {
     if (!user) return;
     try {
+      setIsSaving(true);
       // Créer un ID unique pour cette transaction
       const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const now = Date.now();
@@ -250,9 +274,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
       const plan = SUBSCRIPTION_PLANS[planType];
       const reference = `abonnement-${planType}`;
-      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
+      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&duration=${selectedDuration}`;
       const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
       const logoURL = `${base}/favicon.png`;
+
+      const amount = calculatePrice(planType, selectedDuration);
 
       // Enregistrer la transaction en attente
       try {
@@ -265,7 +291,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
           userId: user.uid,
           transactionId,
           subscriptionType: planType,
-          amount: plan.price,
+          duration: selectedDuration,
+          amount,
           status: 'pending' as const,
           paymentMethod: 'airtel-money' as const,
           reference,
@@ -281,7 +308,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
       // Générer le lien de paiement
       const link = await createSubscriptionPaymentLink({
-        amount: plan.price,
+        amount,
         reference: `${reference}-${transactionId.substring(0, 8)}`, // Inclure un court ID dans la référence
         redirectSuccess,
         redirectError,
@@ -486,6 +513,29 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  <div className="mb-6 p-4 bg-muted/30 rounded-lg space-y-3 border border-muted-foreground/10">
+                    <Label className="text-sm font-medium">Durée de l'abonnement (appliqué aux offres ci-dessous)</Label>
+                    <Select value={selectedDuration} onValueChange={(v) => setSelectedDuration(v as DurationType)}>
+                      <SelectTrigger className="w-full bg-white">
+                        <SelectValue placeholder="Choisir une durée" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {DURATIONS.map((d) => (
+                          <SelectItem key={d.value} value={d.value}>
+                            <div className="flex items-center justify-between w-full gap-2">
+                              <span>{d.label}</span>
+                              {d.discount && (
+                                <Badge variant="secondary" className="bg-green-100 text-green-700 text-[10px] ml-2">
+                                  {d.discount}
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-semibold text-lg">{planLabel}</h3>
@@ -551,8 +601,12 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-nack-red">{SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF</p>
-                      <p className="text-sm text-muted-foreground">par mois</p>
+                      <p className="text-3xl font-bold text-nack-red">
+                        {calculatePrice('transition', selectedDuration).toLocaleString()} XAF
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        pour {DURATIONS.find(d => d.value === selectedDuration)?.label}
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -593,8 +647,12 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="text-center">
-                      <p className="text-3xl font-bold text-nack-red">{SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF</p>
-                      <p className="text-sm text-muted-foreground">par mois</p>
+                      <p className="text-3xl font-bold text-nack-red">
+                        {calculatePrice('transition-pro-max', selectedDuration).toLocaleString()} XAF
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        pour {DURATIONS.find(d => d.value === selectedDuration)?.label}
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -643,14 +701,18 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       className="w-full flex flex-col items-center justify-center py-4 h-auto"
                     >
                       <span className="font-semibold text-base">Renouveler Transition</span>
-                      <span className="text-sm text-muted-foreground mt-1">{SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF</span>
+                      <span className="text-sm text-muted-foreground mt-1">
+                        {calculatePrice('transition', selectedDuration).toLocaleString()} XAF ({DURATIONS.find(d => d.value === selectedDuration)?.label})
+                      </span>
                     </Button>
                     <Button
                       onClick={() => payNow('transition-pro-max')}
                       className="w-full bg-gradient-primary text-white flex flex-col items-center justify-center py-4 h-auto"
                     >
                       <span className="font-semibold text-base">Renouveler Pro Max</span>
-                      <span className="text-sm opacity-90 mt-1">{SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF</span>
+                      <span className="text-sm opacity-90 mt-1">
+                        {calculatePrice('transition-pro-max', selectedDuration).toLocaleString()} XAF ({DURATIONS.find(d => d.value === selectedDuration)?.label})
+                      </span>
                     </Button>
                   </div>
                 </CardContent>
