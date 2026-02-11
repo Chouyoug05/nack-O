@@ -28,9 +28,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SUBSCRIPTION_PLANS, AFFILIATE_COMMISSION_STANDARD, AFFILIATE_COMMISSION_PRO, type SubscriptionFeatures } from "@/utils/subscription";
-import { 
-  exportUsersPdf, 
-  exportUsersCsv, 
+import {
+  exportUsersPdf,
+  exportUsersCsv,
   exportProductsCsv,
   exportProductsPdf,
   exportOrdersCsv,
@@ -95,7 +95,7 @@ const AdminDashboard = () => {
   const [showChangeSubscriptionDialog, setShowChangeSubscriptionDialog] = useState(false);
   const [userToChangeSubscription, setUserToChangeSubscription] = useState<{ uid: string; name: string; currentType?: 'transition' | 'transition-pro-max' } | null>(null);
   const [newSubscriptionType, setNewSubscriptionType] = useState<'transition' | 'transition-pro-max'>('transition-pro-max');
-  
+
   // États pour les données détaillées
   const [allProducts, setAllProducts] = useState<Array<{ id: string; name: string; category: string; price: number; quantity: number; userId: string; userName?: string; establishmentName?: string }>>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
@@ -135,7 +135,7 @@ const AdminDashboard = () => {
   const [newAffiliateCode, setNewAffiliateCode] = useState("");
   const [isCreatingAffiliate, setIsCreatingAffiliate] = useState(false);
   const [showNewAffiliateDialog, setShowNewAffiliateDialog] = useState(false);
-  
+
   // Cache des données pour éviter qu'elles disparaissent
   const dataCacheRef = useRef<{
     products: typeof allProducts;
@@ -160,7 +160,7 @@ const AdminDashboard = () => {
     },
     payments: [],
   });
-  
+
   // États pour la gestion des éléments
   const [editingProduct, setEditingProduct] = useState<{ id: string; userId: string; name: string; category: string; price: number; quantity: number } | null>(null);
   const [editingOrder, setEditingOrder] = useState<{ id: string; userId: string; orderNumber: number; status: string } | null>(null);
@@ -168,11 +168,11 @@ const AdminDashboard = () => {
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [deletingEventId, setDeletingEventId] = useState<string | null>(null);
-  
+
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
-  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements'].includes(viewParam)) 
-    ? viewParam as typeof activeView 
+  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements'].includes(viewParam))
+    ? viewParam as typeof activeView
     : 'menu';
   const [activeView, setActiveView] = useState<"menu" | "users" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "disbursements">(initialView);
   const [isSendingNotifications, setIsSendingNotifications] = useState(false);
@@ -228,12 +228,12 @@ const AdminDashboard = () => {
       try {
         const plansRef = subscriptionPlansColRef(db);
         const plansSnap = await getDocs(plansRef);
-        
+
         const loadedPlans = {
           transition: { ...SUBSCRIPTION_PLANS.transition },
           'transition-pro-max': { ...SUBSCRIPTION_PLANS['transition-pro-max'] },
         };
-        
+
         plansSnap.docs.forEach((docSnap) => {
           const planKey = docSnap.id;
           const planData = docSnap.data();
@@ -249,7 +249,7 @@ const AdminDashboard = () => {
             } as typeof SUBSCRIPTION_PLANS['transition-pro-max'];
           }
         });
-        
+
         setSubscriptionPlans(loadedPlans);
       } catch (error) {
         // En cas d'erreur (permissions, etc.), utiliser les plans par défaut
@@ -260,7 +260,7 @@ const AdminDashboard = () => {
         setIsLoadingPlans(false);
       }
     };
-    
+
     loadPlans();
   }, [isAdmin]);
 
@@ -276,14 +276,14 @@ const AdminDashboard = () => {
     setIsLoadingPayments(true);
     try {
       const payments: Array<PaymentTransaction & { userEmail?: string; userName?: string }> = [];
-      
+
       // Parcourir tous les profils pour récupérer leurs paiements
       for (const profile of allProfiles) {
         try {
           const paymentsRef = paymentsColRef(db, profile.uid);
           const paymentsQuery = query(paymentsRef, where('status', '==', 'completed'));
           const paymentsSnapshot = await getDocs(paymentsQuery);
-          
+
           paymentsSnapshot.docs.forEach(doc => {
             const paymentData = { id: doc.id, ...doc.data() } as PaymentTransaction;
             payments.push({
@@ -296,7 +296,7 @@ const AdminDashboard = () => {
           console.error(`Erreur chargement paiements pour ${profile.uid}:`, error);
         }
       }
-      
+
       // Trier par date de paiement (plus récent en premier)
       payments.sort((a, b) => (b.paidAt || b.createdAt || 0) - (a.paidAt || a.createdAt || 0));
       setAllPayments(payments);
@@ -317,8 +317,8 @@ const AdminDashboard = () => {
   const loadGlobalStats = useCallback(async () => {
     if (allProfiles.length === 0) {
       // Si pas de profils, restaurer depuis le cache si disponible
-      if ((dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) && 
-          globalStats.totalProducts === 0 && globalStats.totalOrders === 0) {
+      if ((dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) &&
+        globalStats.totalProducts === 0 && globalStats.totalOrders === 0) {
         setGlobalStats(dataCacheRef.current.globalStats);
       }
       setIsLoadingGlobalStats(false);
@@ -341,7 +341,7 @@ const AdminDashboard = () => {
           const productsRef = productsColRef(db, profile.uid);
           const productsSnap = await getDocs(productsRef);
           totalProducts += productsSnap.size;
-          
+
           // Compter les ratings
           productsSnap.forEach(doc => {
             const data = doc.data();
@@ -412,12 +412,12 @@ const AdminDashboard = () => {
     setIsLoadingProducts(true);
     try {
       const products: Array<{ id: string; name: string; category: string; price: number; quantity: number; userId: string; userName?: string; establishmentName?: string }> = [];
-      
+
       for (const profile of allProfiles) {
         try {
           const productsRef = productsColRef(db, profile.uid);
           const productsSnap = await getDocs(productsRef);
-          
+
           productsSnap.forEach(doc => {
             const data = doc.data();
             products.push({
@@ -435,7 +435,7 @@ const AdminDashboard = () => {
           console.error(`Erreur chargement produits pour ${profile.uid}:`, error);
         }
       }
-      
+
       setAllProducts(products);
       dataCacheRef.current.products = products;
     } catch (error) {
@@ -463,13 +463,13 @@ const AdminDashboard = () => {
     setIsLoadingOrders(true);
     try {
       const orders: Array<{ id: string; orderNumber: number; tableNumber: string; total: number; status: string; createdAt: number; userId: string; userName?: string; establishmentName?: string }> = [];
-      
+
       for (const profile of allProfiles) {
         try {
           // Commandes normales
           const ordersRef = ordersColRef(db, profile.uid);
           const ordersSnap = await getDocs(ordersRef);
-          
+
           ordersSnap.forEach(doc => {
             const data = doc.data();
             orders.push({
@@ -488,7 +488,7 @@ const AdminDashboard = () => {
           // Commandes Bar Connectée
           const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
           const barOrdersSnap = await getDocs(barOrdersRef);
-          
+
           barOrdersSnap.forEach(doc => {
             const data = doc.data();
             orders.push({
@@ -507,7 +507,7 @@ const AdminDashboard = () => {
           console.error(`Erreur chargement commandes pour ${profile.uid}:`, error);
         }
       }
-      
+
       // Trier par date (plus récent en premier)
       orders.sort((a, b) => b.createdAt - a.createdAt);
       setAllOrders(orders);
@@ -537,12 +537,12 @@ const AdminDashboard = () => {
     setIsLoadingEvents(true);
     try {
       const events: Array<{ id: string; title: string; date: string; time: string; location: string; maxCapacity: number; ticketPrice: number; ticketsSold: number; userId: string; userName?: string; establishmentName?: string }> = [];
-      
+
       for (const profile of allProfiles) {
         try {
           const eventsRef = eventsColRef(db, profile.uid);
           const eventsSnap = await getDocs(eventsRef);
-          
+
           eventsSnap.forEach(doc => {
             const data = doc.data();
             events.push({
@@ -563,7 +563,7 @@ const AdminDashboard = () => {
           console.error(`Erreur chargement événements pour ${profile.uid}:`, error);
         }
       }
-      
+
       // Trier par date (plus récent en premier)
       events.sort((a, b) => {
         const dateA = new Date(a.date + ' ' + a.time).getTime();
@@ -611,12 +611,12 @@ const AdminDashboard = () => {
         userName?: string;
         establishmentName?: string;
       }> = [];
-      
+
       for (const profile of allProfiles) {
         try {
           const customersRef = customersColRef(db, profile.uid);
           const customersSnap = await getDocs(customersRef);
-          
+
           customersSnap.forEach(doc => {
             const data = doc.data();
             customers.push({
@@ -643,7 +643,7 @@ const AdminDashboard = () => {
           console.error(`Erreur chargement clients pour ${profile.uid}:`, error);
         }
       }
-      
+
       setAllCustomers(customers);
     } catch (error) {
       console.error('Erreur chargement clients:', error);
@@ -659,7 +659,7 @@ const AdminDashboard = () => {
     try {
       const requestsSnapshot = await getDocs(query(disbursementRequestsColRef(db), orderBy('requestedAt', 'desc')));
       const requests: Array<DisbursementRequest & { userEmail?: string }> = [];
-      
+
       for (const docSnap of requestsSnapshot.docs) {
         const data = docSnap.data() as DisbursementRequest;
         // Chercher le profil dans allProfiles, ou charger depuis Firestore si pas trouvé
@@ -680,7 +680,7 @@ const AdminDashboard = () => {
           userEmail: profile?.email,
         });
       }
-      
+
       setDisbursementRequests(requests);
     } catch (error) {
       console.error('Erreur chargement demandes Disbursement:', error);
@@ -784,6 +784,29 @@ const AdminDashboard = () => {
     }
   };
 
+  const markAffiliateAsPaid = async (affId: string, affCode: string, amount: number) => {
+    if (!window.confirm(`Confirmer le versement de ${amount.toLocaleString()} XAF à l'affilié ${affCode} ?`)) return;
+
+    try {
+      const affRef = doc(db, 'affiliates', affId);
+      const affSnap = await getDoc(affRef);
+      if (!affSnap.exists()) return;
+
+      const currentPaid = (affSnap.data() as AffiliateDoc).paidEarnings ?? 0;
+      await updateDoc(affRef, {
+        paidEarnings: currentPaid + amount,
+        lastPaymentDate: Date.now(),
+        updatedAt: Date.now(),
+      });
+
+      toast({ title: "Versement enregistré", description: `${amount.toLocaleString()} XAF versés à ${affCode}` });
+      loadAffiliates();
+    } catch (error) {
+      console.error('Erreur versement affilié:', error);
+      toast({ title: "Erreur", description: "Impossible d'enregistrer le versement", variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     if (isAdmin && activeView === 'affiliates') {
       loadAffiliates();
@@ -875,12 +898,12 @@ const AdminDashboard = () => {
     setIsLoadingRatings(true);
     try {
       const ratings: Array<{ productId: string; productName: string; rating: number; ratingCount: number; userId: string; userName?: string; establishmentName?: string }> = [];
-      
+
       for (const profile of allProfiles) {
         try {
           const productsRef = productsColRef(db, profile.uid);
           const productsSnap = await getDocs(productsRef);
-          
+
           productsSnap.forEach(doc => {
             const data = doc.data();
             if (data.ratingCount && data.ratingCount > 0) {
@@ -899,7 +922,7 @@ const AdminDashboard = () => {
           console.error(`Erreur chargement appréciations pour ${profile.uid}:`, error);
         }
       }
-      
+
       // Trier par nombre d'avis (plus d'avis en premier)
       ratings.sort((a, b) => b.ratingCount - a.ratingCount);
       setAllRatings(ratings);
@@ -921,11 +944,11 @@ const AdminDashboard = () => {
   const loadedViewsRef = useRef<Set<string>>(new Set());
   const prevProfilesLengthRef = useRef(0);
   const prevViewsRef = useRef<string>(activeView);
-  
+
   // Restaurer les données depuis le cache si elles sont vides mais le cache contient des données
   useEffect(() => {
     if (!isAdmin) return;
-    
+
     // Restaurer les données depuis le cache si elles existent et que l'état est vide
     if (dataCacheRef.current.products.length > 0 && allProducts.length === 0) {
       setAllProducts(dataCacheRef.current.products);
@@ -947,20 +970,20 @@ const AdminDashboard = () => {
       setAllPayments(dataCacheRef.current.payments);
       setIsLoadingPayments(false);
     }
-    if ((dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) && 
-        globalStats.totalProducts === 0 && globalStats.totalOrders === 0) {
+    if ((dataCacheRef.current.globalStats.totalProducts > 0 || dataCacheRef.current.globalStats.totalOrders > 0) &&
+      globalStats.totalProducts === 0 && globalStats.totalOrders === 0) {
       setGlobalStats(dataCacheRef.current.globalStats);
       setIsLoadingGlobalStats(false);
     }
   }, [isAdmin, allProducts.length, allOrders.length, allEvents.length, allRatings.length, allPayments.length, globalStats.totalProducts, globalStats.totalOrders]);
-  
+
   // Initialiser les états de chargement au démarrage et lors du changement de vue
   useEffect(() => {
     if (!isAdmin) return;
-    
+
     // S'assurer que seuls les états de chargement de la vue active sont actifs
     const currentView = activeView;
-    
+
     // Arrêter le chargement des vues non actives
     if (currentView !== 'products') setIsLoadingProducts(false);
     if (currentView !== 'orders') setIsLoadingOrders(false);
@@ -971,15 +994,15 @@ const AdminDashboard = () => {
       setIsLoadingPayments(false);
     }
   }, [isAdmin, activeView]);
-  
+
   // Charger les données quand on change de vue ou quand les profils deviennent disponibles
   useEffect(() => {
     if (!isAdmin) return;
-    
+
     const prevView = prevViewsRef.current;
     const viewChanged = prevView !== activeView;
     const profilesJustLoaded = prevProfilesLengthRef.current === 0 && allProfiles.length > 0;
-    
+
     // Si on change de vue, réinitialiser les états de chargement des autres vues
     if (viewChanged) {
       // Réinitialiser le chargement pour la nouvelle vue
@@ -994,7 +1017,7 @@ const AdminDashboard = () => {
         setIsLoadingPayments(false);
       }
     }
-    
+
     // Si on n'a pas de profils, restaurer depuis le cache si disponible
     if (allProfiles.length === 0) {
       prevProfilesLengthRef.current = 0;
@@ -1058,24 +1081,24 @@ const AdminDashboard = () => {
         return;
       }
     }
-    
+
     // Charger les données selon la vue si on a des profils
     // Toujours charger si :
     // - La vue a changé
     // - Les profils viennent d'arriver (après un refresh)
     // - La vue n'a pas encore été chargée
     const shouldLoad = allProfiles.length > 0 && (
-      viewChanged || 
-      profilesJustLoaded || 
+      viewChanged ||
+      profilesJustLoaded ||
       !loadedViewsRef.current.has(activeView)
     );
-    
+
     if (shouldLoad) {
       // Si les profils viennent d'arriver, réinitialiser le cache de chargement pour forcer le rechargement
       if (profilesJustLoaded) {
         loadedViewsRef.current.clear();
       }
-      
+
       if (activeView === 'menu') {
         loadGlobalStats();
         loadAllPayments();
@@ -1105,7 +1128,7 @@ const AdminDashboard = () => {
         }
       }
     }
-    
+
     prevProfilesLengthRef.current = allProfiles.length;
     prevViewsRef.current = activeView;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1139,7 +1162,7 @@ const AdminDashboard = () => {
     }).length;
     const trial = allProfiles.filter(p => (p.plan || "trial") === "trial").length;
     const expired = total - active - trial;
-    
+
     // Calculer les revenus basés sur les abonnements actifs de 30 jours
     let monthlyRevenue = 0;
     allProfiles.forEach(p => {
@@ -1153,7 +1176,7 @@ const AdminDashboard = () => {
         }
       }
     });
-    
+
     return { total, active, trial, expired, monthly: monthlyRevenue };
   }, [allProfiles, now, subscriptionPlans]);
 
@@ -1173,20 +1196,20 @@ const AdminDashboard = () => {
 
   const sendNotifications = async () => {
     if (!notif.title || !notif.message) {
-      toast({ 
-        title: "Erreur", 
-        description: "Veuillez remplir le titre et le message", 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir le titre et le message",
+        variant: "destructive"
       });
       return;
     }
 
     const uids = getTargetUids();
     if (uids.length === 0) {
-      toast({ 
-        title: "Erreur", 
-        description: "Aucun utilisateur ciblé. Sélectionnez des utilisateurs ou utilisez 'Tous'", 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: "Aucun utilisateur ciblé. Sélectionnez des utilisateurs ou utilisez 'Tous'",
+        variant: "destructive"
       });
       return;
     }
@@ -1218,25 +1241,25 @@ const AdminDashboard = () => {
       }
 
       if (successCount > 0) {
-        toast({ 
-          title: "Notifications envoyées", 
-          description: `${successCount} notification${successCount > 1 ? 's' : ''} envoyée${successCount > 1 ? 's' : ''}${errorCount > 0 ? `, ${errorCount} erreur${errorCount > 1 ? 's' : ''}` : ''}` 
+        toast({
+          title: "Notifications envoyées",
+          description: `${successCount} notification${successCount > 1 ? 's' : ''} envoyée${successCount > 1 ? 's' : ''}${errorCount > 0 ? `, ${errorCount} erreur${errorCount > 1 ? 's' : ''}` : ''}`
         });
         setNotif(prev => ({ ...prev, title: "", message: "" }));
       } else {
-        toast({ 
-          title: "Erreur", 
-          description: `Aucune notification n'a pu être envoyée. Erreurs: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`, 
-          variant: "destructive" 
+        toast({
+          title: "Erreur",
+          description: `Aucune notification n'a pu être envoyée. Erreurs: ${errors.slice(0, 3).join(', ')}${errors.length > 3 ? '...' : ''}`,
+          variant: "destructive"
         });
       }
     } catch (error: unknown) {
       console.error('Erreur générale envoi notifications:', error);
       const message = error instanceof Error ? error.message : 'Erreur inconnue';
-      toast({ 
-        title: "Erreur", 
-        description: `Erreur lors de l'envoi: ${message}`, 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: `Erreur lors de l'envoi: ${message}`,
+        variant: "destructive"
       });
     } finally {
       setIsSendingNotifications(false);
@@ -1246,14 +1269,14 @@ const AdminDashboard = () => {
   const activateForDays = async (uid: string, days: number, subscriptionType: 'transition' | 'transition-pro-max' = 'transition') => {
     // Validation : maximum 90 jours (3 mois)
     if (days < 1 || days > 90) {
-      toast({ 
-        title: "Erreur", 
-        description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)",
+        variant: "destructive"
       });
       return;
     }
-    
+
     const ms = Math.max(1, Math.min(90, days)) * 24 * 60 * 60 * 1000;
     const until = Date.now() + ms;
     try {
@@ -1269,17 +1292,17 @@ const AdminDashboard = () => {
         subscriptionType,
         updatedAt: Date.now(),
       };
-      
+
       // Si c'est un abonnement de 30 jours (ou multiple de 30), enregistrer le paiement pour les revenus
       if (days === 30 || days === 60 || days === 90) {
         updateData.lastPaymentAt = Date.now();
       }
-      
+
       await updateDoc(doc(db, "profiles", uid), updateData);
       const monthsText = days >= 30 ? ` (${Math.round(days / 30 * 10) / 10} mois)` : '';
-      toast({ 
-        title: "Succès", 
-        description: `Abonnement ${subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'} activé pour ${days} jours${monthsText}` 
+      toast({
+        title: "Succès",
+        description: `Abonnement ${subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'} activé pour ${days} jours${monthsText}`
       });
     } catch (error) {
       console.error('Erreur activation abonnement:', error);
@@ -1297,10 +1320,10 @@ const AdminDashboard = () => {
 
       // Si l'utilisateur n'a pas d'abonnement actif, on ne peut pas changer le type
       if (profile.plan !== 'active' || !profile.subscriptionEndsAt || profile.subscriptionEndsAt < Date.now()) {
-        toast({ 
-          title: "Erreur", 
-          description: "L'utilisateur doit avoir un abonnement actif pour changer de type", 
-          variant: "destructive" 
+        toast({
+          title: "Erreur",
+          description: "L'utilisateur doit avoir un abonnement actif pour changer de type",
+          variant: "destructive"
         });
         return;
       }
@@ -1327,9 +1350,9 @@ const AdminDashboard = () => {
       }
 
       await updateDoc(doc(db, "profiles", uid), updateData);
-      toast({ 
-        title: "Succès", 
-        description: `Type d'abonnement changé vers ${newType === 'transition-pro-max' ? 'Transition Pro Max' : 'Transition'}. L'utilisateur a maintenant accès à toutes les fonctionnalités de ce plan.` 
+      toast({
+        title: "Succès",
+        description: `Type d'abonnement changé vers ${newType === 'transition-pro-max' ? 'Transition Pro Max' : 'Transition'}. L'utilisateur a maintenant accès à toutes les fonctionnalités de ce plan.`
       });
       setShowChangeSubscriptionDialog(false);
       setUserToChangeSubscription(null);
@@ -1341,9 +1364,9 @@ const AdminDashboard = () => {
 
   const openChangeSubscriptionDialog = (profile: UserProfile) => {
     if (profile.plan !== 'active' || !profile.subscriptionEndsAt || profile.subscriptionEndsAt < Date.now()) {
-      toast({ 
-        title: "Information", 
-        description: "L'utilisateur doit avoir un abonnement actif pour changer de type" 
+      toast({
+        title: "Information",
+        description: "L'utilisateur doit avoir un abonnement actif pour changer de type"
       });
       return;
     }
@@ -1366,10 +1389,10 @@ const AdminDashboard = () => {
     const now = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
     const daysToAddMs = days * oneDayMs;
-    
+
     // Obtenir la date de fin actuelle ou utiliser maintenant si pas de date
     const currentEndDate = profile.subscriptionEndsAt || now;
-    
+
     // Ajouter les jours
     const newEndDate = currentEndDate + daysToAddMs;
     const newDaysRemaining = (newEndDate - now) / oneDayMs;
@@ -1385,16 +1408,16 @@ const AdminDashboard = () => {
         plan: 'active',
         updatedAt: now,
       };
-      
+
       // Si on ajoute exactement 30 jours et que le total fait 30 jours, enregistrer le paiement
       if (days === 30 && newDaysRemaining >= 29 && newDaysRemaining <= 31) {
         updateData.lastPaymentAt = now;
       }
-      
+
       await updateDoc(doc(db, "profiles", profile.uid), updateData);
-      toast({ 
-        title: "Abonnement prolongé", 
-        description: `${email}: +${days} jour(s) ajouté(s). Nouveaux jours restants: ${Math.floor(newDaysRemaining)}` 
+      toast({
+        title: "Abonnement prolongé",
+        description: `${email}: +${days} jour(s) ajouté(s). Nouveaux jours restants: ${Math.floor(newDaysRemaining)}`
       });
     } catch (error) {
       console.error('Erreur prolongation abonnement:', error);
@@ -1405,26 +1428,26 @@ const AdminDashboard = () => {
   const fixAbnormalSubscription = async (uid: string) => {
     const profile = allProfiles.find(p => p.uid === uid);
     if (!profile || profile.plan !== 'active' || !profile.subscriptionEndsAt) return;
-    
+
     const now = Date.now();
     const daysRemaining = (profile.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
-    
+
     if (daysRemaining <= 30) {
       toast({ title: "Info", description: "Cet abonnement est normal (≤ 30 jours)" });
       return;
     }
-    
+
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     const newSubscriptionEndsAt = now + thirtyDaysMs;
-    
+
     try {
       await updateDoc(doc(db, "profiles", uid), {
         subscriptionEndsAt: newSubscriptionEndsAt,
         updatedAt: now,
       });
-      toast({ 
-        title: "Corrigé", 
-        description: `Abonnement corrigé: ${Math.floor(daysRemaining)}j → 30j` 
+      toast({
+        title: "Corrigé",
+        description: `Abonnement corrigé: ${Math.floor(daysRemaining)}j → 30j`
       });
     } catch (error) {
       toast({ title: "Erreur", description: "Impossible de corriger l'abonnement", variant: "destructive" });
@@ -1437,11 +1460,11 @@ const AdminDashboard = () => {
     const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     let fixed = 0;
     let errors = 0;
-    
+
     try {
       for (const profile of allProfiles) {
         if (profile.plan !== 'active' || !profile.subscriptionEndsAt) continue;
-        
+
         const daysRemaining = (profile.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
         if (daysRemaining > 30) {
           try {
@@ -1455,10 +1478,10 @@ const AdminDashboard = () => {
           }
         }
       }
-      
-      toast({ 
-        title: "Correction terminée", 
-        description: `${fixed} abonnement(s) corrigé(s)${errors > 0 ? `, ${errors} erreur(s)` : ''}` 
+
+      toast({
+        title: "Correction terminée",
+        description: `${fixed} abonnement(s) corrigé(s)${errors > 0 ? `, ${errors} erreur(s)` : ''}`
       });
     } catch (error) {
       toast({ title: "Erreur", description: "Erreur lors de la correction", variant: "destructive" });
@@ -1474,16 +1497,16 @@ const AdminDashboard = () => {
     const year2025Start = new Date('2025-01-01').getTime();
     let fixed = 0;
     let errors = 0;
-    
+
     try {
       for (const profile of allProfiles) {
         if (!profile.subscriptionEndsAt) continue;
-        
+
         // Vérifier si la date est en 2024 ou dans le passé
         const subscriptionEndsAt = profile.subscriptionEndsAt;
         const isIn2024 = subscriptionEndsAt < year2025Start;
         const isExpired = subscriptionEndsAt < now;
-        
+
         if (isIn2024 || isExpired) {
           try {
             await updateDoc(doc(db, "profiles", profile.uid), {
@@ -1497,10 +1520,10 @@ const AdminDashboard = () => {
           }
         }
       }
-      
-      toast({ 
-        title: "Correction terminée", 
-        description: `${fixed} date(s) d'abonnement corrigée(s) (2024 → 2025)${errors > 0 ? `, ${errors} erreur(s)` : ''}` 
+
+      toast({
+        title: "Correction terminée",
+        description: `${fixed} date(s) d'abonnement corrigée(s) (2024 → 2025)${errors > 0 ? `, ${errors} erreur(s)` : ''}`
       });
     } catch (error) {
       toast({ title: "Erreur", description: "Erreur lors de la correction", variant: "destructive" });
@@ -1516,22 +1539,22 @@ const AdminDashboard = () => {
 
   const confirmDeleteClient = async () => {
     if (!clientToDelete) return;
-    
+
     setDeletingUid(clientToDelete.uid);
     try {
       await deleteDoc(doc(db, "profiles", clientToDelete.uid));
-      toast({ 
-        title: "Client supprimé", 
-        description: `Le client "${clientToDelete.name}" a été supprimé avec succès` 
+      toast({
+        title: "Client supprimé",
+        description: `Le client "${clientToDelete.name}" a été supprimé avec succès`
       });
       setShowDeleteDialog(false);
       setClientToDelete(null);
     } catch (error) {
       console.error('Erreur suppression:', error);
-      toast({ 
-        title: "Erreur", 
-        description: "Impossible de supprimer le client", 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le client",
+        variant: "destructive"
       });
     } finally {
       setDeletingUid(null);
@@ -1540,12 +1563,12 @@ const AdminDashboard = () => {
 
   const saveSubscriptionPlan = async () => {
     if (!editingPlan) return;
-    
+
     setIsLoadingPlans(true);
     try {
       const planRef = subscriptionPlanDocRef(db, editingPlan);
       const currentPlan = subscriptionPlans[editingPlan];
-      
+
       // Préparer les données à sauvegarder
       const planData: {
         name: string;
@@ -1558,38 +1581,38 @@ const AdminDashboard = () => {
           ...planFeatures,
         },
       };
-      
+
       // Ajouter les paramètres spécifiques à Pro Max
       if (editingPlan === 'transition-pro-max') {
         planData.features.eventsLimit = planEventsLimit;
         planData.features.eventsExtraPrice = planEventsExtraPrice;
       }
-      
+
       // Sauvegarder dans Firestore
       await setDoc(planRef, planData, { merge: true });
-      
+
       // Mettre à jour l'état local
       const updatedPlans = {
-        transition: editingPlan === 'transition' 
+        transition: editingPlan === 'transition'
           ? { ...currentPlan, price: planPrice, features: planData.features }
           : subscriptionPlans.transition,
         'transition-pro-max': editingPlan === 'transition-pro-max'
           ? { ...currentPlan, price: planPrice, features: planData.features }
           : subscriptionPlans['transition-pro-max'],
       };
-    setSubscriptionPlans(updatedPlans);
-      
-    setEditingPlan(null);
-      toast({ 
-        title: "Succès", 
-        description: `Plan ${editingPlan} mis à jour et sauvegardé dans Firestore` 
+      setSubscriptionPlans(updatedPlans);
+
+      setEditingPlan(null);
+      toast({
+        title: "Succès",
+        description: `Plan ${editingPlan} mis à jour et sauvegardé dans Firestore`
       });
     } catch (error) {
       console.error('Erreur sauvegarde plan:', error);
-      toast({ 
-        title: "Erreur", 
-        description: "Impossible de sauvegarder le plan", 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder le plan",
+        variant: "destructive"
       });
     } finally {
       setIsLoadingPlans(false);
@@ -1610,7 +1633,7 @@ const AdminDashboard = () => {
   // Fonctions de gestion des produits
   const handleDeleteProduct = async (productId: string, userId: string) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce produit ?")) return;
-    
+
     setDeletingProductId(productId);
     try {
       const productRef = doc(db, `profiles/${userId}/products`, productId);
@@ -1647,13 +1670,13 @@ const AdminDashboard = () => {
       // Essayer d'abord dans orders, puis dans barOrders
       const orderRef = doc(db, `profiles/${userId}/orders`, orderId);
       const barOrderRef = doc(db, `profiles/${userId}/barOrders`, orderId);
-      
+
       try {
         await updateDoc(orderRef, { status: newStatus, updatedAt: Date.now() });
       } catch {
         await updateDoc(barOrderRef, { status: newStatus, updatedAt: Date.now() });
       }
-      
+
       toast({ title: "Commande modifiée", description: `Le statut a été changé en "${newStatus}"` });
       setEditingOrder(null);
       loadAllOrders();
@@ -1665,18 +1688,18 @@ const AdminDashboard = () => {
 
   const handleDeleteOrder = async (orderId: string, userId: string) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette commande ?")) return;
-    
+
     setDeletingOrderId(orderId);
     try {
       const orderRef = doc(db, `profiles/${userId}/orders`, orderId);
       const barOrderRef = doc(db, `profiles/${userId}/barOrders`, orderId);
-      
+
       try {
         await deleteDoc(orderRef);
       } catch {
         await deleteDoc(barOrderRef);
       }
-      
+
       toast({ title: "Commande supprimée", description: "La commande a été supprimée avec succès" });
       loadAllOrders();
     } catch (error) {
@@ -1706,7 +1729,7 @@ const AdminDashboard = () => {
 
   const handleDeleteEvent = async (eventId: string, userId: string) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet événement ? Cette action supprimera également tous les billets associés.")) return;
-    
+
     setDeletingEventId(eventId);
     try {
       const eventRef = doc(db, `profiles/${userId}/events`, eventId);
@@ -1724,7 +1747,7 @@ const AdminDashboard = () => {
   // Fonction pour réinitialiser les appréciations d'un produit
   const handleResetRating = async (productId: string, userId: string) => {
     if (!window.confirm("Êtes-vous sûr de vouloir réinitialiser les appréciations de ce produit ?")) return;
-    
+
     try {
       const productRef = doc(db, `profiles/${userId}/products`, productId);
       await updateDoc(productRef, {
@@ -1757,13 +1780,13 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-        <h1 className="text-3xl font-bold mb-2">Administration Nack</h1>
-        <p className="text-muted-foreground">Gestion complète de la plateforme</p>
+          <h1 className="text-3xl font-bold mb-2">Administration Nack</h1>
+          <p className="text-muted-foreground">Gestion complète de la plateforme</p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={loadGlobalStats} 
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadGlobalStats}
           disabled={isLoadingGlobalStats}
           className="flex items-center gap-2"
         >
@@ -1792,7 +1815,7 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Users size={16} className="text-blue-600"/> Utilisateurs
+              <Users size={16} className="text-blue-600" /> Utilisateurs
             </CardTitle>
             <CardDescription>Total inscrits</CardDescription>
           </CardHeader>
@@ -1806,7 +1829,7 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Package size={16} className="text-purple-600"/> Produits
+              <Package size={16} className="text-purple-600" /> Produits
             </CardTitle>
             <CardDescription>Total produits</CardDescription>
           </CardHeader>
@@ -1819,7 +1842,7 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <ShoppingCart size={16} className="text-green-600"/> Commandes
+              <ShoppingCart size={16} className="text-green-600" /> Commandes
             </CardTitle>
             <CardDescription>Total commandes</CardDescription>
           </CardHeader>
@@ -1835,7 +1858,7 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Star size={16} className="text-yellow-600"/> Appréciations
+              <Star size={16} className="text-yellow-600" /> Appréciations
             </CardTitle>
             <CardDescription>Note moyenne</CardDescription>
           </CardHeader>
@@ -1849,13 +1872,13 @@ const AdminDashboard = () => {
           </CardContent>
         </Card>
       </div>
-      
+
       {/* Statistiques supplémentaires */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Calendar size={16} className="text-orange-600"/> Événements
+              <Calendar size={16} className="text-orange-600" /> Événements
             </CardTitle>
             <CardDescription>Total événements</CardDescription>
           </CardHeader>
@@ -1868,7 +1891,7 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Users size={16} className="text-indigo-600"/> Équipe
+              <Users size={16} className="text-indigo-600" /> Équipe
             </CardTitle>
             <CardDescription>Membres d'équipe</CardDescription>
           </CardHeader>
@@ -1881,7 +1904,7 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <CreditCard size={16} className="text-green-600"/> Paiements
+              <CreditCard size={16} className="text-green-600" /> Paiements
             </CardTitle>
             <CardDescription>Paiements complétés</CardDescription>
           </CardHeader>
@@ -1899,7 +1922,7 @@ const AdminDashboard = () => {
         <Card className="border-0 shadow-card">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <TrendingUp size={16} className="text-green-600"/> Revenus
+              <TrendingUp size={16} className="text-green-600" /> Revenus
             </CardTitle>
             <CardDescription>Revenus mensuels estimés</CardDescription>
           </CardHeader>
@@ -2002,26 +2025,26 @@ const AdminDashboard = () => {
 
       {/* Paiements récents */}
       {allPayments.length > 0 && (
-      <Card className="border-0 shadow-card mt-8">
-        <CardHeader>
+        <Card className="border-0 shadow-card mt-8">
+          <CardHeader>
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
-          <CardTitle className="flex items-center gap-2">
-                  <CreditCard size={20} className="text-blue-600"/> Paiements récents
-          </CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard size={20} className="text-blue-600" /> Paiements récents
+                </CardTitle>
                 <CardDescription>Tous les paiements complétés ({allPayments.length} total)</CardDescription>
               </div>
               <div className="flex gap-2 flex-wrap">
                 <Button variant="outline" size="sm" onClick={() => exportPaymentsCsv(allPayments)}>
-                  <Download size={16} className="mr-2"/> CSV
+                  <Download size={16} className="mr-2" /> CSV
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => exportPaymentsPdf(allPayments)}>
-                  <FileText size={16} className="mr-2"/> PDF
+                  <FileText size={16} className="mr-2" /> PDF
                 </Button>
               </div>
             </div>
-        </CardHeader>
-        <CardContent>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
               {allPayments.map((payment) => (
                 <div key={payment.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
@@ -2039,9 +2062,9 @@ const AdminDashboard = () => {
                   </div>
                 </div>
               ))}
-          </div>
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
@@ -2051,7 +2074,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Utilisateurs</h1>
@@ -2059,14 +2082,14 @@ const AdminDashboard = () => {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportUsersCsv(filtered)}>
-            <Download size={16} className="mr-2"/> CSV
+            <Download size={16} className="mr-2" /> CSV
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportUsersPdf(filtered)}>
-            <FileText size={16} className="mr-2"/> PDF
+            <FileText size={16} className="mr-2" /> PDF
           </Button>
         </div>
       </div>
-      
+
       <Card className="border-0 shadow-card">
         <CardHeader>
           <CardTitle>Utilisateurs</CardTitle>
@@ -2089,12 +2112,12 @@ const AdminDashboard = () => {
             </Select>
             <div className="ml-auto flex items-center gap-2 flex-wrap">
               <div className="flex items-center gap-1">
-                <Input 
-                  type="number" 
-                  className="w-20" 
-                  min={1} 
+                <Input
+                  type="number"
+                  className="w-20"
+                  min={1}
                   max={90}
-                  value={activationDays} 
+                  value={activationDays}
                   onChange={e => {
                     const val = Number(e.target.value || 0);
                     if (val >= 1 && val <= 90) {
@@ -2108,24 +2131,24 @@ const AdminDashboard = () => {
                 </span>
               </div>
               <div className="flex gap-1">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setActivationDays(30)}
                   className={activationDays === 30 ? "bg-primary/10" : ""}
                 >
                   1M
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setActivationDays(60)}
                   className={activationDays === 60 ? "bg-primary/10" : ""}
                 >
                   2M
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => setActivationDays(90)}
                   className={activationDays === 90 ? "bg-primary/10" : ""}
@@ -2142,14 +2165,14 @@ const AdminDashboard = () => {
                   <SelectItem value="transition-pro-max">Pro Max (15000 XAF)</SelectItem>
                 </SelectContent>
               </Select>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={async () => {
                   if (activationDays < 1 || activationDays > 90) {
-                    toast({ 
-                      title: "Erreur", 
-                      description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
-                      variant: "destructive" 
+                    toast({
+                      title: "Erreur",
+                      description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)",
+                      variant: "destructive"
                     });
                     return;
                   }
@@ -2158,7 +2181,7 @@ const AdminDashboard = () => {
                 }}
                 disabled={activationDays < 1 || activationDays > 90}
               >
-                <Gift size={16} className="mr-2"/>
+                <Gift size={16} className="mr-2" />
                 Activer {activationDays} j
                 {activationDays >= 30 && ` (${Math.round(activationDays / 30 * 10) / 10} mois)`}
               </Button>
@@ -2169,8 +2192,8 @@ const AdminDashboard = () => {
           <div className="hidden md:block border rounded-md overflow-x-auto">
             <Table className="min-w-[800px]">
               <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10"></TableHead>
+                <TableRow>
+                  <TableHead className="w-10"></TableHead>
                   <TableHead>Utilisateur</TableHead>
                   <TableHead>Établissement</TableHead>
                   <TableHead>Plan</TableHead>
@@ -2199,9 +2222,9 @@ const AdminDashboard = () => {
                       <TableCell>{p.establishmentName || "—"}</TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                        {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
-                        {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
-                        {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
+                          {status === 'active' && <Badge className="bg-green-100 text-green-700" variant="secondary">Actif</Badge>}
+                          {status === 'trial' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">Essai</Badge>}
+                          {status === 'expired' && <Badge className="bg-red-100 text-red-700" variant="secondary">Expiré</Badge>}
                           {status === 'active' && p.subscriptionType && (
                             <Badge className="bg-blue-100 text-blue-700 text-xs" variant="secondary">
                               {p.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition'}
@@ -2235,24 +2258,24 @@ const AdminDashboard = () => {
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end flex-wrap">
                           {status === 'active' && p.subscriptionType && (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => openChangeSubscriptionDialog(p)}
                               title="Changer le type d'abonnement"
                             >
-                              <Settings size={14} className="mr-2"/> Changer plan
+                              <Settings size={14} className="mr-2" /> Changer plan
                             </Button>
                           )}
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => {
                               if (activationDays < 1 || activationDays > 90) {
-                                toast({ 
-                                  title: "Erreur", 
-                                  description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
-                                  variant: "destructive" 
+                                toast({
+                                  title: "Erreur",
+                                  description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)",
+                                  variant: "destructive"
                                 });
                                 return;
                               }
@@ -2260,21 +2283,21 @@ const AdminDashboard = () => {
                             }}
                             disabled={activationDays < 1 || activationDays > 90}
                           >
-                            <Gift size={14} className="mr-2"/> 
+                            <Gift size={14} className="mr-2" />
                             Activer {activationDays} j
                             {activationDays >= 30 && ` (${Math.round(activationDays / 30 * 10) / 10} mois)`}
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => navigate(`/admin/client/${p.uid}`)}
                             title="Voir les détails du client"
                           >
-                            <Eye size={14} className="mr-2"/> Voir
+                            <Eye size={14} className="mr-2" /> Voir
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
+                          <Button
+                            size="sm"
+                            variant="destructive"
                             onClick={() => handleDeleteClient(p.uid, p.establishmentName || p.ownerName || p.email || 'Client')}
                             disabled={deletingUid === p.uid}
                             title="Supprimer le client"
@@ -2283,7 +2306,7 @@ const AdminDashboard = () => {
                               <>...</>
                             ) : (
                               <>
-                                <Trash2 size={14} className="mr-2"/> Supprimer
+                                <Trash2 size={14} className="mr-2" /> Supprimer
                               </>
                             )}
                           </Button>
@@ -2348,24 +2371,24 @@ const AdminDashboard = () => {
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2 border-t">
                       {status === 'active' && p.subscriptionType && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => openChangeSubscriptionDialog(p)}
                           className="text-xs"
                         >
-                          <Settings size={12} className="mr-1"/> Plan
+                          <Settings size={12} className="mr-1" /> Plan
                         </Button>
                       )}
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => {
                           if (activationDays < 1 || activationDays > 90) {
-                            toast({ 
-                              title: "Erreur", 
-                              description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)", 
-                              variant: "destructive" 
+                            toast({
+                              title: "Erreur",
+                              description: "Le nombre de jours doit être entre 1 et 90 (3 mois maximum)",
+                              variant: "destructive"
                             });
                             return;
                           }
@@ -2374,25 +2397,25 @@ const AdminDashboard = () => {
                         disabled={activationDays < 1 || activationDays > 90}
                         className="text-xs"
                       >
-                        <Gift size={12} className="mr-1"/> 
+                        <Gift size={12} className="mr-1" />
                         Activer {activationDays}j
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => navigate(`/admin/client/${p.uid}`)}
                         className="text-xs"
                       >
-                        <Eye size={12} className="mr-1"/> Voir
+                        <Eye size={12} className="mr-1" /> Voir
                       </Button>
-                      <Button 
-                        size="sm" 
-                        variant="destructive" 
+                      <Button
+                        size="sm"
+                        variant="destructive"
                         onClick={() => handleDeleteClient(p.uid, p.establishmentName || p.ownerName || p.email || 'Client')}
                         disabled={deletingUid === p.uid}
                         className="text-xs"
                       >
-                        {deletingUid === p.uid ? "..." : <><Trash2 size={12} className="mr-1"/> Supprimer</>}
+                        {deletingUid === p.uid ? "..." : <><Trash2 size={12} className="mr-1" /> Supprimer</>}
                       </Button>
                     </div>
                   </CardContent>
@@ -2410,7 +2433,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Produits</h1>
@@ -2418,18 +2441,18 @@ const AdminDashboard = () => {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportProductsCsv(allProducts)} disabled={allProducts.length === 0}>
-            <Download size={16} className="mr-2"/> CSV
+            <Download size={16} className="mr-2" /> CSV
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportProductsPdf(allProducts)} disabled={allProducts.length === 0}>
-            <FileText size={16} className="mr-2"/> PDF
+            <FileText size={16} className="mr-2" /> PDF
           </Button>
           <Button variant="outline" size="sm" onClick={loadAllProducts} disabled={isLoadingProducts}>
             {isLoadingProducts ? "Chargement..." : "Actualiser"}
           </Button>
-              </div>
-              </div>
-          <Card className="border-0 shadow-card">
-            <CardContent>
+        </div>
+      </div>
+      <Card className="border-0 shadow-card">
+        <CardContent>
           {isLoadingProducts ? (
             <div className="text-center py-8 text-muted-foreground">Chargement des produits...</div>
           ) : allProducts.length === 0 ? (
@@ -2466,17 +2489,17 @@ const AdminDashboard = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
+                            <Button
+                              size="sm"
+                              variant="outline"
                               onClick={() => setEditingProduct({ id: product.id, userId: product.userId, name: product.name, category: product.category, price: product.price, quantity: product.quantity })}
                               title="Modifier le produit"
                             >
-                              <Edit size={14} className="mr-2"/> Modifier
+                              <Edit size={14} className="mr-2" /> Modifier
                             </Button>
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
+                            <Button
+                              size="sm"
+                              variant="destructive"
                               onClick={() => handleDeleteProduct(product.id, product.userId)}
                               disabled={deletingProductId === product.id}
                               title="Supprimer le produit"
@@ -2485,7 +2508,7 @@ const AdminDashboard = () => {
                                 <>...</>
                               ) : (
                                 <>
-                                  <Trash2 size={14} className="mr-2"/> Supprimer
+                                  <Trash2 size={14} className="mr-2" /> Supprimer
                                 </>
                               )}
                             </Button>
@@ -2519,22 +2542,22 @@ const AdminDashboard = () => {
                         </p>
                       </div>
                       <div className="flex gap-2 pt-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => setEditingProduct({ id: product.id, userId: product.userId, name: product.name, category: product.category, price: product.price, quantity: product.quantity })}
                           className="flex-1 text-xs"
                         >
-                          <Edit size={12} className="mr-1"/> Modifier
+                          <Edit size={12} className="mr-1" /> Modifier
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
+                        <Button
+                          size="sm"
+                          variant="destructive"
                           onClick={() => handleDeleteProduct(product.id, product.userId)}
                           disabled={deletingProductId === product.id}
                           className="flex-1 text-xs"
                         >
-                          {deletingProductId === product.id ? "..." : <><Trash2 size={12} className="mr-1"/> Supprimer</>}
+                          {deletingProductId === product.id ? "..." : <><Trash2 size={12} className="mr-1" /> Supprimer</>}
                         </Button>
                       </div>
                     </CardContent>
@@ -2543,9 +2566,9 @@ const AdminDashboard = () => {
               </div>
             </>
           )}
-            </CardContent>
-          </Card>
-        </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 
   // Vue Commandes
@@ -2553,7 +2576,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Commandes</h1>
@@ -2561,18 +2584,18 @@ const AdminDashboard = () => {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportOrdersCsv(allOrders)} disabled={allOrders.length === 0}>
-            <Download size={16} className="mr-2"/> CSV
+            <Download size={16} className="mr-2" /> CSV
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportOrdersPdf(allOrders)} disabled={allOrders.length === 0}>
-            <FileText size={16} className="mr-2"/> PDF
+            <FileText size={16} className="mr-2" /> PDF
           </Button>
           <Button variant="outline" size="sm" onClick={loadAllOrders} disabled={isLoadingOrders}>
             {isLoadingOrders ? "Chargement..." : "Actualiser"}
           </Button>
         </div>
       </div>
-        <Card className="border-0 shadow-card">
-          <CardContent>
+      <Card className="border-0 shadow-card">
+        <CardContent>
           {isLoadingOrders ? (
             <div className="text-center py-8 text-muted-foreground">Chargement des commandes...</div>
           ) : allOrders.length === 0 ? (
@@ -2616,8 +2639,8 @@ const AdminDashboard = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end flex-wrap">
-                            <Select 
-                              value={order.status} 
+                            <Select
+                              value={order.status}
                               onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
                             >
                               <SelectTrigger className="w-32">
@@ -2629,9 +2652,9 @@ const AdminDashboard = () => {
                                 <SelectItem value="cancelled">Annulée</SelectItem>
                               </SelectContent>
                             </Select>
-                            <Button 
-                              size="sm" 
-                              variant="destructive" 
+                            <Button
+                              size="sm"
+                              variant="destructive"
                               onClick={() => handleDeleteOrder(order.id, order.userId)}
                               disabled={deletingOrderId === order.id}
                               title="Supprimer la commande"
@@ -2640,7 +2663,7 @@ const AdminDashboard = () => {
                                 <>...</>
                               ) : (
                                 <>
-                                  <Trash2 size={14} className="mr-2"/> Supprimer
+                                  <Trash2 size={14} className="mr-2" /> Supprimer
                                 </>
                               )}
                             </Button>
@@ -2682,8 +2705,8 @@ const AdminDashboard = () => {
                       </div>
                       <div className="flex gap-2 pt-2">
                         <div className="flex-1">
-                          <Select 
-                            value={order.status} 
+                          <Select
+                            value={order.status}
                             onValueChange={(newStatus) => handleUpdateOrderStatus(order.id, order.userId, newStatus)}
                           >
                             <SelectTrigger className="w-full text-xs">
@@ -2696,9 +2719,9 @@ const AdminDashboard = () => {
                             </SelectContent>
                           </Select>
                         </div>
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
+                        <Button
+                          size="sm"
+                          variant="destructive"
                           onClick={() => handleDeleteOrder(order.id, order.userId)}
                           disabled={deletingOrderId === order.id}
                           className="text-xs"
@@ -2712,9 +2735,9 @@ const AdminDashboard = () => {
               </div>
             </>
           )}
-          </CardContent>
-        </Card>
-              </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 
   // Vue Événements
@@ -2722,7 +2745,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Événements</h1>
@@ -2730,16 +2753,16 @@ const AdminDashboard = () => {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportEventsCsv(allEvents)} disabled={allEvents.length === 0}>
-            <Download size={16} className="mr-2"/> CSV
+            <Download size={16} className="mr-2" /> CSV
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportEventsPdf(allEvents)} disabled={allEvents.length === 0}>
-            <FileText size={16} className="mr-2"/> PDF
+            <FileText size={16} className="mr-2" /> PDF
           </Button>
           <Button variant="outline" size="sm" onClick={loadAllEvents} disabled={isLoadingEvents}>
             {isLoadingEvents ? "Chargement..." : "Actualiser"}
-                  </Button>
-                </div>
-              </div>
+          </Button>
+        </div>
+      </div>
       <Card className="border-0 shadow-card">
         <CardContent>
           {isLoadingEvents ? (
@@ -2770,33 +2793,33 @@ const AdminDashboard = () => {
                       <TableCell>{event.time}</TableCell>
                       <TableCell>{event.location}</TableCell>
                       <TableCell>{event.maxCapacity}</TableCell>
-                        <TableCell>
+                      <TableCell>
                         <Badge variant={event.ticketsSold >= event.maxCapacity ? "destructive" : "secondary"}>
                           {event.ticketsSold}/{event.maxCapacity}
                         </Badge>
-                        </TableCell>
+                      </TableCell>
                       <TableCell>{event.ticketPrice.toLocaleString()} XAF</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col">
+                      <TableCell>
+                        <div className="flex flex-col">
                           <span className="font-medium">{event.establishmentName || event.userName || 'N/A'}</span>
                           {event.userName && event.establishmentName && (
                             <span className="text-xs text-muted-foreground">{event.userName}</span>
                           )}
-                          </div>
-                        </TableCell>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => setEditingEvent({ id: event.id, userId: event.userId, title: event.title, date: event.date, time: event.time, location: event.location, maxCapacity: event.maxCapacity, ticketPrice: event.ticketPrice })}
                             title="Modifier l'événement"
                           >
-                            <Edit size={14} className="mr-2"/> Modifier
+                            <Edit size={14} className="mr-2" /> Modifier
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive" 
+                          <Button
+                            size="sm"
+                            variant="destructive"
                             onClick={() => handleDeleteEvent(event.id, event.userId)}
                             disabled={deletingEventId === event.id}
                             title="Supprimer l'événement"
@@ -2805,20 +2828,20 @@ const AdminDashboard = () => {
                               <>...</>
                             ) : (
                               <>
-                                <Trash2 size={14} className="mr-2"/> Supprimer
+                                <Trash2 size={14} className="mr-2" /> Supprimer
                               </>
                             )}
                           </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
           )}
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
     </div>
   );
 
@@ -2827,7 +2850,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Appréciations</h1>
@@ -2868,7 +2891,7 @@ const AdminDashboard = () => {
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
           }} disabled={allRatings.length === 0}>
-            <Download size={16} className="mr-2"/> CSV
+            <Download size={16} className="mr-2" /> CSV
           </Button>
           <Button variant="outline" size="sm" onClick={async () => {
             const { jsPDF } = await import("jspdf");
@@ -2878,31 +2901,31 @@ const AdminDashboard = () => {
             const margin = 40;
             const tableWidth = pageWidth - (2 * margin);
             const rowHeight = 20;
-            
+
             // En-tête
             doc.setFontSize(18);
             doc.setFont(undefined, 'bold');
             doc.text("Liste des Appréciations", margin, y);
             y += 30;
-            
+
             // Date d'export
             doc.setFontSize(10);
             doc.setFont(undefined, 'normal');
-            doc.text(`Exporté le ${new Date().toLocaleDateString('fr-FR', { 
-              day: '2-digit', 
-              month: '2-digit', 
+            doc.text(`Exporté le ${new Date().toLocaleDateString('fr-FR', {
+              day: '2-digit',
+              month: '2-digit',
               year: 'numeric',
               hour: '2-digit',
               minute: '2-digit'
             })}`, margin, y);
             y += 20;
-            
+
             // Ligne de séparation
             doc.setDrawColor(200, 200, 200);
             doc.setLineWidth(0.5);
             doc.line(margin, y, pageWidth - margin, y);
             y += 15;
-            
+
             // En-têtes du tableau
             doc.setFontSize(10);
             doc.setFont(undefined, 'bold');
@@ -2910,7 +2933,7 @@ const AdminDashboard = () => {
             doc.rect(margin, y, tableWidth, rowHeight, 'F');
             doc.setDrawColor(200, 200, 200);
             doc.rect(margin, y, tableWidth, rowHeight);
-            
+
             const colWidths = [150, 60, 80, 150, 155];
             let x = margin + 5;
             doc.text("Produit", x, y + 14);
@@ -2922,16 +2945,16 @@ const AdminDashboard = () => {
             doc.text("Établissement", x, y + 14);
             x += colWidths[3];
             doc.text("Propriétaire", x, y + 14);
-            
+
             y += rowHeight;
-            
+
             // Données
             doc.setFont(undefined, 'normal');
             let pageNumber = 1;
-            
+
             for (let i = 0; i < allRatings.length; i++) {
               const rating = allRatings[i];
-              
+
               // Nouvelle page si nécessaire
               if (y + rowHeight > 800) {
                 doc.addPage();
@@ -2940,7 +2963,7 @@ const AdminDashboard = () => {
                 doc.setFontSize(10);
                 doc.text(`Page ${pageNumber}`, pageWidth - margin - 30, 30);
               }
-              
+
               // Fond alterné
               if (i % 2 === 0) {
                 doc.setFillColor(250, 250, 250);
@@ -2949,11 +2972,11 @@ const AdminDashboard = () => {
                 doc.setFillColor(255, 255, 255);
                 doc.rect(margin, y, tableWidth, rowHeight, 'F');
               }
-              
+
               // Bordures
               doc.setDrawColor(200, 200, 200);
               doc.rect(margin, y, tableWidth, rowHeight);
-              
+
               // Données
               x = margin + 5;
               doc.text((rating.productName || '').substring(0, 30), x, y + 14);
@@ -2965,82 +2988,82 @@ const AdminDashboard = () => {
               doc.text((rating.establishmentName || '').substring(0, 30), x, y + 14);
               x += colWidths[3];
               doc.text((rating.userName || '').substring(0, 30), x, y + 14);
-              
+
               y += rowHeight;
             }
-            
+
             // Pied de page
             doc.setFontSize(8);
             doc.text(`Total: ${allRatings.length} appréciation(s)`, margin, y + 10);
             doc.text(`Page ${pageNumber}`, pageWidth - margin - 30, y + 10);
-            
+
             doc.save(`appreciations-${new Date().toISOString().split('T')[0]}.pdf`);
           }} disabled={allRatings.length === 0}>
-            <FileText size={16} className="mr-2"/> PDF
+            <FileText size={16} className="mr-2" /> PDF
           </Button>
           <Button variant="outline" size="sm" onClick={loadAllRatings} disabled={isLoadingRatings}>
             {isLoadingRatings ? "Chargement..." : "Actualiser"}
-              </Button>
-            </div>
+          </Button>
+        </div>
       </div>
       <Card className="border-0 shadow-card">
-          <CardContent>
+        <CardContent>
           {isLoadingRatings ? (
             <div className="text-center py-8 text-muted-foreground">Chargement des appréciations...</div>
           ) : allRatings.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">Aucune appréciation trouvée</div>
-            ) : (
-              <div className="border rounded-md overflow-x-auto">
-                <Table className="min-w-[700px]">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Produit</TableHead>
-                      <TableHead>Note</TableHead>
-                      <TableHead>Nombre d'avis</TableHead>
-                      <TableHead>Établissement</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+          ) : (
+            <div className="border rounded-md overflow-x-auto">
+              <Table className="min-w-[700px]">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Produit</TableHead>
+                    <TableHead>Note</TableHead>
+                    <TableHead>Nombre d'avis</TableHead>
+                    <TableHead>Établissement</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {allRatings.map((rating) => (
                     <TableRow key={`${rating.userId}-${rating.productId}`}>
                       <TableCell className="font-medium">{rating.productName}</TableCell>
-                        <TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           <Star size={16} className="text-yellow-500 fill-yellow-500" />
                           <span className="font-semibold">{rating.rating.toFixed(1)}/5</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant="secondary">{rating.ratingCount} avis</Badge>
-                        </TableCell>
-                        <TableCell>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex flex-col">
                           <span className="font-medium">{rating.establishmentName || rating.userName || 'N/A'}</span>
                           {rating.userName && rating.establishmentName && (
                             <span className="text-xs text-muted-foreground">{rating.userName}</span>
                           )}
                         </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            onClick={() => handleResetRating(rating.productId, rating.userId)}
-                            title="Réinitialiser les appréciations"
-                          >
-                            <X size={14} className="mr-2"/> Réinitialiser
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleResetRating(rating.productId, rating.userId)}
+                          title="Réinitialiser les appréciations"
+                        >
+                          <X size={14} className="mr-2" /> Réinitialiser
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
-              </div>
+    </div>
   );
 
   // Vue Clients
@@ -3048,7 +3071,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Clients</h1>
@@ -3056,10 +3079,10 @@ const AdminDashboard = () => {
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => exportCustomersCsv(allCustomers)} disabled={allCustomers.length === 0}>
-            <Download size={16} className="mr-2"/> CSV
+            <Download size={16} className="mr-2" /> CSV
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportCustomersPdf(allCustomers)} disabled={allCustomers.length === 0}>
-            <FileText size={16} className="mr-2"/> PDF
+            <FileText size={16} className="mr-2" /> PDF
           </Button>
           <Button variant="outline" size="sm" onClick={loadAllCustomers} disabled={isLoadingCustomers}>
             {isLoadingCustomers ? "Chargement..." : "Actualiser"}
@@ -3116,16 +3139,16 @@ const AdminDashboard = () => {
                             <span className="text-xs text-muted-foreground">{customer.userName}</span>
                           )}
                         </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
-              </div>
+    </div>
   );
 
   // Vue Disbursement ID
@@ -3135,7 +3158,7 @@ const AdminDashboard = () => {
       <div className="p-4 md:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
           <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-            <ArrowLeft size={16} className="mr-2"/> Retour
+            <ArrowLeft size={16} className="mr-2" /> Retour
           </Button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold">Disbursement ID</h1>
@@ -3201,7 +3224,7 @@ const AdminDashboard = () => {
                                 variant="outline"
                                 onClick={() => setEditingDisbursement({ id: request.id, disbursementId: '' })}
                               >
-                                <Edit size={14} className="mr-2"/> Configurer
+                                <Edit size={14} className="mr-2" /> Configurer
                               </Button>
                               <Button
                                 size="sm"
@@ -3213,7 +3236,7 @@ const AdminDashboard = () => {
                                   }
                                 }}
                               >
-                                <X size={14} className="mr-2"/> Rejeter
+                                <X size={14} className="mr-2" /> Rejeter
                               </Button>
                             </div>
                           )}
@@ -3245,7 +3268,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div className="flex-1">
           <h1 className="text-2xl font-bold">Affiliation</h1>
@@ -3256,7 +3279,7 @@ const AdminDashboard = () => {
         <Dialog open={showNewAffiliateDialog} onOpenChange={setShowNewAffiliateDialog}>
           <DialogTrigger asChild>
             <Button className="flex items-center gap-2">
-              <Gift size={16}/> Créer un affilié
+              <Gift size={16} /> Créer un affilié
             </Button>
           </DialogTrigger>
           <DialogContent>
@@ -3303,12 +3326,15 @@ const AdminDashboard = () => {
                   <TableRow>
                     <TableHead>Code</TableHead>
                     <TableHead>Nom</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Établissements parrainés</TableHead>
-                    <TableHead>Revenus (XAF)</TableHead>
+                    <TableHead>WhatsApp / Email</TableHead>
+                    <TableHead>Parrainés</TableHead>
+                    <TableHead>Total (XAF)</TableHead>
+                    <TableHead>Payé (XAF)</TableHead>
+                    <TableHead>Solde (XAF)</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                     <TableHead>Lien inscription</TableHead>
                     <TableHead>QR code</TableHead>
-                    <TableHead>Tableau de bord affilié</TableHead>
+                    <TableHead>Stats</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -3320,24 +3346,47 @@ const AdminDashboard = () => {
                       <TableRow key={aff.id}>
                         <TableCell className="font-mono font-medium">{aff.code}</TableCell>
                         <TableCell>{aff.name}</TableCell>
-                        <TableCell>{aff.email || "-"}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col text-xs">
+                            <span>{aff.whatsapp || "N/A"}</span>
+                            <span className="text-muted-foreground">{aff.email || ""}</span>
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <Badge variant="secondary">{referralCount}</Badge>
                         </TableCell>
-                        <TableCell className="font-semibold text-green-600">
-                          {(aff.totalEarned ?? 0).toLocaleString()} XAF
+                        <TableCell className="font-semibold text-blue-600">
+                          {(aff.totalEarned ?? 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-gray-600">
+                          {(aff.paidEarnings ?? 0).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-bold text-green-600">
+                          {((aff.totalEarned ?? 0) - (aff.paidEarnings ?? 0)).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {((aff.totalEarned ?? 0) - (aff.paidEarnings ?? 0)) > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[10px] bg-green-50 hover:bg-green-100 border-green-200 text-green-700"
+                              onClick={() => markAffiliateAsPaid(aff.id, aff.code, (aff.totalEarned ?? 0) - (aff.paidEarnings ?? 0))}
+                            >
+                              Tout régler
+                            </Button>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <a href={registerUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm truncate block max-w-[200px]">
-                            {registerUrl}
+                          <a href={registerUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs truncate block max-w-[120px]">
+                            Lien
                           </a>
                         </TableCell>
                         <TableCell>
                           <AffiliateQRCell url={registerUrl} />
                         </TableCell>
                         <TableCell>
-                          <a href={dashboardUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-sm">
-                            Voir stats
+                          <a href={dashboardUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">
+                            Stats
                           </a>
                         </TableCell>
                       </TableRow>
@@ -3357,7 +3406,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Abonnements</h1>
@@ -3387,8 +3436,8 @@ const AdminDashboard = () => {
                     </div>
                   ))}
                 </div>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="mt-4"
                   onClick={() => openEditPlan(key as "transition" | "transition-pro-max")}
                 >
@@ -3419,22 +3468,22 @@ const AdminDashboard = () => {
                 placeholder="5000"
               />
             </div>
-            
+
             <div className="space-y-3">
               <Label className="text-base font-semibold">Fonctionnalités</Label>
               {Object.entries(planFeatures).filter(([key]) => key !== 'eventsLimit' && key !== 'eventsExtraPrice').map(([feature, enabled]) => (
-              <div key={feature} className="flex items-center gap-2">
-                <Checkbox 
-                  checked={enabled} 
-                  onCheckedChange={(checked) => 
-                    setPlanFeatures({ ...planFeatures, [feature]: checked as boolean })
-                  }
-                />
+                <div key={feature} className="flex items-center gap-2">
+                  <Checkbox
+                    checked={enabled}
+                    onCheckedChange={(checked) =>
+                      setPlanFeatures({ ...planFeatures, [feature]: checked as boolean })
+                    }
+                  />
                   <Label className="capitalize">{feature === 'barConnectee' ? 'Bar Connectée' : feature}</Label>
-              </div>
-            ))}
+                </div>
+              ))}
             </div>
-            
+
             {editingPlan === 'transition-pro-max' && (
               <div className="space-y-4 pt-4 border-t">
                 <div className="space-y-2">
@@ -3457,9 +3506,9 @@ const AdminDashboard = () => {
                 </div>
               </div>
             )}
-            
+
             <div className="flex gap-2 pt-4">
-              <Button 
+              <Button
                 onClick={saveSubscriptionPlan}
                 disabled={isLoadingPlans}
               >
@@ -3478,7 +3527,7 @@ const AdminDashboard = () => {
     <div className="p-4 md:p-6 lg:p-8">
       <div className="flex items-center gap-4 mb-6">
         <Button variant="ghost" size="sm" onClick={() => navigate('/admin-check')}>
-          <ArrowLeft size={16} className="mr-2"/> Retour
+          <ArrowLeft size={16} className="mr-2" /> Retour
         </Button>
         <div>
           <h1 className="text-2xl font-bold">Notifications</h1>
@@ -3515,9 +3564,9 @@ const AdminDashboard = () => {
             </Button>
           </div>
           <Input placeholder="Message" value={notif.message} onChange={e => setNotif({ ...notif, message: e.target.value })} />
-          </CardContent>
-        </Card>
-      </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 
   // Rendu principal
@@ -3602,7 +3651,7 @@ const AdminDashboard = () => {
             }}>
               Annuler
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (userToChangeSubscription) {
                   changeSubscriptionType(userToChangeSubscription.uid, newSubscriptionType);
@@ -3663,7 +3712,7 @@ const AdminDashboard = () => {
             <Button variant="outline" onClick={() => setEditingProduct(null)}>
               Annuler
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (editingProduct) {
                   handleUpdateProduct(editingProduct.id, editingProduct.userId, {
@@ -3746,7 +3795,7 @@ const AdminDashboard = () => {
             <Button variant="outline" onClick={() => setEditingEvent(null)}>
               Annuler
             </Button>
-            <Button 
+            <Button
               onClick={() => {
                 if (editingEvent) {
                   handleUpdateEvent(editingEvent.id, editingEvent.userId, {

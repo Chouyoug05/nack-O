@@ -60,10 +60,16 @@ export interface AffiliateDoc {
   id?: string;
   code: string; // Code unique (ex: AFF001)
   name: string;
+  whatsapp: string;
+  password?: string;
   email?: string;
   referralCount?: number; // Nombre d'établissements parrainés (mis à jour par l'admin)
   /** Commission totale gagnée (1000 XAF par paiement standard, 2000 par pro) – versée par l'admin à la date du paiement */
   totalEarned?: number;
+  /** Montant déjà versé à l'affilié par l'admin */
+  paidEarnings?: number;
+  /** Date du dernier versement */
+  lastPaymentDate?: number;
   createdAt: number;
   createdBy: string; // uid admin
 } 

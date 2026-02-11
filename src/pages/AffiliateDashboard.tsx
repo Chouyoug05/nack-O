@@ -245,20 +245,35 @@ const AffiliateDashboard = () => {
                   <p className="text-sm text-muted-foreground">établissement(s) inscrit(s) avec votre code</p>
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-lg bg-green-50 border border-green-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-100 flex flex-col items-center justify-center text-center">
+                  <p className="text-xs text-blue-600 font-medium mb-1">Total Cumulé</p>
+                  <p className="text-lg font-bold text-blue-700">{totalEarned.toLocaleString()} XAF</p>
+                </div>
+                <div className="p-3 rounded-lg bg-gray-50 border border-gray-200 flex flex-col items-center justify-center text-center">
+                  <p className="text-xs text-gray-500 font-medium mb-1">Déjà Versé</p>
+                  <p className="text-lg font-bold text-gray-700">{(affiliate.paidEarnings ?? 0).toLocaleString()} XAF</p>
+                </div>
+                <div className="p-3 rounded-lg bg-green-50 border border-green-200 flex flex-col items-center justify-center text-center">
+                  <p className="text-xs text-green-600 font-medium mb-1">Solde à payer</p>
+                  <p className="text-lg font-bold text-green-700">{(totalEarned - (affiliate.paidEarnings ?? 0)).toLocaleString()} XAF</p>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-lg bg-emerald-50 border border-emerald-100">
                 <div className="flex items-center gap-4">
-                  <Wallet size={32} className="text-green-600" />
+                  <Wallet size={32} className="text-emerald-600" />
                   <div>
-                    <p className="text-2xl font-bold text-green-700">{totalEarned.toLocaleString()} XAF</p>
-                    <p className="text-xs text-muted-foreground">Revenus (commission cumulée).</p>
+                    <p className="text-lg font-bold text-emerald-700">{(totalEarned - (affiliate.paidEarnings ?? 0)).toLocaleString()} XAF</p>
+                    <p className="text-xs text-emerald-600/80 font-medium">Récupérer mon solde actuel</p>
                   </div>
                 </div>
                 <Button
                   asChild
-                  className="bg-green-600 hover:bg-green-700 text-white font-bold h-10 px-4 rounded-xl w-full sm:w-auto text-sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 px-4 rounded-xl w-full sm:w-auto text-sm"
                 >
                   <a
-                    href={`https://wa.me/24104746847?text=${encodeURIComponent(`Bonjour, je souhaite récupérer mes commissions Nack!\n\nCode Affilié : ${affiliate.code}\nSolde actuel : ${totalEarned.toLocaleString()} XAF`)}`}
+                    href={`https://wa.me/24104746847?text=${encodeURIComponent(`Bonjour, je souhaite récupérer mes commissions Nack!\n\nCode Affilié : ${affiliate.code}\nSolde à régler : ${(totalEarned - (affiliate.paidEarnings ?? 0)).toLocaleString()} XAF`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                   >

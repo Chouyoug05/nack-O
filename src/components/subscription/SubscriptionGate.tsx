@@ -6,12 +6,23 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
 
 interface Props {
   children: React.ReactNode;
 }
+
+const DURATIONS = [
+  { value: 'month', label: '1 Mois', discount: '' },
+  { value: 'quarter', label: '3 Mois', discount: '' },
+  { value: 'semester', label: '6 Mois', discount: '-10%' },
+  { value: 'year', label: '12 Mois', discount: '2 mois offerts' },
+] as const;
+
+type DurationType = typeof DURATIONS[number]['value'];
 
 const msInDay = 24 * 60 * 60 * 1000;
 const sevenDays = 7 * msInDay;
@@ -31,6 +42,7 @@ const SubscriptionGate = ({ children }: Props) => {
   const { user, profile } = useAuth();
   const [now, setNow] = useState<number>(() => Date.now());
   const [creatingLink, setCreatingLink] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState<DurationType>('month');
   const [trialOpen, setTrialOpen] = useState<boolean>(() => {
     try { return localStorage.getItem('nack_trial_popup_dismissed') !== '1'; } catch { return true; }
   });
@@ -95,24 +107,35 @@ const SubscriptionGate = ({ children }: Props) => {
     return { status: 'expired' as const };
   }, [profile, now]);
 
-  const startPayment = async () => {
+  const calculatePrice = (plan: 'transition' | 'transition-pro-max', duration: DurationType) => {
+    const basePrice = SUBSCRIPTION_PLANS[plan].price;
+    switch (duration) {
+      case 'month': return basePrice;
+      case 'quarter': return basePrice * 3;
+      case 'semester': return Math.round(basePrice * 6 * 0.9); // 10% discount
+      case 'year': return basePrice * 10; // 12 for 10
+      default: return basePrice;
+    }
+  };
+
+  const handleSubscribe = async (plan: 'transition' | 'transition-pro-max') => {
     if (!user) return;
     try {
       setCreatingLink(true);
 
-      // Créer un ID unique pour cette transaction
       const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const now = Date.now();
-
       const base = (
         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
         || window.location.origin
       ).replace(/\/+$/, '');
 
-      const reference = 'abonnement-transition';
-      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
+      const reference = `abonnement-${plan}`;
+      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&duration=${selectedDuration}`;
       const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
       const logoURL = `${base}/favicon.png`;
+
+      const amount = calculatePrice(plan, selectedDuration);
 
       // Enregistrer la transaction en attente
       try {
@@ -124,12 +147,13 @@ const SubscriptionGate = ({ children }: Props) => {
         await addDoc(paymentsRef, {
           userId: user.uid,
           transactionId,
-          subscriptionType: 'transition',
-          amount: SUBSCRIPTION_PLANS.transition.price,
+          subscriptionType: plan,
+          duration: selectedDuration,
+          amount,
           status: 'pending',
           paymentMethod: 'airtel-money',
           reference,
-          paymentLink: '', // Sera rempli après génération
+          paymentLink: '',
           redirectSuccess,
           redirectError,
           createdAt: now,
@@ -139,7 +163,7 @@ const SubscriptionGate = ({ children }: Props) => {
       }
 
       const link = await createSubscriptionPaymentLink({
-        amount: SUBSCRIPTION_PLANS.transition.price,
+        amount,
         reference: `${reference}-${transactionId.substring(0, 8)}`,
         redirectSuccess,
         redirectError,
@@ -172,6 +196,31 @@ const SubscriptionGate = ({ children }: Props) => {
     }
   };
 
+  const DurationSelector = () => (
+    <div className="space-y-2 mb-4">
+      <Label className="text-sm font-medium">Durée de l'abonnement</Label>
+      <Select value={selectedDuration} onValueChange={(v) => setSelectedDuration(v as DurationType)}>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Choisir une durée" />
+        </SelectTrigger>
+        <SelectContent>
+          {DURATIONS.map((d) => (
+            <SelectItem key={d.value} value={d.value}>
+              <div className="flex items-center justify-between w-full gap-2">
+                <span>{d.label}</span>
+                {d.discount && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-700 text-[10px] ml-2">
+                    {d.discount}
+                  </Badge>
+                )}
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   if (state.status === 'loading') return null;
 
   const isExpired = state.status === 'expired';
@@ -200,9 +249,11 @@ const SubscriptionGate = ({ children }: Props) => {
               </p>
             </div>
 
+            <DurationSelector />
+
             <div className="space-y-3">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2">Transition - {SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF/mois</h3>
+                <h3 className="font-semibold text-blue-900 mb-2">Transition - {calculatePrice('transition', selectedDuration).toLocaleString()} XAF</h3>
                 <ul className="text-sm text-blue-800 space-y-1 mb-3">
                   <li>✓ Gestion des produits</li>
                   <li>✓ Point de vente</li>
@@ -210,88 +261,17 @@ const SubscriptionGate = ({ children }: Props) => {
                   <li>✓ Rapports</li>
                 </ul>
                 <Button
-                  onClick={async () => {
-                    if (!user) return;
-                    try {
-                      setCreatingLink(true);
-
-                      const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                      const now = Date.now();
-                      const base = (
-                        (import.meta.env.VITE_PUBLIC_BASE_URL as string)
-                        || window.location.origin
-                      ).replace(/\/+$/, '');
-
-                      const reference = 'abonnement-transition';
-                      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
-                      const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
-                      const logoURL = `${base}/favicon.png`;
-
-                      try {
-                        const { paymentsColRef } = await import('@/lib/collections');
-                        const { db } = await import('@/lib/firebase');
-                        const { addDoc } = await import('firebase/firestore');
-                        const paymentsRef = paymentsColRef(db, user.uid);
-
-                        await addDoc(paymentsRef, {
-                          userId: user.uid,
-                          transactionId,
-                          subscriptionType: 'transition',
-                          amount: SUBSCRIPTION_PLANS.transition.price,
-                          status: 'pending',
-                          paymentMethod: 'airtel-money',
-                          reference,
-                          paymentLink: '',
-                          redirectSuccess,
-                          redirectError,
-                          createdAt: now,
-                        });
-                      } catch (error) {
-                        console.error('Erreur enregistrement transaction pending:', error);
-                      }
-
-                      const link = await createSubscriptionPaymentLink({
-                        amount: SUBSCRIPTION_PLANS.transition.price,
-                        reference: `${reference}-${transactionId.substring(0, 8)}`,
-                        redirectSuccess,
-                        redirectError,
-                        logoURL,
-                        isTransfer: false,
-                      });
-
-                      try {
-                        const { paymentsColRef } = await import('@/lib/collections');
-                        const { db } = await import('@/lib/firebase');
-                        const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
-                        const paymentsRef = paymentsColRef(db, user.uid);
-                        const q = query(paymentsRef, where('transactionId', '==', transactionId));
-                        const snapshot = await getDocs(q);
-                        if (!snapshot.empty) {
-                          await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
-                        }
-                      } catch (error) {
-                        console.error('Erreur mise à jour lien paiement:', error);
-                      }
-
-                      window.location.href = link;
-                    } catch (e) {
-                      console.error(e);
-                      const msg = e instanceof Error ? e.message : String(e);
-                      alert(`Impossible de créer le lien de paiement: ${msg}`);
-                    } finally {
-                      setCreatingLink(false);
-                    }
-                  }}
+                  onClick={() => handleSubscribe('transition')}
                   disabled={creatingLink}
                   variant="outline"
                   className="w-full"
                 >
-                  {creatingLink ? 'Chargement...' : `S'abonner - Transition (${SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF)`}
+                  {creatingLink ? 'Chargement...' : `S'abonner - Transition (${calculatePrice('transition', selectedDuration).toLocaleString()} XAF)`}
                 </Button>
               </div>
 
               <div className="bg-gradient-to-r from-red-600 to-red-700 border border-red-800 rounded-lg p-4">
-                <h3 className="font-semibold text-white mb-2">Transition Pro Max - {SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF/mois</h3>
+                <h3 className="font-semibold text-white mb-2">Transition Pro Max - {calculatePrice('transition-pro-max', selectedDuration).toLocaleString()} XAF</h3>
                 <ul className="text-sm text-red-100 space-y-1 mb-3">
                   <li>✓ Toutes les fonctionnalités Transition</li>
                   <li>✓ Gestion des équipiers</li>
@@ -299,82 +279,11 @@ const SubscriptionGate = ({ children }: Props) => {
                   <li>✓ Événements (5 inclus, puis 1 500 XAF/événement)</li>
                 </ul>
                 <Button
-                  onClick={async () => {
-                    if (!user) return;
-                    try {
-                      setCreatingLink(true);
-
-                      const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                      const now = Date.now();
-                      const base = (
-                        (import.meta.env.VITE_PUBLIC_BASE_URL as string)
-                        || window.location.origin
-                      ).replace(/\/+$/, '');
-
-                      const reference = 'abonnement-transition-pro-max';
-                      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
-                      const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
-                      const logoURL = `${base}/favicon.png`;
-
-                      try {
-                        const { paymentsColRef } = await import('@/lib/collections');
-                        const { db } = await import('@/lib/firebase');
-                        const { addDoc } = await import('firebase/firestore');
-                        const paymentsRef = paymentsColRef(db, user.uid);
-
-                        await addDoc(paymentsRef, {
-                          userId: user.uid,
-                          transactionId,
-                          subscriptionType: 'transition-pro-max',
-                          amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
-                          status: 'pending',
-                          paymentMethod: 'airtel-money',
-                          reference,
-                          paymentLink: '',
-                          redirectSuccess,
-                          redirectError,
-                          createdAt: now,
-                        });
-                      } catch (error) {
-                        console.error('Erreur enregistrement transaction pending:', error);
-                      }
-
-                      const link = await createSubscriptionPaymentLink({
-                        amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
-                        reference: `${reference}-${transactionId.substring(0, 8)}`,
-                        redirectSuccess,
-                        redirectError,
-                        logoURL,
-                        isTransfer: false,
-                      });
-
-                      try {
-                        const { paymentsColRef } = await import('@/lib/collections');
-                        const { db } = await import('@/lib/firebase');
-                        const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
-                        const paymentsRef = paymentsColRef(db, user.uid);
-                        const q = query(paymentsRef, where('transactionId', '==', transactionId));
-                        const snapshot = await getDocs(q);
-                        if (!snapshot.empty) {
-                          await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
-                        }
-                      } catch (error) {
-                        console.error('Erreur mise à jour lien paiement:', error);
-                      }
-
-                      window.location.href = link;
-                    } catch (e) {
-                      console.error(e);
-                      const msg = e instanceof Error ? e.message : String(e);
-                      alert(`Impossible de créer le lien de paiement: ${msg}`);
-                    } finally {
-                      setCreatingLink(false);
-                    }
-                  }}
+                  onClick={() => handleSubscribe('transition-pro-max')}
                   disabled={creatingLink}
                   className="w-full bg-white text-red-600 hover:bg-red-50"
                 >
-                  {creatingLink ? 'Chargement...' : `S'abonner - Pro Max (${SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF)`}
+                  {creatingLink ? 'Chargement...' : `S'abonner - Pro Max (${calculatePrice('transition-pro-max', selectedDuration).toLocaleString()} XAF)`}
                 </Button>
               </div>
             </div>
@@ -416,164 +325,24 @@ const SubscriptionGate = ({ children }: Props) => {
                 <Badge variant="secondary">Temps restant</Badge>
                 <span className="font-medium">{formatCountdown(trialRemaining)}</span>
               </div>
+              <DurationSelector />
+
               <div className="pt-2 space-y-4">
                 <div className="flex flex-col gap-3">
                   <Button
-                    onClick={async () => {
-                      if (!user) return;
-                      try {
-                        setCreatingLink(true);
-
-                        const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                        const now = Date.now();
-                        const base = (
-                          (import.meta.env.VITE_PUBLIC_BASE_URL as string)
-                          || window.location.origin
-                        ).replace(/\/+$/, '');
-
-                        const reference = 'abonnement-transition';
-                        const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
-                        const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
-                        const logoURL = `${base}/favicon.png`;
-
-                        try {
-                          const { paymentsColRef } = await import('@/lib/collections');
-                          const { db } = await import('@/lib/firebase');
-                          const { addDoc } = await import('firebase/firestore');
-                          const paymentsRef = paymentsColRef(db, user.uid);
-
-                          await addDoc(paymentsRef, {
-                            userId: user.uid,
-                            transactionId,
-                            subscriptionType: 'transition',
-                            amount: SUBSCRIPTION_PLANS.transition.price,
-                            status: 'pending',
-                            paymentMethod: 'airtel-money',
-                            reference,
-                            paymentLink: '',
-                            redirectSuccess,
-                            redirectError,
-                            createdAt: now,
-                          });
-                        } catch (error) {
-                          console.error('Erreur enregistrement transaction pending:', error);
-                        }
-
-                        const link = await createSubscriptionPaymentLink({
-                          amount: SUBSCRIPTION_PLANS.transition.price,
-                          reference: `${reference}-${transactionId.substring(0, 8)}`,
-                          redirectSuccess,
-                          redirectError,
-                          logoURL,
-                          isTransfer: false,
-                        });
-
-                        try {
-                          const { paymentsColRef } = await import('@/lib/collections');
-                          const { db } = await import('@/lib/firebase');
-                          const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
-                          const paymentsRef = paymentsColRef(db, user.uid);
-                          const q = query(paymentsRef, where('transactionId', '==', transactionId));
-                          const snapshot = await getDocs(q);
-                          if (!snapshot.empty) {
-                            await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
-                          }
-                        } catch (error) {
-                          console.error('Erreur mise à jour lien paiement:', error);
-                        }
-
-                        window.location.href = link;
-                      } catch (e) {
-                        console.error(e);
-                        const msg = e instanceof Error ? e.message : String(e);
-                        alert(`Impossible de créer le lien de paiement: ${msg}`);
-                      } finally {
-                        setCreatingLink(false);
-                      }
-                    }}
+                    onClick={() => handleSubscribe('transition')}
                     disabled={creatingLink}
                     variant="outline"
                     className="w-full h-12"
                   >
-                    Transition ({SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF)
+                    Transition ({calculatePrice('transition', selectedDuration).toLocaleString()} XAF)
                   </Button>
                   <Button
-                    onClick={async () => {
-                      if (!user) return;
-                      try {
-                        setCreatingLink(true);
-
-                        const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-                        const now = Date.now();
-                        const base = (
-                          (import.meta.env.VITE_PUBLIC_BASE_URL as string)
-                          || window.location.origin
-                        ).replace(/\/+$/, '');
-
-                        const reference = 'abonnement-transition-pro-max';
-                        const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}`;
-                        const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
-                        const logoURL = `${base}/favicon.png`;
-
-                        try {
-                          const { paymentsColRef } = await import('@/lib/collections');
-                          const { db } = await import('@/lib/firebase');
-                          const { addDoc } = await import('firebase/firestore');
-                          const paymentsRef = paymentsColRef(db, user.uid);
-
-                          await addDoc(paymentsRef, {
-                            userId: user.uid,
-                            transactionId,
-                            subscriptionType: 'transition-pro-max',
-                            amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
-                            status: 'pending',
-                            paymentMethod: 'airtel-money',
-                            reference,
-                            paymentLink: '',
-                            redirectSuccess,
-                            redirectError,
-                            createdAt: now,
-                          });
-                        } catch (error) {
-                          console.error('Erreur enregistrement transaction pending:', error);
-                        }
-
-                        const link = await createSubscriptionPaymentLink({
-                          amount: SUBSCRIPTION_PLANS['transition-pro-max'].price,
-                          reference: `${reference}-${transactionId.substring(0, 8)}`,
-                          redirectSuccess,
-                          redirectError,
-                          logoURL,
-                          isTransfer: false,
-                        });
-
-                        try {
-                          const { paymentsColRef } = await import('@/lib/collections');
-                          const { db } = await import('@/lib/firebase');
-                          const { query, where, getDocs, updateDoc, doc } = await import('firebase/firestore');
-                          const paymentsRef = paymentsColRef(db, user.uid);
-                          const q = query(paymentsRef, where('transactionId', '==', transactionId));
-                          const snapshot = await getDocs(q);
-                          if (!snapshot.empty) {
-                            await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
-                          }
-                        } catch (error) {
-                          console.error('Erreur mise à jour lien paiement:', error);
-                        }
-
-                        window.location.href = link;
-                      } catch (e) {
-                        console.error(e);
-                        const msg = e instanceof Error ? e.message : String(e);
-                        alert(`Impossible de créer le lien de paiement: ${msg}`);
-                      } finally {
-                        setCreatingLink(false);
-                      }
-                    }}
+                    onClick={() => handleSubscribe('transition-pro-max')}
                     disabled={creatingLink}
                     className="w-full h-12 bg-gradient-primary text-white"
                   >
-                    Pro Max ({SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF)
+                    Pro Max ({calculatePrice('transition-pro-max', selectedDuration).toLocaleString()} XAF)
                   </Button>
                 </div>
                 <p className="text-[10px] sm:text-xs text-center text-muted-foreground">

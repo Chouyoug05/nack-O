@@ -22,11 +22,11 @@ const PaymentSuccess = () => {
       const paymentType = searchParams.get('type') || '';
       const isMenuDigitalPayment = reference.includes('menu-digital');
       const isEventTicketPayment = reference.includes('event-ticket') || paymentType === 'event-ticket';
-      
+
       // Gérer les paiements de billets d'événement
       if (isEventTicketPayment) {
         const transactionId = searchParams.get('transactionId') || '';
-        
+
         if (transactionId) {
           try {
             // Chercher la transaction dans toutes les collections payments
@@ -35,25 +35,25 @@ const PaymentSuccess = () => {
               where('transactionId', '==', transactionId)
             );
             const snapshot = await getDocs(paymentsQuery);
-            
+
             if (!snapshot.empty) {
               const paymentDoc = snapshot.docs[0];
               const paymentData = paymentDoc.data() as PaymentTransaction;
-              
+
               // Vérifier si la transaction est déjà complétée
               if (paymentData.status === 'completed') {
                 console.warn(`PaymentSuccess: Transaction ${transactionId} déjà complétée. Ignorant le traitement dupliqué.`);
                 setTimeout(() => navigate('/', { replace: true }), 2000);
                 return;
               }
-              
+
               // Mettre à jour la transaction
               await updateDoc(paymentDoc.ref, {
                 status: 'completed',
                 paidAt: Date.now(),
                 updatedAt: Date.now(),
               });
-              
+
               // CRÉER le billet seulement après paiement réussi
               // Les données du billet sont stockées dans ticketData de la transaction
               if (paymentData.ticketData && paymentData.eventId && paymentData.establishmentId) {
@@ -82,7 +82,7 @@ const PaymentSuccess = () => {
                 await updateDoc(evtRef, {
                   ticketsSold: increment(qty)
                 });
-                
+
                 // Charger les infos de l'établissement pour l'affichage
                 const profileDoc = await getDoc(doc(db, 'profiles', paymentData.establishmentId));
                 if (profileDoc.exists()) {
@@ -93,7 +93,7 @@ const PaymentSuccess = () => {
                   });
                 }
               }
-              
+
               // Rediriger vers la page d'accueil après 3 secondes
               setTimeout(() => {
                 navigate('/', { replace: true });
@@ -104,17 +104,17 @@ const PaymentSuccess = () => {
             console.error('Erreur traitement paiement billet événement:', error);
           }
         }
-        
+
         // Redirection par défaut si erreur
         setTimeout(() => navigate('/', { replace: true }), 3000);
         return;
       }
-      
+
       if (isMenuDigitalPayment) {
         // Charger les informations de l'établissement depuis la transaction
         const transactionId = searchParams.get('transactionId') || '';
         const orderId = searchParams.get('orderId') || '';
-        
+
         if (transactionId) {
           try {
             // Chercher la transaction dans toutes les collections payments
@@ -123,11 +123,11 @@ const PaymentSuccess = () => {
               where('transactionId', '==', transactionId)
             );
             const snapshot = await getDocs(paymentsQuery);
-            
+
             if (!snapshot.empty) {
               const paymentData = snapshot.docs[0].data() as PaymentTransaction;
               const establishmentId = paymentData.establishmentId;
-              
+
               if (establishmentId) {
                 // Charger les infos de l'établissement
                 const profileDoc = await getDoc(doc(db, 'profiles', establishmentId));
@@ -144,40 +144,40 @@ const PaymentSuccess = () => {
             console.error('Erreur chargement établissement:', error);
           }
         }
-        
+
         // Mettre à jour la transaction et la commande même sans authentification
         try {
           const transactionId = searchParams.get('transactionId') || '';
-          
+
           if (transactionId) {
             const paymentsQuery = query(
               collectionGroup(db, 'payments'),
               where('transactionId', '==', transactionId)
             );
             const snapshot = await getDocs(paymentsQuery);
-            
+
             if (!snapshot.empty) {
               const paymentDoc = snapshot.docs[0];
               const paymentData = paymentDoc.data() as PaymentTransaction;
-              
+
               // Mettre à jour la transaction
               await updateDoc(paymentDoc.ref, {
                 status: 'completed',
                 paidAt: Date.now(),
                 updatedAt: Date.now(),
               });
-              
+
               // CRÉER la commande seulement après paiement réussi
               // Les données de commande sont stockées dans orderData de la transaction
               if (paymentData.orderData && paymentData.establishmentId) {
                 const { barOrdersColRef } = await import('@/lib/collections');
-                
+
                 // Différencier les commandes sur place et les livraisons
                 // - Sur place (avec table) : status 'pending' pour apparaître dans les commandes clients
                 // - Livraison : status 'paid' car déjà payée et livrée
                 const isDelivery = paymentData.orderData.isDelivery === true;
                 const orderStatus = isDelivery ? 'paid' : 'pending';
-                
+
                 // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
                 const cleanedOrderData: Record<string, unknown> = {
                   orderNumber: paymentData.orderData?.orderNumber,
@@ -194,7 +194,7 @@ const PaymentSuccess = () => {
                   paymentMethod: 'airtel-money',
                   paymentTransactionId: transactionId,
                 };
-                
+
                 // Ajouter deliveryAddress seulement si défini et non undefined
                 const od = paymentData.orderData as Record<string, unknown> | undefined;
                 if (od?.deliveryAddress !== undefined && od?.deliveryAddress !== null) {
@@ -203,7 +203,7 @@ const PaymentSuccess = () => {
 
                 // Créer la commande avec le statut approprié
                 const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId!), cleanedOrderData);
-                
+
                 // Mettre à jour la transaction avec l'ID de la commande créée
                 await updateDoc(paymentDoc.ref, {
                   orderId: orderDocRef.id,
@@ -218,11 +218,11 @@ const PaymentSuccess = () => {
                   paymentTransactionId: transactionId,
                 });
               }
-              
+
               // Rediriger vers le menu après 3 secondes
               setTimeout(() => {
                 if (paymentData.establishmentId) {
-                  navigate(`/commande/${paymentData.establishmentId}`, { 
+                  navigate(`/commande/${paymentData.establishmentId}`, {
                     replace: true,
                     state: { paymentSuccess: true }
                   });
@@ -236,11 +236,11 @@ const PaymentSuccess = () => {
         } catch (error) {
           console.error('Erreur traitement paiement menu digital:', error);
         }
-        
+
         // Redirection par défaut si erreur - essayer de récupérer l'établissement depuis l'URL
         const establishmentIdFromUrl = searchParams.get('establishmentId');
         if (establishmentIdFromUrl) {
-          setTimeout(() => navigate(`/commande/${establishmentIdFromUrl}`, { 
+          setTimeout(() => navigate(`/commande/${establishmentIdFromUrl}`, {
             replace: true,
             state: { paymentSuccess: true }
           }), 3000);
@@ -250,26 +250,26 @@ const PaymentSuccess = () => {
         }
         return;
       }
-      
+
       // Pour les autres types de paiement, authentification requise
       if (!user) return;
       try {
         const now = Date.now();
         const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
-        
+
         // Récupérer les paramètres de l'URL
         const reference = searchParams.get('reference') || '';
         const transactionId = searchParams.get('transactionId') || '';
         const paymentType = searchParams.get('type') || 'subscription';
         const orderId = searchParams.get('orderId') || '';
-        
+
         // Vérification de sécurité: s'assurer qu'on a au moins une référence ou un transactionId
         if (!reference && !transactionId) {
           console.error('PaymentSuccess: Aucune référence ou transactionId fournie');
           setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
           return;
         }
-        
+
         // Gérer le paiement d'événement supplémentaire
         if (paymentType === 'event') {
           // Récupérer les données de l'événement depuis sessionStorage
@@ -279,10 +279,10 @@ const PaymentSuccess = () => {
             setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
             return;
           }
-          
+
           try {
             const eventData = JSON.parse(pendingEventDataStr);
-            
+
             // Chercher la transaction pour obtenir le montant
             let amount = 0;
             const paymentsRef = paymentsColRef(db, user.uid);
@@ -293,7 +293,7 @@ const PaymentSuccess = () => {
                 const paymentDoc = paymentsSnapshot.docs[0];
                 const paymentData = paymentDoc.data() as PaymentTransaction;
                 amount = paymentData.amount || 0;
-                
+
                 // Mettre à jour la transaction
                 await updateDoc(doc(paymentsRef, paymentDoc.id), {
                   status: 'completed',
@@ -302,14 +302,14 @@ const PaymentSuccess = () => {
                 });
               }
             }
-            
+
             // Créer l'événement après paiement réussi
             const { useEvents } = await import('@/contexts/EventContext');
             // Note: On ne peut pas utiliser useEvents ici car c'est un hook
             // On va créer l'événement directement via Firestore
             const { eventsColRef } = await import('@/lib/collections');
             const { addDoc } = await import('firebase/firestore');
-            
+
             // Uploader l'image si elle existe
             let finalImageUrl = eventData.imageUrl;
             if (eventData.selectedImageBase64) {
@@ -324,7 +324,7 @@ const PaymentSuccess = () => {
                 console.error('Erreur upload image événement:', imageError);
               }
             }
-            
+
             // Créer l'événement
             const eventPayload = {
               title: eventData.title,
@@ -339,17 +339,17 @@ const PaymentSuccess = () => {
               imageUrl: finalImageUrl || undefined,
               organizerWhatsapp: eventData.organizerWhatsapp || undefined,
             };
-            
+
             await addDoc(eventsColRef(db, user.uid), {
               ...eventPayload,
               ticketsSold: 0,
               createdAt: now,
               updatedAt: now,
             });
-            
+
             // Nettoyer sessionStorage
             sessionStorage.removeItem('pendingEventData');
-            
+
             // Notification de succès
             try {
               await addDoc(notificationsColRef(db, user.uid), {
@@ -359,8 +359,8 @@ const PaymentSuccess = () => {
                 createdAt: now,
                 read: false,
               });
-            } catch {/* ignore */}
-            
+            } catch {/* ignore */ }
+
             setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
             return;
           } catch (error) {
@@ -369,12 +369,12 @@ const PaymentSuccess = () => {
             return;
           }
         }
-        
+
         // Détecter le type de paiement depuis la référence ou l'URL
         let subscriptionType: 'transition' | 'transition-pro-max' | 'menu-digital' = 'transition';
         let amount = 2500;
         let isMenuDigitalPayment = false;
-        
+
         if (reference.includes('menu-digital')) {
           subscriptionType = 'menu-digital';
           isMenuDigitalPayment = true;
@@ -385,11 +385,11 @@ const PaymentSuccess = () => {
           subscriptionType = 'transition';
           amount = SUBSCRIPTION_PLANS.transition.price;
         }
-        
+
         // Chercher la transaction existante si transactionId fourni
         let paymentTransaction: PaymentTransaction | null = null;
         const paymentsRef = paymentsColRef(db, user.uid);
-        
+
         if (transactionId) {
           try {
             // Essayer de trouver la transaction dans la collection payments
@@ -398,31 +398,31 @@ const PaymentSuccess = () => {
             if (!paymentsSnapshot.empty) {
               const paymentDoc = paymentsSnapshot.docs[0];
               paymentTransaction = { id: paymentDoc.id, ...paymentDoc.data() } as PaymentTransaction;
-              
+
               // Si c'est un paiement Menu Digital, récupérer le montant depuis la transaction
               if (paymentTransaction.subscriptionType === 'menu-digital') {
                 isMenuDigitalPayment = true;
                 amount = paymentTransaction.amount;
               }
-              
+
               // VÉRIFICATION IMPORTANTE: Si la transaction est déjà complétée, ne pas la traiter à nouveau
               if (paymentTransaction.status === 'completed') {
                 console.warn(`PaymentSuccess: Transaction ${transactionId} déjà complétée. Ignorant le traitement dupliqué.`);
-                
+
                 // Pour les paiements Menu Digital, rediriger vers la page de commande
                 if (isMenuDigitalPayment && orderId) {
-                  setTimeout(() => navigate(`/commande/${paymentTransaction.establishmentId || user.uid}`, { 
+                  setTimeout(() => navigate(`/commande/${paymentTransaction.establishmentId || user.uid}`, {
                     replace: true,
                     state: { paymentSuccess: true }
                   }), 2000);
                   return;
                 }
-                
+
                 // Vérifier si un reçu existe déjà
                 const receiptsRef = receiptsColRef(db, user.uid);
                 const receiptQuery = query(receiptsRef, where('transactionId', '==', transactionId));
                 const receiptSnapshot = await getDocs(receiptQuery);
-                
+
                 if (receiptSnapshot.empty && profile) {
                   // Générer le reçu si il n'existe pas encore
                   try {
@@ -449,7 +449,7 @@ const PaymentSuccess = () => {
                     console.error('Erreur génération reçu (transaction déjà complétée):', receiptError);
                   }
                 }
-                
+
                 setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
                 return;
               }
@@ -458,7 +458,7 @@ const PaymentSuccess = () => {
             console.error('Erreur recherche transaction:', error);
           }
         }
-        
+
         // Vérification supplémentaire: chercher par référence pour éviter les doublons
         if (reference && !paymentTransaction) {
           try {
@@ -474,11 +474,11 @@ const PaymentSuccess = () => {
             console.error('Erreur vérification doublon par référence:', error);
           }
         }
-        
+
         // Gérer les paiements Menu Digital différemment
         if (isMenuDigitalPayment && paymentTransaction) {
           const paymentData = paymentTransaction as PaymentTransaction;
-          
+
           // Mettre à jour la transaction de paiement
           await updateDoc(doc(paymentsRef, paymentTransaction.id), {
             status: 'completed',
@@ -491,13 +491,13 @@ const PaymentSuccess = () => {
           if (paymentData.orderData && paymentTransaction.establishmentId) {
             try {
               const { barOrdersColRef } = await import('@/lib/collections');
-              
+
               // Différencier les commandes sur place et les livraisons
               // - Sur place (avec table) : status 'pending' pour apparaître dans les commandes clients
               // - Livraison : status 'paid' car déjà payée et livrée
               const isDelivery = paymentData.orderData.isDelivery === true;
               const orderStatus = isDelivery ? 'paid' : 'pending';
-              
+
               // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
               const cleanedOrderData: Record<string, unknown> = {
                 orderNumber: paymentData.orderData?.orderNumber,
@@ -514,7 +514,7 @@ const PaymentSuccess = () => {
                 paymentMethod: 'airtel-money',
                 paymentTransactionId: transactionId,
               };
-              
+
               // Ajouter deliveryAddress seulement si défini et non undefined
               const od2 = paymentData.orderData as Record<string, unknown> | undefined;
               if (od2?.deliveryAddress !== undefined && od2?.deliveryAddress !== null) {
@@ -523,7 +523,7 @@ const PaymentSuccess = () => {
 
               // Créer la commande avec le statut approprié
               const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId!), cleanedOrderData);
-              
+
               // Mettre à jour la transaction avec l'ID de la commande créée
               await updateDoc(doc(paymentsRef, paymentTransaction.id), {
                 orderId: orderDocRef.id,
@@ -550,7 +550,7 @@ const PaymentSuccess = () => {
           // Rediriger vers la page de commande avec un message de succès
           setTimeout(() => {
             if (paymentTransaction.establishmentId) {
-              navigate(`/commande/${paymentTransaction.establishmentId}`, { 
+              navigate(`/commande/${paymentTransaction.establishmentId}`, {
                 replace: true,
                 state: { paymentSuccess: true }
               });
@@ -560,13 +560,25 @@ const PaymentSuccess = () => {
           }, 2000);
           return;
         }
-        
+
         // Calculer la nouvelle date de fin d'abonnement
-        // CORRECTION IMPORTANTE: Chaque paiement donne TOUJOURS exactement 30 jours à partir de maintenant
-        // Ne JAMAIS accumuler les jours - même si l'abonnement actuel a encore des jours restants
-        // Un paiement = 30 jours à partir de la date de paiement, point final
-        const newSubscriptionEndsAt: number = now + thirtyDaysMs;
-        
+        const duration = searchParams.get('duration') || (paymentTransaction as any)?.duration || 'month';
+        let periodDays = 30;
+        let periodLabel = '30 jours';
+
+        if (duration === 'quarter') {
+          periodDays = 90;
+          periodLabel = '90 jours';
+        } else if (duration === 'semester') {
+          periodDays = 180;
+          periodLabel = '180 jours';
+        } else if (duration === 'year') {
+          periodDays = 365;
+          periodLabel = '365 jours';
+        }
+
+        const newSubscriptionEndsAt: number = now + (periodDays * 24 * 60 * 60 * 1000);
+
         // Si l'abonnement actuel a plus de 30 jours, c'est une anomalie - on le corrige
         if (profile?.subscriptionEndsAt && profile.subscriptionEndsAt > now) {
           const daysRemaining = (profile.subscriptionEndsAt - now) / (24 * 60 * 60 * 1000);
@@ -574,9 +586,9 @@ const PaymentSuccess = () => {
             console.warn(`PaymentSuccess: Abonnement anormal détecté (${Math.floor(daysRemaining)} jours restants). Nouveau paiement = 30 jours à partir de maintenant.`);
           }
         }
-        
+
         // TOUJOURS mettre 30 jours à partir de maintenant, jamais accumuler
-        
+
         // Mettre à jour le profil avec le type d'abonnement
         const updateData: {
           plan: 'active';
@@ -593,7 +605,7 @@ const PaymentSuccess = () => {
           lastPaymentAt: now,
           updatedAt: now,
         };
-        
+
         // Pour Pro Max, initialiser/réinitialiser le compteur d'événements si nécessaire
         if (subscriptionType === 'transition-pro-max') {
           // Si on est dans une nouvelle période (abonnement expiré ou première souscription), réinitialiser
@@ -606,9 +618,9 @@ const PaymentSuccess = () => {
             if (profile.eventsResetAt !== undefined) updateData.eventsResetAt = profile.eventsResetAt;
           }
         }
-        
+
         await updateDoc(doc(db, "profiles", user.uid), updateData);
-        
+
         // Forcer le rafraîchissement du profil dans AuthContext pour activer immédiatement les fonctionnalités
         // Le AuthContext écoute déjà les changements via onSnapshot, donc cette mise à jour
         // devrait automatiquement déclencher le rafraîchissement du profil et activer les fonctionnalités
@@ -654,12 +666,12 @@ const PaymentSuccess = () => {
         try {
           await addDoc(notificationsColRef(db, user.uid), {
             title: "Paiement réussi",
-            message: `Votre abonnement ${subscriptionType === 'transition' ? 'Transition' : 'Transition Pro Max'} (${amount.toLocaleString()} XAF) est activé pour 30 jours.`,
+            message: `Votre abonnement ${subscriptionType === 'transition' ? 'Transition' : 'Transition Pro Max'} (${amount.toLocaleString()} XAF) est activé pour ${periodLabel}.`,
             type: "success",
             createdAt: now,
             read: false,
           });
-        } catch {/* ignore */}
+        } catch {/* ignore */ }
 
         // Générer et sauvegarder le reçu si le profil est disponible
         try {
@@ -684,7 +696,7 @@ const PaymentSuccess = () => {
               paymentMethod: "Airtel Money",
               reference: reference || `abonnement-${subscriptionType}`,
             });
-            
+
             // Sauvegarder une référence au reçu dans Firestore
             try {
               const receiptsRef = receiptsColRef(db, user.uid);
@@ -733,8 +745,8 @@ const PaymentSuccess = () => {
       <div className="max-w-md w-full text-center space-y-6 bg-white rounded-2xl shadow-xl p-8">
         {establishmentInfo?.logoUrl && (
           <div className="flex justify-center mb-4">
-            <img 
-              src={establishmentInfo.logoUrl} 
+            <img
+              src={establishmentInfo.logoUrl}
               alt={establishmentInfo.name}
               className="w-20 h-20 rounded-full object-cover border-4 border-green-500"
             />
@@ -751,11 +763,11 @@ const PaymentSuccess = () => {
           {isMenuDigitalPayment || isEventTicketPayment ? 'Paiement confirmé !' : 'Paiement confirmé'}
         </h1>
         <p className="text-sm text-gray-600">
-          {isMenuDigitalPayment 
+          {isMenuDigitalPayment
             ? 'Votre commande a été payée avec succès. Vous allez être redirigé vers le menu...'
             : isEventTicketPayment
-            ? 'Votre billet a été payé avec succès. Vous allez être redirigé...'
-            : 'Votre abonnement a été activé. Redirection…'}
+              ? 'Votre billet a été payé avec succès. Vous allez être redirigé...'
+              : 'Votre abonnement a été activé. Redirection…'}
         </p>
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">
           <p className="font-semibold mb-1">💳 Paiement par Airtel Money</p>
