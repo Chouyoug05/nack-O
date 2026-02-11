@@ -245,12 +245,26 @@ const AffiliateDashboard = () => {
                   <p className="text-sm text-muted-foreground">établissement(s) inscrit(s) avec votre code</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-green-50 border border-green-200">
-                <Wallet size={32} className="text-green-600" />
-                <div>
-                  <p className="text-2xl font-bold text-green-700">{totalEarned.toLocaleString()} XAF</p>
-                  <p className="text-xs text-muted-foreground">Revenus (commission cumulée). L'admin vous verse à la date du paiement.</p>
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-lg bg-green-50 border border-green-200">
+                <div className="flex items-center gap-4">
+                  <Wallet size={32} className="text-green-600" />
+                  <div>
+                    <p className="text-2xl font-bold text-green-700">{totalEarned.toLocaleString()} XAF</p>
+                    <p className="text-xs text-muted-foreground">Revenus (commission cumulée).</p>
+                  </div>
                 </div>
+                <Button
+                  asChild
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold h-10 px-4 rounded-xl w-full sm:w-auto text-sm"
+                >
+                  <a
+                    href={`https://wa.me/24104746847?text=${encodeURIComponent(`Bonjour, je souhaite récupérer mes commissions Nack!\n\nCode Affilié : ${affiliate.code}\nSolde actuel : ${totalEarned.toLocaleString()} XAF`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Récupérer mes sous
+                  </a>
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -311,7 +325,7 @@ const AffiliateDashboard = () => {
                         <p className="text-xs text-muted-foreground">Inscrit le {new Date(ref.createdAt).toLocaleDateString()}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1 ml-4">
-                        <Badge variant={isActive ? "success" : isTrial ? "secondary" : "destructive"} className="whitespace-nowrap">
+                        <Badge variant={isActive ? "default" : isTrial ? "secondary" : "destructive"} className={isActive ? "bg-green-500 hover:bg-green-600 text-white whitespace-nowrap" : "whitespace-nowrap"}>
                           {isActive ? (
                             <><CheckCircle2 size={12} className="mr-1" /> Payé</>
                           ) : isTrial ? (
