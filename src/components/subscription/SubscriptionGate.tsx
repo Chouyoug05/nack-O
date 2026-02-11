@@ -416,8 +416,8 @@ const SubscriptionGate = ({ children }: Props) => {
                 <Badge variant="secondary">Temps restant</Badge>
                 <span className="font-medium">{formatCountdown(trialRemaining)}</span>
               </div>
-              <div className="pt-2 space-y-2">
-                <div className="grid grid-cols-2 gap-2">
+              <div className="pt-2 space-y-4">
+                <div className="flex flex-col gap-3">
                   <Button
                     onClick={async () => {
                       if (!user) return;
@@ -493,7 +493,7 @@ const SubscriptionGate = ({ children }: Props) => {
                     }}
                     disabled={creatingLink}
                     variant="outline"
-                    className="w-full"
+                    className="w-full h-12"
                   >
                     Transition ({SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF)
                   </Button>
@@ -571,12 +571,12 @@ const SubscriptionGate = ({ children }: Props) => {
                       }
                     }}
                     disabled={creatingLink}
-                    className="w-full bg-gradient-primary text-white"
+                    className="w-full h-12 bg-gradient-primary text-white"
                   >
                     Pro Max ({SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF)
                   </Button>
                 </div>
-                <p className="text-xs text-center text-muted-foreground">
+                <p className="text-[10px] sm:text-xs text-center text-muted-foreground">
                   Transition: Produits, Ventes, Stock, Rapports • Pro Max: Tout + Équipiers + Bar Connectée + 5 Événements
                 </p>
               </div>

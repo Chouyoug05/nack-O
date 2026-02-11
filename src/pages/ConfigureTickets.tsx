@@ -47,16 +47,16 @@ const ConfigureTickets = () => {
         customMessage: ticketInfo.customMessage || undefined,
         legalMentions: ticketInfo.legalMentions || undefined,
       });
-      toast({ 
-        title: "Configuration enregistrée", 
-        description: "Les informations de tickets ont été sauvegardées. Vous pourrez les modifier plus tard dans les paramètres." 
+      toast({
+        title: "Configuration enregistrée",
+        description: "Les informations de tickets ont été sauvegardées. Vous pourrez les modifier plus tard dans les paramètres."
       });
       navigate("/dashboard");
     } catch (error) {
-      toast({ 
-        title: "Erreur", 
-        description: "Impossible d'enregistrer la configuration", 
-        variant: "destructive" 
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer la configuration",
+        variant: "destructive"
       });
     } finally {
       setIsSaving(false);
@@ -72,7 +72,7 @@ const ConfigureTickets = () => {
             <CardTitle className="text-2xl">Configuration des tickets</CardTitle>
           </div>
           <CardDescription>
-            Configurez les informations qui apparaîtront sur vos tickets de paiement. 
+            Configurez les informations qui apparaîtront sur vos tickets de paiement.
             <strong className="text-foreground"> Cette étape est optionnelle</strong> - vous pourrez la compléter plus tard dans les paramètres.
           </CardDescription>
         </CardHeader>
@@ -83,18 +83,18 @@ const ConfigureTickets = () => {
               <Input
                 id="company-name"
                 value={ticketInfo.companyName}
-                onChange={(e) => setTicketInfo({...ticketInfo, companyName: e.target.value})}
+                onChange={(e) => setTicketInfo({ ...ticketInfo, companyName: e.target.value })}
                 placeholder="Ex: Restaurant NACK SARL"
               />
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="rcs-number">Numéro RCS (optionnel)</Label>
                 <Input
                   id="rcs-number"
                   value={ticketInfo.rcsNumber}
-                  onChange={(e) => setTicketInfo({...ticketInfo, rcsNumber: e.target.value})}
+                  onChange={(e) => setTicketInfo({ ...ticketInfo, rcsNumber: e.target.value })}
                   placeholder="Ex: RCS-LB-2024-A-1234"
                 />
               </div>
@@ -103,67 +103,67 @@ const ConfigureTickets = () => {
                 <Input
                   id="nif-number"
                   value={ticketInfo.nifNumber}
-                  onChange={(e) => setTicketInfo({...ticketInfo, nifNumber: e.target.value})}
+                  onChange={(e) => setTicketInfo({ ...ticketInfo, nifNumber: e.target.value })}
                   placeholder="Ex: 1234567890"
                 />
               </div>
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="business-phone">Numéro de téléphone professionnel (optionnel)</Label>
               <Input
                 id="business-phone"
                 type="tel"
                 value={ticketInfo.businessPhone}
-                onChange={(e) => setTicketInfo({...ticketInfo, businessPhone: e.target.value})}
+                onChange={(e) => setTicketInfo({ ...ticketInfo, businessPhone: e.target.value })}
                 placeholder="+241 XX XX XX XX"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="full-address">Adresse complète (optionnel)</Label>
               <Input
                 id="full-address"
                 value={ticketInfo.fullAddress}
-                onChange={(e) => setTicketInfo({...ticketInfo, fullAddress: e.target.value})}
+                onChange={(e) => setTicketInfo({ ...ticketInfo, fullAddress: e.target.value })}
                 placeholder="Ex: Avenue Léon Mba, Libreville, Gabon"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="custom-message">Message personnalisé (optionnel)</Label>
               <Input
                 id="custom-message"
                 value={ticketInfo.customMessage}
-                onChange={(e) => setTicketInfo({...ticketInfo, customMessage: e.target.value})}
+                onChange={(e) => setTicketInfo({ ...ticketInfo, customMessage: e.target.value })}
                 placeholder="Ex: Merci pour votre confiance ❤️"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="legal-mentions">Mentions légales (optionnel)</Label>
               <Textarea
                 id="legal-mentions"
                 value={ticketInfo.legalMentions}
-                onChange={(e) => setTicketInfo({...ticketInfo, legalMentions: e.target.value})}
+                onChange={(e) => setTicketInfo({ ...ticketInfo, legalMentions: e.target.value })}
                 placeholder="Ex: SIRET: 12345678901234 - TVA: FR12345678901"
                 rows={3}
               />
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4 border-t">
-            <Button 
-              variant="outline" 
+          <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
               onClick={handleSkip}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               Passer cette étape
             </Button>
-            <Button 
+            <Button
               onClick={handleSave}
               disabled={isSaving}
-              className="flex-1 bg-gradient-primary text-white"
+              className="w-full sm:flex-1 bg-gradient-primary text-white"
             >
               {isSaving ? "Enregistrement..." : (
                 <>

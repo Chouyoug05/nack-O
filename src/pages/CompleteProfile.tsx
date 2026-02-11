@@ -11,7 +11,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { geocodeAddress, searchAddresses } from "@/utils/geocoding";
-import { Search, Navigation, MapPin } from "lucide-react";
+import { Search, Navigation, MapPin, Loader2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import TermsAndConditions from "@/components/TermsAndConditions";
 
 const establishmentTypes = [
   { value: "bar", label: "Bar" },
@@ -40,7 +42,9 @@ const CompleteProfile = () => {
     latitude: undefined as number | undefined,
     longitude: undefined as number | undefined,
   });
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [addressInput, setAddressInput] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
@@ -121,6 +125,15 @@ const CompleteProfile = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!termsAccepted) {
+      toast({
+        title: "Conditions non acceptées",
+        description: "Veuillez accepter les conditions d'utilisation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     // Validation WhatsApp
     if (!formData.whatsapp.trim()) {
       toast({
@@ -140,6 +153,7 @@ const CompleteProfile = () => {
       return;
     }
 
+    setIsSaving(true);
     try {
       let finalLogoUrl: string | undefined = formData.logoUrl || undefined;
       if (logoFile) {
@@ -173,6 +187,8 @@ const CompleteProfile = () => {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Réessayez.";
       toast({ title: "Erreur", description: message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -285,8 +301,34 @@ const CompleteProfile = () => {
                 {formData.latitude && <p className="text-xs text-green-600 mt-1 font-medium">✓ Localisé avec succès</p>}
               </div>
 
-              <Button type="submit" variant="nack" size="lg" className="w-full h-14 text-lg font-bold" disabled={!formData.latitude}>
-                {formData.latitude ? "Finaliser mon inscription" : "Veuillez localiser l'établissement"}
+              <div className="flex items-start space-x-2 pt-2">
+                <Checkbox
+                  id="terms-complete"
+                  checked={termsAccepted}
+                  onCheckedChange={(checked) => setTermsAccepted(!!checked)}
+                  className="mt-1"
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <label
+                    htmlFor="terms-complete"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    J'accepte les{" "}
+                    <TermsAndConditions trigger={<button type="button" className="text-nack-red hover:underline p-0 h-auto font-medium">conditions d'utilisation</button>} />
+                    {" "}de NACK!
+                  </label>
+                </div>
+              </div>
+
+              <Button type="submit" variant="nack" size="lg" className="w-full h-14 text-lg font-bold" disabled={!formData.latitude || !termsAccepted || isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Enregistrement...
+                  </>
+                ) : (
+                  formData.latitude ? "Finaliser mon inscription" : "Veuillez localiser l'établissement"
+                )}
               </Button>
             </form>
           </CardContent>

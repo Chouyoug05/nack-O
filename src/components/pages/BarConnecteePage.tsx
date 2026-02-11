@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { 
-  QrCode, 
-  Plus, 
-  Trash2, 
-  Edit, 
-  Download, 
+import {
+  QrCode,
+  Plus,
+  Trash2,
+  Edit,
+  Download,
   Copy,
   Table,
   MapPin,
@@ -33,6 +33,19 @@ import QRScanner from "@/components/QRScanner";
 import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collections";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
+
+interface Product {
+  id: string;
+  name: string;
+  price: number | string;
+  imageUrl?: string;
+  category?: string;
+  available?: boolean;
+  quantity?: number;
+  stock?: number;
+  description?: string;
+  showOnMenuDigital?: boolean;
+}
 
 interface TableZone {
   id: string;
@@ -71,7 +84,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const { toast } = useToast();
   // State local pour gérer les onglets si pas fourni en props
   const [localActiveTab, setLocalActiveTab] = useState<string>("qr-code");
-  
+
   // Utiliser le state externe si fourni, sinon le state local
   const activeTab = externalActiveTab ?? localActiveTab;
   const handleTabChange = (val: string) => {
@@ -81,12 +94,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       setLocalActiveTab(val);
     }
   };
-  
+
   const [tables, setTables] = useState<TableZone[]>([]);
   const [orders, setOrders] = useState<BarOrder[]>([]);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
-  const [products, setProducts] = useState<Array<{ id: string; name?: string; quantity?: number; stock?: number; price?: number }>>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [newTableName, setNewTableName] = useState("");
   const [newTableType, setNewTableType] = useState<'table' | 'zone'>('table');
   const [newTableCapacity, setNewTableCapacity] = useState<number>(0);
@@ -95,6 +108,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const [isLoading, setIsLoading] = useState(true);
   const [menuTheme, setMenuTheme] = useState<MenuThemeConfig>(defaultMenuTheme);
   const [isSavingTheme, setIsSavingTheme] = useState(false);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [debugClickCount, setDebugClickCount] = useState(0);
 
   // Fonction utilitaire pour obtenir l'URL publique
   const getPublicUrl = useCallback(() => {
@@ -174,7 +189,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           const allProducts = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-          }));
+          } as Product));
           const productsInStock = allProducts.filter(product => {
             const stock = product.quantity || product.stock || 0;
             let priceValue = 0;
@@ -330,11 +345,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       });
       return;
     }
-    
+
     setIsGeneratingQR(true);
     try {
       const publicUrl = getPublicUrl();
-      
+
       const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
         width: 300,
         margin: 2,
@@ -343,9 +358,9 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           light: '#FFFFFF'
         }
       });
-      
+
       setQrCodeUrl(qrCodeDataUrl);
-      
+
       // Sauvegarder l'URL publique dans Firestore
       try {
         await setDoc(doc(db, `profiles/${user.uid}/barConnectee`, 'config'), {
@@ -357,7 +372,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       } catch (firestoreError) {
         // Ignorer l'erreur de sauvegarde (permissions)
       }
-      
+
       toast({
         title: "QR Code généré !",
         description: "Votre QR Code est prêt à être utilisé par vos clients."
@@ -384,7 +399,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       });
       return;
     }
-    
+
     try {
       const tableData = {
         name: newTableName.trim(),
@@ -393,32 +408,32 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         ...(newTableDescription.trim() && { description: newTableDescription.trim() }),
         createdAt: Date.now()
       };
-      
+
       console.log('Ajout table:', tableData);
       console.log('Collection path:', `profiles/${user.uid}/tables`);
-      
+
       await addDoc(collection(db, `profiles/${user.uid}/tables`), tableData);
-      
+
       // Réinitialiser le formulaire
       setNewTableName("");
       setNewTableType('table');
       setNewTableCapacity(0);
       setNewTableDescription("");
-      
+
       toast({
         title: "Table ajoutée !",
         description: `${newTableName} a été ajoutée avec succès.`
       });
     } catch (error) {
       console.error('Erreur ajout table:', error);
-      
+
       let errorMessage = "Impossible d'ajouter la table.";
       if (error.code === 'permission-denied') {
         errorMessage = "Permissions insuffisantes. Contactez le support.";
       } else if (error.code === 'unavailable') {
         errorMessage = "Service temporairement indisponible. Réessayez.";
       }
-      
+
       toast({
         title: "Erreur",
         description: errorMessage,
@@ -430,13 +445,13 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   // Supprimer une table
   const deleteTable = async (tableId: string) => {
     if (!user) return;
-    
+
     try {
       await setDoc(doc(db, `profiles/${user.uid}/tables`, tableId), {
         deleted: true,
         deletedAt: Date.now()
       });
-      
+
       toast({
         title: "Table supprimée !",
         description: "La table a été supprimée avec succès."
@@ -461,13 +476,13 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       });
       return;
     }
-    
+
     try {
       await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
         status: 'confirmed',
         confirmedAt: Date.now()
       }, { merge: true });
-      
+
       toast({
         title: "Commande confirmée !",
         description: "La commande a été confirmée et est prête à être servie."
@@ -492,24 +507,24 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       });
       return;
     }
-    
+
     // Utiliser setTimeout pour éviter les problèmes de timing avec React DOM
     const confirmed = await new Promise<boolean>((resolve) => {
       setTimeout(() => {
         resolve(window.confirm('Êtes-vous sûr de vouloir annuler cette commande ?'));
       }, 0);
     });
-    
+
     if (!confirmed) {
       return;
     }
-    
+
     try {
       await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
         status: 'cancelled',
         cancelledAt: Date.now()
       }, { merge: true });
-      
+
       toast({
         title: "Commande annulée",
         description: "La commande a été annulée avec succès.",
@@ -534,24 +549,24 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       });
       return;
     }
-    
+
     // Utiliser setTimeout pour éviter les problèmes de timing avec React DOM
     const confirmed = await new Promise<boolean>((resolve) => {
       setTimeout(() => {
         resolve(window.confirm('Êtes-vous sûr de vouloir supprimer définitivement cette commande annulée ? Cette action est irréversible.'));
       }, 0);
     });
-    
+
     if (!confirmed) {
       return;
     }
-    
+
     try {
       if (!user.uid || !orderId) {
         throw new Error('UID utilisateur ou ID commande manquant');
       }
       await deleteDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId));
-      
+
       toast({
         title: "Commande supprimée",
         description: "La commande annulée a été supprimée avec succès.",
@@ -575,7 +590,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       });
       return;
     }
-    
+
     try {
       // Trouver la commande
       const order = orders.find(o => o.id === orderId);
@@ -590,7 +605,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
       // Diminuer le stock pour chaque produit
       const batch = writeBatch(db);
-      
+
       for (const item of order.items) {
         // Trouver le produit dans la liste des produits
         const product = products.find(p => p.name === item.name);
@@ -604,10 +619,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
             });
             return;
           }
-          
+
           // Mettre à jour le stock
           const productRef = doc(db, `profiles/${user.uid}/products`, product.id);
-          batch.update(productRef, { 
+          batch.update(productRef, {
             quantity: newStock,
             lastStockUpdate: Date.now()
           });
@@ -647,7 +662,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
       // Exécuter toutes les opérations en batch
       await batch.commit();
-      
+
       toast({
         title: "Commande servie et payée !",
         description: `Commande #${order.orderNumber} finalisée (${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF)`
@@ -707,7 +722,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       };
 
       await generateTicketPDF(ticketData);
-      
+
       toast({
         title: "Ticket téléchargé",
         description: `Ticket de la commande #${order.orderNumber} téléchargé avec succès.`
@@ -747,7 +762,24 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-bold text-foreground mb-1">Menu Digital</h2>
+          <h2
+            className="text-xl font-bold text-foreground mb-1 cursor-default select-none"
+            onClick={() => {
+              const newCount = debugClickCount + 1;
+              if (newCount >= 7) {
+                setShowDebugInfo(!showDebugInfo);
+                setDebugClickCount(0);
+                toast({
+                  title: showDebugInfo ? "Debug désactivé" : "Debug activé",
+                  description: showDebugInfo ? "Les infos techniques sont masquées." : "Les infos techniques sont visibles."
+                });
+              } else {
+                setDebugClickCount(newCount);
+              }
+            }}
+          >
+            Menu Digital
+          </h2>
           <p className="text-sm text-muted-foreground">Gérez les commandes QR de vos clients</p>
         </div>
       </div>
@@ -879,10 +911,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                       {/* Image du produit */}
                       <div className="aspect-square relative">
                         {product.imageUrl && product.imageUrl.trim() !== '' ? (
-                          <img 
-                            src={product.imageUrl} 
-                            alt={product.name} 
-                            className="w-full h-full object-cover rounded-lg" 
+                          <img
+                            src={product.imageUrl}
+                            alt={product.name}
+                            className="w-full h-full object-cover rounded-lg"
                             onError={(e) => {
                               e.currentTarget.style.display = 'none';
                               e.currentTarget.nextElementSibling?.classList.remove('hidden');
@@ -900,7 +932,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Informations du produit */}
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -924,18 +956,20 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                   <p className="text-muted-foreground mb-4">
                     Ajoutez des produits dans la section Stock pour qu'ils apparaissent ici.
                   </p>
-                  <div className="mt-4 p-4 bg-muted rounded-lg text-left">
-                    <p className="text-sm font-medium mb-2">Debug Info:</p>
-                    <p className="text-xs text-muted-foreground">
-                      Collection: profiles/{user?.uid}/products
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Filtre: stock &gt; 0 et prix &gt; 0
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Vérifiez la console pour plus de détails
-                    </p>
-                  </div>
+                  {showDebugInfo && (
+                    <div className="mt-4 p-4 bg-muted rounded-lg text-left">
+                      <p className="text-sm font-medium mb-2">Debug Info:</p>
+                      <p className="text-xs text-muted-foreground">
+                        Collection: profiles/{user?.uid}/products
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Filtre: stock &gt; 0 et prix &gt; 0
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Vérifiez la console pour plus de détails
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -1077,7 +1111,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                           {new Date(order.createdAt).toLocaleString()}
                         </div>
                       </div>
-                      
+
                       <div className="mb-3">
                         <p className="text-sm text-muted-foreground mb-2">
                           <MapPin className="w-4 h-4 inline mr-1" />
@@ -1148,10 +1182,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                           </Button>
                         )}
                         {order.status === 'cancelled' && order.id && (
-                          <Button 
-                            variant="destructive" 
-                            size="sm" 
-                            onClick={() => order.id && deleteOrder(order.id)} 
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => order.id && deleteOrder(order.id)}
                             className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm"
                           >
                             <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
@@ -1456,7 +1490,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                       Une fois validé par l'administration, le paiement en ligne sera activé.
                     </p>
                   </div>
-                  
+
                   {profile?.airtelMoneyNumber && !profile?.disbursementId && (
                     <Button
                       onClick={async () => {
@@ -1468,7 +1502,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                           });
                           return;
                         }
-                        
+
                         // Vérifier que toutes les données nécessaires sont présentes
                         if (!profile.email || !profile.ownerName || !profile.establishmentName) {
                           toast({
@@ -1478,7 +1512,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                           });
                           return;
                         }
-                        
+
                         try {
                           // Vérifier si une demande existe déjà
                           const existingRequestsQuery = query(
@@ -1487,7 +1521,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             where('status', '==', 'pending')
                           );
                           const existingSnapshot = await getDocs(existingRequestsQuery);
-                          
+
                           if (!existingSnapshot.empty) {
                             toast({
                               title: "Demande déjà en cours",
@@ -1496,7 +1530,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             });
                             return;
                           }
-                          
+
                           await addDoc(disbursementRequestsColRef(db), {
                             userId: user.uid,
                             userEmail: profile.email,
@@ -1506,12 +1540,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             status: 'pending',
                             requestedAt: Date.now(),
                           });
-                          
+
                           await setDoc(doc(db, 'profiles', user.uid), {
                             disbursementStatus: 'pending',
                             updatedAt: Date.now(),
                           }, { merge: true });
-                          
+
                           toast({
                             title: "Demande envoyée",
                             description: "Votre demande a été envoyée à l'administration. Vous recevrez une notification une fois qu'elle sera traitée.",

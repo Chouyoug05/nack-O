@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, Building2, MapPin, Gift, Navigation, Search } from "lucide-react";
+import { Eye, EyeOff, Building2, MapPin, Gift, Navigation, Search, Loader2 } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,8 @@ import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinar
 import { validateWhatsApp } from "@/utils/whatsapp";
 import { geocodeAddress, searchAddresses } from "@/utils/geocoding";
 import { getFriendlyErrorMessage } from "@/utils/authErrors";
+import { Checkbox } from "@/components/ui/checkbox";
+import TermsAndConditions from "@/components/TermsAndConditions";
 
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -31,7 +33,7 @@ const Register = () => {
     longitude: undefined as number | undefined,
     address: "",
   });
-
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -73,7 +75,7 @@ const Register = () => {
       case 1: return !!(formData.establishmentName && formData.establishmentType && formData.ownerName);
       case 2: return !!(formData.email && formData.phone && validateWhatsApp(formData.whatsapp));
       case 3: return !!(formData.address && formData.latitude && formData.longitude);
-      case 4: return !!(formData.password && formData.password.length >= 6 && formData.password === formData.confirmPassword);
+      case 4: return !!(formData.password && formData.password.length >= 6 && formData.password === formData.confirmPassword && termsAccepted);
       default: return true;
     }
   };
@@ -159,6 +161,10 @@ const Register = () => {
       toast({ title: "Erreur", description: "Mots de passe différents", variant: "destructive" });
       return;
     }
+    if (!termsAccepted) {
+      toast({ title: "Erreur", description: "Veuillez accepter les conditions d'utilisation.", variant: "destructive" });
+      return;
+    }
     setIsLoading(true);
     try {
       await signUpWithEmail(formData.email, formData.password);
@@ -204,6 +210,10 @@ const Register = () => {
     }
     if (formData.password !== formData.confirmPassword) {
       toast({ title: "Mots de passe différents", variant: "destructive" });
+      return;
+    }
+    if (!termsAccepted) {
+      toast({ title: "Erreur", description: "Veuillez accepter les conditions d'utilisation.", variant: "destructive" });
       return;
     }
     setIsLoading(true);
@@ -265,14 +275,49 @@ const Register = () => {
         <div className="space-y-4">
           <Input name="ownerName" placeholder="Nom complet" value={formData.ownerName} onChange={handleInputChange} className="h-14" />
           <Input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} className="h-14" />
-          <Input name="whatsapp" type="tel" placeholder="WhatsApp (ex: +241...)" value={formData.whatsapp} onChange={handleInputChange} className="h-14" />
+          <Input name="whatsapp" type="tel" placeholder="WhatsApp (ex: +241...)" value={formData.whatsapp}
+            onChange={handleInputChange}
+            required
+            className="h-14"
+          />
           <div className="grid grid-cols-2 gap-3">
             <Input name="password" type="password" placeholder="Mot de passe" value={formData.password} onChange={handleInputChange} className="h-14" />
             <Input name="confirmPassword" type="password" placeholder="Confirmer" value={formData.confirmPassword} onChange={handleInputChange} className="h-14" />
           </div>
         </div>
-        <Button onClick={handleAffiliateSubmit} disabled={isLoading || !formData.ownerName || !formData.email || !formData.whatsapp || !formData.password || formData.password !== formData.confirmPassword} className="w-full h-14 bg-nack-red text-white font-bold">
-          {isLoading ? 'Création...' : 'Créer mon compte affilié'}
+
+        <div className="flex items-start space-x-2 pt-2">
+          <Checkbox
+            id="terms-affiliate"
+            checked={termsAccepted}
+            onCheckedChange={(checked) => setTermsAccepted(!!checked)}
+            className="mt-1"
+          />
+          <div className="grid gap-1.5 leading-none">
+            <label
+              htmlFor="terms-affiliate"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              J'accepte les{" "}
+              <TermsAndConditions trigger={<button type="button" className="text-nack-red hover:underline p-0 h-auto font-medium">conditions d'utilisation</button>} />
+              {" "}de NACK!
+            </label>
+          </div>
+        </div>
+
+        <Button
+          onClick={handleAffiliateSubmit}
+          variant="nack"
+          size="lg"
+          className="w-full h-12"
+          disabled={isLoading || !formData.ownerName || !formData.email || !formData.whatsapp || !formData.password || formData.password !== formData.confirmPassword || !termsAccepted}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Création du compte...
+            </>
+          ) : "Créer mon compte partenaire"}
         </Button>
         <div className="text-center">
           <Button variant="ghost" onClick={() => navigate('/login')} className="text-muted-foreground">Annuler</Button>
@@ -381,6 +426,25 @@ const Register = () => {
                     <div className="mt-2">
                       <Label className="text-xs text-muted-foreground">Ou uploader un fichier :</Label>
                       <Input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="h-10 text-xs mt-1" />
+                    </div>
+
+                    <div className="flex items-start space-x-2 pt-4 border-t mt-4">
+                      <Checkbox
+                        id="terms-manager"
+                        checked={termsAccepted}
+                        onCheckedChange={(checked) => setTermsAccepted(!!checked)}
+                        className="mt-1"
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <label
+                          htmlFor="terms-manager"
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          J'accepte les{" "}
+                          <TermsAndConditions trigger={<button type="button" className="text-nack-red hover:underline p-0 h-auto font-medium">conditions d'utilisation</button>} />
+                          {" "}de NACK!
+                        </label>
+                      </div>
                     </div>
                   </div>
                 )}
