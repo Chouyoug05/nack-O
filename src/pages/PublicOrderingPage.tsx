@@ -71,7 +71,7 @@ const PublicOrderingPage = () => {
   const params = useParams<{ establishmentId: string }>();
   const location = useLocation();
   const establishmentId = useMemo(() => params?.establishmentId ?? null, [params?.establishmentId]);
-  
+
   // State
   const [products, setProducts] = useState<Product[]>([]);
   const [tables, setTables] = useState<TableZone[]>([]);
@@ -141,7 +141,7 @@ const PublicOrderingPage = () => {
   // useEffect principal
   useEffect(() => {
     isMountedRef.current = true;
-    
+
     if (unsubscribeProductsRef.current) {
       try {
         unsubscribeProductsRef.current();
@@ -212,10 +212,10 @@ const PublicOrderingPage = () => {
 
     // Charger les produits
     const productsRef = collection(db, `profiles/${establishmentId}/products`);
-    
+
     const handleProductsSnapshot = (snapshot: QuerySnapshot<DocumentData>) => {
       if (!isMountedRef.current) return;
-      
+
       const productsData = snapshot.docs.map((docItem) => {
         const data = docItem.data();
         return {
@@ -229,32 +229,33 @@ const PublicOrderingPage = () => {
           rating: data.rating || 0,
           ratingCount: data.ratingCount || 0,
           description: data.description || '',
-          imageUrl: (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '') 
-            ? data.imageUrl.trim() 
+          imageUrl: (data.imageUrl && typeof data.imageUrl === 'string' && data.imageUrl.trim() !== '')
+            ? data.imageUrl.trim()
             : undefined,
           showOnMenuDigital: data.showOnMenuDigital === true,
         } as Product;
       });
-      
+
       const availableProducts = productsData.filter(p => {
-        const priceValue = typeof p.price === 'number' 
-          ? p.price 
+        const priceValue = typeof p.price === 'number'
+          ? p.price
           : parseFloat(String(p.price || '0')) || 0;
-        return priceValue > 0 && p.available !== false;
+        // Only show products that are explicitly marked for the digital menu
+        return priceValue > 0 && p.available !== false && p.showOnMenuDigital === true;
       });
-      
+
       availableProducts.sort((a, b) => {
         const nameA = (a.name || '').toLowerCase();
         const nameB = (b.name || '').toLowerCase();
         return nameA.localeCompare(nameB);
       });
-      
+
       setProducts(availableProducts);
       setIsLoading(false);
     };
-    
+
     let unsubscribeProducts: (() => void) | null = null;
-    
+
     try {
       const productsQuery = query(productsRef, orderBy('name'));
       unsubscribeProducts = onSnapshot(
@@ -304,7 +305,7 @@ const PublicOrderingPage = () => {
           id: doc.id,
           ...doc.data()
         })) as TableZone[];
-        
+
         const filteredTables = tablesData.filter(t => !('deleted' in t && t.deleted));
         setTables(filteredTables);
         setIsLoading(false);
@@ -322,10 +323,10 @@ const PublicOrderingPage = () => {
 
   // Fonctions
   const addToCart = (product: Product) => {
-    const priceValue = typeof product.price === 'number' 
-      ? product.price 
+    const priceValue = typeof product.price === 'number'
+      ? product.price
       : parseFloat(String(product.price)) || 0;
-    
+
     setCart(prev => {
       const existingItem = prev.find(item => item.productId === product.id);
       if (existingItem) {
@@ -370,7 +371,7 @@ const PublicOrderingPage = () => {
     const menuProducts = hasMenuDuJour
       ? products.filter(p => p.showOnMenuDigital === true)
       : products;
-    
+
     return menuProducts.filter(product => {
       const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = activeCategoryTab === "all" || product.category === activeCategoryTab;
@@ -396,13 +397,13 @@ const PublicOrderingPage = () => {
       alert('Votre panier est vide.');
       return;
     }
-    
+
     // Validation : table ou livraison
     if (!isDelivery && !selectedTable) {
       alert('Veuillez sélectionner une table ou activer la livraison.');
       return;
     }
-    
+
     if (isDelivery && !deliveryAddress.trim()) {
       alert('Veuillez saisir votre adresse de livraison.');
       return;
@@ -453,12 +454,12 @@ const PublicOrderingPage = () => {
               timestamp: Date.now()
             }
           };
-          
+
           // Ajouter deliveryAddress seulement si c'est une livraison (éviter undefined)
           if (isDelivery && deliveryAddress) {
             orderData.deliveryAddress = deliveryAddress;
           }
-          
+
           // Créer une copie nettoyée de orderData pour la transaction (supprimer les undefined)
           const cleanedOrderDataForPayment: Record<string, unknown> = { ...orderData };
           // Supprimer deliveryAddress si undefined
@@ -538,7 +539,7 @@ const PublicOrderingPage = () => {
           timestamp: Date.now()
         }
       };
-      
+
       // Ajouter deliveryAddress seulement si c'est une livraison (éviter undefined)
       if (isDelivery && deliveryAddress) {
         orderData.deliveryAddress = deliveryAddress;
@@ -733,7 +734,7 @@ const PublicOrderingPage = () => {
               Télécharger
             </Button>
           </div>
-          <Button 
+          <Button
             variant="outline"
             onClick={() => {
               setOrderComplete(false);
@@ -773,15 +774,15 @@ const PublicOrderingPage = () => {
           </div>
         </div>
       )}
-      
+
       {/* Header avec logo */}
       <header className="sticky top-0 z-10 bg-white/98 backdrop-blur-sm shadow-md border-b-2" style={{ borderColor: menuTheme.primaryColor + '40' }}>
         <div className="container mx-auto px-4 py-3 sm:py-5 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
             {establishment?.logoUrl && (
-              <img 
-                src={establishment.logoUrl} 
-                alt={establishment.establishmentName} 
+              <img
+                src={establishment.logoUrl}
+                alt={establishment.establishmentName}
                 className="w-10 h-10 sm:w-14 sm:h-14 rounded-full object-cover border-2 shadow-sm flex-shrink-0"
                 style={{ borderColor: menuTheme.primaryColor }}
               />
@@ -793,7 +794,7 @@ const PublicOrderingPage = () => {
           <div className="relative cursor-pointer flex-shrink-0 ml-2">
             <ShoppingBag className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: menuTheme.primaryColor }} />
             {cart.length > 0 && (
-              <span 
+              <span
                 className="absolute -top-2 -right-2 text-white text-xs rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center font-bold shadow-lg"
                 style={{ backgroundColor: menuTheme.primaryColor }}
               >
@@ -843,10 +844,10 @@ const PublicOrderingPage = () => {
         {/* Grille produits - 2 colonnes mobile, 3 colonnes tablette+ */}
         <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
           {filteredProducts.map((product) => {
-            const priceValue = typeof product.price === 'number' 
-              ? product.price 
+            const priceValue = typeof product.price === 'number'
+              ? product.price
               : parseFloat(String(product.price)) || 0;
-            
+
             return (
               <div
                 key={product.id}
@@ -907,8 +908,8 @@ const PublicOrderingPage = () => {
         {filteredProducts.length === 0 && (
           <div className="text-center py-12">
             <p className="text-gray-600">
-              {searchTerm || activeCategoryTab !== "all" 
-                ? "Aucun produit ne correspond à votre recherche." 
+              {searchTerm || activeCategoryTab !== "all"
+                ? "Aucun produit ne correspond à votre recherche."
                 : "Aucun produit disponible pour le moment."}
             </p>
           </div>
@@ -1077,7 +1078,7 @@ const PublicOrderingPage = () => {
                 )}
               </div>
             )}
-            
+
             {/* Sélection table/zone (si livraison désactivée) */}
             {!isDelivery && (
               <>
@@ -1109,7 +1110,7 @@ const PublicOrderingPage = () => {
                 )}
               </>
             )}
-            
+
             <div className="flex gap-2 pt-4">
               <Button
                 variant="outline"
@@ -1192,8 +1193,8 @@ const PublicOrderingPage = () => {
                 )}
                 <div className="flex items-center justify-between pt-4 border-t">
                   <span className="text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>
-                    {(typeof selectedProduct.price === 'number' 
-                      ? selectedProduct.price 
+                    {(typeof selectedProduct.price === 'number'
+                      ? selectedProduct.price
                       : parseFloat(String(selectedProduct.price)) || 0
                     ).toLocaleString('fr-FR')} XAF
                   </span>
@@ -1221,8 +1222,8 @@ const PublicOrderingPage = () => {
           <DialogHeader>
             <DialogTitle>Recevoir les paiements sur Airtel Money</DialogTitle>
             <DialogDescription>
-              Pour recevoir les paiements des commandes directement sur votre compte Airtel Money, 
-              veuillez entrer votre numéro Airtel Money. Votre demande sera envoyée à l'administration 
+              Pour recevoir les paiements des commandes directement sur votre compte Airtel Money,
+              veuillez entrer votre numéro Airtel Money. Votre demande sera envoyée à l'administration
               pour configuration du Disbursement ID.
             </DialogDescription>
           </DialogHeader>
@@ -1244,7 +1245,7 @@ const PublicOrderingPage = () => {
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
                 <p className="text-sm text-yellow-800">
-                  Une fois votre demande approuvée par l'administration, vous recevrez un message de confirmation 
+                  Une fois votre demande approuvée par l'administration, vous recevrez un message de confirmation
                   et pourrez commencer à recevoir les paiements automatiquement.
                 </p>
               </div>
