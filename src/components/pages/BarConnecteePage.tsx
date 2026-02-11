@@ -199,7 +199,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               const parsed = parseFloat(product.price.trim());
               priceValue = isNaN(parsed) ? 0 : parsed;
             }
-            return priceValue > 0;
+            // Only show products that are explicitly marked for the digital menu
+            return priceValue > 0 && product.showOnMenuDigital === true;
           });
           setProducts(productsInStock);
         } catch (error) {

@@ -492,9 +492,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       {currentPlan === 'trial' ? (
                         <p className="text-2xl font-bold text-nack-red">Gratuit (7 jours)</p>
                       ) : currentPlan === 'transition' ? (
-                        <p className="text-2xl font-bold text-nack-red">{SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF / 30 jours</p>
+                        <p className="text-2xl font-bold text-nack-red">à partir de {SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF</p>
                       ) : currentPlan === 'transition-pro-max' ? (
-                        <p className="text-2xl font-bold text-nack-red">{SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF / 30 jours</p>
+                        <p className="text-2xl font-bold text-nack-red">à partir de {SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF</p>
                       ) : (
                         <p className="text-2xl font-bold text-red-600">Expiré</p>
                       )}
