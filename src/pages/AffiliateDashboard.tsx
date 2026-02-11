@@ -8,11 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Building2, QrCode, Users, Loader2, Copy, Wallet, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { Building2, QrCode, Users, Loader2, Copy, Wallet, CheckCircle2, AlertCircle, Clock, Smartphone } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import QRCode from "qrcode";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
 
 const baseUrl = typeof window !== "undefined" ? `${window.location.origin}${(import.meta.env?.BASE_URL || "").replace(/\/$/, "")}` : "";
 
@@ -78,7 +77,7 @@ const AffiliateDashboard = () => {
         setAffiliate(null);
       })
       .finally(() => setLoading(false));
-  }, [activeCode]); // Utilise activeCode (code URL ou session)
+  }, [activeCode, sessionCode]); // Ajout de sessionCode aux dépendances
 
   useEffect(() => {
     if (!affiliate?.code) return;
@@ -210,8 +209,6 @@ const AffiliateDashboard = () => {
     );
   }
 
-  // Suppression du bloc d'erreur séparé car handleLogin/activeCode gèrent tout
-
   const registerUrl = `${baseUrl}/register?ref=${encodeURIComponent(affiliate.code)}`;
   const count = affiliate.referralCount ?? 0;
   const totalEarned = affiliate.totalEarned ?? 0;
@@ -240,134 +237,147 @@ const AffiliateDashboard = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
-              <Building2 size={32} className="text-primary" />
-              <div>
-                <p className="text-2xl font-bold">{referrals.length || count}</p>
-              </Card>
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-muted/50">
+                <Building2 size={32} className="text-primary" />
+                <div>
+                  <p className="text-2xl font-bold">{referrals.length || count}</p>
+                  <p className="text-sm text-muted-foreground">établissement(s) inscrit(s) avec votre code</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 p-4 rounded-lg bg-green-50 border border-green-200">
+                <Wallet size={32} className="text-green-600" />
+                <div>
+                  <p className="text-2xl font-bold text-green-700">{totalEarned.toLocaleString()} XAF</p>
+                  <p className="text-xs text-muted-foreground">Revenus (commission cumulée). L'admin vous verse à la date du paiement.</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              {/* Bloc Communauté WhatsApp */}
-              <Card className="shadow-card border-0 mb-6 bg-gradient-to-br from-green-50 to-emerald-50 border-emerald-100 shrink-0">
-                <CardContent className="pt-6">
-                  <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-                    <div className="bg-white p-3 rounded-2xl shadow-sm shrink-0">
-                      <Smartphone className="text-emerald-600 w-8 h-8" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold text-emerald-900">Rejoignez la Communauté NACK!</h3>
-                      <p className="text-sm text-emerald-800/80">
-                        Suivez notre chaîne officielle pour recevoir des guides, des conseils d'expert et des cadeaux exclusifs.
-                      </p>
-                    </div>
-                    <Button
-                      asChild
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 px-6 rounded-xl w-full sm:w-auto"
-                    >
-                      <a href="https://whatsapp.com/channel/0029Vb7K9Ul9hXF1FhgeES0C" target="_blank" rel="noopener noreferrer">
-                        Rejoindre la chaîne
-                      </a>
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+        {/* Bloc Communauté WhatsApp */}
+        <Card className="shadow-card border-0 mb-6 bg-gradient-to-br from-green-50 to-emerald-50 border-emerald-100 shrink-0">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+              <div className="bg-white p-3 rounded-2xl shadow-sm shrink-0">
+                <Smartphone className="text-emerald-600 w-8 h-8" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-emerald-900">Rejoignez la Communauté NACK!</h3>
+                <p className="text-sm text-emerald-800/80">
+                  Suivez notre chaîne officielle pour recevoir des guides, des conseils d'expert et des cadeaux exclusifs.
+                </p>
+              </div>
+              <Button
+                asChild
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 px-6 rounded-xl w-full sm:w-auto"
+              >
+                <a href="https://whatsapp.com/channel/0029Vb7K9Ul9hXF1FhgeES0C" target="_blank" rel="noopener noreferrer">
+                  Rejoindre la chaîne
+                </a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-              {/* Liste des parrainages */}
-              <Card className="shadow-card border-0 mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 size={20} />
-                    Établissements parrainés
-                  </CardTitle>
-                  <CardDescription>
-                    Suivez l'état des abonnements de vos parrainages.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {referrals.length === 0 ? (
-                    <div className="text-center py-6 text-muted-foreground">
-                      Aucun établissement n'est encore inscrit avec votre code.
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {referrals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((ref) => {
-                        const isExpired = ref.plan === 'expired';
-                        const isActive = ref.plan === 'active';
-                        const isTrial = ref.plan === 'trial';
+        {/* Liste des parrainages */}
+        <Card className="shadow-card border-0 mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 size={20} />
+              Établissements parrainés
+            </CardTitle>
+            <CardDescription>
+              Suivez l'état des abonnements de vos parrainages.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {referrals.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground">
+                Aucun établissement n'est encore inscrit avec votre code.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {referrals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).map((ref) => {
+                  const isExpired = ref.plan === 'expired';
+                  const isActive = ref.plan === 'active';
+                  const isTrial = ref.plan === 'trial';
 
-                        return (
-                          <div key={ref.uid} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-semibold truncate">{ref.establishmentName}</p>
-                              <p className="text-xs text-muted-foreground">Inscrit le {new Date(ref.createdAt).toLocaleDateString()}</p>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 ml-4">
-                              <Badge variant={isActive ? "success" : isTrial ? "secondary" : "destructive"} className="whitespace-nowrap">
-                                {isActive ? (
-                                  <><CheckCircle2 size={12} className="mr-1" /> Payé</>
-                                ) : isTrial ? (
-                                  <><Clock size={12} className="mr-1" /> Essai gratuit</>
-                                ) : (
-                                  <><AlertCircle size={12} className="mr-1" /> Expiré</>
-                                )}
-                              </Badge>
-                              {ref.subscriptionEndsAt && (
-                                <p className="text-[10px] text-muted-foreground">
-                                  Expire le {new Date(ref.subscriptionEndsAt).toLocaleDateString()}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                  return (
+                    <div key={ref.uid} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/30 transition-colors">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold truncate">{ref.establishmentName}</p>
+                        <p className="text-xs text-muted-foreground">Inscrit le {new Date(ref.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 ml-4">
+                        <Badge variant={isActive ? "success" : isTrial ? "secondary" : "destructive"} className="whitespace-nowrap">
+                          {isActive ? (
+                            <><CheckCircle2 size={12} className="mr-1" /> Payé</>
+                          ) : isTrial ? (
+                            <><Clock size={12} className="mr-1" /> Essai gratuit</>
+                          ) : (
+                            <><AlertCircle size={12} className="mr-1" /> Expiré</>
+                          )}
+                        </Badge>
+                        {ref.subscriptionEndsAt && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Expire le {new Date(ref.subscriptionEndsAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-              <Card className="shadow-card border-0 mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <QrCode size={20} />
-                    Inscription par QR code
-                  </CardTitle>
-                  <CardDescription>
-                    Partagez ce QR code ou le lien pour que les établissements s'inscrivent avec votre code.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex flex-col sm:flex-row items-center gap-6">
-                  {qrDataUrl && (
-                    <div className="flex-shrink-0">
-                      <img src={qrDataUrl} alt="QR code inscription" className="w-48 h-48 rounded-lg border bg-white p-2" />
-                    </div>
-                  )}
-                  <div className="flex-1 space-y-2 w-full">
-                    <Label className="text-muted-foreground">Lien d'inscription</Label>
-                    <div className="flex gap-2">
-                      <Input readOnly value={registerUrl} className="font-mono text-sm" />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        title="Copier le lien"
-                        onClick={() => {
-                          navigator.clipboard.writeText(registerUrl);
-                        }}
-                      >
-                        <Copy size={16} />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Les nouveaux établissements qui s'inscrivent via ce lien seront comptés dans vos statistiques.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <p className="text-center text-sm text-muted-foreground">
-                <Link to="/" className="text-primary hover:underline">Retour à l'accueil</Link>
+        <Card className="shadow-card border-0 mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <QrCode size={20} />
+              Inscription par QR code
+            </CardTitle>
+            <CardDescription>
+              Partagez ce QR code ou le lien pour que les établissements s'inscrivent avec votre code.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col sm:flex-row items-center gap-6">
+            {qrDataUrl && (
+              <div className="flex-shrink-0">
+                <img src={qrDataUrl} alt="QR code inscription" className="w-48 h-48 rounded-lg border bg-white p-2" />
+              </div>
+            )}
+            <div className="flex-1 space-y-2 w-full">
+              <Label className="text-muted-foreground">Lien d'inscription</Label>
+              <div className="flex gap-2">
+                <Input readOnly value={registerUrl} className="font-mono text-sm" />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  title="Copier le lien"
+                  onClick={() => {
+                    navigator.clipboard.writeText(registerUrl);
+                  }}
+                >
+                  <Copy size={16} />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Les nouveaux établissements qui s'inscrivent via ce lien seront comptés dans vos statistiques.
               </p>
             </div>
-          </div>
-          );
+          </CardContent>
+        </Card>
+
+        <p className="text-center text-sm text-muted-foreground">
+          <Link to="/" className="text-primary hover:underline">Retour à l'accueil</Link>
+        </p>
+      </div>
+    </div>
+  );
 };
 
-          export default AffiliateDashboard;
+export default AffiliateDashboard;
