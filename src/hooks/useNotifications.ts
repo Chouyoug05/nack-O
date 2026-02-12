@@ -19,7 +19,7 @@ export const useNotifications = (userId?: string) => {
                 if (permission === 'granted') {
                     // Get the FCM token
                     const token = await getToken(messaging, {
-                        vapidKey: 'BM2W0K-mI-Z0X5Jp2W-mI-Z0X5Jp2W-mI-Z0X5Jp' // Placeholder
+                        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY
                     });
 
                     if (token && token !== profile?.fcmToken) {
