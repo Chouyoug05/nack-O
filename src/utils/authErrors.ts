@@ -1,9 +1,10 @@
 /**
  * Mappe les codes d'erreur Firebase Auth vers des messages simples et conviviaux.
  */
-export const getFriendlyErrorMessage = (error: any): string => {
-    const code = error?.code || "";
-    const message = error?.message || "";
+export const getFriendlyErrorMessage = (error: unknown): string => {
+    const err = error as { code?: string; message?: string };
+    const code = err?.code || "";
+    const message = err?.message || "";
 
     switch (code) {
         case 'auth/invalid-email':

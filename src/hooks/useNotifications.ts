@@ -3,6 +3,7 @@ import { getToken, onMessage } from 'firebase/messaging';
 import { messaging } from '@/lib/firebase';
 import { useToast } from './use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import type { UserProfile } from '@/types/profile';
 
 export const useNotifications = (userId?: string) => {
     const [fcmToken, setFcmToken] = useState<string | null>(null);
@@ -31,7 +32,7 @@ export const useNotifications = (userId?: string) => {
                                 await saveProfile({
                                     ...profile,
                                     fcmToken: token
-                                } as any);
+                                } as UserProfile);
                             }
                         } catch (err) {
                             console.error('Error saving FCM token:', err);

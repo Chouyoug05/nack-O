@@ -155,159 +155,158 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setProfile(null);
       }
       setProfileLoading(false);
-    });
-    setProfile(snap.exists() ? (snap.data() as UserProfile) : null);
-    setProfileLoading(false);
-  }, () => setProfileLoading(false));
-  const unsubAdmin = onSnapshot(adminDocRef(db, user.uid), (snap) => {
-    setIsAdmin(!!snap.exists());
-    setIsAdminLoading(false);
-  }, () => setIsAdminLoading(false));
-  return () => {
-    try { unsubProfile(); } catch { /* ignore */ }
-    try { unsubAdmin(); } catch { /* ignore */ }
-  };
-}, [user]);
+    }, () => setProfileLoading(false));
 
-useEffect(() => {
-  const pushSystemNotifications = async () => {
-    if (!user || !profile) return;
-    const uid = user.uid;
-    try {
-      const now = Date.now();
-      const baseKey = (k: string) => `nack_sys_notif_${k}_${uid}`;
+    const unsubAdmin = onSnapshot(adminDocRef(db, user.uid), (snap) => {
+      setIsAdmin(!!snap.exists());
+      setIsAdminLoading(false);
+    }, () => setIsAdminLoading(false));
 
-      // Seulement les notifications importantes - suppression de la notification de bienvenue
-      if (profile.plan === 'trial' && profile.trialEndsAt) {
-        const msLeft = profile.trialEndsAt - now;
-        const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
-        // Seulement les 2 derniers jours d'essai
-        if (daysLeft > 0 && daysLeft <= 2) {
-          const dayKey = baseKey(`trial_${daysLeft}`);
-          if (!localStorage.getItem(dayKey)) {
-            try {
-              await addDoc(notificationsColRef(db, uid), {
-                title: "Essai bientôt terminé",
-                message: `Il vous reste ${daysLeft} jour${daysLeft > 1 ? 's' : ''} pour utiliser la plateforme. Passez à l'abonnement.`,
-                type: "warning",
-                createdAt: now,
-                read: false,
-              });
-              localStorage.setItem(dayKey, '1');
-            } catch { /* ignore trial notif failure */ }
+    return () => {
+      unsubProfile();
+      unsubAdmin();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const pushSystemNotifications = async () => {
+      if (!user || !profile) return;
+      const uid = user.uid;
+      try {
+        const now = Date.now();
+        const baseKey = (k: string) => `nack_sys_notif_${k}_${uid}`;
+
+        // Seulement les notifications importantes - suppression de la notification de bienvenue
+        if (profile.plan === 'trial' && profile.trialEndsAt) {
+          const msLeft = profile.trialEndsAt - now;
+          const daysLeft = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
+          // Seulement les 2 derniers jours d'essai
+          if (daysLeft > 0 && daysLeft <= 2) {
+            const dayKey = baseKey(`trial_${daysLeft}`);
+            if (!localStorage.getItem(dayKey)) {
+              try {
+                await addDoc(notificationsColRef(db, uid), {
+                  title: "Essai bientôt terminé",
+                  message: `Il vous reste ${daysLeft} jour${daysLeft > 1 ? 's' : ''} pour utiliser la plateforme. Passez à l'abonnement.`,
+                  type: "warning",
+                  createdAt: now,
+                  read: false,
+                });
+                localStorage.setItem(dayKey, '1');
+              } catch { /* ignore trial notif failure */ }
+            }
           }
         }
-      }
-    } catch { /* ignore sys notif orchestration errors */ }
+      } catch { /* ignore sys notif orchestration errors */ }
+    };
+    pushSystemNotifications();
+  }, [user, profile]);
+
+  const signInWithGoogle = async (): Promise<void> => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    try {
+      try { sessionStorage.setItem('nack_oauth_redirect', '1'); } catch { /* ignore */ }
+      await signInWithRedirect(auth, provider);
+    } catch (e) {
+      console.error('Google redirect error:', e);
+      throw new Error("Connexion Google indisponible pour le moment. Réessayez.");
+    }
   };
-  pushSystemNotifications();
-}, [user, profile]);
 
-const signInWithGoogle = async (): Promise<void> => {
-  const provider = new GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: 'select_account' });
-  try {
-    try { sessionStorage.setItem('nack_oauth_redirect', '1'); } catch { /* ignore */ }
-    await signInWithRedirect(auth, provider);
-  } catch (e) {
-    console.error('Google redirect error:', e);
-    throw new Error("Connexion Google indisponible pour le moment. Réessayez.");
-  }
-};
+  const signInWithEmail = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
 
-const signInWithEmail = async (email: string, password: string) => {
-  await signInWithEmailAndPassword(auth, email, password);
-};
+  const signUpWithEmail = async (email: string, password: string) => {
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const ref = doc(db, "profiles", cred.user.uid);
+      const now = Date.now();
+      const sevenDays = 7 * 24 * 60 * 60 * 1000;
+      const data: UserProfile = {
+        uid: cred.user.uid,
+        establishmentName: "",
+        establishmentType: "",
+        ownerName: "",
+        email,
+        phone: "",
+        // logoUrl omis si non défini
+        plan: 'trial',
+        trialEndsAt: now + sevenDays,
+        // subscriptionEndsAt omis si non défini
+        // lastPaymentAt omis si non défini
+        tutorialCompleted: false,
+        tutorialStep: 'stock',
+        createdAt: now,
+        updatedAt: now,
+      } as unknown as UserProfile; // champs optionnels non requis
+      await setDoc(ref, removeUndefinedFields(data), { merge: true });
+      setProfile(data);
+    } catch (err: unknown) {
+      throw new Error(getFriendlyErrorMessage(err));
+    }
+  };
 
-const signUpWithEmail = async (email: string, password: string) => {
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    const ref = doc(db, "profiles", cred.user.uid);
+  const resetPassword = async (email: string) => {
+    await sendPasswordResetEmail(auth, email);
+  };
+
+  const saveProfile = async (data: Omit<UserProfile, "uid" | "createdAt" | "updatedAt">) => {
+    let currentUser = user ?? auth.currentUser;
+    if (!currentUser) {
+      currentUser = await new Promise<User | null>((resolve) => {
+        const unsubscribe = onAuthStateChanged(auth, (u) => {
+          unsubscribe();
+          resolve(u);
+        });
+        setTimeout(() => {
+          unsubscribe();
+          resolve(null);
+        }, 5000);
+      });
+    }
+    if (!currentUser) throw new Error("Authentification en cours. Veuillez réessayer dans un instant.");
+    const ref = doc(db, "profiles", currentUser.uid);
     const now = Date.now();
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
-    const data: UserProfile = {
-      uid: cred.user.uid,
-      establishmentName: "",
-      establishmentType: "",
-      ownerName: "",
-      email,
-      phone: "",
-      // logoUrl omis si non défini
-      plan: 'trial',
-      trialEndsAt: now + sevenDays,
-      // subscriptionEndsAt omis si non défini
-      // lastPaymentAt omis si non défini
-      tutorialCompleted: false,
-      tutorialStep: 'stock',
-      createdAt: now,
+    const shouldSetTrialDefaults = !profile?.plan;
+    const payload: Partial<UserProfile> = {
+      uid: currentUser.uid,
+      ...data,
+      createdAt: profile?.createdAt ?? now,
       updatedAt: now,
-    } as unknown as UserProfile; // champs optionnels non requis
-    await setDoc(ref, removeUndefinedFields(data), { merge: true });
-    setProfile(data);
-  } catch (err: unknown) {
-    throw new Error(getFriendlyErrorMessage(err));
-  }
-};
-
-const resetPassword = async (email: string) => {
-  await sendPasswordResetEmail(auth, email);
-};
-
-const saveProfile = async (data: Omit<UserProfile, "uid" | "createdAt" | "updatedAt">) => {
-  let currentUser = user ?? auth.currentUser;
-  if (!currentUser) {
-    currentUser = await new Promise<User | null>((resolve) => {
-      const unsubscribe = onAuthStateChanged(auth, (u) => {
-        unsubscribe();
-        resolve(u);
-      });
-      setTimeout(() => {
-        unsubscribe();
-        resolve(null);
-      }, 5000);
-    });
-  }
-  if (!currentUser) throw new Error("Authentification en cours. Veuillez réessayer dans un instant.");
-  const ref = doc(db, "profiles", currentUser.uid);
-  const now = Date.now();
-  const sevenDays = 7 * 24 * 60 * 60 * 1000;
-  const shouldSetTrialDefaults = !profile?.plan;
-  const payload: Partial<UserProfile> = {
-    uid: currentUser.uid,
-    ...data,
-    createdAt: profile?.createdAt ?? now,
-    updatedAt: now,
-    ...(shouldSetTrialDefaults ? { plan: 'trial', trialEndsAt: now + sevenDays } : {}),
+      ...(shouldSetTrialDefaults ? { plan: 'trial', trialEndsAt: now + sevenDays } : {}),
+    };
+    const clean = removeUndefinedFields(payload);
+    await setDoc(ref, clean, { merge: true });
+    setProfile({ ...(profile || { uid: currentUser.uid, createdAt: now }), ...(clean as UserProfile) });
   };
-  const clean = removeUndefinedFields(payload);
-  await setDoc(ref, clean, { merge: true });
-  setProfile({ ...(profile || { uid: currentUser.uid, createdAt: now }), ...(clean as UserProfile) });
-};
 
-const logout = async () => {
-  await signOut(auth);
-};
+  const logout = async () => {
+    await signOut(auth);
+  };
 
-const value = useMemo<AuthContextValue>(() => ({
-  user,
-  loading,
-  profile,
-  profileLoading,
-  isAdmin,
-  isAdminLoading,
-  signInWithGoogle,
-  signInWithEmail,
-  signUpWithEmail,
-  resetPassword,
-  saveProfile,
-  logout,
-}), [user, loading, profile, profileLoading, isAdmin, isAdminLoading]);
+  const value = useMemo<AuthContextValue>(() => ({
+    user,
+    loading,
+    profile,
+    profileLoading,
+    isAdmin,
+    isAdminLoading,
+    signInWithGoogle,
+    signInWithEmail,
+    signUpWithEmail,
+    resetPassword,
+    saveProfile,
+    logout,
+  }), [user, loading, profile, profileLoading, isAdmin, isAdminLoading]);
 
-return (
-  <AuthContext.Provider value={value}>
-    {children}
-  </AuthContext.Provider>
-);
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {

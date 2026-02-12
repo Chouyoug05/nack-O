@@ -210,9 +210,9 @@ const PaymentSuccess = () => {
                   if (profDoc.exists()) {
                     const profData = profDoc.data();
                     if (profData.fcmToken) {
-                      const orderNum = (cleanedOrderData as any).orderNumber;
-                      const tableZone = (cleanedOrderData as any).tableZone;
-                      const totalAmount = (cleanedOrderData as any).total;
+                      const orderNum = (cleanedOrderData as { orderNumber?: string | number }).orderNumber;
+                      const tableZone = (cleanedOrderData as { tableZone?: string }).tableZone;
+                      const totalAmount = (cleanedOrderData as { total?: number }).total;
                       const body = `Commande PAYÉE #${orderNum} - ${tableZone} - ${Number(totalAmount).toLocaleString('fr-FR')} XAF`;
                       fetch('/.netlify/functions/send-notification', {
                         method: 'POST',
@@ -221,7 +221,7 @@ const PaymentSuccess = () => {
                           title: "Nouvelle commande payée",
                           body: body,
                           data: {
-                            orderNumber: String((cleanedOrderData as any).orderNumber),
+                            orderNumber: String((cleanedOrderData as { orderNumber?: string | number }).orderNumber),
                             type: 'NEW_PAID_ORDER'
                           }
                         })
@@ -590,7 +590,7 @@ const PaymentSuccess = () => {
         }
 
         // Calculer la nouvelle date de fin d'abonnement
-        const duration = searchParams.get('duration') || (paymentTransaction as any)?.duration || 'month';
+        const duration = searchParams.get('duration') || (paymentTransaction as { duration?: string })?.duration || 'month';
         let periodDays = 30;
         let periodLabel = '30 jours';
 
