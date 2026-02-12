@@ -210,7 +210,10 @@ const PaymentSuccess = () => {
                   if (profDoc.exists()) {
                     const profData = profDoc.data();
                     if (profData.fcmToken) {
-                      const body = `Commande PAYÉE #${cleanedOrderData.orderNumber} - ${cleanedOrderData.tableZone} - ${Number(cleanedOrderData.total).toLocaleString('fr-FR')} XAF`;
+                      const orderNum = (cleanedOrderData as any).orderNumber;
+                      const tableZone = (cleanedOrderData as any).tableZone;
+                      const totalAmount = (cleanedOrderData as any).total;
+                      const body = `Commande PAYÉE #${orderNum} - ${tableZone} - ${Number(totalAmount).toLocaleString('fr-FR')} XAF`;
                       fetch('/.netlify/functions/send-notification', {
                         method: 'POST',
                         body: JSON.stringify({
@@ -218,7 +221,7 @@ const PaymentSuccess = () => {
                           title: "Nouvelle commande payée",
                           body: body,
                           data: {
-                            orderNumber: String(cleanedOrderData.orderNumber),
+                            orderNumber: String((cleanedOrderData as any).orderNumber),
                             type: 'NEW_PAID_ORDER'
                           }
                         })
