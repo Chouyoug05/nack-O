@@ -1648,7 +1648,7 @@ const AdminDashboard = () => {
       const planName = p.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition';
       return `Bonjour ${owner} de ${establishment}, votre abonnement ${planName} sur Nack-O arrive à expiration dans ${days} jour(s). Pensez à le renouveler pour éviter toute interruption. L'équipe Nack.`;
     } else {
-      return `Bonjour ${owner} de ${establishment}, votre accès sur Nack-O a expiré. Pour réactiver vos services, veuillez nous contacter ou renouveler votre abonnement. L'équipe Nack.`;
+      return `Bonjour ${owner} de ${establishment}, votre accès sur Nack-O est maintenant expiré. 🚀 Ne laissez pas votre gestion s'arrêter là ! Réactivez votre abonnement dès aujourd'hui pour continuer à profiter de toutes nos fonctionnalités pro. L'équipe Nack.`;
     }
   };
 
