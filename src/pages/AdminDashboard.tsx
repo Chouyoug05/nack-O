@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft, Edit, X, FileText } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft, Edit, X, FileText, Copy, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -1629,6 +1629,35 @@ const AdminDashboard = () => {
       setPlanEventsExtraPrice(plan.features.eventsExtraPrice ?? 1500);
     }
   };
+  const getReminderMessage = (p: UserProfile) => {
+    const now = Date.now();
+    const isExpired = (p.plan === 'expired') || (typeof p.subscriptionEndsAt === 'number' ? p.subscriptionEndsAt < now : false);
+    const status = p.plan === 'active' && !isExpired ? 'active' : p.plan === 'trial' ? 'trial' : 'expired';
+
+    // Calcul des jours restants
+    const endsAt = p.subscriptionEndsAt || p.trialEndsAt || 0;
+    const diff = endsAt - now;
+    const days = Math.max(0, Math.ceil(diff / (24 * 60 * 60 * 1000)));
+
+    const owner = p.ownerName || "Cher partenaire";
+    const establishment = p.establishmentName || "votre établissement";
+
+    if (status === 'trial') {
+      return `Bonjour ${owner} de ${establishment}, votre période d'essai sur Nack-O se termine dans ${days} jour(s). Pour continuer à profiter de nos services, pensez à activer votre abonnement. L'équipe Nack.`;
+    } else if (status === 'active') {
+      const planName = p.subscriptionType === 'transition-pro-max' ? 'Pro Max' : 'Transition';
+      return `Bonjour ${owner} de ${establishment}, votre abonnement ${planName} sur Nack-O arrive à expiration dans ${days} jour(s). Pensez à le renouveler pour éviter toute interruption. L'équipe Nack.`;
+    } else {
+      return `Bonjour ${owner} de ${establishment}, votre accès sur Nack-O a expiré. Pour réactiver vos services, veuillez nous contacter ou renouveler votre abonnement. L'équipe Nack.`;
+    }
+  };
+
+  const copyReminderMessage = (p: UserProfile) => {
+    const msg = getReminderMessage(p);
+    navigator.clipboard.writeText(msg).then(() => {
+      toast({ title: "Message copié", description: "Le rappel est prêt à être envoyé." });
+    });
+  };
 
   // Fonctions de gestion des produits
   const handleDeleteProduct = async (productId: string, userId: string) => {
@@ -2310,6 +2339,29 @@ const AdminDashboard = () => {
                               </>
                             )}
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => copyReminderMessage(p)}
+                            title="Copier le message de rappel"
+                            className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
+                          >
+                            <Copy size={14} className="mr-2" /> Rappel
+                          </Button>
+                          {p.whatsapp && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const msg = encodeURIComponent(getReminderMessage(p));
+                                window.open(`https://wa.me/${p.whatsapp.replace(/\D/g, '')}?text=${msg}`, '_blank');
+                              }}
+                              title="Envoyer le rappel via WhatsApp"
+                              className="bg-green-50 text-green-600 border-green-200 hover:bg-green-100"
+                            >
+                              <MessageCircle size={14} className="mr-2" /> WhatsApp
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -2417,6 +2469,27 @@ const AdminDashboard = () => {
                       >
                         {deletingUid === p.uid ? "..." : <><Trash2 size={12} className="mr-1" /> Supprimer</>}
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyReminderMessage(p)}
+                        className="text-xs bg-blue-50 text-blue-600 border-blue-200"
+                      >
+                        <Copy size={12} className="mr-1" /> Rappel
+                      </Button>
+                      {p.whatsapp && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const msg = encodeURIComponent(getReminderMessage(p));
+                            window.open(`https://wa.me/${p.whatsapp.replace(/\D/g, '')}?text=${msg}`, '_blank');
+                          }}
+                          className="text-xs bg-green-50 text-green-600 border-green-200"
+                        >
+                          <MessageCircle size={12} className="mr-1" /> WA
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
