@@ -35,6 +35,7 @@ const Register = () => {
   });
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [addressInput, setAddressInput] = useState("");
@@ -68,6 +69,20 @@ const Register = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    setLogoFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setLogoPreview(null);
+    }
   };
 
   const validateStep = (step: number): boolean => {
@@ -419,13 +434,34 @@ const Register = () => {
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
+                    {formData.password && formData.password.length < 6 && (
+                      <p className="text-xs text-red-500 mt-1">Le mot de passe doit faire au moins 6 caractères.</p>
+                    )}
                     <Label>Confirmer *</Label>
                     <Input name="confirmPassword" type="password" placeholder="••••••" value={formData.confirmPassword} onChange={handleInputChange} className="h-12" />
-                    <Label>Logo (URL optionnelle)</Label>
+                    {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                      <p className="text-xs text-red-500 mt-1">Les mots de passe ne correspondent pas.</p>
+                    )}
+                    <Label className="mt-4 inline-block">Logo (URL optionnelle)</Label>
                     <Input name="logoUrl" placeholder="https://..." value={formData.logoUrl} onChange={handleInputChange} className="h-12" />
                     <div className="mt-2">
                       <Label className="text-xs text-muted-foreground">Ou uploader un fichier :</Label>
-                      <Input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} className="h-10 text-xs mt-1" />
+                      {!isCloudinaryConfigured() && (
+                        <p className="text-[10px] text-amber-600 mb-1">⚠️ L'upload d'image n'est pas encore configuré (Cloudinary). L'image ne sera pas sauvegardée.</p>
+                      )}
+                      <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-xs mt-1" />
+                      {logoPreview && (
+                        <div className="mt-2 relative inline-block">
+                          <img src={logoPreview} alt="Preview" className="w-16 h-16 object-cover rounded-md border" />
+                          <button
+                            type="button"
+                            onClick={() => { setLogoFile(null); setLogoPreview(null); }}
+                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex items-start space-x-2 pt-4 border-t mt-4">
@@ -454,9 +490,14 @@ const Register = () => {
                   {formStep < 4 ? (
                     <Button onClick={() => setFormStep(formStep + 1)} disabled={!validateStep(formStep)} className="h-12 px-8 font-semibold ml-auto bg-nack-red text-white">Suivant</Button>
                   ) : (
-                    <Button onClick={handleManagerSubmit} disabled={isLoading || !validateStep(4)} className="h-12 px-8 font-bold ml-auto bg-green-600 text-white">
-                      {isLoading ? 'Création...' : 'Créer mon compte'}
-                    </Button>
+                    <div className="flex flex-col items-end gap-2 ml-auto">
+                      {!termsAccepted && formData.password === formData.confirmPassword && formData.password.length >= 6 && (
+                        <p className="text-[10px] text-amber-600">Acceptez les conditions pour continuer</p>
+                      )}
+                      <Button onClick={handleManagerSubmit} disabled={isLoading || !validateStep(4)} className="h-12 px-8 font-bold bg-green-600 text-white">
+                        {isLoading ? 'Création...' : 'Créer mon compte'}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>
