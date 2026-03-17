@@ -23,3 +23,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Lint / ESLint output (générés localement, ne pas pousser)
+eslint_errors.txt
+eslint_errors_utf8.txt
+lint_output.txt
+compact_lint.txt

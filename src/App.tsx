@@ -37,6 +37,8 @@ import { FeatureGate } from "@/components/subscription/FeatureGate";
 import PublicOrderingPage from "./pages/PublicOrderingPage";
 import ConfigureTickets from "./pages/ConfigureTickets";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useOfflineCacheWarmup } from "@/hooks/useOfflineCacheWarmup";
+import OfflineAuthBlock from "@/components/OfflineAuthBlock";
 
 const queryClient = new QueryClient();
 
@@ -93,6 +95,7 @@ const HomeRedirect = () => {
 const RootLayout = () => {
   const { user } = useAuth();
   useNotifications(user?.uid);
+  useOfflineCacheWarmup();
   const location = useLocation();
   const isPublicPage = location.pathname.startsWith('/event/') ||
     location.pathname.startsWith('/commande/') ||
@@ -121,8 +124,8 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomeRedirect /> },
       { path: "onboarding", element: <Onboarding /> },
-      { path: "login", element: <Login /> },
-      { path: "register", element: <Register /> },
+      { path: "login", element: <><OfflineAuthBlock title="Connexion indisponible hors‑ligne" /><Login /></> },
+      { path: "register", element: <><OfflineAuthBlock title="Inscription indisponible hors‑ligne" /><Register /></> },
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "complete-profile", element: <RequireAuth><CompleteProfile /></RequireAuth> },
       { path: "configure-tickets", element: <RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth> },

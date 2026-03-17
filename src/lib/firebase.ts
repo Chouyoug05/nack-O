@@ -1,7 +1,7 @@
 import { initializeApp, getApps, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import { getAuth, setPersistence, browserLocalPersistence, type Auth, browserSessionPersistence, inMemoryPersistence } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getMessaging, type Messaging } from "firebase/messaging";
 
@@ -45,6 +45,19 @@ if (typeof window !== "undefined") {
     });
 }
 
-export const db: Firestore = getFirestore(app);
+// Persistance offline Firestore (cache IndexedDB) pour que l'app fonctionne sans réseau
+let db: Firestore;
+if (typeof window !== "undefined") {
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch {
+    db = getFirestore(app);
+  }
+} else {
+  db = getFirestore(app);
+}
+export { db };
 export const storage: FirebaseStorage = getStorage(app);
 export const messaging: Messaging | undefined = typeof window !== "undefined" ? getMessaging(app) : undefined;

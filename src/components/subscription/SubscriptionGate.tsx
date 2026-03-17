@@ -84,6 +84,8 @@ const SubscriptionGate = ({ children }: Props) => {
     normalize();
   }, [user, profile]);
 
+  // État abonnement / essai. En hors-ligne, profile vient du cache Firestore : les utilisateurs
+  // dont l'abonnement est expiré restent bloqués même sans connexion.
   const state = useMemo(() => {
     if (!profile) return { status: 'loading' as const };
     // Fallback: si plan manquant, reconstituer essai basé sur createdAt

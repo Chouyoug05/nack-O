@@ -1,31 +1,25 @@
-﻿import { createRoot } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import "./lib/firebase";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
-// Nettoyage préventif d'anciens Service Workers/caches qui peuvent casser la navigation sur Chrome
+// Service worker (PWA + offline + notifications)
+// En production on enregistre le SW principal. En dev, on évite de garder un SW
+// qui peut mettre le serveur vite en cache.
 try {
-  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-    (async () => {
-      try {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        if (regs.length > 0) {
-          for (const reg of regs) {
-            // Ne pas désenregistrer le service worker des notifications
-            if (reg.active?.scriptURL.includes('firebase-messaging-sw.js')) continue;
-            try { await reg.unregister(); } catch { /* ignore */ }
-          }
-          try {
-            const keys = await caches.keys();
-            await Promise.all(keys.map((k) => caches.delete(k)));
-          } catch { /* ignore */ }
-          // L’onglet courant restera contrôlé jusqu’au rechargement; log d’info.
-          // L’utilisateur peut recharger manuellement si un SW contrôlait la page.
-          console.warn('Service workers/caches nettoyés. Rechargez la page si un comportement persiste.');
-        }
-      } catch { /* ignore */ }
-    })();
+  if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+    if (import.meta.env.PROD) {
+      navigator.serviceWorker.register("/firebase-messaging-sw.js").catch(() => {
+        // ignore registration errors (ex: navigateur non supporté / policies)
+      });
+    } else {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => {
+          try { r.unregister(); } catch { /* ignore */ }
+        });
+      }).catch(() => { /* ignore */ });
+    }
   }
 } catch { /* ignore */ }
 
@@ -43,6 +37,35 @@ try {
         // ignore et retomber sur retour neutre
       }
       return child;
+    };
+  }
+} catch { /* ignore */ }
+
+// Garde globale: éviter NotFoundError sur insertBefore quand un script externe
+// modifie le DOM sous React (le "before" n'est plus un enfant du parent).
+try {
+  if (typeof window !== "undefined" && typeof Node !== "undefined") {
+    const originalInsertBefore: typeof Node.prototype.insertBefore = Node.prototype.insertBefore;
+    Node.prototype.insertBefore = function <T extends Node>(newChild: T, refChild: Node | null): T {
+      try {
+        if (refChild == null) {
+          return originalInsertBefore.call(this, newChild, refChild) as T;
+        }
+        // Si le noeud de référence n'est plus un enfant de ce parent, fallback sans crash.
+        if (refChild.parentNode !== this) {
+          // appendChild est le plus proche équivalent sémantiquement.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (this.appendChild(newChild) as any) as T;
+        }
+        return originalInsertBefore.call(this, newChild, refChild) as T;
+      } catch {
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          return (this.appendChild(newChild) as any) as T;
+        } catch {
+          return newChild;
+        }
+      }
     };
   }
 } catch { /* ignore */ }
