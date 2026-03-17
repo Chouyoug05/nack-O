@@ -1,7 +1,13 @@
 import { initializeApp, getApps, type FirebaseApp, type FirebaseOptions } from "firebase/app";
 import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 import { getAuth, setPersistence, browserLocalPersistence, type Auth, browserSessionPersistence, inMemoryPersistence } from "firebase/auth";
-import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, type Firestore } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from "firebase/firestore";
 import { getStorage, type FirebaseStorage } from "firebase/storage";
 import { getMessaging, type Messaging } from "firebase/messaging";
 
@@ -45,14 +51,14 @@ if (typeof window !== "undefined") {
     });
 }
 
-// Persistance offline Firestore (cache IndexedDB) pour que l'app fonctionne sans réseau
+// Firestore avec persistance offline (IndexedDB). Si échec (mode privé, vieux navigateur), fallback sans persistance.
 let db: Firestore;
 if (typeof window !== "undefined") {
   try {
     db = initializeFirestore(app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     });
-  } catch {
+  } catch (_e) {
     db = getFirestore(app);
   }
 } else {
