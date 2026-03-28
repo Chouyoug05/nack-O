@@ -142,11 +142,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsub();
   }, []);
 
-  // Realtime profile and admin updates
+  // Mises à jour temps réel profil / admin. Ne pas remettre profileLoading / isAdminLoading à true :
+  // le premier getDoc dans onAuthStateChanged a déjà hydraté l’état ; refaire « loading » bloquait
+  // l’UI (menu / redirections) jusqu’au premier snapshot réseau, parfois très long.
   useEffect(() => {
     if (!user) return;
-    setProfileLoading(true);
-    setIsAdminLoading(true);
     const unsubProfile = onSnapshot(doc(db, "profiles", user.uid), (snap) => {
       if (snap.exists()) {
         const data = snap.data();

@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
 import { addDoc, doc as fsDoc, getDoc, onSnapshot, orderBy, query, runTransaction, where, updateDoc, writeBatch, doc as fsDocDirect } from "firebase/firestore";
 import type { ProductDoc, PaymentMethod, SaleDoc, SaleItem } from "@/types/inventory";
@@ -76,6 +77,7 @@ interface Sale {
 const SalesPage = () => {
   const { toast } = useToast();
   const { user } = useAuth();
+  const { isOnline } = useOnlineStatus();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
@@ -296,18 +298,28 @@ const SalesPage = () => {
     if (isSaving) return;
 
     try {
-      // Pré-contrôle des stocks, ajuster le panier si nécessaire
+      // Pré-contrôle des stocks (hors ligne : cache Firestore / liste produits déjà chargée)
       const adjusted: CartItem[] = [];
       const changes: string[] = [];
       for (const item of cart) {
-        const ref = fsDoc(productsColRef(db, user.uid), item.id);
-        const snap = await getDoc(ref);
-        if (!snap.exists()) {
-          changes.push(`${item.name}: supprimé (produit introuvable)`);
-          continue;
+        let currentQty: number;
+        if (!isOnline) {
+          const p = products.find((x) => x.id === item.id);
+          if (!p) {
+            changes.push(`${item.name}: supprimé (produit introuvable en local)`);
+            continue;
+          }
+          currentQty = Number(p.stock ?? 0);
+        } else {
+          const ref = fsDoc(productsColRef(db, user.uid), item.id);
+          const snap = await getDoc(ref);
+          if (!snap.exists()) {
+            changes.push(`${item.name}: supprimé (produit introuvable)`);
+            continue;
+          }
+          const data = snap.data() as ProductDoc;
+          currentQty = Number((data as { quantity?: number }).quantity ?? 0);
         }
-        const data = snap.data() as ProductDoc;
-        const currentQty = Number((data as { quantity?: number }).quantity ?? 0);
         if (currentQty <= 0) {
           changes.push(`${item.name}: supprimé (stock épuisé)`);
           continue;
@@ -340,17 +352,24 @@ const SalesPage = () => {
       if (!ownerUidForWrites) throw new Error("Propriétaire introuvable pour l'écriture");
       // 2) Batch atomique: décrémenter le stock + créer la vente
       const batch = writeBatch(db);
-        for (const item of cart) {
-          const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
-        const snap = await getDoc(productRef);
+      for (const item of cart) {
+        const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
+        let currentQty: number;
+        if (!isOnline) {
+          const p = products.find((x) => x.id === item.id);
+          if (!p) throw new Error(`Produit introuvable: ${item.name}`);
+          currentQty = Number(p.stock ?? 0);
+        } else {
+          const snap = await getDoc(productRef);
           if (!snap.exists()) throw new Error(`Produit introuvable: ${item.name}`);
           const data = snap.data() as ProductDoc;
+          currentQty = Number((data as { quantity?: number }).quantity ?? 0);
+        }
         const qtyToDecrement = Number(item.quantity || 0);
-        const currentQty = Number((data as { quantity?: number }).quantity ?? 0);
         if (qtyToDecrement <= 0) continue;
         if (currentQty < qtyToDecrement) throw new Error(`Stock insuffisant pour ${item.name}`);
         batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
-        }
+      }
         const saleItems: SaleItem[] = cart.map(ci => ({ id: ci.id, name: ci.name, price: ci.price, quantity: ci.quantity, isFormula: ci.isFormula }));
               const saleCol = salesColRef(db, ownerUidForWrites);
         // create new sale doc id
@@ -372,7 +391,12 @@ const SalesPage = () => {
         }
       } catch { /* ignore */ }
 
-      toast({ title: "Vente enregistrée", description: `Vente de ${cartTotal.toLocaleString()} XAF` });
+      toast({
+        title: "Vente enregistrée",
+        description: !isOnline
+          ? `Vente de ${cartTotal.toLocaleString()} XAF — enregistrée sur l’appareil ; synchro automatique au retour du réseau.`
+          : `Vente de ${cartTotal.toLocaleString()} XAF`,
+      });
       
       // Proposer d'imprimer le reçu pour le client
       const shouldPrint = window.confirm(`Vente enregistrée avec succès !\n\nSouhaitez-vous imprimer le reçu pour le client ?`);

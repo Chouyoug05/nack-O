@@ -40,5 +40,17 @@ export default defineConfig(({ mode }) => {
         "@": path.resolve(__dirname, "./src"),
       },
     },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+            if (id.includes("firebase")) return "firebase";
+            if (id.includes("recharts") || id.includes("jspdf")) return "charts-pdf";
+            if (id.includes("@radix-ui")) return "radix";
+          },
+        },
+      },
+    },
   };
 });

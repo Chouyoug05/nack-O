@@ -553,33 +553,32 @@ const ServeurInterface = () => {
     let queued = false;
     let success = false;
     let orderDocId: string | null = null;
-    
-    if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      queued = true;
-    } else {
-      try {
-        const docRef = await addDoc(ordersColRef(db, ownerUid), orderPayload);
-        orderDocId = docRef.id;
-        success = true;
-        
-        // Mettre à jour la fidélité du client si un client est associé
-        if (selectedCustomer && selectedCustomer.id) {
-          await updateCustomerLoyalty(selectedCustomer.id, total, orderDocId);
-        }
-        
+
+    try {
+      const docRef = await addDoc(ordersColRef(db, ownerUid), orderPayload);
+      orderDocId = docRef.id;
+      success = true;
+
+      if (selectedCustomer && selectedCustomer.id) {
         try {
-          await addDoc(notificationsColRef(db, ownerUid), {
-            title: "Nouvelle commande",
-            message: `Table ${tableNumber.trim()} • Total ${total.toLocaleString()} XAF${selectedCustomer ? ` • Client: ${selectedCustomer.firstName} ${selectedCustomer.lastName}` : ''}`,
-            type: "info",
-            createdAt: Date.now(),
-            read: false,
-          });
-        } catch { /* ignore notifications permission errors */ }
-      } catch (e) {
-        console.error('Erreur lors de l\'envoi de la commande:', e);
-        queued = true;
+          await updateCustomerLoyalty(selectedCustomer.id, total, orderDocId);
+        } catch {
+          /* fidélité peut échouer hors ligne ; la synchro suivra avec la commande */
+        }
       }
+
+      try {
+        await addDoc(notificationsColRef(db, ownerUid), {
+          title: "Nouvelle commande",
+          message: `Table ${tableNumber.trim()} • Total ${total.toLocaleString()} XAF${selectedCustomer ? ` • Client: ${selectedCustomer.firstName} ${selectedCustomer.lastName}` : ''}`,
+          type: "info",
+          createdAt: Date.now(),
+          read: false,
+        });
+      } catch { /* ignore notifications permission errors */ }
+    } catch (e) {
+      console.error('Erreur lors de l\'envoi de la commande:', e);
+      queued = true;
     }
 
     if (queued && ownerUid) {
@@ -618,6 +617,9 @@ const ServeurInterface = () => {
         } else {
           description += `. Montant ajouté au client`;
         }
+      }
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        description += ' — Synchronisation automatique au retour du réseau.';
       }
       toast({
         title: `Commande ${statusText}`,

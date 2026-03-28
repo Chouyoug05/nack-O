@@ -3,42 +3,43 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createBrowserRouter, RouterProvider, Outlet, useLocation, Navigate } from "react-router-dom";
-import { useEffect } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { OrderProvider } from "@/contexts/OrderContext";
 import { EventProvider } from "@/contexts/EventContext";
 import PWAInstallButton from "@/components/PWAInstallButton";
 import WhatsAppCommunityPopup from "@/components/WhatsAppCommunityPopup";
 import LocationRequestDialog from "@/components/LocationRequestDialog";
 import NackLogo from "@/components/NackLogo";
-import Index from "./pages/Index";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
-import Dashboard from "./pages/Dashboard";
-import ServeurInterface from "./pages/ServeurInterface";
-import CaisseInterface from "./pages/CaisseInterface";
-import CuisineInterface from "./pages/CuisineInterface";
-import EventPublicPage from "./pages/EventPublicPage";
-import AgentEvenementInterface from "./pages/AgentEvenementInterface";
 import NotFound from "./pages/NotFound";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import CompleteProfile from "./pages/CompleteProfile";
 import SubscriptionGate from "@/components/subscription/SubscriptionGate";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentError from "./pages/PaymentError";
-import AdminDashboard from "./pages/AdminDashboard";
 import AdminCheck from "./pages/AdminCheck";
-import AffiliateDashboard from "./pages/AffiliateDashboard";
-import ClientDetailsPage from "./pages/ClientDetailsPage";
-import TeamPage from "@/components/pages/TeamPage";
-import CustomerDetailsPage from "@/components/pages/CustomerDetailsPage";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
-import PublicOrderingPage from "./pages/PublicOrderingPage";
-import ConfigureTickets from "./pages/ConfigureTickets";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useOfflineCacheWarmup } from "@/hooks/useOfflineCacheWarmup";
 import OfflineAuthBlock from "@/components/OfflineAuthBlock";
+import OfflineStatusBar from "@/components/OfflineStatusBar";
+
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const CompleteProfile = lazy(() => import("./pages/CompleteProfile"));
+const ConfigureTickets = lazy(() => import("./pages/ConfigureTickets"));
+const TeamPage = lazy(() => import("@/components/pages/TeamPage"));
+const CustomerDetailsPage = lazy(() => import("@/components/pages/CustomerDetailsPage"));
+const ClientDetailsPage = lazy(() => import("./pages/ClientDetailsPage"));
+const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
+const ServeurInterface = lazy(() => import("./pages/ServeurInterface"));
+const CaisseInterface = lazy(() => import("./pages/CaisseInterface"));
+const CuisineInterface = lazy(() => import("./pages/CuisineInterface"));
+const AgentEvenementInterface = lazy(() => import("./pages/AgentEvenementInterface"));
+const EventPublicPage = lazy(() => import("./pages/EventPublicPage"));
+const PublicOrderingPage = lazy(() => import("./pages/PublicOrderingPage"));
+const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
+const PaymentError = lazy(() => import("./pages/PaymentError"));
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,10 @@ const FullscreenLoader = () => (
   <div className="min-h-screen flex items-center justify-center bg-background">
     <NackLogo size="xl" pulse showAdminButton={false} />
   </div>
+);
+
+const LazyBoundary = ({ children }: { children: ReactNode }) => (
+  <Suspense fallback={<FullscreenLoader />}>{children}</Suspense>
 );
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
@@ -109,6 +114,7 @@ const RootLayout = () => {
     location.pathname === '/configure-tickets';
   return (
     <>
+      <OfflineStatusBar />
       <Outlet />
       {!isPublicPage && <PWAInstallButton />}
       {!isPublicPage && <WhatsAppCommunityPopup />}
@@ -127,24 +133,24 @@ const router = createBrowserRouter([
       { path: "login", element: <><OfflineAuthBlock title="Connexion indisponible hors‑ligne" /><Login /></> },
       { path: "register", element: <><OfflineAuthBlock title="Inscription indisponible hors‑ligne" /><Register /></> },
       { path: "forgot-password", element: <ForgotPassword /> },
-      { path: "complete-profile", element: <RequireAuth><CompleteProfile /></RequireAuth> },
-      { path: "configure-tickets", element: <RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth> },
-      { path: "dashboard", element: <RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth> },
-      { path: "team", element: <RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth> },
-      { path: "customer/:customerId", element: <RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth> },
+      { path: "complete-profile", element: <LazyBoundary><RequireAuth><CompleteProfile /></RequireAuth></LazyBoundary> },
+      { path: "configure-tickets", element: <LazyBoundary><RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth></LazyBoundary> },
+      { path: "dashboard", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
+      { path: "team", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
+      { path: "customer/:customerId", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "admin-check", element: <AdminCheck /> },
       { path: "mon-uid", element: <AdminCheck /> },
-      { path: "affiliate", element: <AffiliateDashboard /> },
-      { path: "admin", element: <RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth> },
-      { path: "admin/client/:uid", element: <RequireAuth><RequireAdmin><ClientDetailsPage /></RequireAdmin></RequireAuth> },
-      { path: "serveur/:agentCode", element: <ServeurInterface /> },
-      { path: "caisse/:agentCode", element: <CaisseInterface /> },
-      { path: "cuisine/:agentCode", element: <CuisineInterface /> },
-      { path: "agent-evenement/:agentCode", element: <AgentEvenementInterface /> },
-      { path: "event/:eventId", element: <EventPublicPage /> },
-      { path: "commande/:establishmentId", element: <PublicOrderingPage /> },
-      { path: "payment/success", element: <PaymentSuccess /> },
-      { path: "payment/error", element: <PaymentError /> },
+      { path: "affiliate", element: <LazyBoundary><AffiliateDashboard /></LazyBoundary> },
+      { path: "admin", element: <LazyBoundary><RequireAuth><RequireAdmin><AdminDashboard /></RequireAdmin></RequireAuth></LazyBoundary> },
+      { path: "admin/client/:uid", element: <LazyBoundary><RequireAuth><RequireAdmin><ClientDetailsPage /></RequireAdmin></RequireAuth></LazyBoundary> },
+      { path: "serveur/:agentCode", element: <LazyBoundary><ServeurInterface /></LazyBoundary> },
+      { path: "caisse/:agentCode", element: <LazyBoundary><CaisseInterface /></LazyBoundary> },
+      { path: "cuisine/:agentCode", element: <LazyBoundary><CuisineInterface /></LazyBoundary> },
+      { path: "agent-evenement/:agentCode", element: <LazyBoundary><AgentEvenementInterface /></LazyBoundary> },
+      { path: "event/:eventId", element: <LazyBoundary><EventPublicPage /></LazyBoundary> },
+      { path: "commande/:establishmentId", element: <LazyBoundary><PublicOrderingPage /></LazyBoundary> },
+      { path: "payment/success", element: <LazyBoundary><PaymentSuccess /></LazyBoundary> },
+      { path: "payment/error", element: <LazyBoundary><PaymentError /></LazyBoundary> },
       { path: "*", element: <NotFound /> },
     ],
   },

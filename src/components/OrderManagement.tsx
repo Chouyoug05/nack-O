@@ -216,101 +216,94 @@ const OrderManagement = ({
   const handleProcessOrder = async (order: Order) => {
     if (processingIds.has(order.id)) return;
     setProcessingIds(prev => new Set(prev).add(order.id));
-    // validation silencieuse: pas de toast
-    if (uidToUse && (typeof navigator === 'undefined' || navigator.onLine)) {
-      try {
-        let redirected = false;
-        if (onGoToSales) {
-          // Pré-remplir le panier de la page Ventes et y naviguer
-          try {
-            const prefill = order.items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity }));
-            localStorage.setItem('nack_prefill_cart', JSON.stringify(prefill));
-            localStorage.setItem('nack_prefill_order_meta', JSON.stringify({ orderId: order.id, ownerUid: uidToUse }));
-          } catch { /* ignore */ }
-          onGoToSales();
-          // pas de toast ici: redirection directe vers Ventes
-          redirected = true;
-        }
-        if (redirected) {
-          setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
-          return; // Stop flow ici; la vente sera créée depuis SalesPage
-        }
 
-        // 3) Marquer la commande comme validée (autorisé via agentToken même sans auth)
-        // Pour les caissiers, on doit inclure agentToken dans le payload pour que les règles Firestore l'autorisent
-        const updatePayload: { status: 'sent'; agentToken?: string } = { status: 'sent' };
-        if (agentToken && !isOwnerAuthed) {
-          updatePayload.agentToken = agentToken;
-        }
-        await updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), updatePayload);
+    if (!uidToUse) {
+      setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+      return;
+    }
 
+    try {
+      let redirected = false;
+      if (onGoToSales) {
+        try {
+          const prefill = order.items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity }));
+          localStorage.setItem('nack_prefill_cart', JSON.stringify(prefill));
+          localStorage.setItem('nack_prefill_order_meta', JSON.stringify({ orderId: order.id, ownerUid: uidToUse }));
+        } catch { /* ignore */ }
+        onGoToSales();
+        redirected = true;
+      }
+      if (redirected) {
+        setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+        return;
+      }
+
+      const updatePayload: { status: 'sent'; agentToken?: string } = { status: 'sent' };
+      if (agentToken && !isOwnerAuthed) {
+        updatePayload.agentToken = agentToken;
+      }
+      await updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), updatePayload);
+
+      setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'sent' } : o));
+      updateOrderStatus(order.id, 'sent');
+      const offline = typeof navigator !== 'undefined' && !navigator.onLine;
+      toast({
+        title: isOwnerAuthed ? "Encaissement réussi" : "Commande validée",
+        description: offline
+          ? "Enregistré sur l’appareil — synchro automatique au retour du réseau."
+          : `Commande #${order.orderNumber} ${isOwnerAuthed ? 'encaissée' : 'validée'}`,
+      });
+
+      const shouldPrint = window.confirm(`Commande validée avec succès !\n\nSouhaitez-vous imprimer le reçu pour le client ?`);
+      if (shouldPrint) {
+        try {
+          const profileRef = fsDoc(db, 'profiles', uidToUse);
+          const profileSnap = await getDoc(profileRef);
+          const profileData = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
+
+          const thermalData = {
+            orderNumber: String(order.orderNumber || `C-${Date.now()}`),
+            establishmentName: profileData?.establishmentName || 'Établissement',
+            establishmentLogo: profileData?.logoUrl,
+            tableZone: order.tableNumber || 'Table',
+            items: order.items.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price
+            })),
+            total: order.total,
+            createdAt: order.createdAt instanceof Date ? order.createdAt.getTime() : (order.createdAt || Date.now()),
+            companyName: profileData?.companyName,
+            fullAddress: profileData?.fullAddress,
+            businessPhone: profileData?.businessPhone || profileData?.phone,
+            rcsNumber: profileData?.rcsNumber,
+            nifNumber: profileData?.nifNumber,
+            legalMentions: profileData?.legalMentions,
+            customMessage: profileData?.customMessage,
+            ticketLogoUrl: profileData?.ticketLogoUrl,
+            showDeliveryMention: profileData?.showDeliveryMention,
+            showCSSMention: profileData?.showCSSMention,
+            cssPercentage: profileData?.cssPercentage,
+            ticketFooterMessage: profileData?.ticketFooterMessage
+          };
+
+          const { printThermalTicket } = await import('@/utils/ticketThermal');
+          printThermalTicket(thermalData);
+        } catch (error) {
+          console.error('Erreur impression reçu:', error);
+        }
+      }
+    } catch (e: unknown) {
+      if (!isOwnerAuthed && agentToken && uidToUse) {
+        queueManagerUpdate(order.id, 'sent');
         setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'sent' } : o));
         updateOrderStatus(order.id, 'sent');
-        toast({ title: isOwnerAuthed ? "Encaissement réussi" : "Commande validée", description: `Commande #${order.orderNumber} ${isOwnerAuthed ? 'encaissée' : 'validée'}` });
-        
-        // Proposer d'imprimer le reçu pour le client
-        const shouldPrint = window.confirm(`Commande validée avec succès !\n\nSouhaitez-vous imprimer le reçu pour le client ?`);
-        if (shouldPrint) {
-          try {
-            // Récupérer toutes les informations du profil pour le ticket
-            const profileRef = fsDoc(db, 'profiles', uidToUse);
-            const profileSnap = await getDoc(profileRef);
-            const profileData = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
-            
-            const thermalData = {
-              orderNumber: String(order.orderNumber || `C-${Date.now()}`),
-              establishmentName: profileData?.establishmentName || 'Établissement',
-              establishmentLogo: profileData?.logoUrl,
-              tableZone: order.tableNumber || 'Table',
-              items: order.items.map(item => ({
-                name: item.name,
-                quantity: item.quantity,
-                price: item.price
-              })),
-              total: order.total,
-              createdAt: order.createdAt instanceof Date ? order.createdAt.getTime() : (order.createdAt || Date.now()),
-              // Informations personnalisées du profil
-              companyName: profileData?.companyName,
-              fullAddress: profileData?.fullAddress,
-              businessPhone: profileData?.businessPhone || profileData?.phone,
-              rcsNumber: profileData?.rcsNumber,
-              nifNumber: profileData?.nifNumber,
-              legalMentions: profileData?.legalMentions,
-              customMessage: profileData?.customMessage,
-              // Paramètres avancés
-              ticketLogoUrl: profileData?.ticketLogoUrl,
-              showDeliveryMention: profileData?.showDeliveryMention,
-              showCSSMention: profileData?.showCSSMention,
-              cssPercentage: profileData?.cssPercentage,
-              ticketFooterMessage: profileData?.ticketFooterMessage
-            };
-
-            const { printThermalTicket } = await import('@/utils/ticketThermal');
-            printThermalTicket(thermalData);
-          } catch (error) {
-            console.error('Erreur impression reçu:', error);
-            // Ne pas bloquer, juste logger l'erreur
-          }
-        }
-      } catch (e: unknown) {
-        // Si l'agent n'est pas le gérant, on met en file et on met à jour l'UI pour ne pas bloquer
-        if (!isOwnerAuthed && agentToken && uidToUse) {
-          queueManagerUpdate(order.id, 'sent');
-          setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'sent' } : o));
-          updateOrderStatus(order.id, 'sent');
-          toast({ title: "Validation en file", description: "La commande sera validée dès que possible.", });
-        } else {
-          const message = e instanceof Error ? e.message : 'Erreur lors de la validation';
-          toast({ title: 'Erreur', description: message, variant: 'destructive' });
-        }
-      } finally {
-        setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+        toast({ title: "Validation en file", description: "La commande sera validée dès que possible.", });
+      } else {
+        const message = e instanceof Error ? e.message : 'Erreur lors de la validation';
+        toast({ title: 'Erreur', description: message, variant: 'destructive' });
       }
-    } else {
-      queueManagerUpdate(order.id, 'sent');
-      setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'sent' } : o));
-    updateOrderStatus(order.id, 'sent');
-      toast({ title: "Validation hors-ligne", description: "La commande sera validée dès le retour en ligne." });
+    } finally {
       setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
     }
   };

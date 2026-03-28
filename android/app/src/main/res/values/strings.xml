@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">NACK</string>
+    <string name="title_activity_main">NACK</string>
+    <string name="package_name">com.nack.app</string>
+    <string name="custom_url_scheme">com.nack.app</string>
+</resources>

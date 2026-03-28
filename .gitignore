@@ -29,3 +29,14 @@ eslint_errors.txt
 eslint_errors_utf8.txt
 lint_output.txt
 compact_lint.txt
+
+# Capacitor / native
+ios/App/Pods
+ios/App/public
+ios/DerivedData
+android/.gradle
+android/app/build
+android/build
+android/local.properties
+android/captures
+*.orig

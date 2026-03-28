@@ -183,11 +183,32 @@ const Dashboard = () => {
     if (!user) return;
     const unsubs: Array<() => void> = [];
 
-    // Products count
+    // Produits : un seul listener (compteur + plats avec food cost)
+    const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
     unsubs.push(onSnapshot(
-      productsColRef(db, user.uid), 
+      productsColRef(db, user.uid),
       (snap) => {
         setStatsValues((prev) => ({ ...prev, productsCount: snap.size }));
+        const foodItems = snap.docs
+          .map(d => {
+            const data = d.data();
+            const category = data.category || "";
+            if (foodCategories.includes(category) && data.foodCost) {
+              return {
+                id: d.id,
+                name: data.name || "",
+                category,
+                price: Number(data.price || 0),
+                foodCost: data.foodCost as {
+                  rawMaterials: Array<{ name: string; unitCost: number }>;
+                  productionCosts: Array<{ type: string; amount: number }>;
+                }
+              };
+            }
+            return null;
+          })
+          .filter((item): item is NonNullable<typeof item> => item !== null);
+        setFoodProducts(foodItems);
       }
     ));
 
@@ -226,34 +247,6 @@ const Dashboard = () => {
     } catch {
       setBarPendingCount(0);
     }
-
-    // Food products with Food Cost
-    const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
-    unsubs.push(onSnapshot(
-      productsColRef(db, user.uid),
-      (snap) => {
-        const foodItems = snap.docs
-          .map(d => {
-            const data = d.data();
-            const category = data.category || "";
-            if (foodCategories.includes(category) && data.foodCost) {
-              return {
-                id: d.id,
-                name: data.name || "",
-                category,
-                price: Number(data.price || 0),
-                foodCost: data.foodCost as {
-                  rawMaterials: Array<{ name: string; unitCost: number }>;
-                  productionCosts: Array<{ type: string; amount: number }>;
-                }
-              };
-            }
-            return null;
-          })
-          .filter((item): item is NonNullable<typeof item> => item !== null);
-        setFoodProducts(foodItems);
-      }
-    ));
 
     return () => {
       unsubs.forEach((u) => u());
