@@ -1,3 +1,5 @@
+import { publicAssetUrl } from "@/lib/assets";
+
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 
@@ -88,7 +90,7 @@ export const generateTicketPDF = async (ticketData: TicketData): Promise<void> =
   y += 3;
 
   // ===== LOGO =====
-  const logoUrl = ticketData.ticketLogoUrl || ticketData.establishmentLogo || "/Design sans titre.svg";
+  const logoUrl = ticketData.ticketLogoUrl || ticketData.establishmentLogo || publicAssetUrl("Design sans titre.svg");
   if (logoUrl) {
     try {
       const response = await fetch(logoUrl);

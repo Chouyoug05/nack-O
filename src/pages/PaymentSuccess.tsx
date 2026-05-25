@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, addDoc, query, where, getDocs, getDoc, collectionGroup } from "firebase/firestore";
@@ -17,6 +18,12 @@ const PaymentSuccess = () => {
 
   useEffect(() => {
     const run = async () => {
+      const returnClientElectron = searchParams.get("returnClient") === "electron";
+      const scheduleNav = (fn: () => void, ms: number) => {
+        if (returnClientElectron) return;
+        setTimeout(fn, ms);
+      };
+
       // Pour les paiements menu digital et événements, l'utilisateur n'est pas nécessairement authentifié
       const reference = searchParams.get('reference') || '';
       const paymentType = searchParams.get('type') || '';
@@ -95,7 +102,7 @@ const PaymentSuccess = () => {
               }
 
               // Rediriger vers la page d'accueil après 3 secondes
-              setTimeout(() => {
+              scheduleNav(() => {
                 navigate('/', { replace: true });
               }, 3000);
               return;
@@ -106,7 +113,7 @@ const PaymentSuccess = () => {
         }
 
         // Redirection par défaut si erreur
-        setTimeout(() => navigate('/', { replace: true }), 3000);
+        scheduleNav(() => navigate('/', { replace: true }), 3000);
         return;
       }
 
@@ -248,7 +255,7 @@ const PaymentSuccess = () => {
               }
 
               // Rediriger vers le menu après 3 secondes
-              setTimeout(() => {
+              scheduleNav(() => {
                 if (paymentData.establishmentId) {
                   navigate(`/commande/${paymentData.establishmentId}`, {
                     replace: true,
@@ -268,13 +275,13 @@ const PaymentSuccess = () => {
         // Redirection par défaut si erreur - essayer de récupérer l'établissement depuis l'URL
         const establishmentIdFromUrl = searchParams.get('establishmentId');
         if (establishmentIdFromUrl) {
-          setTimeout(() => navigate(`/commande/${establishmentIdFromUrl}`, {
+          scheduleNav(() => navigate(`/commande/${establishmentIdFromUrl}`, {
             replace: true,
             state: { paymentSuccess: true }
           }), 3000);
         } else {
           // Si on ne peut pas récupérer l'établissement, rediriger vers la page d'accueil
-          setTimeout(() => navigate('/', { replace: true }), 3000);
+          scheduleNav(() => navigate('/', { replace: true }), 3000);
         }
         return;
       }
@@ -294,7 +301,7 @@ const PaymentSuccess = () => {
         // Vérification de sécurité: s'assurer qu'on a au moins une référence ou un transactionId
         if (!reference && !transactionId) {
           console.error('PaymentSuccess: Aucune référence ou transactionId fournie');
-          setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+          scheduleNav(() => navigate('/dashboard', { replace: true }), 2000);
           return;
         }
 
@@ -304,7 +311,7 @@ const PaymentSuccess = () => {
           const pendingEventDataStr = sessionStorage.getItem('pendingEventData');
           if (!pendingEventDataStr) {
             console.error('PaymentSuccess: Données d\'événement non trouvées');
-            setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+            scheduleNav(() => navigate('/dashboard', { replace: true }), 2000);
             return;
           }
 
@@ -389,11 +396,11 @@ const PaymentSuccess = () => {
               });
             } catch {/* ignore */ }
 
-            setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+            scheduleNav(() => navigate('/dashboard', { replace: true }), 2000);
             return;
           } catch (error) {
             console.error('Erreur création événement après paiement:', error);
-            setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+            scheduleNav(() => navigate('/dashboard', { replace: true }), 2000);
             return;
           }
         }
@@ -439,7 +446,7 @@ const PaymentSuccess = () => {
 
                 // Pour les paiements Menu Digital, rediriger vers la page de commande
                 if (isMenuDigitalPayment && orderId) {
-                  setTimeout(() => navigate(`/commande/${paymentTransaction.establishmentId || user.uid}`, {
+                  scheduleNav(() => navigate(`/commande/${paymentTransaction.establishmentId || user.uid}`, {
                     replace: true,
                     state: { paymentSuccess: true }
                   }), 2000);
@@ -478,7 +485,7 @@ const PaymentSuccess = () => {
                   }
                 }
 
-                setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
+                scheduleNav(() => navigate('/dashboard', { replace: true }), 1200);
                 return;
               }
             }
@@ -495,7 +502,7 @@ const PaymentSuccess = () => {
             if (!refSnapshot.empty) {
               const existingTransaction = { id: refSnapshot.docs[0].id, ...refSnapshot.docs[0].data() } as PaymentTransaction;
               console.warn(`PaymentSuccess: Une transaction avec la référence ${reference} est déjà complétée. TransactionId: ${existingTransaction.transactionId}`);
-              setTimeout(() => navigate('/dashboard', { replace: true }), 2000);
+              scheduleNav(() => navigate('/dashboard', { replace: true }), 2000);
               return;
             }
           } catch (error) {
@@ -576,7 +583,7 @@ const PaymentSuccess = () => {
           }
 
           // Rediriger vers la page de commande avec un message de succès
-          setTimeout(() => {
+          scheduleNav(() => {
             if (paymentTransaction.establishmentId) {
               navigate(`/commande/${paymentTransaction.establishmentId}`, {
                 replace: true,
@@ -757,7 +764,9 @@ const PaymentSuccess = () => {
         // Afficher un message d'erreur à l'utilisateur
         alert(`Une erreur est survenue lors du traitement du paiement. Veuillez contacter le support avec votre référence: ${searchParams.get('reference') || searchParams.get('transactionId') || 'N/A'}`);
       } finally {
-        setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
+        if (!returnClientElectron) {
+          setTimeout(() => navigate('/dashboard', { replace: true }), 1200);
+        }
       }
     };
     run();
@@ -767,6 +776,7 @@ const PaymentSuccess = () => {
   const paymentType = searchParams.get('type') || '';
   const isMenuDigitalPayment = reference.includes('menu-digital');
   const isEventTicketPayment = reference.includes('event-ticket') || paymentType === 'event-ticket';
+  const wantsDesktopReturn = searchParams.get("returnClient") === "electron";
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
@@ -791,12 +801,27 @@ const PaymentSuccess = () => {
           {isMenuDigitalPayment || isEventTicketPayment ? 'Paiement confirmé !' : 'Paiement confirmé'}
         </h1>
         <p className="text-sm text-gray-600">
-          {isMenuDigitalPayment
-            ? 'Votre commande a été payée avec succès. Vous allez être redirigé vers le menu...'
-            : isEventTicketPayment
-              ? 'Votre billet a été payé avec succès. Vous allez être redirigé...'
-              : 'Votre abonnement a été activé. Redirection…'}
+          {wantsDesktopReturn
+            ? isMenuDigitalPayment || isEventTicketPayment
+              ? "Paiement enregistré. Utilisez le bouton ci-dessous pour revenir à l'application NACK."
+              : "Votre abonnement est activé. Revenez à l'application NACK pour continuer (synchronisation automatique avec votre compte)."
+            : isMenuDigitalPayment
+              ? 'Votre commande a été payée avec succès. Vous allez être redirigé vers le menu...'
+              : isEventTicketPayment
+                ? 'Votre billet a été payé avec succès. Vous allez être redirigé...'
+                : 'Votre abonnement a été activé. Redirection…'}
         </p>
+        {wantsDesktopReturn && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 text-left space-y-3">
+            <p className="text-sm font-medium text-emerald-950">Retour à l&apos;application</p>
+            <p className="text-xs text-emerald-900">
+              Vous pouvez fermer cet onglet après être revenu dans NACK. Les données sont déjà enregistrées.
+            </p>
+            <Button asChild className="w-full" size="lg">
+              <a href="nack://open">Ouvrir l&apos;application NACK</a>
+            </Button>
+          </div>
+        )}
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">
           <p className="font-semibold mb-1">💳 Paiement par Airtel Money</p>
           <p className="text-xs">Le paiement est disponible uniquement via <strong>Airtel Money</strong> pour le moment.</p>

@@ -1033,6 +1033,16 @@ const StockPage = () => {
     let successCount = 0;
     let errorCount = 0;
 
+    if (profile?.plan === 'free' && productsCount + importPreview.length > 10) {
+      toast({
+        title: "Limite atteinte",
+        description: `Le plan gratuit est limité à 10 produits. L'importation de ces ${importPreview.length} produits dépasserait la limite. Veuillez passer au plan Transition.`,
+        variant: "destructive"
+      });
+      setIsImporting(false);
+      return;
+    }
+
     try {
       for (const product of importPreview) {
         // Accepter les produits même avec quantité 0 (sera modifiable après)
@@ -1200,10 +1210,17 @@ const StockPage = () => {
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full md:w-auto">
               <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                <DialogTrigger asChild>
                   <Button
                     className="w-full sm:w-auto bg-gradient-primary text-white shadow-button hover:shadow-elegant"
                     onClick={() => {
+                      if (profile?.plan === 'free' && productsCount >= 10) {
+                        toast({
+                          title: "Limite atteinte",
+                          description: "Le plan gratuit est limité à 10 produits. Veuillez passer au plan Transition pour en ajouter plus.",
+                          variant: "destructive"
+                        });
+                        return;
+                      }
                       requireManagerAuth(() => {
                         setEditingProduct(null);
                         setNewProduct({
@@ -1218,7 +1235,6 @@ const StockPage = () => {
                     <Plus className="mr-2" size={18} />
                     Ajouter un produit
                   </Button>
-                </DialogTrigger>
               </Dialog>
 
               {/* Bouton Import */}

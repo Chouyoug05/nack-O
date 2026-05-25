@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { notificationsColRef, ordersColRef } from "@/lib/collections";
+import { publicAssetUrl } from "@/lib/assets";
 import { deleteDoc, doc as fsDoc, onSnapshot, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { Order } from "@/types/order";
 
@@ -53,7 +54,7 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
   useEffect(() => {
     // Preload a short sound for notifications
     try {
-      const audio = new Audio('/favicon.png'); // placeholder to warm cache
+      const audio = new Audio(publicAssetUrl("favicon.png")); // placeholder to warm cache
       audioRef.current = new Audio('data:audio/mp3;base64,//uQZAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCA...');
     } catch { /* ignore */ }
     // Request permission for Web Notifications
@@ -96,7 +97,7 @@ const NotificationPanel = ({ size = "md", className, onNavigateToOrders }: Notif
             audioRef.current.play().catch(() => undefined);
           }
           if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(newest.title, { body: newest.message, icon: '/icons/icon-192x192.png' });
+            new Notification(newest.title, { body: newest.message, icon: publicAssetUrl("icons/icon-192x192.png") });
           }
         }
       } catch { /* ignore */ }

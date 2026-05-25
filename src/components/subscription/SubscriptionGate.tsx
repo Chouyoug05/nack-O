@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
+import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
 
 interface Props {
@@ -70,7 +71,7 @@ const SubscriptionGate = ({ children }: Props) => {
       if (!needsPlan && !needsTrial) return;
       const createdAt = profile.createdAt || Date.now();
       const trialEndsAt = (profile.trialEndsAt ?? (createdAt + sevenDays));
-      const plan = trialEndsAt > Date.now() ? 'trial' : 'expired';
+      const plan = trialEndsAt > Date.now() ? 'trial' : 'free';
       try {
         await updateDoc(doc(db, 'profiles', user.uid), {
           plan,
@@ -84,29 +85,14 @@ const SubscriptionGate = ({ children }: Props) => {
     normalize();
   }, [user, profile]);
 
-  // État abonnement / essai. En hors-ligne, profile vient du cache Firestore : les utilisateurs
-  // dont l'abonnement est expiré restent bloqués même sans connexion.
   const state = useMemo(() => {
     if (!profile) return { status: 'loading' as const };
-    // Fallback: si plan manquant, reconstituer essai basé sur createdAt
-    const plan = profile.plan ?? 'trial';
-    const trialEndsAtFallback = (profile.trialEndsAt ?? ((profile.createdAt || 0) + sevenDays));
-    const trialEndsAt = trialEndsAtFallback;
-    const subEndsAt = profile.subscriptionEndsAt ?? 0;
-
-    if (plan === 'trial') {
-      const remaining = trialEndsAt - now;
-      if (remaining > 0) return { status: 'trial' as const, remaining };
-      return { status: 'expired' as const };
-    }
-    if (plan === 'active') {
-      if (subEndsAt && subEndsAt > now) {
-        const remaining = subEndsAt - now;
-        return { status: 'active' as const, remaining };
-      }
-      return { status: 'expired' as const };
-    }
-    return { status: 'expired' as const };
+    
+    // Le nouveau système est freemium, on ne bloque plus l'utilisateur.
+    // Il a toujours accès, les fonctionnalités sont limitées par le FeatureGate
+    // et les limites (10 produits max en gratuit).
+    
+    return { status: 'active' as const, remaining: 0 };
   }, [profile, now]);
 
   const calculatePrice = (plan: 'transition' | 'transition-pro-max', duration: DurationType) => {
@@ -133,8 +119,10 @@ const SubscriptionGate = ({ children }: Props) => {
       ).replace(/\/+$/, '');
 
       const reference = `abonnement-${plan}`;
-      const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&duration=${selectedDuration}`;
-      const redirectError = `${base}/payment/error?transactionId=${transactionId}`;
+      const redirectSuccess = appendElectronPaymentReturn(
+        `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&duration=${selectedDuration}`,
+      );
+      const redirectError = appendElectronPaymentReturn(`${base}/payment/error?transactionId=${transactionId}`);
       const logoURL = `${base}/favicon.png`;
 
       const amount = calculatePrice(plan, selectedDuration);
@@ -188,7 +176,7 @@ const SubscriptionGate = ({ children }: Props) => {
         console.error('Erreur mise à jour lien paiement:', error);
       }
 
-      window.location.href = link;
+      await openPaymentUrl(link);
     } catch (e) {
       console.error(e);
       const msg = e instanceof Error ? e.message : String(e);
@@ -230,74 +218,7 @@ const SubscriptionGate = ({ children }: Props) => {
   const trialRemaining = showTrial ? state.remaining : 0;
   const activeRemaining = state.status === 'active' ? state.remaining : 0;
 
-  // BLOQUER l'accès si l'essai est expiré ou l'abonnement est expiré
-  if (isExpired) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md shadow-lg">
-          <CardContent className="p-6 space-y-4">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Accès bloqué</h2>
-              <p className="text-gray-600 mb-4">
-                Votre période d'essai gratuite est terminée ou votre abonnement a expiré.
-              </p>
-              <p className="text-sm text-gray-500 mb-6">
-                Pour continuer à utiliser l'application, veuillez vous abonner à l'un de nos forfaits.
-              </p>
-            </div>
-
-            <DurationSelector />
-
-            <div className="space-y-3">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2">Transition - {calculatePrice('transition', selectedDuration).toLocaleString()} XAF</h3>
-                <ul className="text-sm text-blue-800 space-y-1 mb-3">
-                  <li>✓ Gestion des produits</li>
-                  <li>✓ Point de vente</li>
-                  <li>✓ Gestion du stock</li>
-                  <li>✓ Rapports</li>
-                </ul>
-                <Button
-                  onClick={() => handleSubscribe('transition')}
-                  disabled={creatingLink}
-                  variant="outline"
-                  className="w-full"
-                >
-                  {creatingLink ? 'Chargement...' : `S'abonner - Transition (${calculatePrice('transition', selectedDuration).toLocaleString()} XAF)`}
-                </Button>
-              </div>
-
-              <div className="bg-gradient-to-r from-red-600 to-red-700 border border-red-800 rounded-lg p-4">
-                <h3 className="font-semibold text-white mb-2">Transition Pro Max - {calculatePrice('transition-pro-max', selectedDuration).toLocaleString()} XAF</h3>
-                <ul className="text-sm text-red-100 space-y-1 mb-3">
-                  <li>✓ Toutes les fonctionnalités Transition</li>
-                  <li>✓ Gestion des équipiers</li>
-                  <li>✓ Bar Connectée</li>
-                  <li>✓ Événements (5 inclus, puis 1 500 XAF/événement)</li>
-                </ul>
-                <Button
-                  onClick={() => handleSubscribe('transition-pro-max')}
-                  disabled={creatingLink}
-                  className="w-full bg-white text-red-600 hover:bg-red-50"
-                >
-                  {creatingLink ? 'Chargement...' : `S'abonner - Pro Max (${calculatePrice('transition-pro-max', selectedDuration).toLocaleString()} XAF)`}
-                </Button>
-              </div>
-            </div>
-
-            <p className="text-xs text-center text-gray-500 mt-4">
-              Le paiement est disponible uniquement via <strong>Airtel Money</strong>
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  // Freemium: l'accès n'est plus bloqué
 
   return (
     <>

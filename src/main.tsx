@@ -3,13 +3,14 @@ import App from "./App.tsx";
 import "./index.css";
 import "./lib/firebase";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import { isElectronRenderer } from "@/lib/platform";
 
 // Service worker (PWA + offline + notifications)
 // En production on enregistre le SW principal. En dev, on évite de garder un SW
 // qui peut mettre le serveur vite en cache.
 try {
   if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-    if (import.meta.env.PROD) {
+    if (import.meta.env.PROD && !isElectronRenderer()) {
       navigator.serviceWorker.register("/firebase-messaging-sw.js").catch(() => {
         // ignore registration errors (ex: navigateur non supporté / policies)
       });

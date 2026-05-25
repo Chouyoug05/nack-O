@@ -36,6 +36,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { ordersColRef, productsColRef, teamColRef, notificationsColRef, agentTokensTopColRef, customersColRef } from "@/lib/collections";
 import { addDoc, getDocs, limit, onSnapshot, query, where, collectionGroup, doc, getDoc, updateDoc, runTransaction, orderBy } from "firebase/firestore";
+import { enqueuePendingOrder, flushPendingOrders } from "@/lib/localSyncQueue";
 import type { Customer, CustomerDoc, Reward } from "@/types/customer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,7 +60,6 @@ interface FirestoreProductDoc {
 
 // Offline helpers
 const getProductsCacheKey = (ownerUid: string) => `nack_products_${ownerUid}`;
-const getOrderOutboxKey = (ownerUid: string, agentCode: string) => `nack_order_outbox_${ownerUid}_${agentCode}`;
 const getServeurAuthKey = (agentCode: string) => `nack_serveur_auth_${agentCode}`;
 
 interface OutboxOrder {
@@ -267,41 +267,20 @@ const ServeurInterface = () => {
 
   useEffect(() => {
     const flush = async () => {
-      if (!ownerUid || !agentCode) return;
-      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
-      let queued: OutboxOrder[] = [];
+      if (!ownerUid) return;
       try {
-        const raw = localStorage.getItem(getOrderOutboxKey(ownerUid, agentCode));
-        if (raw) queued = JSON.parse(raw) as OutboxOrder[];
-      } catch (e) { /* ignore parse errors */ }
-      if (!queued.length) return;
-      const remaining: OutboxOrder[] = [];
-      for (const o of queued) {
-        try {
-          await addDoc(ordersColRef(db, ownerUid), o);
-          try {
-            await addDoc(notificationsColRef(db, ownerUid), {
-              title: "Nouvelle commande",
-              message: `Table ${o.tableNumber} • Total ${o.total.toLocaleString()} XAF`,
-              type: "info",
-              createdAt: Date.now(),
-              read: false,
-            });
-          } catch { /* ignore notifications permission errors */ }
-        } catch {
-          remaining.push(o);
-        }
+        await flushPendingOrders(ownerUid);
+      } catch {
+        // ignore flush errors, on retry au prochain retour réseau
       }
-      try {
-        if (remaining.length) localStorage.setItem(getOrderOutboxKey(ownerUid, agentCode), JSON.stringify(remaining));
-        else localStorage.removeItem(getOrderOutboxKey(ownerUid, agentCode));
-      } catch (e) { /* ignore quota errors */ }
     };
-    flush();
-    const onOnline = () => flush();
-    window.addEventListener('online', onOnline);
-    return () => window.removeEventListener('online', onOnline);
-  }, [ownerUid, agentCode]);
+    void flush();
+    const onOnline = () => {
+      void flush();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [ownerUid]);
 
   const products = fsProducts ?? [];
   // Filtrer les produits vendables : tous les produits avec prix > 0
@@ -583,11 +562,18 @@ const ServeurInterface = () => {
 
     if (queued && ownerUid) {
       try {
-        const key = getOrderOutboxKey(ownerUid, agentCode!);
-        const raw = localStorage.getItem(key);
-        const list: OutboxOrder[] = raw ? JSON.parse(raw) : [];
-        list.push(orderPayload);
-        localStorage.setItem(key, JSON.stringify(list));
+        await enqueuePendingOrder({
+          ownerUid,
+          channel: "orders",
+          payload: orderPayload as unknown as Record<string, unknown>,
+          notificationPayload: {
+            title: "Nouvelle commande",
+            message: `Table ${tableNumber.trim()} • Total ${total.toLocaleString()} XAF${selectedCustomer ? ` • Client: ${selectedCustomer.firstName} ${selectedCustomer.lastName}` : ''}`,
+            type: "info",
+            createdAt: Date.now(),
+            read: false,
+          },
+        });
         toast({ 
           title: "Commande enregistrée hors-ligne", 
           description: "Elle sera synchronisée automatiquement dès que la connexion sera rétablie.", 

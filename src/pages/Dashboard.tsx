@@ -296,7 +296,7 @@ const Dashboard = () => {
         );
       case "bar-connectee":
         return (
-          <FeatureGate feature="barConnectee">
+          <FeatureGate feature="menuDigital">
             <BarConnecteePage />
           </FeatureGate>
         );

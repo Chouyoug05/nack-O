@@ -11,7 +11,7 @@ export interface UserProfile {
   // Sécurité gérant
   managerPinHash?: string; // SHA-256 hex of optional manager code (not account password)
   // Abonnement
-  plan?: 'trial' | 'active' | 'expired';
+  plan?: 'trial' | 'active' | 'expired' | 'free';
   subscriptionType?: 'transition' | 'transition-pro-max'; // Type d'abonnement payant
   trialEndsAt?: number; // epoch ms
   subscriptionEndsAt?: number; // epoch ms

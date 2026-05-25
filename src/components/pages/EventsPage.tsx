@@ -39,6 +39,7 @@ import type { TicketDoc } from "@/types/event";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { generateEventTicket } from "@/utils/ticketGenerator";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
+import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 
 type NewEventPayload = {
   title: string;
@@ -187,8 +188,12 @@ const EventsPage = () => {
           ).replace(/\/+$/, '');
 
           const reference = 'evenement-supplementaire';
-          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&type=event`;
-          const redirectError = `${base}/payment/error?transactionId=${transactionId}&type=event`;
+          const redirectSuccess = appendElectronPaymentReturn(
+            `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&type=event`,
+          );
+          const redirectError = appendElectronPaymentReturn(
+            `${base}/payment/error?transactionId=${transactionId}&type=event`,
+          );
           const logoURL = `${base}/favicon.png`;
 
           // Enregistrer la transaction en attente
@@ -246,7 +251,7 @@ const EventsPage = () => {
           });
 
           // Rediriger vers le paiement
-          window.location.href = link;
+          await openPaymentUrl(link);
           return; // Ne pas continuer avec la création de l'événement
         } catch (error) {
           console.error('Erreur création lien paiement:', error);

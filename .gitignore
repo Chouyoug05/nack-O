@@ -13,6 +13,12 @@ dist-ssr
 *.local
 .env
 
+# Electron : installeur et build local (ne pas versionner)
+release/
+
+# Icônes copiées pour electron-builder (régénéré par npm run electron:copy-icons)
+build/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

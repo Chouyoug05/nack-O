@@ -15,6 +15,7 @@ import { eventTicketsColRef, eventsColRef, paymentsColRef } from "@/lib/collecti
 import { addDoc, doc, getDoc, increment, orderBy, query, runTransaction, updateDoc, getDocs } from "firebase/firestore";
 import type { TicketDoc } from "@/types/event";
 import { createEventPaymentLink } from "@/lib/payments/eventPayment";
+import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 
 interface EventPaymentDialogProps {
   event: Event | null;
@@ -100,11 +101,17 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
       const totalAmount = event.ticketPrice * formData.quantity;
       
       // Générer les URLs de redirection
-      const baseUrl = window.location.origin;
+      const baseUrl = (
+        (import.meta.env.VITE_PUBLIC_BASE_URL as string) || window.location.origin
+      ).replace(/\/+$/, "");
       const transactionId = `EVT-${event.id}-${Date.now()}`;
       const reference = `event-ticket-${event.id}-${Date.now()}`;
-      const redirectSuccess = `${baseUrl}/payment/success?reference=${encodeURIComponent(reference)}&transactionId=${transactionId}&type=event-ticket`;
-      const redirectError = `${baseUrl}/payment/error?reference=${encodeURIComponent(reference)}&transactionId=${transactionId}`;
+      const redirectSuccess = appendElectronPaymentReturn(
+        `${baseUrl}/payment/success?reference=${encodeURIComponent(reference)}&transactionId=${transactionId}&type=event-ticket`,
+      );
+      const redirectError = appendElectronPaymentReturn(
+        `${baseUrl}/payment/error?reference=${encodeURIComponent(reference)}&transactionId=${transactionId}`,
+      );
       
       // Logo URL (utiliser le logo de l'établissement ou un logo par défaut)
       const logoURL = profileData.logoUrl || `${baseUrl}/logo.png`;
@@ -168,14 +175,15 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
       }
       
       // Rediriger vers le lien de paiement
-      window.location.href = paymentLink;
+      await openPaymentUrl(paymentLink);
     } catch (e: unknown) {
-      setIsProcessing(false);
       toast({ 
         title: "Erreur", 
         description: e instanceof Error ? e.message : "Impossible de procéder au paiement", 
         variant: "destructive" 
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 

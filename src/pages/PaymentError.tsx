@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, query, where, getDocs, collectionGroup, getDoc } from "firebase/firestore";
@@ -14,6 +15,12 @@ const PaymentError = () => {
   
   useEffect(() => {
     const run = async () => {
+      const returnClientElectron = searchParams.get("returnClient") === "electron";
+      const scheduleNav = (fn: () => void, ms: number) => {
+        if (returnClientElectron) return;
+        setTimeout(fn, ms);
+      };
+
       const transactionId = searchParams.get('transactionId');
       const reference = searchParams.get('reference') || '';
       const isMenuDigitalPayment = reference.includes('menu-digital');
@@ -51,7 +58,7 @@ const PaymentError = () => {
               }
               
               // Rediriger vers le menu après 3 secondes
-              setTimeout(() => {
+              scheduleNav(() => {
                 if (paymentData.establishmentId) {
                   navigate(`/commande/${paymentData.establishmentId}`, { replace: true });
                 } else {
@@ -71,7 +78,7 @@ const PaymentError = () => {
                 updatedAt: Date.now(),
               });
             }
-            setTimeout(() => navigate('/dashboard', { replace: true }), 3000);
+            scheduleNav(() => navigate('/dashboard', { replace: true }), 3000);
             return;
           }
         } catch (error) {
@@ -81,18 +88,14 @@ const PaymentError = () => {
       
       // Redirection par défaut
       if (isMenuDigitalPayment) {
-        // Pour les paiements menu digital, toujours essayer de rediriger vers le menu
         const establishmentIdFromUrl = searchParams.get('establishmentId');
         const redirectPath = establishmentInfo?.id || establishmentIdFromUrl
           ? `/commande/${establishmentInfo?.id || establishmentIdFromUrl}`
           : '/';
-        const t = setTimeout(() => navigate(redirectPath, { replace: true }), 3000);
-        return () => clearTimeout(t);
+        scheduleNav(() => navigate(redirectPath, { replace: true }), 3000);
       } else {
-        // Pour les autres paiements, rediriger vers dashboard si authentifié
         const redirectPath = user ? '/dashboard' : '/';
-        const t = setTimeout(() => navigate(redirectPath, { replace: true }), 3000);
-        return () => clearTimeout(t);
+        scheduleNav(() => navigate(redirectPath, { replace: true }), 3000);
       }
     };
     run();
@@ -100,7 +103,8 @@ const PaymentError = () => {
   
   const reference = searchParams.get('reference') || '';
   const isMenuDigitalPayment = reference.includes('menu-digital');
-  
+  const wantsDesktopReturn = searchParams.get("returnClient") === "electron";
+
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="max-w-md w-full text-center space-y-6 bg-white rounded-2xl shadow-xl p-8">
@@ -124,10 +128,20 @@ const PaymentError = () => {
           {isMenuDigitalPayment ? 'Paiement échoué' : 'Paiement non abouti'}
         </h1>
         <p className="text-sm text-gray-600">
-          {isMenuDigitalPayment 
-            ? 'Le paiement de votre commande n\'a pas pu être effectué. Vous pouvez réessayer ou commander sans paiement.'
-            : 'Une erreur est survenue lors du paiement. Redirection…'}
+          {wantsDesktopReturn
+            ? "Le paiement n'a pas abouti. Revenez dans l'application NACK pour réessayer."
+            : isMenuDigitalPayment
+              ? 'Le paiement de votre commande n\'a pas pu être effectué. Vous pouvez réessayer ou commander sans paiement.'
+              : 'Une erreur est survenue lors du paiement. Redirection…'}
         </p>
+        {wantsDesktopReturn && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/90 p-4 text-left space-y-3">
+            <p className="text-sm font-medium text-amber-950">Retour à l&apos;application</p>
+            <Button asChild className="w-full" size="lg" variant="secondary">
+              <a href="nack://open">Ouvrir l&apos;application NACK</a>
+            </Button>
+          </div>
+        )}
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">
           <p className="font-semibold mb-1">💳 Paiement par Airtel Money</p>
           <p className="text-xs">Le paiement est disponible uniquement via <strong>Airtel Money</strong> pour le moment.</p>

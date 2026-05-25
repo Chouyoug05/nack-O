@@ -1,5 +1,6 @@
 import type { SaleDoc, LossDoc } from "@/types/inventory";
 import jsPDF from "jspdf";
+import { publicAssetUrl } from "@/lib/assets";
 
 export interface ReportOrder {
   createdAt: number;
@@ -74,7 +75,7 @@ export const exportSalesPdf = async (opts: { sales: SaleDoc[]; losses: LossDoc[]
   let y = 40;
 
   // Header avec logo et établissement
-  const logoUrl = org.logoUrl || "/Design sans titre.svg";
+  const logoUrl = org.logoUrl || publicAssetUrl("Design sans titre.svg");
   if (logoUrl) {
     try {
       const dataUrl = await loadImageAsDataURL(logoUrl);

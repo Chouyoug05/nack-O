@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,6 +34,7 @@ import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
+import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
@@ -331,7 +332,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         console.error('Erreur mise à jour lien paiement:', error);
       }
 
-      window.location.href = link;
+      await openPaymentUrl(link);
     } catch (error) {
       console.error('Erreur création lien paiement:', error);
       toast({

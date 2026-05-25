@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, RouterProvider, Outlet, useLocation, Navigate } from "react-router-dom";
+import { createBrowserRouter, createHashRouter, RouterProvider, Outlet, useLocation, Navigate } from "react-router-dom";
 import { lazy, Suspense, type ReactNode } from "react";
 import { OrderProvider } from "@/contexts/OrderContext";
 import { EventProvider } from "@/contexts/EventContext";
@@ -23,6 +23,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useOfflineCacheWarmup } from "@/hooks/useOfflineCacheWarmup";
 import OfflineAuthBlock from "@/components/OfflineAuthBlock";
 import OfflineStatusBar from "@/components/OfflineStatusBar";
+import { isElectronRenderer } from "@/lib/platform";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
@@ -123,7 +124,7 @@ const RootLayout = () => {
   );
 };
 
-const router = createBrowserRouter([
+const routes = [
   {
     path: "/",
     element: <RootLayout />,
@@ -154,8 +155,13 @@ const router = createBrowserRouter([
       { path: "*", element: <NotFound /> },
     ],
   },
-], {
-  basename: import.meta.env.BASE_URL,
+];
+
+const routerFactory = isElectronRenderer() ? createHashRouter : createBrowserRouter;
+const routerBaseName = isElectronRenderer() ? undefined : import.meta.env.BASE_URL;
+
+const router = routerFactory(routes, {
+  basename: routerBaseName,
 });
 
 const App = () => (

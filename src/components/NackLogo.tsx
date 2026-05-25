@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Shield } from "lucide-react";
+import { publicAssetUrl } from "@/lib/assets";
 
 interface NackLogoProps {
   className?: string;
@@ -36,7 +37,7 @@ const NackLogo = ({ className, size = "md", showAdminButton = true, pulse = fals
   return (
     <div className={cn("relative flex items-center justify-center", className)}>
       <img
-        src={variant === "affiliate" ? "/Design sans titre12.svg" : "/Design sans titre.svg"}
+        src={variant === "affiliate" ? publicAssetUrl("Design sans titre12.svg") : publicAssetUrl("Design sans titre.svg")}
         alt="nack! logo"
         className={cn(
           "object-contain animate-fade-in cursor-pointer",

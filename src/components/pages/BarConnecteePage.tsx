@@ -31,6 +31,7 @@ import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, or
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
 import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collections";
+import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 
@@ -1390,17 +1391,18 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           </Card>
 
           {/* Section Paiement Menu Digital */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5" />
-                Paiement Menu Digital
-              </CardTitle>
-              <CardDescription>
-                Activez le paiement en ligne pour que vos clients puissent payer directement via Airtel Money
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <FeatureGate feature="disbursementRequest">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Paiement Menu Digital
+                </CardTitle>
+                <CardDescription>
+                  Activez le paiement en ligne pour que vos clients puissent payer directement via Airtel Money
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
               {/* Statut du Disbursement ID */}
               <div className="space-y-2">
                 <Label>Statut du paiement</Label>
@@ -1629,8 +1631,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                   )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </Card>
+          </FeatureGate>
         </div>
       )}
     </div>

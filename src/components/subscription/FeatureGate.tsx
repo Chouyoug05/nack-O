@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
 
 interface FeatureGateProps {
-  feature: 'products' | 'sales' | 'stock' | 'reports' | 'team' | 'barConnectee' | 'events';
+  feature: 'products' | 'sales' | 'stock' | 'reports' | 'team' | 'barConnectee' | 'events' | 'menuDigital' | 'disbursementRequest';
   children: ReactNode;
   fallback?: ReactNode;
 }
@@ -34,6 +34,8 @@ export const FeatureGate = ({ feature, children, fallback }: FeatureGateProps) =
     reports: 'Rapports',
     team: 'Équipiers',
     barConnectee: 'Bar Connectée',
+    menuDigital: 'Menu Digital',
+    disbursementRequest: 'Demande de Disbursement ID',
     events: 'Événements',
   };
 

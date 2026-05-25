@@ -1,3 +1,5 @@
+import { publicAssetUrl } from "@/lib/assets";
+
 import jsPDF from "jspdf";
 
 import type { UserProfile } from "@/types/profile";
@@ -17,7 +19,7 @@ export async function generateSubscriptionReceiptPDF(profile: Pick<
   let y = 48;
 
   // Header
-  const logoUrl = profile.logoUrl || "/Design sans titre.svg";
+  const logoUrl = profile.logoUrl || publicAssetUrl("Design sans titre.svg");
   if (logoUrl) {
     try {
       const response = await fetch(logoUrl);

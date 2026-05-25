@@ -14,6 +14,8 @@ import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
 import { paymentsColRef, barOrdersColRef } from "@/lib/collections";
+import { enqueuePendingOrder, flushPendingOrders } from "@/lib/localSyncQueue";
+import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 
 interface Product {
   id: string;
@@ -323,6 +325,23 @@ const PublicOrderingPage = () => {
     return cleanup;
   }, [establishmentId]);
 
+  useEffect(() => {
+    const flush = async () => {
+      if (!establishmentId) return;
+      try {
+        await flushPendingOrders(establishmentId);
+      } catch {
+        // ignore flush errors; la synchro reprendra au prochain passage online
+      }
+    };
+    void flush();
+    const onOnline = () => {
+      void flush();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [establishmentId]);
+
   // Fonctions
   const addToCart = (product: Product) => {
     const priceValue = typeof product.price === 'number'
@@ -434,8 +453,12 @@ const PublicOrderingPage = () => {
           const transactionId = `TXN-MENU-${establishmentId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
           const base = (import.meta.env.VITE_PUBLIC_BASE_URL as string || window.location.origin).replace(/\/+$/, '');
           const reference = `menu-digital-${orderNumberValue}`;
-          const redirectSuccess = `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`;
-          const redirectError = `${base}/payment/error?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`;
+          const redirectSuccess = appendElectronPaymentReturn(
+            `${base}/payment/success?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`,
+          );
+          const redirectError = appendElectronPaymentReturn(
+            `${base}/payment/error?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`,
+          );
           // Utiliser le logo de l'établissement, ou un logo par défaut
           const logoURL = establishment?.logoUrl || `${base}/favicon.png`;
 
@@ -514,7 +537,7 @@ const PublicOrderingPage = () => {
           }
 
           // Rediriger vers le paiement
-          window.location.href = paymentLink;
+          await openPaymentUrl(paymentLink);
           return;
         } catch (error) {
           console.error('Erreur création paiement:', error);
@@ -548,11 +571,21 @@ const PublicOrderingPage = () => {
       }
 
       // Créer la commande dans barOrders pour qu'elle arrive chez le gérant
+      let queuedOffline = false;
       if (establishmentId) {
-        await addDoc(barOrdersColRef(db, establishmentId), orderData);
+        try {
+          await addDoc(barOrdersColRef(db, establishmentId), orderData);
+        } catch {
+          await enqueuePendingOrder({
+            ownerUid: establishmentId,
+            channel: "barOrders",
+            payload: orderData,
+          });
+          queuedOffline = true;
+        }
 
         // Envoyer la notification push au gérant si le token est disponible
-        if (establishment?.fcmToken) {
+        if (establishment?.fcmToken && !queuedOffline) {
           try {
             fetch('/.netlify/functions/send-notification', {
               method: 'POST',
@@ -590,6 +623,9 @@ const PublicOrderingPage = () => {
       setOrderNumber(orderNumberValue);
       setReceiptQR(receiptQRDataUrl);
       setOrderComplete(true);
+      if (queuedOffline) {
+        alert("Commande enregistrée hors ligne. Elle sera synchronisée automatiquement dès que la connexion reviendra.");
+      }
 
     } catch (error) {
       console.error('Erreur lors de la commande:', error);

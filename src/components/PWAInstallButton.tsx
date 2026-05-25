@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Download, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { isElectronRenderer } from "@/lib/platform";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -13,6 +14,8 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const PWAInstallButton = () => {
+  const isElectron = isElectronRenderer();
+
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -89,7 +92,7 @@ const PWAInstallButton = () => {
     }
   })() : null;
 
-  if (isInstalled || !showInstallBanner || dismissed) {
+  if (isElectron || isInstalled || !showInstallBanner || dismissed) {
     return null;
   }
 
