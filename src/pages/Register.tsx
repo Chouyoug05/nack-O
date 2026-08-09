@@ -1,10 +1,11 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Eye, EyeOff, Building2, MapPin, Gift, Navigation, Search, Loader2 } from "lucide-react";
+import { Eye, EyeOff, MapPin, Gift, Navigation, Search, Loader2, Smartphone, ShieldCheck, ArrowLeft, X } from "lucide-react";
+import { MAIN_CATEGORIES, ESTABLISHMENT_TYPES } from "@/constants/establishmentTypes";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,10 +16,13 @@ import { getFriendlyErrorMessage } from "@/utils/authErrors";
 import { Checkbox } from "@/components/ui/checkbox";
 import TermsAndConditions from "@/components/TermsAndConditions";
 
+// MAIN_CATEGORIES and ESTABLISHMENT_TYPES are imported from @/constants/establishmentTypes
+
 const Register = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formStep, setFormStep] = useState(1);
+  const [selectedMainCategory, setSelectedMainCategory] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     establishmentName: "",
     establishmentType: "",
@@ -42,27 +46,15 @@ const Register = () => {
   const [addressSuggestions, setAddressSuggestions] = useState<Array<{ display_name: string; lat: string; lon: string }>>([]);
   const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [affiliateStep, setAffiliateStep] = useState(1);
+  const [affiliateCode, setAffiliateCode] = useState("");
 
+  const { signUpWithEmail, saveProfile } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const refCode = searchParams.get("ref")?.trim() || undefined;
   const isAffiliateMode = searchParams.get("mode") === "affiliate";
-
-  const [affiliateCode, setAffiliateCode] = useState<string | null>(null);
-  const [affiliateStep, setAffiliateStep] = useState(1); // 1: Form, 2: Success
-
-  const { toast } = useToast();
-  const { signUpWithEmail, saveProfile } = useAuth();
-
-  const establishmentTypes = [
-    { value: "bar", label: "Bar" },
-    { value: "restaurant", label: "Restaurant" },
-    { value: "snack", label: "Snack Bar" },
-    { value: "nightclub", label: "Boîte de nuit" },
-    { value: "restaurant-bar", label: "Restaurant-Bar" },
-    { value: "hotel-bar", label: "Bar d'hôtel" },
-    { value: "other", label: "Autre" }
-  ];
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -87,17 +79,22 @@ const Register = () => {
 
   const validateStep = (step: number): boolean => {
     switch (step) {
-      case 1: return !!(formData.establishmentName && formData.establishmentType && formData.ownerName);
-      case 2: return !!(formData.email && formData.phone && validateWhatsApp(formData.whatsapp));
-      case 3: return !!(formData.address && formData.latitude && formData.longitude);
-      case 4: return !!(formData.password && formData.password.length >= 6 && formData.password === formData.confirmPassword && termsAccepted);
+      case 1: return !!(formData.establishmentType);
+      case 2: 
+        if (selectedMainCategory === 'commerce' || selectedMainCategory === 'boutique') {
+          return !!(formData.ownerName);
+        }
+        return !!(formData.establishmentName && formData.ownerName);
+      case 3: return !!(formData.email && formData.whatsapp && validateWhatsApp(formData.whatsapp));
+      case 4: return !!(formData.address && formData.latitude && formData.longitude);
+      case 5: return !!(formData.password && formData.password.length >= 6 && formData.password === formData.confirmPassword && termsAccepted);
       default: return true;
     }
   };
 
   const getCurrentLocation = async () => {
     if (!navigator.geolocation) {
-      setLocationError("La géolocalisation n'est pas supportée");
+      setLocationError("La gÃ©olocalisation n'est pas supportÃ©e");
       return;
     }
     setIsGettingLocation(true);
@@ -119,9 +116,9 @@ const Register = () => {
         setFormData(prev => ({ ...prev, address: fallback }));
         setAddressInput(fallback);
       }
-      toast({ title: "Position enregistrée" });
+      toast({ title: "Position enregistrÃ©e" });
     } catch {
-      setLocationError("Erreur de géolocalisation");
+      setLocationError("Erreur de gÃ©olocalisation");
     } finally {
       setIsGettingLocation(false);
     }
@@ -171,9 +168,17 @@ const Register = () => {
     }
   };
 
+  const handleNext = () => {
+    if (!validateStep(formStep)) {
+      toast({ title: "Erreur", description: "Veuillez remplir les champs requis.", variant: "destructive" });
+      return;
+    }
+    setFormStep(formStep + 1);
+  };
+
   const handleManagerSubmit = async () => {
     if (formData.password !== formData.confirmPassword) {
-      toast({ title: "Erreur", description: "Mots de passe différents", variant: "destructive" });
+      toast({ title: "Erreur", description: "Mots de passe diffÃ©rents", variant: "destructive" });
       return;
     }
     if (!termsAccepted) {
@@ -183,6 +188,7 @@ const Register = () => {
     setIsLoading(true);
     try {
       await signUpWithEmail(formData.email, formData.password);
+
       let finalLogoUrl = formData.logoUrl || undefined;
       if (logoFile && isCloudinaryConfigured()) {
         try {
@@ -205,7 +211,7 @@ const Register = () => {
         locationAsked: true,
         referredBy: refCode,
       });
-      toast({ title: "Inscription réussie !" });
+      toast({ title: "Inscription rÃ©ussie !" });
       navigate("/configure-tickets");
     } catch (error) {
       toast({
@@ -224,7 +230,7 @@ const Register = () => {
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      toast({ title: "Mots de passe différents", variant: "destructive" });
+      toast({ title: "Mots de passe diffÃ©rents", variant: "destructive" });
       return;
     }
     if (!termsAccepted) {
@@ -244,7 +250,7 @@ const Register = () => {
         name: formData.ownerName,
         email: formData.email,
         whatsapp: formData.whatsapp,
-        password: formData.password, // Stockage du mot de passe pour la connexion simplifiée
+        password: formData.password,
         referralCount: 0,
         totalEarned: 0,
         createdAt: Date.now(),
@@ -252,7 +258,7 @@ const Register = () => {
       });
       setAffiliateCode(code);
       setAffiliateStep(2);
-      toast({ title: "Compte créé !" });
+      toast({ title: "Compte crÃ©Ã© !" });
     } catch (error) {
       toast({
         title: "Erreur",
@@ -272,12 +278,12 @@ const Register = () => {
             <Gift size={40} className="animate-bounce" />
           </div>
           <h3 className="text-3xl font-bold">Bienvenue, Partenaire !</h3>
-          <p className="text-muted-foreground">Votre compte a été créé. Notez votre code :</p>
+          <p className="text-muted-foreground">Votre compte a Ã©tÃ© crÃ©Ã©. Notez votre code :</p>
           <div className="bg-white border-2 border-dashed border-nack-red p-6 rounded-2xl shadow-sm inline-block my-4">
             <span className="text-4xl font-mono font-bold text-nack-red tracking-widest">{affiliateCode}</span>
           </div>
           <Button onClick={() => navigate(`/affiliate?code=${affiliateCode}`)} className="w-full h-16 text-xl font-bold bg-nack-red hover:bg-nack-red-dark text-white rounded-xl shadow-lg mt-6">
-            Accéder à mon tableau de bord
+            AccÃ©der Ã  mon tableau de bord
           </Button>
         </div>
       );
@@ -285,8 +291,8 @@ const Register = () => {
 
     return (
       <div className="space-y-6 py-4">
-        <h3 className="text-2xl font-bold text-center">Devenir Affilié Nack</h3>
-        <p className="text-center text-muted-foreground">Gagnez des revenus en parrainant des établissements.</p>
+        <h3 className="text-2xl font-bold text-center">Devenir AffiliÃ© Nack</h3>
+        <p className="text-center text-muted-foreground">Gagnez des revenus en parrainant des Ã©tablissements.</p>
         <div className="space-y-4">
           <Input name="ownerName" placeholder="Nom complet" value={formData.ownerName} onChange={handleInputChange} className="h-14" />
           <Input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} className="h-14" />
@@ -330,9 +336,9 @@ const Register = () => {
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Création du compte...
+              CrÃ©ation du compte...
             </>
-          ) : "Créer mon compte partenaire"}
+          ) : "CrÃ©er mon compte partenaire"}
         </Button>
         <div className="text-center">
           <Button variant="ghost" onClick={() => navigate('/login')} className="text-muted-foreground">Annuler</Button>
@@ -346,18 +352,18 @@ const Register = () => {
       <div className="w-full max-w-2xl animate-scale-in">
         <div className="text-center mb-6">
           <NackLogo size="md" className="mb-2" />
-          <p className="text-muted-foreground text-sm">Rejoignez la communauté NACK!</p>
+          <p className="text-muted-foreground text-sm">Rejoignez la communautÃ© NACK!</p>
         </div>
 
         <Card className="shadow-card border-0">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl">
-              {isAffiliateMode ? (affiliateStep === 2 ? "Félicitations !" : "Devenir Affilié") : "Créer un compte"}
+              {isAffiliateMode ? (affiliateStep === 2 ? "FÃ©licitations !" : "Devenir AffiliÃ©") : "CrÃ©er un compte"}
             </CardTitle>
-            {!isAffiliateMode && <CardDescription>Étape {formStep} sur 4</CardDescription>}
+            {!isAffiliateMode && <CardDescription>Ã‰tape {formStep} sur 5</CardDescription>}
             {!isAffiliateMode && (
               <div className="flex gap-2 mt-4">
-                {[1, 2, 3, 4].map(s => (
+                {[1, 2, 3, 4, 5].map(s => (
                   <div key={s} className={`h-2 flex-1 rounded-full ${formStep >= s ? 'bg-green-500' : 'bg-gray-200'}`} />
                 ))}
               </div>
@@ -367,147 +373,139 @@ const Register = () => {
           <CardContent>
             {isAffiliateMode ? renderAffiliateForm() : (
               <div className="space-y-6 py-4 min-h-[400px]">
+                {/* Step 1: Main category and type */}
                 {formStep === 1 && (
-                  <div className="space-y-4">
-                    <Label>Nom de l'établissement *</Label>
-                    <Input name="establishmentName" placeholder="Mon Bar" value={formData.establishmentName} onChange={handleInputChange} className="h-12" />
-                    <Label>Type d'établissement *</Label>
-                    <select
-                      className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={formData.establishmentType}
-                      onChange={(e) => setFormData({ ...formData, establishmentType: e.target.value })}
-                    >
-                      <option value="">Choisir...</option>
-                      {establishmentTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-                    </select>
-                    <Label>Nom du gérant *</Label>
-                    <Input name="ownerName" placeholder="Votre nom" value={formData.ownerName} onChange={handleInputChange} className="h-12" />
+                  <div className="space-y-6">
+                    {!selectedMainCategory ? (
+                      <div className="space-y-4">
+                        <Label className="text-lg">Quelle est l'activitÃ© principale de votre Ã©tablissement ? *</Label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {MAIN_CATEGORIES.map((cat) => {
+                            const Icon = cat.icon;
+                            return (
+                              <button
+                                key={cat.id}
+                                onClick={() => setSelectedMainCategory(cat.id)}
+                                className="flex flex-col items-center justify-center p-6 border-2 border-gray-100 rounded-xl hover:border-nack-red hover:bg-red-50 transition-all text-center group"
+                              >
+                                <Icon className="w-12 h-12 mb-3 text-gray-400 group-hover:text-nack-red" />
+                                <h3 className="font-bold text-gray-800 mb-1">{cat.label}</h3>
+                                <p className="text-xs text-gray-500">{cat.description}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                        <div className="flex items-center gap-2 mb-4">
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedMainCategory(null); setFormData({ ...formData, establishmentType: "" }); }} className="p-0 h-auto text-muted-foreground hover:text-foreground">
+                            <ArrowLeft className="w-4 h-4 mr-1" /> Retour
+                          </Button>
+                        </div>
+                        <Label className="text-lg">PrÃ©cisez votre type d'Ã©tablissement *</Label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {ESTABLISHMENT_TYPES.filter(t => t.main === selectedMainCategory).map((t) => (
+                            <button
+                              key={t.value}
+                              onClick={() => setFormData({ ...formData, establishmentType: t.value })}
+                              className={`p-4 border-2 rounded-lg text-left transition-all ${formData.establishmentType === t.value ? 'border-nack-red bg-red-50 text-nack-red font-semibold' : 'border-gray-100 hover:border-gray-300'}`}
+                            >
+                              {t.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
-
+                {/* Step 2: Owner and establishment name */}
                 {formStep === 2 && (
+                  <div className="space-y-4">
+                    {!(selectedMainCategory === 'commerce' || selectedMainCategory === 'boutique') && (
+                      <>
+                        <Label>Nom de l'Ã©tablissement *</Label>
+                        <Input name="establishmentName" placeholder="Mon Ã©tablissement" value={formData.establishmentName} onChange={handleInputChange} className="h-12" />
+                      </>
+                    )}
+                    <Label>Nom complet du gÃ©rant *</Label>
+                    <Input name="ownerName" placeholder="Votre nom complet" value={formData.ownerName} onChange={handleInputChange} className="h-12" />
+                  </div>
+                )}
+                {formStep === 3 && (
                   <div className="space-y-4">
                     <Label>Email *</Label>
                     <Input name="email" type="email" placeholder="votre@email.com" value={formData.email} onChange={handleInputChange} className="h-12" />
-                    <Label>Téléphone *</Label>
-                    <Input name="phone" type="tel" placeholder="+241..." value={formData.phone} onChange={handleInputChange} className="h-12" />
                     <Label>WhatsApp *</Label>
-                    <Input name="whatsapp" type="tel" placeholder="+241..." value={formData.whatsapp} onChange={handleInputChange} className="h-12" />
+                    <Input name="whatsapp" placeholder="WhatsApp (ex: +241...)" value={formData.whatsapp} onChange={handleInputChange} className="h-12" />
                   </div>
                 )}
-
-                {formStep === 3 && (
+                {/* Step 4: Address */}
+                {formStep === 4 && (
                   <div className="space-y-4">
                     <Label>Adresse *</Label>
-                    <div className="relative">
-                      <Input
-                        placeholder="Chercher une adresse..."
-                        value={addressInput}
-                        onChange={(e) => handleAddressInputChange(e.target.value)}
-                        className="h-12 pr-10"
-                      />
-                      <Button variant="ghost" size="icon" onClick={handleGeocodeAddress} className="absolute right-0 top-0 h-12 w-10">
-                        <Search className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {showSuggestions && addressSuggestions.length > 0 && (
-                      <div className="border rounded-md bg-white shadow-md max-h-40 overflow-y-auto">
+                    <Input value={addressInput} onChange={e => handleAddressInputChange(e.target.value)} placeholder="Entrez votre adresse" className="h-12" />
+                    {showSuggestions && (
+                      <div className="border rounded bg-white max-h-48 overflow-y-auto">
                         {addressSuggestions.map((s, i) => (
-                          <button key={i} onClick={() => handleSelectAddress(s)} className="w-full text-left p-2 hover:bg-gray-100 text-sm border-b">{s.display_name}</button>
+                          <div key={i} className="p-2 cursor-pointer hover:bg-gray-100" onClick={() => handleSelectAddress(s)}>{s.display_name}</div>
                         ))}
                       </div>
                     )}
-                    <Button variant="outline" onClick={getCurrentLocation} disabled={isGettingLocation} className="w-full h-12 mt-2">
-                      <Navigation className="w-4 h-4 mr-2" /> GPS
-                    </Button>
-                    {locationError && <p className="text-xs text-red-500 mt-1">{locationError}</p>}
-                    {formData.latitude && <p className="text-xs text-green-600 mt-1">✓ Localisé</p>}
+                    <div className="flex space-x-2">
+                      <Button onClick={getCurrentLocation} variant="outline" disabled={isGettingLocation}>
+                        {isGettingLocation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Navigation className="mr-2 h-4 w-4" />}
+                        {isGettingLocation ? "Localisation..." : "Utiliser ma position"}
+                      </Button>
+                      <Button onClick={handleGeocodeAddress} variant="outline" disabled={isSearchingAddress}>
+                        {isSearchingAddress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                        GÃ©ocoder l'adresse
+                      </Button>
+                    </div>
                   </div>
                 )}
-
-                {formStep === 4 && (
+                {/* Step 5: Password and submit */}
+                {formStep === 5 && (
                   <div className="space-y-4">
                     <Label>Mot de passe *</Label>
-                    <div className="relative">
-                      <Input name="password" type={showPassword ? "text" : "password"} placeholder="••••••" value={formData.password} onChange={handleInputChange} className="h-12" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                      </button>
-                    </div>
-                    {formData.password && formData.password.length < 6 && (
-                      <p className="text-xs text-red-500 mt-1">Le mot de passe doit faire au moins 6 caractères.</p>
-                    )}
-                    <Label>Confirmer *</Label>
-                    <Input name="confirmPassword" type="password" placeholder="••••••" value={formData.confirmPassword} onChange={handleInputChange} className="h-12" />
-                    {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                      <p className="text-xs text-red-500 mt-1">Les mots de passe ne correspondent pas.</p>
-                    )}
-                    <Label className="mt-4 inline-block">Logo (URL optionnelle)</Label>
-                    <Input name="logoUrl" placeholder="https://..." value={formData.logoUrl} onChange={handleInputChange} className="h-12" />
-                    <div className="mt-2">
-                      <Label className="text-xs text-muted-foreground">Ou uploader un fichier :</Label>
-                      {!isCloudinaryConfigured() && (
-                        <p className="text-[10px] text-amber-600 mb-1">⚠️ L'upload d'image n'est pas encore configuré (Cloudinary). L'image ne sera pas sauvegardée.</p>
-                      )}
-                      <Input type="file" accept="image/*" onChange={handleFileChange} className="h-10 text-xs mt-1" />
-                      {logoPreview && (
-                        <div className="mt-2 relative inline-block">
-                          <img src={logoPreview} alt="Preview" className="w-16 h-16 object-cover rounded-md border" />
-                          <button
-                            type="button"
-                            onClick={() => { setLogoFile(null); setLogoPreview(null); }}
-                            className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex items-start space-x-2 pt-4 border-t mt-4">
-                      <Checkbox
-                        id="terms-manager"
-                        checked={termsAccepted}
-                        onCheckedChange={(checked) => setTermsAccepted(!!checked)}
-                        className="mt-1"
-                      />
+                    <Input name="password" type="password" placeholder="Mot de passe" value={formData.password} onChange={handleInputChange} className="h-12" />
+                    <Label>Confirmer le mot de passe *</Label>
+                    <Input name="confirmPassword" type="password" placeholder="Confirmer" value={formData.confirmPassword} onChange={handleInputChange} className="h-12" />
+                    <div className="flex items-start space-x-2 pt-2">
+                      <Checkbox id="terms" checked={termsAccepted} onCheckedChange={checked => setTermsAccepted(!!checked)} className="mt-1" />
                       <div className="grid gap-1.5 leading-none">
-                        <label
-                          htmlFor="terms-manager"
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          J'accepte les{" "}
-                          <TermsAndConditions trigger={<button type="button" className="text-nack-red hover:underline p-0 h-auto font-medium">conditions d'utilisation</button>} />
-                          {" "}de NACK!
+                        <label htmlFor="terms" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                          J'accepte les <TermsAndConditions trigger={<button type="button" className="text-nack-red hover:underline p-0 h-auto font-medium">conditions d'utilisation</button>} />
+                          de NACK!
                         </label>
                       </div>
                     </div>
+                    <Button onClick={handleManagerSubmit} disabled={isLoading || !termsAccepted} className="w-full h-12" variant="nack">
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          CrÃ©ation du compte...
+                        </>
+                      ) : "CrÃ©er mon compte"}
+                    </Button>
                   </div>
                 )}
-
-                <div className="flex justify-between gap-3 pt-4 border-t">
-                  {formStep > 1 && <Button variant="outline" onClick={() => setFormStep(formStep - 1)} className="h-12 px-6">Retour</Button>}
-                  {formStep < 4 ? (
-                    <Button onClick={() => setFormStep(formStep + 1)} disabled={!validateStep(formStep)} className="h-12 px-8 font-semibold ml-auto bg-nack-red text-white">Suivant</Button>
-                  ) : (
-                    <div className="flex flex-col items-end gap-2 ml-auto">
-                      {!termsAccepted && formData.password === formData.confirmPassword && formData.password.length >= 6 && (
-                        <p className="text-[10px] text-amber-600">Acceptez les conditions pour continuer</p>
-                      )}
-                      <Button onClick={handleManagerSubmit} disabled={isLoading || !validateStep(4)} className="h-12 px-8 font-bold bg-green-600 text-white">
-                        {isLoading ? 'Création...' : 'Créer mon compte'}
-                      </Button>
-                    </div>
+                {/* Navigation Buttons */}
+                <div className="flex justify-between mt-6">
+                  {formStep > 1 && (
+                    <Button variant="outline" onClick={() => setFormStep(formStep - 1)} disabled={isLoading}>PrÃ©cÃ©dent</Button>
                   )}
+                  {formStep < 5 && (
+                    <Button onClick={handleNext} disabled={isLoading}>Suivant</Button>
+                  )}
+                </div>
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    DÃ©jÃ  un compte ? <Link to="/login" className="text-nack-red font-medium">Se connecter</Link>
+                  </p>
                 </div>
               </div>
             )}
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                Déjà un compte ? <Link to="/login" className="text-nack-red font-medium">Se connecter</Link>
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -516,3 +514,9 @@ const Register = () => {
 };
 
 export default Register;
+
+
+
+
+
+

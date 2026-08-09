@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { isFoodBusiness as _isFoodBusiness, isServiceBusiness as _isServiceBusiness, isBoutique as _isBoutique } from "@/constants/establishmentTypes";
+import BoutiqueHub from "@/components/pages/BoutiqueHub";
 import SalesPage from "@/components/pages/SalesPage";
 import StockPage from "@/components/pages/StockPage";
 import ReportsPage from "@/components/pages/ReportsPage";
@@ -161,6 +163,10 @@ const menuCards: MenuCard[] = [
 const Dashboard = () => {
   const navigate = useNavigate();
   const { logout, user, profile } = useAuth();
+  const isFoodBusiness = _isFoodBusiness(profile?.establishmentType);
+  const isServiceBusiness = _isServiceBusiness(profile?.establishmentType);
+  const isBoutique = _isBoutique(profile?.establishmentType);
+  const isSimpleBusiness = isBoutique || isServiceBusiness;
   const [activeAction, setActiveAction] = useState<ActionKey | "menu">("menu");
   const [statsValues, setStatsValues] = useState({
     salesToday: 0,
@@ -183,17 +189,17 @@ const Dashboard = () => {
     if (!user) return;
     const unsubs: Array<() => void> = [];
 
-    // Produits : un seul listener (compteur + plats avec food cost)
     const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
     unsubs.push(onSnapshot(
       productsColRef(db, user.uid),
       (snap) => {
         setStatsValues((prev) => ({ ...prev, productsCount: snap.size }));
-        const foodItems = snap.docs
+        const profitableItems = snap.docs
           .map(d => {
             const data = d.data();
             const category = data.category || "";
-            if (foodCategories.includes(category) && data.foodCost) {
+            const isEligible = isFoodBusiness ? foodCategories.includes(category) : true;
+            if (isEligible && data.foodCost) {
               return {
                 id: d.id,
                 name: data.name || "",
@@ -208,7 +214,7 @@ const Dashboard = () => {
             return null;
           })
           .filter((item): item is NonNullable<typeof item> => item !== null);
-        setFoodProducts(foodItems);
+        setFoodProducts(profitableItems);
       }
     ));
 
@@ -270,8 +276,8 @@ const Dashboard = () => {
 
   const handleCardClick = async (key: MenuCard["key"]) => {
     if (key === "logout") {
-    await logout();
-    navigate("/login");
+      await logout();
+      navigate("/login");
       return;
     }
     if (key === "team") {
@@ -444,18 +450,18 @@ const Dashboard = () => {
           <div className="w-full max-w-7xl mx-auto">
             <Card className="shadow-card border-0">
               <CardHeader>
-                <CardTitle>Rentabilité des plats</CardTitle>
-                <CardDescription>Analyse des coûts et marges des produits alimentaires</CardDescription>
+                <CardTitle>Rentabilité des {isFoodBusiness ? "plats" : "produits/services"}</CardTitle>
+                <CardDescription>Analyse des coûts et marges de vos {isFoodBusiness ? "produits alimentaires" : "offres"}</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Nom du plat</TableHead>
+                        <TableHead>{isFoodBusiness ? "Nom du plat" : "Nom du produit"}</TableHead>
                         <TableHead>Coût total</TableHead>
                         <TableHead>Prix de vente</TableHead>
-                        <TableHead>Food cost %</TableHead>
+                        <TableHead>{isFoodBusiness ? "Food cost %" : "Part du coût %"}</TableHead>
                         <TableHead>Marge</TableHead>
                         <TableHead>Statut</TableHead>
                       </TableRow>
@@ -506,34 +512,34 @@ const Dashboard = () => {
       {/* Main Actions */}
       {activeAction === "menu" ? (
         <main className="p-4 md:p-6 lg:p-8 pt-2 md:pt-4 lg:pt-6 flex-1">
-          <div className="w-full">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6 lg:gap-8 max-w-7xl mx-auto">
-              {menuCards.map(({ key, title, icon: Icon, hint, accentColor }) => (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => handleCardClick(key)}
-                  className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
-                >
-                  <Icon size={40} className={`md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:h-20 ${accentColor} transition-transform group-hover:scale-110`} />
-                  <div className="flex flex-col text-center">
-                    <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">
-                      {title}
-                    </h2>
-                    {hint && (
-                      <p className={`text-sm md:text-base font-normal leading-normal mt-1 ${accentColor}`}>
-                        {hint}
-                      </p>
+          <div className="w-full max-w-7xl mx-auto">
+            {isSimpleBusiness ? (
+              <BoutiqueHub onNavigate={(action) => setActiveAction(action as ActionKey)} />
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
+                {menuCards.map(({ key, title, icon: Icon, hint, accentColor }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleCardClick(key)}
+                    className="relative flex aspect-square flex-col items-center justify-center gap-2 md:gap-3 lg:gap-4 rounded-xl md:rounded-2xl border border-gray-200 bg-white p-4 md:p-6 lg:p-8 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+                  >
+                    <Icon size={40} className={`md:w-12 md:h-12 lg:w-16 lg:h-16 xl:w-20 xl:w-20 ${accentColor} transition-transform group-hover:scale-110`} />
+                    <div className="flex flex-col text-center">
+                      <h2 className="text-base md:text-lg lg:text-xl font-semibold tracking-tight text-gray-900">{title}</h2>
+                      {hint && (
+                        <p className={`text-sm md:text-base font-normal leading-normal mt-1 ${accentColor}`}>{hint}</p>
+                      )}
+                    </div>
+                    {key === 'bar-connectee' && barPendingCount > 0 && (
+                      <span className="absolute -top-1 -right-1 md:-top-2 md:-right-2 min-w-[20px] h-5 md:h-6 px-1.5 md:px-2 rounded-full bg-red-600 text-white text-xs md:text-sm font-bold flex items-center justify-center shadow-lg">
+                        {barPendingCount}
+                      </span>
                     )}
-                  </div>
-                  {key === 'bar-connectee' && barPendingCount > 0 && (
-                    <span className="absolute -top-1 -right-1 md:-top-2 md:-right-2 min-w-[20px] h-5 md:h-6 px-1.5 md:px-2 rounded-full bg-red-600 text-white text-xs md:text-sm font-bold flex items-center justify-center shadow-lg">
-                      {barPendingCount}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </main>
       ) : (

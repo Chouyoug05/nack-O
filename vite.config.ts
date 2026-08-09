@@ -1,6 +1,5 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
-import legacy from "@vitejs/plugin-legacy";
 import path from "path";
 import fs from "fs";
 import { componentTagger } from "lovable-tagger";
@@ -37,11 +36,6 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
-      legacy({
-        targets: ["chrome >= 63", "safari >= 12.1", "firefox >= 78", "android >= 63"],
-        additionalLegacyPolyfills: ["regenerator-runtime/runtime"],
-        modernPolyfills: true,
-      }),
       mode === "development" && componentTagger(),
       spa404Plugin(),
     ].filter(Boolean),
@@ -51,6 +45,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
+      target: "es2015",
       rollupOptions: {
         output: {
           manualChunks(id) {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,19 +11,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { uploadImageToCloudinary, isCloudinaryConfigured } from "@/lib/cloudinary";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { geocodeAddress, searchAddresses } from "@/utils/geocoding";
-import { Search, Navigation, MapPin, Loader2 } from "lucide-react";
+import { Search, Navigation, MapPin, Loader2, Building2 } from "lucide-react";
+import { ESTABLISHMENT_TYPES, getEstablishmentLabel } from "@/constants/establishmentTypes";
 import { Checkbox } from "@/components/ui/checkbox";
 import TermsAndConditions from "@/components/TermsAndConditions";
-
-const establishmentTypes = [
-  { value: "bar", label: "Bar" },
-  { value: "restaurant", label: "Restaurant" },
-  { value: "snack", label: "Snack Bar" },
-  { value: "nightclub", label: "Boîte de nuit" },
-  { value: "restaurant-bar", label: "Restaurant-Bar" },
-  { value: "hotel-bar", label: "Bar d'hôtel" },
-  { value: "other", label: "Autre" }
-];
 
 const CompleteProfile = () => {
   const { user, profile, profileLoading, saveProfile, isAdmin, isAdminLoading } = useAuth();
@@ -53,7 +44,7 @@ const CompleteProfile = () => {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Si admin, rediriger vers /admin même sans profil
+    // Si admin, rediriger vers /admin mÃªme sans profil
     if (user && !isAdminLoading && isAdmin) {
       navigate("/admin", { replace: true });
     }
@@ -92,7 +83,7 @@ const CompleteProfile = () => {
 
   const getCurrentLocation = async () => {
     if (!navigator.geolocation) {
-      setLocationError("La géolocalisation n'est pas supportée");
+      setLocationError("La gÃ©olocalisation n'est pas supportÃ©e");
       return;
     }
     setIsGettingLocation(true);
@@ -114,9 +105,9 @@ const CompleteProfile = () => {
         setFormData(prev => ({ ...prev, address: fallback }));
         setAddressInput(fallback);
       }
-      toast({ title: "Position enregistrée" });
+      toast({ title: "Position enregistrÃ©e" });
     } catch {
-      setLocationError("Erreur de géolocalisation");
+      setLocationError("Erreur de gÃ©olocalisation");
     } finally {
       setIsGettingLocation(false);
     }
@@ -127,7 +118,7 @@ const CompleteProfile = () => {
 
     if (!termsAccepted) {
       toast({
-        title: "Conditions non acceptées",
+        title: "Conditions non acceptÃ©es",
         description: "Veuillez accepter les conditions d'utilisation.",
         variant: "destructive"
       });
@@ -137,8 +128,8 @@ const CompleteProfile = () => {
     // Validation WhatsApp
     if (!formData.whatsapp.trim()) {
       toast({
-        title: "Numéro WhatsApp requis",
-        description: "Le numéro WhatsApp est obligatoire pour le support.",
+        title: "NumÃ©ro WhatsApp requis",
+        description: "Le numÃ©ro WhatsApp est obligatoire pour le support.",
         variant: "destructive"
       });
       return;
@@ -158,14 +149,14 @@ const CompleteProfile = () => {
       let finalLogoUrl: string | undefined = formData.logoUrl || undefined;
       if (logoFile) {
         if (!isCloudinaryConfigured()) {
-          toast({ title: "Cloudinary non configuré", description: "Ajoutez VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET", variant: "destructive" });
+          toast({ title: "Cloudinary non configurÃ©", description: "Ajoutez VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET", variant: "destructive" });
           return;
         }
         try {
           finalLogoUrl = await uploadImageToCloudinary(logoFile, "logos");
         } catch (uploadErr: unknown) {
           const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
-          toast({ title: "Échec de l'upload du logo", description: msg, variant: "destructive" });
+          toast({ title: "Ã‰chec de l'upload du logo", description: msg, variant: "destructive" });
           return;
         }
       }
@@ -182,10 +173,10 @@ const CompleteProfile = () => {
         address: formData.address || undefined,
         locationAsked: true,
       });
-      toast({ title: "Profil enregistré", description: "Bienvenue sur NACK!" });
+      toast({ title: "Profil enregistrÃ©", description: "Bienvenue sur NACK!" });
       navigate("/dashboard", { replace: true });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Réessayez.";
+      const message = error instanceof Error ? error.message : "RÃ©essayez.";
       toast({ title: "Erreur", description: message, variant: "destructive" });
     } finally {
       setIsSaving(false);
@@ -203,29 +194,29 @@ const CompleteProfile = () => {
       <div className="w-full max-w-md animate-scale-in">
         <div className="text-center mb-6">
           <NackLogo size="md" className="mb-2" />
-          <p className="text-muted-foreground text-sm">Complétez votre profil pour continuer</p>
+          <p className="text-muted-foreground text-sm">ComplÃ©tez votre profil pour continuer</p>
         </div>
 
         <Card className="shadow-card border-0">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl">Compléter le profil</CardTitle>
-            <CardDescription>Ces informations seront utilisées dans votre tableau de bord</CardDescription>
+            <CardTitle className="text-xl">ComplÃ©ter le profil</CardTitle>
+            <CardDescription>Ces informations seront utilisÃ©es dans votre tableau de bord</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="establishmentName">Nom de l'établissement</Label>
+                <Label htmlFor="establishmentName">Nom de l'Ã©tablissement</Label>
                 <Input id="establishmentName" name="establishmentName" value={formData.establishmentName} onChange={handleInputChange} required />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="establishmentType">Type d'établissement</Label>
+                <Label htmlFor="establishmentType">Type d'Ã©tablissement</Label>
                 <Select value={formData.establishmentType} onValueChange={(value) => setFormData({ ...formData, establishmentType: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez le type" />
+                    <SelectValue placeholder="SÃ©lectionnez le type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {establishmentTypes.map((type) => (
+                    {ESTABLISHMENT_TYPES.map((type) => (
                       <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -233,7 +224,7 @@ const CompleteProfile = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ownerName">Nom du gérant</Label>
+                <Label htmlFor="ownerName">Nom du gÃ©rant</Label>
                 <Input id="ownerName" name="ownerName" value={formData.ownerName} onChange={handleInputChange} required />
               </div>
 
@@ -243,7 +234,7 @@ const CompleteProfile = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Téléphone</Label>
+                <Label htmlFor="phone">TÃ©lÃ©phone</Label>
                 <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required />
               </div>
 
@@ -263,9 +254,9 @@ const CompleteProfile = () => {
                   <p className="text-xs text-red-500">{getWhatsAppErrorMessage(formData.whatsapp)}</p>
                 )}
                 {formData.whatsapp && validateWhatsApp(formData.whatsapp) && (
-                  <p className="text-xs text-green-600">✓ Format WhatsApp valide</p>
+                  <p className="text-xs text-green-600">âœ“ Format WhatsApp valide</p>
                 )}
-                <p className="text-xs text-muted-foreground">Numéro WhatsApp obligatoire pour le support</p>
+                <p className="text-xs text-muted-foreground">NumÃ©ro WhatsApp obligatoire pour le support</p>
               </div>
 
               <div className="space-y-2">
@@ -275,7 +266,7 @@ const CompleteProfile = () => {
               </div>
 
               <div className="space-y-2 border-t pt-4 mt-4">
-                <Label className="font-semibold">Localisation de l'établissement</Label>
+                <Label className="font-semibold">Localisation de l'Ã©tablissement</Label>
                 <div className="relative">
                   <Input
                     placeholder="Chercher une adresse..."
@@ -298,7 +289,7 @@ const CompleteProfile = () => {
                   <Navigation className="w-4 h-4 mr-2" /> GPS
                 </Button>
                 {locationError && <p className="text-xs text-red-500 mt-1">{locationError}</p>}
-                {formData.latitude && <p className="text-xs text-green-600 mt-1 font-medium">✓ Localisé avec succès</p>}
+                {formData.latitude && <p className="text-xs text-green-600 mt-1 font-medium">âœ“ LocalisÃ© avec succÃ¨s</p>}
               </div>
 
               <div className="flex items-start space-x-2 pt-2">
@@ -327,7 +318,7 @@ const CompleteProfile = () => {
                     Enregistrement...
                   </>
                 ) : (
-                  formData.latitude ? "Finaliser mon inscription" : "Veuillez localiser l'établissement"
+                  formData.latitude ? "Finaliser mon inscription" : "Veuillez localiser l'Ã©tablissement"
                 )}
               </Button>
             </form>
@@ -339,3 +330,5 @@ const CompleteProfile = () => {
 };
 
 export default CompleteProfile; 
+
+

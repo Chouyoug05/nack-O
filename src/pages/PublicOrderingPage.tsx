@@ -12,6 +12,7 @@ import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
+import { isFoodBusiness as isFoodBusinessFn } from "@/constants/establishmentTypes";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
 import { paymentsColRef, barOrdersColRef } from "@/lib/collections";
 import { enqueuePendingOrder, flushPendingOrders } from "@/lib/localSyncQueue";
@@ -48,6 +49,7 @@ interface CartItem {
 
 interface Establishment {
   establishmentName: string;
+  establishmentType?: string;
   logoUrl?: string;
   companyName?: string;
   fullAddress?: string;
@@ -79,6 +81,7 @@ const PublicOrderingPage = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [tables, setTables] = useState<TableZone[]>([]);
   const [establishment, setEstablishment] = useState<Establishment | null>(null);
+  const [collectionBase, setCollectionBase] = useState<'establishments' | 'profiles'>('profiles');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>("");
   const [showTableDialog, setShowTableDialog] = useState(false);
@@ -103,6 +106,10 @@ const PublicOrderingPage = () => {
   const isMountedRef = useRef<boolean>(true);
   const unsubscribeProductsRef = useRef<(() => void) | null>(null);
   const unsubscribeTablesRef = useRef<(() => void) | null>(null);
+
+  const establishmentType = establishment?.establishmentType || '';
+  const isFoodBusiness = isFoodBusinessFn(establishmentType);
+  const isSimpleBusiness = !isFoodBusiness;
 
   // Calcul du total de la commande (articles du panier + livraison si applicable)
   // Ce total est utilisé pour le paiement Menu Digital, PAS le prix de l'abonnement
@@ -129,7 +136,11 @@ const PublicOrderingPage = () => {
 
     const loadTheme = async () => {
       try {
-        const themeDoc = await getDoc(doc(db, `profiles/${establishmentId}/menuDigital`, 'theme'));
+        // Essayer le chemin establishments d'abord, puis profiles (legacy)
+        let themeDoc = await getDoc(doc(db, `establishments/${establishmentId}/menuDigital`, 'theme'));
+        if (!themeDoc.exists()) {
+          themeDoc = await getDoc(doc(db, `profiles/${establishmentId}/menuDigital`, 'theme'));
+        }
         if (themeDoc.exists()) {
           setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
         }
@@ -179,43 +190,61 @@ const PublicOrderingPage = () => {
       return cleanup;
     }
 
-    // Charger l'établissement
-    getDoc(doc(db, 'profiles', establishmentId))
-      .then((profileDoc) => {
-        if (!isMountedRef.current) return;
-        if (profileDoc.exists()) {
-          const profileData = profileDoc.data();
-          setEstablishment({
-            establishmentName: profileData.establishmentName || 'Établissement',
-            logoUrl: profileData.logoUrl,
-            companyName: profileData.companyName,
-            fullAddress: profileData.fullAddress,
-            businessPhone: profileData.businessPhone,
-            rcsNumber: profileData.rcsNumber,
-            nifNumber: profileData.nifNumber,
-            legalMentions: profileData.legalMentions,
-            customMessage: profileData.customMessage,
-            ticketLogoUrl: profileData.ticketLogoUrl,
-            showDeliveryMention: profileData.showDeliveryMention,
-            showCSSMention: profileData.showCSSMention,
-            cssPercentage: profileData.cssPercentage,
-            ticketFooterMessage: profileData.ticketFooterMessage,
-            disbursementId: profileData.disbursementId,
-            disbursementStatus: profileData.disbursementStatus,
-            airtelMoneyNumber: profileData.airtelMoneyNumber,
-            deliveryEnabled: profileData.deliveryEnabled,
-            deliveryPrice: profileData.deliveryPrice,
-            fcmToken: profileData.fcmToken,
-          } as Establishment);
-        }
-      })
-      .catch(() => {
-        if (!isMountedRef.current) return;
-        setIsLoading(false);
-      });
+    // Charger l'établissement (essayer establishments d'abord, puis profiles pour legacy)
+    const loadEstablishmentData = async () => {
+      let estDoc = await getDoc(doc(db, 'establishments', establishmentId));
+      let base: 'establishments' | 'profiles' = 'establishments';
 
+      if (!estDoc.exists()) {
+        estDoc = await getDoc(doc(db, 'profiles', establishmentId));
+        base = 'profiles';
+      }
+
+      if (!isMountedRef.current) return;
+      if (!estDoc.exists()) {
+        setIsLoading(false);
+        return;
+      }
+
+      setCollectionBase(base);
+      const data = estDoc.data();
+      setEstablishment({
+        establishmentName: data.name || data.establishmentName || 'Établissement',
+        establishmentType: data.type || data.establishmentType,
+        logoUrl: data.logoUrl,
+        companyName: data.companyName,
+        fullAddress: data.fullAddress || data.address,
+        businessPhone: data.businessPhone || data.phone,
+        rcsNumber: data.rcsNumber,
+        nifNumber: data.nifNumber,
+        legalMentions: data.legalMentions,
+        customMessage: data.customMessage,
+        ticketLogoUrl: data.ticketLogoUrl,
+        showDeliveryMention: data.showDeliveryMention,
+        showCSSMention: data.showCSSMention,
+        cssPercentage: data.cssPercentage,
+        ticketFooterMessage: data.ticketFooterMessage,
+        disbursementId: data.disbursementId,
+        disbursementStatus: data.disbursementStatus,
+        airtelMoneyNumber: data.airtelMoneyNumber,
+        deliveryEnabled: data.deliveryEnabled,
+        deliveryPrice: data.deliveryPrice,
+        fcmToken: data.fcmToken,
+      } as Establishment);
+
+      if (!isMountedRef.current) return;
+
+      // Charger les produits
+      setupProductsAndTables(base);
+    };
+    loadEstablishmentData().catch(() => {
+      if (!isMountedRef.current) return;
+      setIsLoading(false);
+    });
+
+    function setupProductsAndTables(base: 'establishments' | 'profiles') {
     // Charger les produits
-    const productsRef = collection(db, `profiles/${establishmentId}/products`);
+    const productsRef = collection(db, `${base}/${establishmentId}/products`);
 
     const handleProductsSnapshot = (snapshot: QuerySnapshot<DocumentData>) => {
       if (!isMountedRef.current) return;
@@ -300,7 +329,7 @@ const PublicOrderingPage = () => {
     }
 
     // Charger les tables
-    const tablesRef = collection(db, `profiles/${establishmentId}/tables`);
+    const tablesRef = collection(db, `${base}/${establishmentId}/tables`);
     const unsubscribeTables = onSnapshot(
       tablesRef,
       (snapshot) => {
@@ -321,6 +350,7 @@ const PublicOrderingPage = () => {
       }
     );
     unsubscribeTablesRef.current = unsubscribeTables;
+    }
 
     return cleanup;
   }, [establishmentId]);
@@ -531,7 +561,7 @@ const PublicOrderingPage = () => {
           const paymentsSnapshot = await getDocs(paymentsQuery);
           if (!paymentsSnapshot.empty) {
             const latestPayment = paymentsSnapshot.docs[0];
-            await updateDoc(doc(db, `profiles/${establishmentId}/payments`, latestPayment.id), {
+            await updateDoc(doc(db, `${collectionBase}/${establishmentId}/payments`, latestPayment.id), {
               paymentLink,
             });
           }
@@ -945,6 +975,7 @@ const PublicOrderingPage = () => {
                     <span className="text-xl font-bold tracking-wide" style={{ color: menuTheme.primaryColor }}>
                       {priceValue.toLocaleString('fr-FR')} XAF
                     </span>
+                    {isFoodBusiness && (
                     <Button
                       size="sm"
                       onClick={(e) => {
@@ -956,6 +987,7 @@ const PublicOrderingPage = () => {
                     >
                       <Plus className="w-4 h-4" />
                     </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1256,6 +1288,7 @@ const PublicOrderingPage = () => {
                       : parseFloat(String(selectedProduct.price)) || 0
                     ).toLocaleString('fr-FR')} XAF
                   </span>
+                  {!isSimpleBusiness && (
                   <Button
                     onClick={() => {
                       addToCart(selectedProduct);
@@ -1267,6 +1300,7 @@ const PublicOrderingPage = () => {
                     <ShoppingBag className="w-4 h-4 mr-2" />
                     Commander
                   </Button>
+                  )}
                 </div>
               </div>
             </>

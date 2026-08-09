@@ -41,7 +41,11 @@ import {
   Eye,
   EyeOff,
   Image as ImageIcon,
-  Sparkles
+  Sparkles,
+  Copy,
+  Download,
+  ArrowDown,
+  ArrowUp
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -73,6 +77,11 @@ interface Product {
   };
   /** Si true, le produit apparaît sur le menu digital (menu du jour) */
   showOnMenuDigital?: boolean;
+  sku?: string;
+  subCategory?: string;
+  brand?: string;
+  isPromotional?: boolean;
+  isFeatured?: boolean;
 }
 
 const StockPage = () => {
@@ -137,6 +146,11 @@ const StockPage = () => {
             productionCosts: foodCost.productionCosts || []
           } : undefined,
           showOnMenuDigital: raw.showOnMenuDigital === true,
+          sku: (raw.sku as string) || undefined,
+          subCategory: (raw.subCategory as string) || undefined,
+          brand: (raw.brand as string) || undefined,
+          isPromotional: raw.isPromotional === true,
+          isFeatured: raw.isFeatured === true,
         } as Product;
       });
 
@@ -197,6 +211,8 @@ const StockPage = () => {
     rawMaterials: [] as Array<{ name: string; unitCost: string }>,
     productionCosts: [] as Array<{ type: string; amount: string }>,
     showOnMenuDigital: false,
+    sku: "",
+    subCategory: "",
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -333,7 +349,24 @@ const StockPage = () => {
     }
   };
 
-  const categories = ["Boisson alcoolisée", "Boisson non alcoolisée", "Plat / Repas", "Snack", "Dessert", "Entrée", "Autre"];
+  const categories = ["Boisson alcoolisée", "Boisson non alcoolisée", "Plat / Repas", "Snack", "Dessert", "Entrée", "Vêtements", "Accessoires", "Chaussures", "Maison & Déco", "Cosmétiques", "Électronique", "Jeux & Jouets", "Alimentation", "Autre"];
+
+  const subCategories: Record<string, string[]> = {
+    "Vêtements": ["T-shirts", "Chemises", "Pantalons", "Robes", "Shorts", "Sweats", "Manteaux", "Sous-vêtements", "Sport", "Autre"],
+    "Accessoires": ["Sacs", "Ceintures", "Bijoux", "Montres", "Lunettes", "Écharpes", "Chapeaux", "Gants", "Autre"],
+    "Chaussures": ["Baskets", "Escarpins", "Sandales", "Tongs", "Bottes", "Chaussures de sport", "Mocassins", "Autre"],
+    "Maison & Déco": ["Décoration", "Cuisine", "Literie", "Salle de bain", "Rangement", "Éclairage", "Autre"],
+    "Cosmétiques": ["Soins visage", "Maquillage", "Parfums", "Soins corps", "Cheveux", "Hygiène", "Autre"],
+    "Électronique": ["Téléphones", "Accessoires téléphone", "Casques", "Chargeurs", "Câbles", "Autre"],
+    "Jeux & Jouets": ["Jeux de société", "Peluches", "Jeux éducatifs", "Jeux en plein air", "Autre"],
+    "Alimentation": ["Épicerie", "Sucreries", "Boissons", "Produits frais", "Surgelés", "Autre"],
+    "Boisson alcoolisée": ["Bières", "Vins", "Spiritueux", "Champagne", "Liqueurs", "Autre"],
+    "Boisson non alcoolisée": ["Jus", "Sodas", "Eaux", "Sirops", "Thés glacés", "Autre"],
+    "Plat / Repas": ["Entrées", "Plats principaux", "Accompagnements", "Grillades", "Poissons", "Végétarien", "Autre"],
+    "Snack": ["Frites", "Burgers", "Tacos", "Brochettes", "Beignets", "Fruits secs", "Autre"],
+    "Dessert": ["Pâtisseries", "Glaces", "Fruits", "Crèmes", "Gâteaux", "Autre"],
+    "Entrée": ["Salades", "Soupes", "Tartines", "Verrines", "Autre"],
+  };
 
   // Catégories alimentaires qui nécessitent le module Food Cost
   const foodCategories = ["Plat / Repas", "Snack", "Dessert", "Entrée"];
@@ -517,6 +550,8 @@ const StockPage = () => {
           }
         } : {}),
         ...(foodCostData ? { foodCost: foodCostData } : {}),
+        ...(newProduct.sku ? { sku: newProduct.sku } : {}),
+        ...(newProduct.subCategory ? { subCategory: newProduct.subCategory } : {}),
         ...(newProduct.showOnMenuDigital ? { showOnMenuDigital: true } : {}),
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -538,6 +573,8 @@ const StockPage = () => {
         rawMaterials: [],
         productionCosts: [],
         showOnMenuDigital: false,
+        sku: "",
+        subCategory: "",
       });
       setImageFile(null);
       setIsAddModalOpen(false);
@@ -569,6 +606,8 @@ const StockPage = () => {
       rawMaterials: product.foodCost?.rawMaterials.map(m => ({ name: m.name, unitCost: String(m.unitCost) })) || [],
       productionCosts: product.foodCost?.productionCosts.map(c => ({ type: c.type, amount: String(c.amount) })) || [],
       showOnMenuDigital: product.showOnMenuDigital === true,
+      sku: product.sku || "",
+      subCategory: product.subCategory || "",
     });
     setIsAddModalOpen(true);
   };
@@ -626,6 +665,34 @@ const StockPage = () => {
         next.add(productId);
       }
       return next;
+    });
+  };
+
+  const handleDuplicateProduct = async (product: Product) => {
+    if (!user) return;
+    requireManagerAuth(async () => {
+      try {
+        const payload: ProductDoc = {
+          name: `${product.name} (copie)`,
+          category: product.category,
+          price: product.price,
+          quantity: 0,
+          cost: product.cost,
+          ...(product.description ? { description: product.description } : {}),
+          ...(product.icon ? { icon: product.icon } : {}),
+          ...(product.sku ? { sku: product.sku } : {}),
+          ...(product.subCategory ? { subCategory: product.subCategory } : {}),
+          ...(product.brand ? { brand: product.brand } : {}),
+          showOnMenuDigital: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        await addDoc(productsColRef(db, user.uid), payload);
+        toast({ title: "Produit dupliqué", description: `${product.name} a été dupliqué avec succès` });
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : "Erreur inconnue";
+        toast({ title: "Erreur", description: message, variant: "destructive" });
+      }
     });
   };
 
@@ -778,6 +845,8 @@ const StockPage = () => {
         } : {}),
         ...(foodCostData ? { foodCost: foodCostData } : {}),
         showOnMenuDigital: newProduct.showOnMenuDigital === true,
+        ...(newProduct.sku ? { sku: newProduct.sku } : {}),
+        ...(newProduct.subCategory ? { subCategory: newProduct.subCategory } : {}),
         updatedAt: Date.now(),
       };
       await updateDoc(productRef, payload);
@@ -799,6 +868,8 @@ const StockPage = () => {
         rawMaterials: [],
         productionCosts: [],
         showOnMenuDigital: false,
+        sku: "",
+        subCategory: "",
       });
       toast({ title: "Produit modifié", description: "Le produit a été mis à jour" });
     } catch (e: unknown) {
@@ -1147,6 +1218,65 @@ const StockPage = () => {
     }
   };
 
+  // --- Stock Entry Modal ---
+  const [isStockEntryModalOpen, setIsStockEntryModalOpen] = useState(false);
+  const [stockEntryData, setStockEntryData] = useState({
+    productId: "",
+    quantity: "",
+    reason: "",
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  const handleStockEntry = async () => {
+    if (!user) return;
+    if (!stockEntryData.productId || !stockEntryData.quantity) {
+      toast({ title: "Champs requis", description: "Sélectionnez un produit et une quantité.", variant: "destructive" });
+      return;
+    }
+    const qty = Number(stockEntryData.quantity);
+    if (qty <= 0) {
+      toast({ title: "Quantité invalide", description: "La quantité doit être supérieure à 0.", variant: "destructive" });
+      return;
+    }
+    try {
+      const ref = fsDoc(productsColRef(db, user.uid), stockEntryData.productId);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) throw new Error("Produit introuvable");
+      const current = snap.data() as Product;
+      await updateDoc(ref, { quantity: (current.quantity || 0) + qty, updatedAt: Date.now() });
+      setStockEntryData({ productId: "", quantity: "", reason: "", date: new Date().toISOString().split('T')[0] });
+      setIsStockEntryModalOpen(false);
+      toast({ title: "Stock ajouté", description: `${qty} unité(s) ajoutée(s) au stock.` });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erreur";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
+    }
+  };
+
+  // --- Export CSV ---
+  const handleExportCSV = () => {
+    const headers = ["Nom", "Catégorie", "Sous-catégorie", "SKU", "Prix", "Quantité", "Coût", "Description"];
+    const rows = filteredProducts.map(p => [
+      `"${(p.name || "").replace(/"/g, '""')}"`,
+      `"${(p.category || "").replace(/"/g, '""')}"`,
+      `"${(p.subCategory || "").replace(/"/g, '""')}"`,
+      `"${(p.sku || "").replace(/"/g, '""')}"`,
+      p.price,
+      p.quantity,
+      p.cost,
+      `"${(p.description || "").replace(/"/g, '""')}"`,
+    ]);
+    const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `stock_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Export réussi", description: `${filteredProducts.length} produit(s) exporté(s) en CSV.` });
+  };
+
   return (
     <div className="space-y-6" translate="no">
       {/* Header Stats */}
@@ -1359,6 +1489,37 @@ const StockPage = () => {
                 </DialogContent>
               </Dialog>
 
+              {/* Bouton Entrée de stock */}
+              <Button
+                variant="outline"
+                onClick={() => setIsStockEntryModalOpen(true)}
+                className="w-full sm:w-auto border-green-200 text-green-700 hover:bg-green-50"
+              >
+                <ArrowDown className="mr-2" size={18} />
+                Entrée
+              </Button>
+
+              {/* Bouton Sortie de stock */}
+              <Button
+                variant="outline"
+                onClick={() => setIsLossModalOpen(true)}
+                className="w-full sm:w-auto border-red-200 text-red-600 hover:bg-red-50"
+              >
+                <ArrowUp className="mr-2" size={18} />
+                Sortie
+              </Button>
+
+              {/* Bouton Export CSV */}
+              <Button
+                variant="outline"
+                onClick={handleExportCSV}
+                className="w-full sm:w-auto"
+                disabled={filteredProducts.length === 0}
+              >
+                <Download className="mr-2" size={18} />
+                Exporter
+              </Button>
+
               {/* Bouton Sécurité */}
               <Button
                 variant="outline"
@@ -1484,6 +1645,36 @@ const StockPage = () => {
                         <Icon size={32} />
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                {/* SKU et Sous-catégorie */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="sku" className="text-lg font-semibold mb-3 block text-center">SKU / Référence</Label>
+                    <Input
+                      id="sku"
+                      value={newProduct.sku}
+                      onChange={(e) => setNewProduct({ ...newProduct, sku: e.target.value })}
+                      className="w-full h-14 text-xl text-center font-semibold"
+                      placeholder="Ex: VET-001"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="subCategory" className="text-lg font-semibold mb-3 block text-center">Sous-catégorie</Label>
+                    <Select
+                      value={newProduct.subCategory}
+                      onValueChange={(value) => setNewProduct({ ...newProduct, subCategory: value })}
+                    >
+                      <SelectTrigger className="w-full h-14 text-lg text-center">
+                        <SelectValue placeholder="Aucune" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(subCategories[newProduct.category] || []).map(sub => (
+                          <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -1941,6 +2132,15 @@ const StockPage = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          onClick={() => handleDuplicateProduct(product)}
+                          className="text-green-600 hover:text-green-700 hover:bg-green-50 h-7 w-7 p-0"
+                          title="Dupliquer"
+                        >
+                          <Copy size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => handleDeleteProduct(product.id)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0"
                           title="Supprimer"
@@ -2166,6 +2366,80 @@ const StockPage = () => {
           </div>
         </DialogContent>
       </Dialog >
+
+      {/* Dialog pour Entrée de stock */}
+      <Dialog open={isStockEntryModalOpen} onOpenChange={setIsStockEntryModalOpen}>
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="pb-4">
+            <DialogTitle className="text-xl font-bold">Ajouter du stock</DialogTitle>
+            <DialogDescription className="text-base">
+              Sélectionnez le produit et la quantité à ajouter.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-6 py-4">
+            <div>
+              <Label htmlFor="entryProduct" className="text-sm font-medium mb-2 block">Produit concerné *</Label>
+              <Select
+                value={stockEntryData.productId}
+                onValueChange={(value) => setStockEntryData({ ...stockEntryData, productId: value })}
+              >
+                <SelectTrigger className="w-full h-11 text-base bg-background">
+                  <SelectValue placeholder="Sélectionner un produit" />
+                </SelectTrigger>
+                <SelectContent className="bg-background border shadow-lg z-50 max-h-60 overflow-y-auto">
+                  {products.map(product => (
+                    <SelectItem key={product.id} value={product.id} className="text-base py-3 cursor-pointer hover:bg-muted">
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{product.name}</span>
+                        <span className="text-sm text-muted-foreground">Stock actuel: {product.quantity}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="entryQuantity" className="text-sm font-medium mb-2 block">Quantité à ajouter *</Label>
+              <Input
+                id="entryQuantity"
+                type="number"
+                value={stockEntryData.quantity}
+                onChange={(e) => setStockEntryData({ ...stockEntryData, quantity: e.target.value })}
+                className="w-full h-11 text-base"
+                placeholder="Nombre d'unités à ajouter"
+                min="1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="entryDate" className="text-sm font-medium mb-2 block">Date</Label>
+              <Input
+                id="entryDate"
+                type="date"
+                value={stockEntryData.date}
+                onChange={(e) => setStockEntryData({ ...stockEntryData, date: e.target.value })}
+                className="w-full h-11 text-base"
+              />
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setIsStockEntryModalOpen(false)}
+              className="h-11 px-6 text-base"
+            >
+              Annuler
+            </Button>
+            <Button
+              onClick={handleStockEntry}
+              className="h-11 px-6 text-base font-medium bg-green-600 hover:bg-green-700 text-white"
+            >
+              Ajouter au stock
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Manager Auth Dialog (Optionnel) */}
       < Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen} >

@@ -31,6 +31,12 @@ export interface ProductDoc {
   foodCost?: FoodCost; // Module Food Cost pour produits alimentaires
   /** Si true, le produit apparaît sur le menu digital (menu du jour). Si aucun produit n'est coché, tous sont visibles. */
   showOnMenuDigital?: boolean;
+  // Champs boutique / commerce
+  sku?: string;
+  subCategory?: string;
+  brand?: string;
+  isPromotional?: boolean;
+  isFeatured?: boolean;
   createdAt: number;
   updatedAt: number;
 }

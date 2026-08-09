@@ -48,7 +48,6 @@ const Login = () => {
     try {
       await signInWithEmail(formData.email, formData.password);
       toast({ title: "Connexion réussie !", description: "Bienvenue sur NACK!" });
-      // La redirection est gérée par l'effet en fonction de isAdmin/profile
     } catch (error: unknown) {
       toast({
         title: "Erreur de connexion",

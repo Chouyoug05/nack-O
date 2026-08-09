@@ -5,53 +5,51 @@ export interface UserProfile {
   ownerName: string;
   email: string;
   phone: string;
-  whatsapp?: string; // Numéro WhatsApp obligatoire
+  whatsapp?: string;
   logoUrl?: string;
   logoDeleteToken?: string;
-  // Sécurité gérant
-  managerPinHash?: string; // SHA-256 hex of optional manager code (not account password)
-  // Abonnement
+  managerPinHash?: string;
   plan?: 'trial' | 'active' | 'expired' | 'free';
-  subscriptionType?: 'transition' | 'transition-pro-max'; // Type d'abonnement payant
-  trialEndsAt?: number; // epoch ms
-  subscriptionEndsAt?: number; // epoch ms
-  lastPaymentAt?: number; // epoch ms
-  // Gestion des événements (pour Pro Max)
-  eventsCount?: number; // Nombre d'événements créés dans la période
-  extraEventsBilled?: number; // Nombre d'événements supplémentaires facturés
-  eventsResetAt?: number; // Date de reset du compteur d'événements (début de période)
-  // Tutoriel
+  subscriptionType?: 'transition' | 'transition-pro-max';
+  trialEndsAt?: number;
+  subscriptionEndsAt?: number;
+  lastPaymentAt?: number;
+  eventsCount?: number;
+  extraEventsBilled?: number;
+  eventsResetAt?: number;
   tutorialCompleted?: boolean;
   tutorialStep?: 'stock' | 'first-product' | 'sales' | 'report' | 'security' | 'completed';
-  // Géolocalisation
   latitude?: number;
   longitude?: number;
-  address?: string; // Adresse formatée
-  locationAsked?: boolean; // Indique si on a déjà demandé la géolocalisation
-  // Personnalisation des tickets
-  companyName?: string; // Nom de la structure / Entreprise
-  rcsNumber?: string; // Numéro RCS
-  nifNumber?: string; // Numéro NIF
-  businessPhone?: string; // Numéro de téléphone professionnel
-  fullAddress?: string; // Adresse complète pour les tickets
-  customMessage?: string; // Message personnalisé (ex : "Merci pour votre confiance ❤️")
-  legalMentions?: string; // Mentions légales
-  // Paramètres avancés des tickets
-  ticketLogoUrl?: string; // Logo noir et blanc pour les tickets
-  showDeliveryMention?: boolean; // Afficher "LIVRAISON A DOMICILE"
-  showCSSMention?: boolean; // Afficher "C.S.S. X%"
-  cssPercentage?: number; // Pourcentage CSS (par défaut 1)
-  ticketFooterMessage?: string; // Message personnalisé en bas du ticket
-  // Paiement Menu Digital
-  airtelMoneyNumber?: string; // Numéro Airtel Money pour recevoir les paiements
-  disbursementId?: string; // Disbursement ID SingPay (configuré par l'admin)
-  disbursementStatus?: 'pending' | 'approved' | 'rejected'; // Statut du Disbursement ID
-  // Livraison
-  deliveryEnabled?: boolean; // Activer la livraison
-  deliveryPrice?: number; // Prix de livraison en XAF
-  fcmToken?: string; // Token pour les notifications push
-  // Affiliation (parrainage)
-  referredBy?: string; // Code affilié utilisé à l'inscription
+  address?: string;
+  locationAsked?: boolean;
+  companyName?: string;
+  rcsNumber?: string;
+  nifNumber?: string;
+  businessPhone?: string;
+  fullAddress?: string;
+  customMessage?: string;
+  legalMentions?: string;
+  ticketLogoUrl?: string;
+  showDeliveryMention?: boolean;
+  showCSSMention?: boolean;
+  cssPercentage?: number;
+  ticketFooterMessage?: string;
+  airtelMoneyNumber?: string;
+  disbursementId?: string;
+  disbursementStatus?: 'pending' | 'approved' | 'rejected';
+  deliveryEnabled?: boolean;
+  deliveryPrice?: number;
+  fcmToken?: string;
+  referredBy?: string;
+  // Multi-établissement
+  activeEstablishmentId?: string;
+  establishments?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    logoUrl?: string;
+  }>;
   createdAt: number;
   updatedAt: number;
 }

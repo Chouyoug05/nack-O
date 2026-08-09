@@ -71,8 +71,51 @@ try {
   }
 } catch { /* ignore */ }
 
-createRoot(document.getElementById("root")!).render(
-  <ErrorBoundary>
-    <App />
-  </ErrorBoundary>
-);
+// Handler global : afficher une erreur au lieu d'un écran blanc
+if (typeof window !== "undefined") {
+  window.onerror = function (msg, _src, _line, _col, error) {
+    console.error("[NACK] Global error:", msg, error);
+    var fb = document.getElementById("nack-fallback");
+    if (fb) {
+      fb.innerHTML =
+        '<div style="text-align:center;padding:1.5rem">' +
+        '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 1rem"><rect width="48" height="48" rx="12" fill="#dc2626"/><text x="24" y="32" text-anchor="middle" fill="white" font-size="24" font-weight="bold" font-family="sans-serif">N</text></svg>' +
+        '<h2 style="font-size:1.125rem;margin-bottom:0.5rem">Une erreur est survenue</h2>' +
+        '<p style="color:#666;font-size:0.875rem;margin-bottom:1rem">Essayez de recharger la page. Si le problème persiste, votre appareil est peut-être trop ancien.</p>' +
+        '<button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:#dc2626;color:white;border:none;border-radius:0.375rem;cursor:pointer;font-size:0.875rem">Recharger</button>' +
+        '</div>';
+    }
+    return false;
+  };
+
+  window.addEventListener("unhandledrejection", function (e) {
+    console.error("[NACK] Unhandled promise rejection:", e.reason);
+  });
+}
+
+try {
+  const rootEl = document.getElementById("root");
+  if (!rootEl) throw new Error("Root element not found");
+
+  // Supprimer le fallback une fois que React est prêt
+  const fallback = document.getElementById("nack-fallback");
+  if (fallback) fallback.remove();
+
+  createRoot(rootEl).render(
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+} catch (err) {
+  console.error("[NACK] Failed to mount React:", err);
+  var fb = document.getElementById("nack-fallback");
+  if (fb) {
+    fb.innerHTML =
+      '<div style="text-align:center;padding:1.5rem">' +
+      '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 1rem"><rect width="48" height="48" rx="12" fill="#dc2626"/><text x="24" y="32" text-anchor="middle" fill="white" font-size="24" font-weight="bold" font-family="sans-serif">N</text></svg>' +
+      '<h2 style="font-size:1.125rem;margin-bottom:0.5rem">Appareil non compatible</h2>' +
+      '<p style="color:#666;font-size:0.875rem;margin-bottom:1rem">Votre navigateur ne peut pas exécuter NACK. Veuillez utiliser un navigateur plus récent.</p>' +
+      '<button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:#dc2626;color:white;border:none;border-radius:0.375rem;cursor:pointer;font-size:0.875rem">Recharger</button>' +
+      '</div>';
+  }
+}

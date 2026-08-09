@@ -1,10 +1,61 @@
 import { collection, doc, type CollectionReference, type Firestore } from "firebase/firestore";
 
+// --- Profils utilisateur (legacy) ---
 export const profileDocRef = (db: Firestore, uid: string) => doc(db, "profiles", uid);
 
 export const profilesColRef = (db: Firestore): CollectionReference =>
   collection(db, "profiles") as CollectionReference;
 
+// --- Établissements (multi-établissement) ---
+export const establishmentsColRef = (db: Firestore): CollectionReference =>
+  collection(db, "establishments") as CollectionReference;
+
+export const establishmentDocRef = (db: Firestore, eid: string) =>
+  doc(db, "establishments", eid);
+
+export const estProductsColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "products") as CollectionReference;
+
+export const estSalesColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "sales") as CollectionReference;
+
+export const estLossesColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "losses") as CollectionReference;
+
+export const estEventsColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "events") as CollectionReference;
+
+export const estEventTicketsColRef = (db: Firestore, eid: string, eventId: string): CollectionReference =>
+  collection(db, "establishments", eid, "events", eventId, "tickets") as CollectionReference;
+
+export const estTeamColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "team") as CollectionReference;
+
+export const estOrdersColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "orders") as CollectionReference;
+
+export const estNotificationsColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "notifications") as CollectionReference;
+
+export const estPaymentsColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "payments") as CollectionReference;
+
+export const estReceiptsColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "receipts") as CollectionReference;
+
+export const estCustomersColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "customers") as CollectionReference;
+
+export const estLoyaltyConfigDocRef = (db: Firestore, eid: string) =>
+  doc(db, "establishments", eid, "config", "loyalty");
+
+export const estOrderCancellationsColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "orderCancellations") as CollectionReference;
+
+export const estBarOrdersColRef = (db: Firestore, eid: string): CollectionReference =>
+  collection(db, "establishments", eid, "barOrders") as CollectionReference;
+
+// --- Legacy helpers (profil utilisateur comme racine) ---
 export const productsColRef = (db: Firestore, uid: string): CollectionReference =>
   collection(db, "profiles", uid, "products") as CollectionReference;
 

@@ -13,6 +13,7 @@ import NackLogo from "@/components/NackLogo";
 import NotificationPanel from "@/components/NotificationPanel";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { getEstablishmentIcon, getEstablishmentLabel } from "@/constants/establishmentTypes";
 
 interface TabletSidebarProps {
   activeTab: string;
@@ -54,6 +55,12 @@ const TabletSidebar = ({ activeTab, onTabChange, onLogout }: TabletSidebarProps)
           </div>
         </div>
         <p className="text-sm text-muted-foreground">{establishmentName}</p>
+        {profile?.establishmentType && (
+          <div className="flex items-center gap-1.5 mt-1">
+            {(() => { const Icon = getEstablishmentIcon(profile.establishmentType!); return <Icon className="w-3.5 h-3.5 text-muted-foreground" />; })()}
+            <span className="text-xs text-muted-foreground">{getEstablishmentLabel(profile.establishmentType)}</span>
+          </div>
+        )}
       </div>
 
       {/* Navigation Buttons */}
@@ -97,7 +104,12 @@ const TabletSidebar = ({ activeTab, onTabChange, onLogout }: TabletSidebarProps)
             )}
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-foreground truncate">{ownerName}</p>
-              <p className="text-sm text-muted-foreground">Gérant • {establishmentName}</p>
+              <p className="text-sm text-muted-foreground">
+                Gérant • {establishmentName}
+                {profile?.establishmentType && (
+                  <span className="block text-xs text-muted-foreground/70">{getEstablishmentLabel(profile.establishmentType)}</span>
+                )}
+              </p>
             </div>
           </button>
           <Button 
