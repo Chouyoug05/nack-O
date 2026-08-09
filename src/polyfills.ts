@@ -26,6 +26,40 @@
 })();
 
 
+// ---------- structuredClone ----------
+// ES2022 — absent de Safari < 15.4 / iOS < 15.4 — utilisé par Firebase SDK
+(function () {
+  if (typeof (globalThis as any).structuredClone === 'function') return;
+
+  (globalThis as any).structuredClone = function structuredClone(value: any, options?: StructuredSerializeOptions): any {
+    if (value === null || typeof value !== 'object') return value;
+    if (value instanceof Date) return new Date(value.getTime());
+    if (value instanceof RegExp) return new RegExp(value.source, value.flags);
+    if (value instanceof Map) {
+      const m = new Map();
+      value.forEach(function (v: any, k: any) { m.set(structuredClone(k, options), structuredClone(v, options)); });
+      return m;
+    }
+    if (value instanceof Set) {
+      const s = new Set();
+      value.forEach(function (v: any) { s.add(structuredClone(v, options)); });
+      return s;
+    }
+    if (Array.isArray(value)) return value.map(function (v: any) { return structuredClone(v, options); });
+    if (typeof value === 'object') {
+      var result: any = {};
+      for (var key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          result[key] = structuredClone(value[key], options);
+        }
+      }
+      return result;
+    }
+    return value;
+  };
+})();
+
+
 // ---------- ResizeObserver ----------
 // Basé sur juggle/resize-observer-polyfill (MIT) — version simplifiée et compacte
 (function () {

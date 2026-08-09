@@ -116,6 +116,18 @@ const ensureFirstEstablishment = async (profile: UserProfile, dbInstance: typeof
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Safety net : forcer loading=false après 10s si Firebase Auth ne répond pas
+  // (évite l'écran blanc infini sur les anciens appareils)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) console.warn("[NACK] Auth loading timeout — forcing resolution");
+        return false;
+      });
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, []);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);

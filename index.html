@@ -76,9 +76,17 @@
         });
 
         window.addEventListener('load', function(){
+          // Ne supprimer le fallback QUE si React a monté (root a des enfants)
           clearTimeout(timeout);
-          var fb = document.getElementById('nack-fallback');
-          if(fb) setTimeout(function(){ fb.remove(); }, 500);
+          var root = document.getElementById('root');
+          if (root && root.children.length > 1) { // >1 car nack-fallback est le premier enfant
+            var fb = document.getElementById('nack-fallback');
+            if(fb) setTimeout(function(){ fb.remove(); }, 500);
+          } else {
+            // React n'a pas monté — afficher un message d'erreur
+            var fb2 = document.getElementById('nack-fallback');
+            if(fb2) fb2.innerHTML = '<div><svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 1rem"><rect width="48" height="48" rx="12" fill="#dc2626"/><text x="24" y="32" text-anchor="middle" fill="white" font-size="24" font-weight="bold" font-family="sans-serif">N</text></svg><h2 style="font-size:1.125rem;margin-bottom:0.5rem">Erreur de chargement</h2><p style="color:#666;font-size:0.875rem;margin-bottom:1rem">Votre navigateur ne peut pas exécuter NACK. Essayez de recharger ou utilisez un navigateur plus récent.</p><button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:#dc2626;color:white;border:none;border-radius:0.375rem;cursor:pointer;font-size:0.875rem">Recharger</button></div>';
+          }
         });
       })();
     </script>

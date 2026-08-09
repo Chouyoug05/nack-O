@@ -55,8 +55,14 @@ if (typeof window !== "undefined") {
 let db: Firestore;
 if (typeof window !== "undefined") {
   try {
+    // BroadcastChannel requis par persistentMultipleTabManager — absent de Safari < 14.1
+    const hasBroadcastChannel = typeof BroadcastChannel !== "undefined";
     db = initializeFirestore(app, {
-      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      localCache: persistentLocalCache(
+        hasBroadcastChannel
+          ? { tabManager: persistentMultipleTabManager() }
+          : {},
+      ),
     });
   } catch (_e) {
     db = getFirestore(app);
@@ -66,4 +72,17 @@ if (typeof window !== "undefined") {
 }
 export { db };
 export const storage: FirebaseStorage = getStorage(app);
-export const messaging: Messaging | undefined = typeof window !== "undefined" ? getMessaging(app) : undefined;
+
+// getMessaging peut crasher sur les navigateurs anciens (iOS 12, etc.)
+// qui ne supportent pas le Push API / ServiceWorker
+let messagingInstance: Messaging | undefined;
+if (typeof window !== "undefined") {
+  try {
+    if ("serviceWorker" in navigator && "PushManager" in window) {
+      messagingInstance = getMessaging(app);
+    }
+  } catch (_e) {
+    // Messaging indisponible — non bloquant
+  }
+}
+export const messaging = messagingInstance;
