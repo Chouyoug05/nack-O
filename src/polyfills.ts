@@ -206,21 +206,28 @@
 
 // ---------- MediaQueryList.addEventListener ----------
 // Safari < 14 : MediaQueryList n'hérite pas d'EventTarget — addListener() est la seule méthode
-// (sonner gère déjà ce cas avec un try/catch, mais on polyfill pour les autres cas potentiels)
+// Sur iOS 12, window.MediaQueryList peut être undefined (le constructeur n'est pas une globale).
+// On patche le prototype de l'objet retourné par matchMedia() pour garantir la compatibilité.
 (function () {
   if (typeof window === 'undefined') return;
-
-  // MediaQueryList est déjà un objet natif — on ne peut pas le remplacer
-  // mais on peut ajouter addEventListener/removeEventListener s'ils manquent
   if (typeof window.matchMedia === 'undefined') return;
 
   const test = window.matchMedia('(prefers-color-scheme: dark)');
   if (test && typeof test.addEventListener === 'function') return; // natif présent
 
-  // Fallback : polyfill addEventListener sur MediaQueryList.prototype
-  const proto = (window as any).MediaQueryList?.prototype;
+  // Essayer d'abord via le constructeur global
+  let proto: any = undefined;
+  try {
+    proto = (window as any).MediaQueryList && (window as any).MediaQueryList.prototype;
+  } catch { /* ignore */ }
+
+  // Fallback : obtenir le prototype depuis un objet matchMedia réel
+  if (!proto && test) {
+    proto = Object.getPrototypeOf(test);
+  }
+
   if (proto && typeof proto.addEventListener !== 'function') {
-    proto.addEventListener = function (type: string, listener: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions) {
+    proto.addEventListener = function (type: string, listener: EventListenerOrEventListenerObject) {
       if (type === 'change') {
         this.addListener(typeof listener === 'function' ? listener : listener.handleEvent);
       }
