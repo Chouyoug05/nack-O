@@ -130,8 +130,33 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html, body, #root {
+    height: 100%;
+  }
+
   body {
     @apply bg-background text-foreground;
+    margin: 0;
+    /* iOS PWA : l'app doit occuper tout l'écran (fallback 100vh pour iOS 12) */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+    overflow-x: hidden;
+  }
+
+  /* PWA standalone : éviter les barres de défilement / overscroll gênants */
+  @media all and (display-mode: standalone) {
+    html, body {
+      overscroll-behavior: none;
+      -webkit-touch-callout: none;
+    }
+  }
+
+  /* iPhone/iPad avec notch : utiliser la zone safe */
+  @supports (padding: env(safe-area-inset-top)) {
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
   }
 }
 

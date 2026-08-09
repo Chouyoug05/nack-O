@@ -3,7 +3,9 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
 // --- Offline / PWA cache (app shell) - ES5 compatible ---
-var APP_SHELL_CACHE = 'nack-app-shell-v1';
+// v2 : le nom de cache est incrémenté à chaque déploiement pour forcer
+// le re-téléchargement de l'app shell et éviter de servir une version cassée.
+var APP_SHELL_CACHE = 'nack-app-shell-v2';
 var APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -20,6 +22,16 @@ var APP_SHELL_URLS = [
   '/icons/icon-384x384.png',
   '/icons/icon-512x512.png'
 ];
+
+// Réponse réseau par défaut (error) pour fallback offline
+var NETWORK_ERROR_RESPONSE = Response.error();
+
+// Permettre au client d'activer immédiatement un nouveau SW (mise à jour PWA)
+self.addEventListener('message', function (event) {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', function (event) {
   event.waitUntil(
@@ -42,9 +54,12 @@ self.addEventListener('activate', function (event) {
   event.waitUntil(
     caches.keys()
       .then(function (keys) {
+        // Supprimer TOUS les caches d'app shell sauf le courant (v1, v2, etc.)
         return Promise.all(
           keys.map(function (k) {
-            return k === APP_SHELL_CACHE ? Promise.resolve() : caches.delete(k);
+            if (k === APP_SHELL_CACHE) return Promise.resolve();
+            if (k.indexOf('nack-app-shell-') === 0) return caches.delete(k);
+            return Promise.resolve();
           })
         );
       })
@@ -57,45 +72,57 @@ self.addEventListener('activate', function (event) {
   );
 });
 
-// Navigation: network-first avec fallback sur index.html cache (SPA offline)
+// Navigation: network-first. Le réseau est TOUJOURS prioritaire pour index.html
+// afin qu'une nouvelle version déployée soit servie immédiatement.
+// Le cache sert uniquement de fallback hors-ligne.
 function handleNavigation(request) {
   return fetch(request)
     .then(function (fresh) {
-      // Mettre à jour index.html dans le cache si possible
-      caches.open(APP_SHELL_CACHE).then(function (cache) {
-        cache.put('/index.html', fresh.clone());
-        cache.put('/', fresh.clone());
-      }).catch(function () {});
+      // Mettre à jour le cache index.html AVEC la réponse réseau (stale-while-revalidate)
+      if (fresh && fresh.ok) {
+        caches.open(APP_SHELL_CACHE).then(function (cache) {
+          cache.put('/index.html', fresh.clone());
+          cache.put('/', fresh.clone());
+        }).catch(function () {});
+      }
       return fresh;
     })
     .catch(function () {
       return caches.open(APP_SHELL_CACHE).then(function (cache) {
         return cache.match('/index.html').then(function (cached) {
           return cached || cache.match('/').then(function (cachedRoot) {
-            return cachedRoot || Response.error();
+            return cachedRoot || NETWORK_ERROR_RESPONSE;
           });
         });
       });
     });
 }
 
-// Assets: cache-first (js/css/images/fonts) pour pouvoir relancer l'app hors-ligne
+// Assets: stale-while-revalidate. On sert le cache immédiatement (rapide),
+// et on met à jour en arrière-plan pour la prochaine visite.
+// Les noms de fichiers Vite sont content-hashed : l'ancienne version est
+// toujours valide pour l'index.html qui la référence.
 function handleAsset(request) {
   return caches.open(APP_SHELL_CACHE).then(function (cache) {
     return cache.match(request).then(function (cached) {
-      if (cached) return cached;
-      return fetch(request).then(function (fresh) {
-        // Cache uniquement les réponses valides de même origine
+      // Récupérer la version fraîche en arrière-plan (pas bloquant)
+      var networkFetch = fetch(request).then(function (fresh) {
         try {
           var url = new URL(request.url);
-          if (url.origin === self.location.origin && fresh && fresh.ok) {
+          if (fresh && fresh.ok && url.origin === self.location.origin) {
             cache.put(request, fresh.clone());
           }
         } catch (e) { /* ignore */ }
         return fresh;
       }).catch(function () {
-        return cached || Response.error();
+        return cached || NETWORK_ERROR_RESPONSE;
       });
+
+      if (cached) {
+        // Sert le cache tout de suite, mais laisse le fetch réseau compléter
+        return cached;
+      }
+      return networkFetch;
     });
   });
 }

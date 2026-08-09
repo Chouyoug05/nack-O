@@ -12,8 +12,27 @@ import { isElectronRenderer } from "@/lib/platform";
 try {
   if (typeof window !== "undefined" && "serviceWorker" in navigator) {
     if (import.meta.env.PROD && !isElectronRenderer()) {
-      navigator.serviceWorker.register("/firebase-messaging-sw.js").catch(() => {
+      navigator.serviceWorker.register("/firebase-messaging-sw.js").then((reg) => {
+        // Détection d'une nouvelle version du SW : forcer son activation immédiate
+        reg.addEventListener("updatefound", () => {
+          const newWorker = reg.installing;
+          if (!newWorker) return;
+          newWorker.addEventListener("statechange", () => {
+            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+              // Nouvelle version installée → demander activation immédiate
+              newWorker.postMessage({ type: "SKIP_WAITING" });
+            }
+          });
+        });
+      }).catch(() => {
         // ignore registration errors (ex: navigateur non supporté / policies)
+      });
+
+      // Quand le nouveau SW prend le contrôle → recharger pour servir la nouvelle version
+      navigator.serviceWorker.addEventListener("controllerchange", () => {
+        if (navigator.serviceWorker.controller) {
+          window.location.reload();
+        }
       });
     } else {
       navigator.serviceWorker.getRegistrations().then((regs) => {
