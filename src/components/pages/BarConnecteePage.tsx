@@ -25,8 +25,10 @@ import {
   CreditCard
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { isFoodBusiness as _isFoodBusiness, isBoutique as _isBoutique, isServiceBusiness as _isServiceBusiness } from "@/constants/establishmentTypes";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
+import { clipboardCopy } from "@/lib/clipboard";
 import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch, deleteDoc, updateDoc } from "firebase/firestore";
 import QRCode from "qrcode";
 import QRScanner from "@/components/QRScanner";
@@ -83,6 +85,10 @@ interface BarConnecteePageProps {
 const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: externalActiveTab, onTabChange: externalOnTabChange }) => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const isFoodBusiness = _isFoodBusiness(profile?.establishmentType);
+  const isBoutique = _isBoutique(profile?.establishmentType);
+  const isServiceBusiness = _isServiceBusiness(profile?.establishmentType);
+  const isSimpleBusiness = !isFoodBusiness;
   // State local pour gérer les onglets si pas fourni en props
   const [localActiveTab, setLocalActiveTab] = useState<string>("qr-code");
 
@@ -148,34 +154,50 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       const q = query(ordersRef, orderBy('createdAt', 'desc'));
       const unsubscribeOrders = onSnapshot(q, (snapshot) => {
         try {
+          // Gérer les changements (notifications et auto-correction)
+          snapshot.docChanges().forEach((change) => {
+            const data = change.doc.data();
+            
+            // Auto-correction : on le fait une seule fois quand le doc est ajouté ou modifié
+            if (
+              (change.type === 'added' || change.type === 'modified') &&
+              data.status === 'paid' && 
+              !data.isDelivery && 
+              data.tableZone && 
+              data.tableZone !== 'Livraison'
+            ) {
+              updateDoc(change.doc.ref, { status: 'pending' }).catch(err => console.error('Erreur correction statut commande:', err));
+            }
+
+            // Notifications pour les nouvelles commandes uniquement
+            if (change.type === 'added') {
+              const isPending = data.status === 'pending' || (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison');
+              if (isPending && data.createdAt > (Date.now() - 60000)) {
+                addDoc(notificationsColRef(db, user.uid), {
+                  title: "Nouvelle commande Menu Digital",
+                  message: `Commande #${data.orderNumber} - ${data.tableZone} - ${(data.total || 0).toLocaleString('fr-FR', { useGrouping: false })} XAF`,
+                  type: "info",
+                  createdAt: Date.now(),
+                  read: false,
+                }).catch(error => console.error('Erreur création notification:', error));
+              }
+            }
+          });
+
+          // Mettre à jour le state
           const ordersData = snapshot.docs
             .map(doc => {
               const data = doc.data();
               if (!doc.id) return null;
+              
               if (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison') {
-                updateDoc(doc.ref, { status: 'pending' }).catch(err => console.error('Erreur correction statut commande:', err));
                 return { id: doc.id, ...data, status: 'pending' } as BarOrder;
               }
+              
               return { id: doc.id, ...data } as BarOrder;
             })
             .filter((order): order is BarOrder => order !== null && !!order.id);
 
-          const newOrders = ordersData.filter(order =>
-            order.status === 'pending' && order.createdAt > (Date.now() - 60000)
-          );
-          newOrders.forEach(async (order) => {
-            try {
-              await addDoc(notificationsColRef(db, user.uid), {
-                title: "Nouvelle commande Menu Digital",
-                message: `Commande #${order.orderNumber} - ${order.tableZone} - ${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF`,
-                type: "info",
-                createdAt: Date.now(),
-                read: false,
-              });
-            } catch (error) {
-              console.error('Erreur création notification:', error);
-            }
-          });
           setOrders(ordersData);
         } catch (error) {
           console.error('Erreur traitement commandes:', error);
@@ -780,7 +802,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               }
             }}
           >
-            Menu Digital
+            {isFoodBusiness ? "Menu Digital" : "Catalogue Connecté"}
           </h2>
           <p className="text-sm text-muted-foreground">Gérez les commandes QR de vos clients</p>
         </div>
@@ -796,6 +818,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           <QrCode className="w-4 h-4 mr-2" />
           QR Code
         </Button>
+        {isFoodBusiness && (
         <Button
           variant={activeTab === "tables" ? "default" : "outline"}
           onClick={() => handleTabChange("tables")}
@@ -804,6 +827,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           <Table className="w-4 h-4 mr-2" />
           Tables & Zones
         </Button>
+        )}
+        {isFoodBusiness && (
         <Button
           variant={activeTab === "orders" ? "default" : "outline"}
           onClick={() => handleTabChange("orders")}
@@ -812,6 +837,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           <ShoppingCart className="w-4 h-4 mr-2" />
           Commandes
         </Button>
+        )}
+        {isFoodBusiness && (
         <Button
           variant={activeTab === "scanner" ? "default" : "outline"}
           onClick={() => handleTabChange("scanner")}
@@ -820,6 +847,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           <QrCode className="w-4 h-4 mr-2" />
           Scanner
         </Button>
+        )}
         <Button
           variant={activeTab === "settings" ? "default" : "outline"}
           onClick={() => handleTabChange("settings")}
@@ -866,7 +894,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                       Télécharger
                     </Button>
                     <Button variant="outline" onClick={() => {
-                      navigator.clipboard.writeText(getPublicUrl());
+                      clipboardCopy(getPublicUrl());
                       toast({ title: "URL copiée !", description: "L'URL publique a été copiée dans le presse-papiers." });
                     }}>
                       <Copy className="w-4 h-4 mr-2" />
@@ -883,8 +911,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                 <div className="text-center py-8">
                   <QrCode className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
                   <h3 className="text-lg font-semibold mb-2">Générer votre QR Code</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Créez un QR Code unique pour permettre à vos clients de commander directement.
+                    <p className="text-muted-foreground mb-4">
+                    Créez un QR Code unique pour permettre à vos clients de découvrir votre {isFoodBusiness ? "menu" : "catalogue"}.
                   </p>
                   <Button onClick={generateQRCode} disabled={isGeneratingQR}>
                     {isGeneratingQR ? "Génération..." : "Générer QR Code"}
@@ -899,10 +927,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="w-5 h-5" />
-                Produits disponibles pour commande
+                {isFoodBusiness ? "Produits disponibles pour commande" : "Vos produits et services"}
               </CardTitle>
               <CardDescription>
-                Ces produits seront visibles par vos clients lorsqu'ils scannent le QR Code
+                {isFoodBusiness ? "Ces produits seront visibles par vos clients lorsqu'ils scannent le QR Code" : "Vos clients verront ce catalogue en scannant le QR Code"}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -944,9 +972,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                         <p className="text-sm text-muted-foreground">
                           Prix: {product.price?.toLocaleString('fr-FR', { useGrouping: false })} XAF
                         </p>
+                        {!isServiceBusiness && (
                         <p className="text-sm text-muted-foreground">
                           Stock: {(product.quantity || product.stock || 0)} unités
                         </p>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1631,6 +1661,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                   )}
                 </div>
               </div>
+            </CardContent>
             </Card>
           </FeatureGate>
         </div>

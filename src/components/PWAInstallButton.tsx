@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Download, X } from "lucide-react";
+import { Download, X, Share, Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { isElectronRenderer } from "@/lib/platform";
 
@@ -13,6 +13,17 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as { standalone?: boolean }).standalone === true;
+}
+
 const PWAInstallButton = () => {
   const isElectron = isElectronRenderer();
 
@@ -23,17 +34,15 @@ const PWAInstallButton = () => {
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       try {
-        const alreadyInstalled = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as { standalone?: boolean }).standalone;
+        const alreadyInstalled = isStandalone();
         const dismissed = localStorage.getItem('pwa-install-dismissed') === 'true';
-        // Ne bloquer l'infobar que si on veut réellement afficher notre bannière custom
         if (!alreadyInstalled && !dismissed) {
           e.preventDefault();
           setDeferredPrompt(e as BeforeInstallPromptEvent);
           setShowInstallBanner(true);
         }
-        // Sinon: laisser Chrome gérer (pas de preventDefault) pour éviter l’avertissement
       } catch {
-        // En cas d'erreur d'accès storage, fallback au comportement par défaut (ne rien faire)
+        // En cas d'erreur d'accès storage, fallback au comportement par défaut
       }
     };
 
@@ -43,8 +52,7 @@ const PWAInstallButton = () => {
       setShowInstallBanner(false);
     };
 
-    // Check if app is already installed
-    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as { standalone?: boolean }).standalone) {
+    if (isStandalone()) {
       setIsInstalled(true);
     }
 
@@ -60,10 +68,8 @@ const PWAInstallButton = () => {
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
 
-    // Show the install prompt
     deferredPrompt.prompt();
 
-    // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
     
     if (outcome === 'accepted') {
@@ -73,17 +79,19 @@ const PWAInstallButton = () => {
       console.log('User dismissed the install prompt');
     }
 
-    // Clear the deferredPrompt variable
     setDeferredPrompt(null);
   };
 
   const dismissBanner = () => {
     setShowInstallBanner(false);
-    // Store in localStorage to remember user dismissed it
-    localStorage.setItem('pwa-install-dismissed', 'true');
+    try {
+      localStorage.setItem('pwa-install-dismissed', 'true');
+    } catch {
+      // ignore
+    }
   };
 
-  // Don't show if already installed or user dismissed
+  // Vérifier si déjà dismissé
   const dismissed = typeof window !== 'undefined' ? (() => {
     try {
       return localStorage.getItem('pwa-install-dismissed');
@@ -92,7 +100,68 @@ const PWAInstallButton = () => {
     }
   })() : null;
 
-  if (isElectron || isInstalled || !showInstallBanner || dismissed) {
+  if (isElectron || isInstalled || dismissed) {
+    return null;
+  }
+
+  // iOS Safari : pas de beforeinstallprompt → afficher instructions manuelles
+  const showIOSInstructions = isIOS() && !isStandalone() && !deferredPrompt;
+  if (showIOSInstructions && !dismissed) {
+    return (
+      <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-80">
+        <Card className="shadow-lg border-2 border-nack-red/20 bg-gradient-to-r from-white to-nack-beige-light">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-gradient-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                <Download className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-sm text-foreground mb-1">
+                  Installer NACK
+                </h3>
+                <p className="text-xs text-muted-foreground mb-2">
+                  Ajoutez NACK à l'écran d'accueil pour un accès rapide
+                </p>
+                <div className="bg-blue-50 rounded-lg p-2.5 mb-3 space-y-1.5">
+                  <div className="flex items-center gap-2 text-xs text-blue-800">
+                    <span className="font-bold text-blue-600">1.</span>
+                    <span>Appuyez sur l'icône <Share className="w-3 h-3 inline" /> de partage en bas</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-blue-800">
+                    <span className="font-bold text-blue-600">2.</span>
+                    <span>Sélectionnez « Sur l'écran d'accueil » <Plus className="w-3 h-3 inline" /></span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-blue-800">
+                    <span className="font-bold text-blue-600">3.</span>
+                    <span>Appuyez sur « Ajouter »</span>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={dismissBanner}
+                  className="text-xs h-8 hover:bg-red-50 hover:text-red-600"
+                >
+                  Plus tard
+                </Button>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={dismissBanner}
+                className="h-6 w-6 hover:bg-red-50 hover:text-red-600 flex-shrink-0"
+              >
+                <X className="w-3 h-3" />
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Navigation normale (Android/Chrome) — bannière classique avec beforeinstallprompt
+  if (!showInstallBanner || !deferredPrompt) {
     return null;
   }
 

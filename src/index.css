@@ -164,3 +164,21 @@ All colors MUST be HSL.
     line-height: 1.2 !important;
   }
 }
+
+/* Fallback pour backdrop-filter sur les anciens Safari/iOS (pas de support sans -webkit-) */
+@supports not ((-webkit-backdrop-filter: blur(0)) or (backdrop-filter: blur(0))) {
+  .backdrop-blur-sm,
+  .backdrop-blur,
+  .backdrop-blur-md,
+  .backdrop-blur-lg {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: rgba(255, 255, 255, 0.85);
+  }
+  .dark .backdrop-blur-sm,
+  .dark .backdrop-blur,
+  .dark .backdrop-blur-md,
+  .dark .backdrop-blur-lg {
+    background-color: rgba(0, 0, 0, 0.85);
+  }
+}

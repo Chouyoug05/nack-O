@@ -40,6 +40,7 @@ import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { generateEventTicket } from "@/utils/ticketGenerator";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
+import { clipboardCopy } from "@/lib/clipboard";
 
 type NewEventPayload = {
   title: string;
@@ -355,7 +356,7 @@ const EventsPage = () => {
   };
 
   const handleCopyLink = (link: string) => {
-    navigator.clipboard.writeText(link);
+    clipboardCopy(link);
     toast({ title: "Lien copié", description: "Le lien de partage a été copié dans le presse-papiers" });
   };
 

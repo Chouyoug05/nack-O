@@ -12,6 +12,7 @@ import { Building2, QrCode, Users, Loader2, Copy, Wallet, CheckCircle2, AlertCir
 import NackLogo from "@/components/NackLogo";
 import QRCode from "qrcode";
 import { Badge } from "@/components/ui/badge";
+import { clipboardCopy } from "@/lib/clipboard";
 
 const baseUrl = typeof window !== "undefined" ? `${window.location.origin}${(import.meta.env?.BASE_URL || "").replace(/\/$/, "")}` : "";
 
@@ -388,7 +389,7 @@ const AffiliateDashboard = () => {
                   size="icon"
                   title="Copier le lien"
                   onClick={() => {
-                    navigator.clipboard.writeText(registerUrl);
+                    clipboardCopy(registerUrl);
                   }}
                 >
                   <Copy size={16} />

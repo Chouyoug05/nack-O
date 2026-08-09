@@ -28,6 +28,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { teamColRef, agentTokensTopColRef, profileDocRef } from "@/lib/collections";
 import { addDoc, deleteDoc, doc as fsDoc, onSnapshot, updateDoc, setDoc, doc, getDoc } from "firebase/firestore";
 import type { TeamMemberDoc, TeamRole } from "@/types/team";
+import { clipboardCopy } from "@/lib/clipboard";
 import { useNavigate } from "react-router-dom";
 
 interface TeamMember {
@@ -333,7 +334,7 @@ const TeamPage = () => {
       // Copier le lien dans le presse-papier
       const fullLink = `${window.location.origin}${dashboardLink}`;
       try {
-        await navigator.clipboard.writeText(fullLink);
+        await clipboardCopy(fullLink);
       } catch (clipboardError) {
         console.error('Erreur lors de la copie dans le presse-papier:', clipboardError);
         // Ne pas bloquer si la copie échoue
@@ -371,7 +372,7 @@ const TeamPage = () => {
 
   const copyDashboardLink = (link: string, name: string) => {
     const fullLink = `${window.location.origin}${link}`;
-    navigator.clipboard.writeText(fullLink);
+    clipboardCopy(fullLink);
     toast({
       title: "Lien copié",
       description: `Le lien d'accès de ${name} a été copié dans le presse-papier`,
@@ -487,7 +488,7 @@ const TeamPage = () => {
       });
       const full = `${window.location.origin}${newLink}`;
       try {
-        await navigator.clipboard.writeText(full);
+        await clipboardCopy(full);
       } catch (clipboardError) {
         console.error('Erreur lors de la copie dans le presse-papier:', clipboardError);
       }
@@ -1032,7 +1033,7 @@ const TeamPage = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(selectedMember.agentCode || '');
+                        clipboardCopy(selectedMember.agentCode || '');
                         toast({ title: "Code copié", description: "Le code d'agent a été copié" });
                       }}
                       className="w-full"
@@ -1054,7 +1055,7 @@ const TeamPage = () => {
                       size="sm"
                       onClick={() => {
                         const fullLink = `${window.location.origin}${selectedMember.dashboardLink}`;
-                        navigator.clipboard.writeText(fullLink);
+                        clipboardCopy(fullLink);
                         toast({ title: "Lien copié", description: "Le lien a été copié" });
                       }}
                       className="w-full"

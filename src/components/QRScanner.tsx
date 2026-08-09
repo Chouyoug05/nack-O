@@ -3,6 +3,7 @@ import { Html5QrcodeScanner, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -58,6 +59,17 @@ const QRScanner: React.FC = () => {
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string>('');
+  const [manualCode, setManualCode] = useState('');
+  const [cameraAvailable, setCameraAvailable] = useState<boolean | null>(null);
+
+  // Vérifier la disponibilité de la caméra
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+      setCameraAvailable(true);
+    } else {
+      setCameraAvailable(false);
+    }
+  }, []);
 
   // Nettoyage du scanner au démontage (doit être appelé inconditionnellement)
   useEffect(() => {
@@ -355,12 +367,43 @@ const QRScanner: React.FC = () => {
               <QrCode className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Prêt à scanner</h3>
               <p className="text-muted-foreground mb-4">
-                Cliquez sur le bouton ci-dessous pour démarrer le scanner QR Code
+                {cameraAvailable !== false
+                  ? "Cliquez sur le bouton ci-dessous pour démarrer le scanner QR Code"
+                  : "La caméra n'est pas disponible. Vous pouvez saisir le code manuellement."
+                }
               </p>
-              <Button onClick={startScanner} className="w-full sm:w-auto">
-                <QrCode className="w-4 h-4 mr-2" />
-                Démarrer le scanner
-              </Button>
+              {cameraAvailable !== false && (
+                <Button onClick={startScanner} className="w-full sm:w-auto mb-4">
+                  <QrCode className="w-4 h-4 mr-2" />
+                  Démarrer le scanner
+                </Button>
+              )}
+              {/* Saisie manuelle du code QR (fallback si caméra indisponible) */}
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-muted-foreground mb-2">Saisie manuelle du code</p>
+                <div className="flex gap-2 max-w-sm mx-auto">
+                  <Input
+                    type="text"
+                    placeholder='Coller le contenu du QR Code (JSON)'
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!manualCode.trim()}
+                    onClick={() => {
+                      if (manualCode.trim()) {
+                        handleScannedCode(manualCode.trim());
+                        setManualCode('');
+                      }
+                    }}
+                  >
+                    Valider
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">

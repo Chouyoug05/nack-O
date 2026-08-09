@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SUBSCRIPTION_PLANS, AFFILIATE_COMMISSION_STANDARD, AFFILIATE_COMMISSION_PRO, type SubscriptionFeatures } from "@/utils/subscription";
+import { clipboardCopy } from "@/lib/clipboard";
 import {
   exportUsersPdf,
   exportUsersCsv,
@@ -1654,7 +1655,7 @@ const AdminDashboard = () => {
 
   const copyReminderMessage = (p: UserProfile) => {
     const msg = getReminderMessage(p);
-    navigator.clipboard.writeText(msg).then(() => {
+    clipboardCopy(msg).then(() => {
       toast({ title: "Message copié", description: "Le rappel est prêt à être envoyé." });
     });
   };
