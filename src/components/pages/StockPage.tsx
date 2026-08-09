@@ -56,6 +56,8 @@ import type { UserProfile } from "@/types/profile";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
 import { searchGoogleImages } from "@/utils/productImageSearch";
+import { sha256Hex } from "@/lib/sha256";
+import DialogErrorBoundary from "@/components/DialogErrorBoundary";
 
 interface Product {
   id: string;
@@ -268,12 +270,7 @@ const StockPage = () => {
     setIsManagerAuthOpen(true);
   };
 
-  const digestSha256Hex = async (text: string): Promise<string> => {
-    const data = new TextEncoder().encode(text);
-    const buf = await crypto.subtle.digest('SHA-256', data);
-    const bytes = Array.from(new Uint8Array(buf));
-    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
+  const digestSha256Hex = (text: string) => sha256Hex(text);
 
   const submitManagerAuth = async () => {
     if (!profile?.managerPinHash) {
@@ -306,12 +303,7 @@ const StockPage = () => {
   const [newCode, setNewCode] = useState("");
   const [confirmCode, setConfirmCode] = useState("");
   const [isSavingCode, setIsSavingCode] = useState(false);
-  const digestSha256HexLocal = async (text: string): Promise<string> => {
-    const data = new TextEncoder().encode(text);
-    const buf = await crypto.subtle.digest('SHA-256', data);
-    const bytes = Array.from(new Uint8Array(buf));
-    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
+  const digestSha256HexLocal = (text: string) => sha256Hex(text);
   const handleSaveSecurityCode = async () => {
     try {
       if (!newCode || !confirmCode) {
@@ -2451,16 +2443,18 @@ const StockPage = () => {
               Ce code n’est <strong>pas</strong> votre mot de passe de compte. Il est <strong>optionnel</strong> et utile si vous partagez le compte gérant.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label htmlFor="mgr-code">Code gérant</Label>
-            <Input id="mgr-code" type="password" value={managerCode} onChange={(e) => setManagerCode(e.target.value)} />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)}>Annuler</Button>
-            <Button onClick={submitManagerAuth} disabled={isAuthChecking} className="bg-gradient-primary text-white">
-              {isAuthChecking ? 'Vérification…' : 'Vérifier'}
-            </Button>
-          </div>
+          <DialogErrorBoundary onClose={() => setIsManagerAuthOpen(false)}>
+            <div className="space-y-3 py-2">
+              <Label htmlFor="mgr-code">Code gérant</Label>
+              <Input id="mgr-code" type="password" value={managerCode} onChange={(e) => setManagerCode(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)}>Annuler</Button>
+              <Button onClick={submitManagerAuth} disabled={isAuthChecking} className="bg-gradient-primary text-white">
+                {isAuthChecking ? 'Vérification…' : 'Vérifier'}
+              </Button>
+            </div>
+          </DialogErrorBoundary>
         </DialogContent>
       </Dialog >
 

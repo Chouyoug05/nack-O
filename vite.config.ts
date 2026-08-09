@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
+import legacy from "@vitejs/plugin-legacy";
 import path from "path";
 import fs from "fs";
 import { componentTagger } from "lovable-tagger";
@@ -36,6 +37,15 @@ export default defineConfig(({ mode }) => {
     },
     plugins: [
       react(),
+      // Bundle legacy pour les très vieux navigateurs (iPad 3 / iOS 9, etc.)
+      // Génère un bundle nomodule transpilé + injecte les polyfills core-js automatiquement
+      legacy({
+        targets: ["ios >= 9"],
+        modernTargets: ["ios >= 12.2", "chrome >= 63"],
+        additionalLegacyPolyfills: ["regenerator-runtime/runtime"],
+        modernPolyfills: true,
+        renderLegacyChunks: true,
+      }),
       mode === "development" && componentTagger(),
       spa404Plugin(),
     ].filter(Boolean),

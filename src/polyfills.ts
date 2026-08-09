@@ -7,6 +7,40 @@
  * - MediaQueryList.addEventListener : absent de Safari < 14 — sonner utilise addListener en fallback
  */
 
+// ---------- Détection navigateur hérité ----------
+// Doit être exécuté AVANT tout polyfill pour capturer l'état natif réel.
+// Sur les vieux navigateurs (iOS 9, Safari < 11), on désactivera le Service Worker
+// PWA pour éviter qu'il mette en cache une version cassée.
+(function () {
+  if (typeof window === 'undefined') return;
+
+  let legacy = false;
+
+  // 1. Absence native de Promise.allSettled (ES2020) → navigateur < Safari 13
+  if (typeof Promise === 'undefined' || typeof Promise.allSettled !== 'function') {
+    legacy = true;
+  }
+
+  // 2. Versions iOS / Safari très anciennes détectées via User-Agent
+  if (!legacy && typeof navigator !== 'undefined') {
+    const ua = navigator.userAgent || '';
+    // iOS: "iPhone OS 9_3" / "CPU OS 9_3" / "CPU iPhone OS 12_1"
+    const iosMatch = ua.match(/OS (\d+)[_.\d]*/i);
+    if (iosMatch) {
+      const iosMajor = parseInt(iosMatch[1], 10);
+      if (iosMajor < 11) legacy = true; // iOS < 11 → pas de SW fiable
+    }
+    // Safari desktop < 11
+    const safariMatch = ua.match(/Version\/(\d+)/);
+    if (safariMatch && /Safari/.test(ua) && !/Chrome/.test(ua) && !/CriOS/.test(ua)) {
+      const safariMajor = parseInt(safariMatch[1], 10);
+      if (safariMajor < 11) legacy = true;
+    }
+  }
+
+  (window as any).__NACK_LEGACY_BROWSER__ = legacy;
+})();
+
 // ---------- Promise.allSettled ----------
 // ES2020 — absent de Safari < 13 / iOS < 13 — utilisé par recharts
 (function () {

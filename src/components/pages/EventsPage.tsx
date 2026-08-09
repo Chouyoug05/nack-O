@@ -41,7 +41,8 @@ import { generateEventTicket } from "@/utils/ticketGenerator";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 import { clipboardCopy } from "@/lib/clipboard";
-
+import { sha256Hex } from "@/lib/sha256";
+import DialogErrorBoundary from "@/components/DialogErrorBoundary";
 type NewEventPayload = {
   title: string;
   description: string;
@@ -439,12 +440,7 @@ const EventsPage = () => {
     setIsManagerAuthOpen(true);
   };
 
-  const digestSha256Hex = async (text: string): Promise<string> => {
-    const data = new TextEncoder().encode(text);
-    const buf = await crypto.subtle.digest('SHA-256', data);
-    const bytes = Array.from(new Uint8Array(buf));
-    return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
-  };
+  const digestSha256Hex = (text: string) => sha256Hex(text);
 
   const submitManagerAuth = async () => {
     if (!profile?.managerPinHash) {
@@ -1135,42 +1131,44 @@ const EventsPage = () => {
               Veuillez saisir votre code de sécurité pour autoriser cette action.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="manager-pin">Code de sécurité</Label>
-              <div className="relative">
-                <Input
-                  id="manager-pin"
-                  type={showPin ? "text" : "password"}
-                  value={managerCode}
-                  onChange={(e) => setManagerCode(e.target.value)}
-                  placeholder="Saisissez votre code..."
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && submitManagerAuth()}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPin(!showPin)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+          <DialogErrorBoundary onClose={() => setIsManagerAuthOpen(false)}>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="manager-pin">Code de sécurité</Label>
+                <div className="relative">
+                  <Input
+                    id="manager-pin"
+                    type={showPin ? "text" : "password"}
+                    value={managerCode}
+                    onChange={(e) => setManagerCode(e.target.value)}
+                    placeholder="Saisissez votre code..."
+                    autoFocus
+                    onKeyDown={(e) => e.key === 'Enter' && submitManagerAuth()}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin(!showPin)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)} disabled={isAuthChecking}>
-              Annuler
-            </Button>
-            <Button onClick={submitManagerAuth} disabled={isAuthChecking || !managerCode} className="bg-nack-red text-white">
-              {isAuthChecking ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Vérification...
-                </>
-              ) : "Valider"}
-            </Button>
-          </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)} disabled={isAuthChecking}>
+                Annuler
+              </Button>
+              <Button onClick={submitManagerAuth} disabled={isAuthChecking || !managerCode} className="bg-nack-red text-white">
+                {isAuthChecking ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Vérification...
+                  </>
+                ) : "Valider"}
+              </Button>
+            </div>
+          </DialogErrorBoundary>
         </DialogContent>
       </Dialog>
     </div>

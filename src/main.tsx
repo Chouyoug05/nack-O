@@ -9,9 +9,15 @@ import { isElectronRenderer } from "@/lib/platform";
 // Service worker (PWA + offline + notifications)
 // En production on enregistre le SW principal. En dev, on évite de garder un SW
 // qui peut mettre le serveur vite en cache.
+// Sur les navigateurs hérités (iOS < 11, Safari < 11), on désactive le SW PWA
+// pour éviter qu'il mette en cache une version cassée.
 try {
+  const isLegacyBrowser = typeof (window as any).__NACK_LEGACY_BROWSER__ === "boolean"
+    ? (window as any).__NACK_LEGACY_BROWSER__
+    : false;
+
   if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-    if (import.meta.env.PROD && !isElectronRenderer()) {
+    if (import.meta.env.PROD && !isElectronRenderer() && !isLegacyBrowser) {
       navigator.serviceWorker.register("/firebase-messaging-sw.js").then((reg) => {
         // Détection d'une nouvelle version du SW : forcer son activation immédiate
         reg.addEventListener("updatefound", () => {
@@ -35,6 +41,7 @@ try {
         }
       });
     } else {
+      // Dev, Electron, ou navigateur hérité : désenregistrer tout SW pour éviter le cache
       navigator.serviceWorker.getRegistrations().then((regs) => {
         regs.forEach((r) => {
           try { r.unregister(); } catch { /* ignore */ }
