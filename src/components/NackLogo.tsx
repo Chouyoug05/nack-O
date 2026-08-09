@@ -14,8 +14,14 @@ interface NackLogoProps {
   variant?: "nack" | "affiliate";
 }
 
+// Le logo principal est un gros SVG (filtres + PNG embarqué) qui peut être lent ou
+// échouer sur les vieux WebKit (iPad 3 / iOS 9). On bascule sur le PNG des icônes en fallback.
+const LOGO_SRC = publicAssetUrl("Design sans titre.svg");
+const LOGO_FALLBACK_SRC = publicAssetUrl("icons/icon-192x192.png");
+
 const NackLogo = ({ className, size = "md", showAdminButton = true, pulse = false, variant = "nack" }: NackLogoProps) => {
   const [showAdminAccess, setShowAdminAccess] = useState(false);
+  const [imgError, setImgError] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -34,10 +40,14 @@ const NackLogo = ({ className, size = "md", showAdminButton = true, pulse = fals
     }
   };
 
+  const src = imgError
+    ? LOGO_FALLBACK_SRC
+    : (variant === "affiliate" ? publicAssetUrl("Design sans titre12.svg") : LOGO_SRC);
+
   return (
     <div className={cn("relative flex items-center justify-center", className)}>
       <img
-        src={variant === "affiliate" ? publicAssetUrl("Design sans titre12.svg") : publicAssetUrl("Design sans titre.svg")}
+        src={src}
         alt="nack! logo"
         className={cn(
           "object-contain animate-fade-in cursor-pointer",
@@ -46,6 +56,7 @@ const NackLogo = ({ className, size = "md", showAdminButton = true, pulse = fals
           className
         )}
         onDoubleClick={handleDoubleClick}
+        onError={() => setImgError(true)}
         title={showAdminButton ? "Double-cliquez pour accès admin" : undefined}
       />
 

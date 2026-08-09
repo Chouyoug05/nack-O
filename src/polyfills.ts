@@ -39,6 +39,14 @@
   }
 
   (window as any).__NACK_LEGACY_BROWSER__ = legacy;
+
+  // Marqueur CSS : permet de désactiver les animations/effets GPU lourds
+  // sur les appareils très anciens (ex: iPad 3 / iOS 9).
+  if (legacy && typeof document !== 'undefined' && document.documentElement) {
+    try {
+      document.documentElement.className += ' legacy-browser';
+    } catch { /* ignore */ }
+  }
 })();
 
 // ---------- Promise.allSettled ----------
@@ -324,5 +332,67 @@
         this.removeListener(typeof listener === 'function' ? listener : listener.handleEvent);
       }
     };
+  }
+})();
+
+
+// ---------- Évènements tactiles (300ms delay fix) ----------
+// iOS 9 inflige un délai de ~300ms entre le tap et l'évènement click, ce qui donne
+// l'impression que l'UI est gelée / que les boutons "Annuler" ne répondent pas.
+// On supprime ce délai en déclenchant un click immédiat sur touchend (style FastClick),
+// en veillant à ne pas générer de double-click (ghost click).
+(function () {
+  if (typeof window === 'undefined') return;
+  if (typeof document === 'undefined') return;
+  if (!('ontouchstart' in window)) return; // pas d'écran tactile → inutile
+
+  const legacy = (window as any).__NACK_LEGACY_BROWSER__ === true;
+
+  // Désactiver le zoom double-tap (évite les ghost clicks)
+  try {
+    if (document.documentElement) {
+      document.documentElement.style.touchAction = 'manipulation';
+    }
+  } catch { /* ignore */ }
+
+  const tapTargets = new WeakMap<Element, number>();
+
+  document.addEventListener('touchend', function (ev: Event) {
+    if (legacy) {
+      // Sur navigateurs hérités, click natif peut ne pas se propager correctement
+      // jusqu'aux handlers React dans certaines modales → on force le click.
+      const touch = (ev as TouchEvent).changedTouches && (ev as TouchEvent).changedTouches[0];
+      if (!touch) return;
+      const el = document.elementFromPoint(touch.clientX, touch.clientY) as Element | null;
+      if (!el) return;
+      const btn = closestClickable(el);
+      if (!btn) return;
+      const last = tapTargets.get(btn) || 0;
+      const now = Date.now();
+      if (now - last < 450) return; // déjà traité → ignore le ghost click
+      tapTargets.set(btn, now);
+      try {
+        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+      } catch {
+        try {
+          btn.click();
+        } catch { /* ignore */ }
+      }
+    }
+  }, false);
+
+  function closestClickable(el: Element): Element | null {
+    let cur: Element | null = el;
+    while (cur && cur !== document.body) {
+      const tag = cur.tagName;
+      const role = cur.getAttribute && cur.getAttribute('role');
+      if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'SELECT' || tag === 'LABEL' ||
+          role === 'button' || role === 'menuitem' || role === 'checkbox' || role === 'radio' ||
+          cur.getAttribute && cur.getAttribute('onclick')) {
+        return cur;
+      }
+      cur = cur.parentElement;
+    }
+    return null;
   }
 })();

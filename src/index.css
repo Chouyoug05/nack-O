@@ -207,3 +207,62 @@ All colors MUST be HSL.
     background-color: rgba(0, 0, 0, 0.85);
   }
 }
+
+/* ==========================================================================
+   Appareils très anciens (iPad 3 / iOS 9) — classe "legacy-browser" posée
+   par polyfills.ts sur <html>.
+   On désactive les animations/transitions/effets GPU lourds qui saturent le
+   GPU et donnent l'impression que l'UI est gelée. Les modales restent
+   fonctionnelles (affichage instantané, sans transitions).
+   ========================================================================== */
+html.legacy-browser *,
+html.legacy-browser *::before,
+html.legacy-browser *::after {
+  animation: none !important;
+  animation-duration: 0s !important;
+  transition: none !important;
+  transition-duration: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+html.legacy-browser .backdrop-blur,
+html.legacy-browser .backdrop-blur-sm,
+html.legacy-browser .backdrop-blur-md,
+html.legacy-browser .backdrop-blur-lg,
+html.legacy-browser [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+html.legacy-browser .dark .backdrop-blur,
+html.legacy-browser .dark .backdrop-blur-sm,
+html.legacy-browser .dark .backdrop-blur-md,
+html.legacy-browser .dark .backdrop-blur-lg,
+html.legacy-browser .dark [class*="backdrop-blur"] {
+  background-color: rgba(0, 0, 0, 0.92) !important;
+}
+
+/* Sur anciens appareils, on force l'affichage des modales à être instantané et
+   on s'assure qu'elles restent cliquables (z-index et position stables). */
+html.legacy-browser [role="dialog"] {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+html.legacy-browser .animate-spin,
+html.legacy-browser .animate-pulse,
+html.legacy-browser .animate-bounce,
+html.legacy-browser .animate-ping,
+html.legacy-browser .animate-fade-in,
+html.legacy-browser .animate-slide-in,
+html.legacy-browser .animate-zoom-in {
+  animation: none !important;
+}
+
+/* Le blur/backdrop-filter natif d'iOS 9 est extrêmement lent → on le neutralise partout */
+html.legacy-browser {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
