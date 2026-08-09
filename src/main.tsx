@@ -1,3 +1,4 @@
+import "./polyfills"; // Polyfills iOS 12 — DOIVENT être chargés avant tout autre import
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
