@@ -7,6 +7,25 @@
  * - MediaQueryList.addEventListener : absent de Safari < 14 — sonner utilise addListener en fallback
  */
 
+// ---------- Promise.allSettled ----------
+// ES2020 — absent de Safari < 13 / iOS < 13 — utilisé par recharts
+(function () {
+  if (typeof Promise === 'undefined') return;
+  if (typeof Promise.allSettled === 'function') return;
+
+  Promise.allSettled = function (iterable: Iterable<any>): Promise<any[]> {
+    return Promise.all(
+      Array.from(iterable).map(function (item: any) {
+        return Promise.resolve(item).then(
+          function (value) { return { status: 'fulfilled', value: value }; },
+          function (reason) { return { status: 'rejected', reason: reason }; }
+        );
+      })
+    );
+  } as typeof Promise.allSettled;
+})();
+
+
 // ---------- ResizeObserver ----------
 // Basé sur juggle/resize-observer-polyfill (MIT) — version simplifiée et compacte
 (function () {
