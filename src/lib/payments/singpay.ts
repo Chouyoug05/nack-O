@@ -67,11 +67,21 @@ async function requestPaymentLinkViaProxy(proxyUrl: string, params: CreatePaymen
     credentials: "omit",
     mode: "cors",
   });
+  const text = await res.text().catch(() => "");
   if (!res.ok) {
-    const text = await res.text().catch(() => "");
-    throw new Error(`Proxy error ${res.status}: ${text}`);
+    let detail = text;
+    try {
+      const j = JSON.parse(text) as { error?: string; detail?: string; hint?: string };
+      detail = [j.error, j.detail, j.hint].filter(Boolean).join(" — ") || text;
+    } catch { /* plain text */ }
+    throw new Error(`Proxy error ${res.status}: ${detail}`);
   }
-  const data = (await res.json()) as CreatePaymentLinkResponse;
+  let data: CreatePaymentLinkResponse;
+  try {
+    data = JSON.parse(text) as CreatePaymentLinkResponse;
+  } catch {
+    throw new Error("Réponse paiement invalide (JSON attendu)");
+  }
   if (!data.link) throw new Error("Lien de paiement introuvable");
   return data.link;
 }

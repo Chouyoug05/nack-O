@@ -10,7 +10,9 @@
   # VITE_PUBLIC_BASE_URL = "https://<votre-site>.netlify.app"
 
 # Les secrets sensibles (SingPay, Cloudinary) doivent être définis dans le dashboard Netlify
-# Site settings > Build & deploy > Environment > Environment variables
+# Site settings > Environment variables — pour le paiement runtime :
+#   SINGPAY_CLIENT_ID, SINGPAY_CLIENT_SECRET, SINGPAY_WALLET
+# (les VITE_SINGPAY_* du build front ne suffisent pas toujours aux Functions)
 
 # SPA fallback défini via public/_redirects (copié vers dist/_redirects au build) 
 

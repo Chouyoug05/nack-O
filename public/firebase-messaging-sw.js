@@ -5,7 +5,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 // --- Offline / PWA cache (app shell) - ES5 compatible ---
 // v2 : le nom de cache est incrémenté à chaque déploiement pour forcer
 // le re-téléchargement de l'app shell et éviter de servir une version cassée.
-var APP_SHELL_CACHE = 'nack-app-shell-v2';
+var APP_SHELL_CACHE = 'nack-app-shell-v3';
 var APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -103,14 +103,18 @@ function handleNavigation(request) {
 // Les noms de fichiers Vite sont content-hashed : l'ancienne version est
 // toujours valide pour l'index.html qui la référence.
 function handleAsset(request) {
+  // Les requêtes Range renvoient souvent un 206 — Cache.put refuse les réponses partielles
+  if (request.headers && request.headers.get('range')) {
+    return fetch(request);
+  }
   return caches.open(APP_SHELL_CACHE).then(function (cache) {
     return cache.match(request).then(function (cached) {
-      // Récupérer la version fraîche en arrière-plan (pas bloquant)
       var networkFetch = fetch(request).then(function (fresh) {
         try {
           var url = new URL(request.url);
-          if (fresh && fresh.ok && url.origin === self.location.origin) {
-            cache.put(request, fresh.clone());
+          // Uniquement 200 complet (pas 206 Partial Content)
+          if (fresh && fresh.status === 200 && url.origin === self.location.origin) {
+            cache.put(request, fresh.clone()).catch(function () { /* ignore quota / 206 */ });
           }
         } catch (e) { /* ignore */ }
         return fresh;
@@ -119,7 +123,6 @@ function handleAsset(request) {
       });
 
       if (cached) {
-        // Sert le cache tout de suite, mais laisse le fetch réseau compléter
         return cached;
       }
       return networkFetch;
