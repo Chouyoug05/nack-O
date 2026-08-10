@@ -136,9 +136,96 @@
   function docToObj(doc) {
     if (!doc) return null;
     var obj = { id: doc.name ? doc.name.split("/").pop() : "" };
+    if (doc.name) obj._path = doc.name.replace(/^projects\/[^/]+\/databases\/[^/]+\/documents\//, "");
     var fields = doc.fields || {};
     for (var k in fields) if (Object.prototype.hasOwnProperty.call(fields, k)) obj[k] = fromFsValue(fields[k]);
     return obj;
+  }
+
+  function ownerUidFromTeamPath(path) {
+    if (!path) return null;
+    var m = String(path).match(/\/profiles\/([^/]+)\/team\//);
+    return m ? m[1] : null;
+  }
+
+  function ownerDataRoot(ownerUid, profile) {
+    if (profile && profile.activeEstablishmentId) return "establishments/" + profile.activeEstablishmentId;
+    return "profiles/" + ownerUid;
+  }
+
+  function publicListDocs(path, pageSize) {
+    var qs = "?key=" + API_KEY + (pageSize ? ("&pageSize=" + pageSize) : "");
+    return xhr("GET", FS_BASE + "/" + path + qs, null, null).then(function (res) {
+      var docs = res.documents || [], out = [];
+      for (var i = 0; i < docs.length; i++) out.push(docToObj(docs[i]));
+      return out;
+    });
+  }
+
+  function publicCreateDoc(path, data) {
+    return xhr("POST", FS_BASE + "/" + path + "?key=" + API_KEY, { fields: toFsFields(data) }, { "Content-Type": "application/json" }).then(docToObj);
+  }
+
+  function publicPatchDoc(path, data, maskFields) {
+    var qs = "?key=" + API_KEY;
+    if (maskFields && maskFields.length) {
+      for (var i = 0; i < maskFields.length; i++) qs += "&updateMask.fieldPaths=" + encodeURIComponent(maskFields[i]);
+    }
+    return xhr("PATCH", FS_BASE + "/" + path + qs, { fields: toFsFields(data) }, { "Content-Type": "application/json" }).then(docToObj);
+  }
+
+  function resolveAgentToken(token) {
+    var t = String(token || "").trim();
+    if (!t) return Promise.resolve(null);
+    return getPublicDoc("agentTokens/" + t).then(function (doc) {
+      if (doc && doc.ownerUid) {
+        return {
+          ownerUid: doc.ownerUid,
+          agentToken: t,
+          agentCode: doc.agentCode || t,
+          agentName: ((doc.firstName || "") + " " + (doc.lastName || "")).trim() || "Agent",
+          memberId: doc.memberId || null,
+          role: doc.role || null
+        };
+      }
+      return runPublicQuery({
+        from: [{ collectionId: "team", allDescendants: true }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "agentToken" },
+            op: "EQUAL",
+            value: { stringValue: t }
+          }
+        },
+        limit: 1
+      }).then(function (docs) {
+        if (docs.length) return docs;
+        return runPublicQuery({
+          from: [{ collectionId: "team", allDescendants: true }],
+          where: {
+            fieldFilter: {
+              field: { fieldPath: "agentCode" },
+              op: "EQUAL",
+              value: { stringValue: t }
+            }
+          },
+          limit: 1
+        });
+      }).then(function (docs) {
+        if (!docs || !docs.length) return null;
+        var d = docs[0];
+        var ownerUid = ownerUidFromTeamPath(d._path);
+        if (!ownerUid) return null;
+        return {
+          ownerUid: ownerUid,
+          agentToken: d.agentToken || t,
+          agentCode: d.agentCode || t,
+          agentName: ((d.firstName || "") + " " + (d.lastName || "")).trim() || "Agent",
+          memberId: d.id || null,
+          role: d.role || null
+        };
+      });
+    });
   }
 
   function toFsValue(val) {
@@ -347,14 +434,57 @@
     return patchDoc("profiles/" + uid, data, maskFields);
   }
 
+  function signUp(email, password) {
+    return xhr("POST", AUTH_BASE + "/accounts:signUp?key=" + API_KEY, {
+      email: email, password: password, returnSecureToken: true
+    }).then(function (res) { saveSession(res); return res; });
+  }
+
+  function resetPassword(email) {
+    return xhr("POST", AUTH_BASE + "/accounts:sendOobCode?key=" + API_KEY, {
+      requestType: "PASSWORD_RESET", email: email
+    });
+  }
+
+  function isAdmin(uid) {
+    return getPublicDoc("admins/" + uid).then(function (d) { return !!(d && d.id); });
+  }
+
+  function startPolling(fn, ms) {
+    fn();
+    return setInterval(fn, ms || 8000);
+  }
+
+  function stopPolling(id) { if (id) clearInterval(id); }
+
+  function exportCsv(filename, rows) {
+    var csv = rows.map(function (row) {
+      return row.map(function (c) { return '"' + String(c == null ? "" : c).replace(/"/g, '""') + '"'; }).join(",");
+    }).join("\n");
+    var blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+  }
+
   global.NACK_LIGHT.api = {
     xhr: xhr, getSession: getSession, saveSession: saveSession, clearSession: clearSession,
-    signIn: signIn, refreshIdToken: refreshIdToken,
+    signIn: signIn, signUp: signUp, resetPassword: resetPassword, refreshIdToken: refreshIdToken,
     getDoc: getDoc, listDocs: listDocs, createDoc: createDoc, patchDoc: patchDoc, deleteDoc: deleteDoc,
     setDoc: setDoc, getPublicDoc: getPublicDoc, runPublicQuery: runPublicQuery,
     findAgentByCode: findAgentByCode, loginAffiliate: loginAffiliate, queryReferrals: queryReferrals,
     createPaymentLink: createPaymentLink, patchProfile: patchProfile, teamPath: teamPath,
-    dataRoot: dataRoot, publicBase: publicBase, resolvePaymentProxy: resolvePaymentProxy,
-    getProfile: function (uid) { return getDoc("profiles/" + uid); }
+    isAdmin: isAdmin, startPolling: startPolling, stopPolling: stopPolling, exportCsv: exportCsv,
+    dataRoot: dataRoot, ownerDataRoot: ownerDataRoot, publicBase: publicBase, resolvePaymentProxy: resolvePaymentProxy,
+    publicListDocs: publicListDocs, publicCreateDoc: publicCreateDoc, publicPatchDoc: publicPatchDoc,
+    resolveAgentToken: resolveAgentToken,
+    getProfile: function (uid) { return getDoc("profiles/" + uid); },
+    getPublicProfile: function (uid) { return getPublicDoc("profiles/" + uid); },
+    lightHref: function (hash) {
+      var h = hash || "";
+      if (h.charAt(0) !== "#") h = "#/" + h.replace(/^\//, "");
+      return publicBase() + "/light/" + h;
+    }
   };
 })(window);

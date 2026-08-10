@@ -80,6 +80,8 @@
             (token ? '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="copy-text" data-arg="' + ui.escapeHtml(roleLink(m.role, token)) + '">Copier lien</button>' : "") +
             '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="team-edit" data-arg="' + ui.escapeHtml(m.id) + '">Modifier</button>' +
             '<button type="button" class="lg-btn lg-btn-nack lg-btn-sm" data-action="team-regen" data-arg="' + ui.escapeHtml(m.id) + '">Régénérer</button>' +
+            '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="team-toggle" data-arg="' + ui.escapeHtml(m.id) + '">' + (m.status === "inactive" ? "Activer" : "Désactiver") + '</button>' +
+            '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="team-del" data-arg="' + ui.escapeHtml(m.id) + '">Supprimer</button>' +
           '</div></div>';
     }
     el.innerHTML = html;
@@ -221,9 +223,32 @@
     });
   }
 
+  function toggleStatus(id) {
+    var m = findMember(id);
+    if (!m) return;
+    var next = m.status === "inactive" ? "active" : "inactive";
+    api.patchDoc(api.teamPath(state.ctx.uid) + "/" + id, { status: next, updatedAt: Date.now() }, ["status", "updatedAt"]).then(function () {
+      ui.toast(next === "active" ? "Membre activé" : "Membre désactivé", "ok");
+      load();
+    });
+  }
+
+  function deleteMember(id) {
+    var m = findMember(id);
+    if (!m) return;
+    if (!confirm("Supprimer " + ((m.firstName || "") + " " + (m.lastName || "")).trim() + " ?")) return;
+    ui.requireManagerAuth(state.ctx.profile, function () {
+      var chain = api.deleteDoc(api.teamPath(state.ctx.uid) + "/" + id);
+      if (m.agentToken) chain = chain.then(function () { return api.deleteDoc("agentTokens/" + m.agentToken).catch(function () {}); });
+      chain.then(function () { ui.toast("Membre supprimé", "ok"); load(); })
+        .catch(function (err) { ui.toast(err.message || "Erreur", "error"); });
+    });
+  }
+
   global.NACK_LIGHT.views = global.NACK_LIGHT.views || {};
   global.NACK_LIGHT.views.team = {
     render: render, openAddModal: openAddModal, openEditModal: openEditModal,
-    submitMember: submitMember, regenerateCodes: regenerateCodes
+    submitMember: submitMember, regenerateCodes: regenerateCodes,
+    toggleStatus: toggleStatus, deleteMember: deleteMember
   };
 })(window);

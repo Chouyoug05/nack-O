@@ -22,6 +22,11 @@ window.NACK_LIGHT.PLANS = {
   transition: { name: "Standard", price: 3000 },
   "transition-pro-max": { name: "Premium", price: 7500 }
 };
+window.NACK_LIGHT.CLOUDINARY = {
+  /* Renseigner comme VITE_CLOUDINARY_* dans env.example */
+  cloudName: "",
+  uploadPreset: ""
+};
 window.NACK_LIGHT.DURATIONS = [
   { value: "month", label: "1 mois" },
   { value: "quarter", label: "3 mois" },

@@ -7,10 +7,20 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="NACK!" />
   <title>NACK Pro</title>
+  <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="../Design%20sans%20titre.svg" type="image/svg+xml" />
 </head>
 <body>
+  <div id="lg-offline-bar" class="lg-offline-bar" style="display:none"></div>
+  <div id="lg-pwa-banner" class="lg-pwa-banner lg-hidden" style="display:none"></div>
+  <div id="lg-offline-auth" class="lg-offline-auth lg-hidden" style="display:none">
+    <div class="lg-offline-auth-box">
+      <h2>Connexion indisponible hors-ligne</h2>
+      <p>Vous êtes <strong>hors connexion</strong>. La connexion et l'inscription nécessitent Internet. Réactivez vos données ou le Wi‑Fi puis réessayez.</p>
+      <button type="button" class="lg-btn lg-btn-nack lg-btn-block" id="offline-auth-retry">Réessayer</button>
+    </div>
+  </div>
   <div id="screen-login" class="lg-login">
     <div class="lg-login-box">
       <img class="lg-nack-logo lg-lg" id="login-nack-logo" src="../icons/icon-192x192.png" alt="NACK!" onerror="this.style.display='none';document.getElementById('login-nack-fallback').style.display='flex';" />
@@ -43,6 +53,10 @@
             <input class="lg-input" id="login-password" type="password" autocomplete="current-password" required />
           </div>
           <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="login-submit">Se connecter</button>
+          <p class="lg-field-hint" style="text-align:center;margin-top:10px">
+            <a href="#/forgot">Mot de passe oublié</a> · <a href="#/register">S'inscrire</a>
+          </p>
+          <p class="lg-field-hint" style="text-align:center"><a href="#/onboarding">Découvrir NACK</a></p>
         </form>
       </div>
 
@@ -80,7 +94,7 @@
           <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="aff-submit">Accéder à mon espace</button>
         </form>
         <p class="lg-field-hint" style="text-align:center;margin-top:10px">
-          Pas encore partenaire ? <a href="../register?mode=affiliate">Devenir affilié</a>
+          Pas encore partenaire ? <a href="#/register?mode=affiliate">Devenir affilié</a>
         </p>
       </div>
     </div>
@@ -88,6 +102,10 @@
 
   <div id="screen-affiliate" class="lg-affiliate lg-hidden" style="display:none">
     <div id="affiliate-root"></div>
+  </div>
+
+  <div id="screen-route" class="lg-route lg-hidden" style="display:none">
+    <main id="route-root"></main>
   </div>
 
   <div id="screen-app" class="lg-app lg-hidden" style="display:none">
@@ -102,7 +120,8 @@
       </div>
       <div class="lg-title" id="hdr-title">NACK Pro</div>
       <div class="lg-header-right">
-        <div class="lg-avatar" id="hdr-avatar-right" style="width:32px;height:32px;font-size:0.75rem">N</div>
+        <button type="button" class="lg-btn-icon-only" id="hdr-notif-btn" data-action="nav" data-arg="notifications" aria-label="Notifications"></button>
+        <button type="button" class="lg-avatar" id="hdr-avatar-right" data-action="nav" data-arg="profile" style="width:32px;height:32px;font-size:0.75rem;border:none;cursor:pointer">N</button>
       </div>
     </header>
     <main class="lg-main" id="view-root"></main>
@@ -170,6 +189,8 @@
       <div class="lg-field"><label class="lg-label" for="ev-date">Date</label><input class="lg-input" id="ev-date" type="date" required /></div>
       <div class="lg-field"><label class="lg-label" for="ev-time">Heure</label><input class="lg-input" id="ev-time" type="time" /></div>
       <div class="lg-field"><label class="lg-label" for="ev-location">Lieu</label><input class="lg-input" id="ev-location" /></div>
+      <div class="lg-field"><label class="lg-label" for="ev-image">Image (URL)</label><input class="lg-input" id="ev-image" /></div>
+      <input type="hidden" id="ev-edit-id" value="" />
       <div class="lg-field"><label class="lg-label" for="ev-capacity">Capacité max</label><input class="lg-input" id="ev-capacity" type="number" min="1" /></div>
       <div class="lg-field"><label class="lg-label" for="ev-price">Prix billet (XAF)</label><input class="lg-input" id="ev-price" type="number" min="0" required /></div>
       <div class="lg-modal-actions">
@@ -216,14 +237,31 @@
     </form>
   </div>
 
+  <div id="modal-subscription-overlay" class="lg-modal-overlay lg-hidden" style="display:none"></div>
+  <div id="modal-subscription" class="lg-modal lg-hidden" role="dialog" style="display:none">
+    <h2>Abonnement requis</h2>
+    <p class="lg-modal-desc" id="sub-gate-msg">Votre essai est terminé. Choisissez un plan pour continuer.</p>
+    <div class="lg-modal-actions">
+      <button type="button" class="lg-btn lg-btn-nack lg-btn-block" data-action="nav" data-arg="profile">Voir les offres</button>
+      <button type="button" class="lg-btn lg-btn-secondary lg-btn-block" data-action="close-modal" data-arg="modal-subscription" style="margin-top:8px">Fermer</button>
+    </div>
+  </div>
+
   <div id="lg-toast" class="lg-toast lg-hidden" style="display:none"></div>
 
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
   <script src="js/sha256.js"></script>
   <script src="js/api.js"></script>
+  <script src="js/subscription.js"></script>
+  <script src="js/upload.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/login.js"></script>
+  <script src="js/views/onboarding.js"></script>
+  <script src="js/views/register.js"></script>
+  <script src="js/views/forgot.js"></script>
+  <script src="js/views/complete-profile.js"></script>
+  <script src="js/views/configure-tickets.js"></script>
   <script src="js/views/home.js"></script>
   <script src="js/views/stock.js"></script>
   <script src="js/views/sales.js"></script>
@@ -232,7 +270,22 @@
   <script src="js/views/menu.js"></script>
   <script src="js/views/events.js"></script>
   <script src="js/views/customers.js"></script>
+  <script src="js/views/customer-detail.js"></script>
+  <script src="js/views/notifications.js"></script>
   <script src="js/views/profile.js"></script>
+  <script src="js/views/admin.js"></script>
+  <script src="js/interfaces/serveur.js"></script>
+  <script src="js/interfaces/caisse.js"></script>
+  <script src="js/interfaces/cuisine.js"></script>
+  <script src="js/interfaces/agent-event.js"></script>
+  <script src="js/public/ordering.js"></script>
+  <script src="js/public/event-public.js"></script>
+  <script src="js/public/payment-result.js"></script>
+  <script src="js/tutorial.js"></script>
+  <script src="js/pwa.js"></script>
+  <script src="js/offline.js"></script>
+  <script src="js/whatsapp.js"></script>
+  <script src="js/location.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

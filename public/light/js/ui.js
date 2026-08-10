@@ -214,5 +214,7 @@
     }
     var back = $("hdr-back");
     if (back) back.innerHTML = iconFn("chevL", 22);
+    var notif = $("hdr-notif-btn");
+    if (notif) notif.innerHTML = iconFn("clock", 20);
   }
 })(window);

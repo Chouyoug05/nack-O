@@ -10,11 +10,13 @@
       ctx: ctx,
       products: [],
       orders: [],
+      sales: [],
       cart: prev.cart || {},
       tab: prev.tab || "caisse",
       tableNumber: prev.tableNumber || "",
       editingOrderId: prev.editingOrderId || null,
-      query: ""
+      query: "",
+      category: "all"
     };
 
     root.innerHTML =
@@ -29,6 +31,7 @@
     else paintCaissePanel();
     loadProducts();
     loadOrders();
+    loadRecentSales();
   }
 
   function productsPath() { return api.dataRoot(state.ctx.profile, state.ctx.uid) + "/products"; }
@@ -41,19 +44,36 @@
     for (var i = 0; i < tabs.length; i++) {
       var t = tabs[i];
       var arg = t.getAttribute("data-arg");
-      var cls = "lg-tab";
-      if (arg === tab) cls += " active";
-      t.className = cls;
+      t.className = "lg-tab" + (arg === tab ? " active" : "");
     }
     if (tab === "orders") paintOrdersPanel();
     else paintCaissePanel();
+  }
+
+  function buildCategoryTabs() {
+    var cats = { all: true };
+    for (var i = 0; i < state.products.length; i++) {
+      cats[state.products[i].category || "Autre"] = true;
+    }
+    var keys = ["all"];
+    var sorted = Object.keys(cats).sort();
+    for (var j = 0; j < sorted.length; j++) if (sorted[j] !== "all") keys.push(sorted[j]);
+    var html = '<div class="lg-row-actions" style="flex-wrap:wrap;margin-bottom:10px">';
+    for (var k = 0; k < keys.length; k++) {
+      var c = keys[k];
+      html += '<button type="button" class="lg-btn lg-btn-sm ' + (state.category === c ? "lg-btn-nack" : "lg-btn-secondary") +
+        '" data-action="sales-cat" data-arg="' + ui.escapeHtml(c) + '">' + ui.escapeHtml(c === "all" ? "Toutes" : c) + '</button>';
+    }
+    return html + '</div>';
   }
 
   function paintCaissePanel() {
     var panel = ui.$("sales-panel");
     if (!panel) return;
     panel.innerHTML =
+      '<div id="sales-last" class="lg-card" style="margin-bottom:12px;display:none"></div>' +
       '<div class="lg-search"><input class="lg-input" id="sales-search" type="search" placeholder="Rechercher un produit…"></div>' +
+      '<div id="sales-cats"></div>' +
       '<div class="lg-field" style="margin-bottom:12px">' +
         '<label class="lg-label" for="sales-table">Table / Zone (commande en cours)</label>' +
         '<input class="lg-input" id="sales-table" placeholder="Ex: Table 5, Terrasse…" value="' + ui.escapeHtml(state.tableNumber) + '">' +
@@ -69,9 +89,19 @@
     ui.$("sales-table").oninput = function () {
       state.tableNumber = String(ui.$("sales-table").value || "");
     };
+    var catsEl = ui.$("sales-cats");
+    if (catsEl) catsEl.innerHTML = buildCategoryTabs();
     paintCartPanel();
     paintGrid();
     paintFloatBar();
+    paintLastSales();
+  }
+
+  function setCategory(cat) {
+    state.category = cat || "all";
+    var catsEl = ui.$("sales-cats");
+    if (catsEl) catsEl.innerHTML = buildCategoryTabs();
+    paintGrid();
   }
 
   function paintOrdersPanel() {
@@ -84,7 +114,11 @@
   function loadProducts() {
     api.listDocs(productsPath(), 200).then(function (docs) {
       state.products = docs || [];
-      if (state.tab === "caisse") paintGrid();
+      if (state.tab === "caisse") {
+        var catsEl = ui.$("sales-cats");
+        if (catsEl) catsEl.innerHTML = buildCategoryTabs();
+        paintGrid();
+      }
     }).catch(function (err) {
       var el = ui.$("sales-grid");
       if (el) el.innerHTML = '<div class="lg-empty">' + ui.escapeHtml(err.message) + '</div>';
@@ -98,6 +132,62 @@
       updateOrdersBadge();
       if (state.tab === "orders") paintOrdersList();
     }).catch(function () { updateOrdersBadge(); });
+  }
+
+  function loadRecentSales() {
+    api.listDocs(salesPath(), 20).then(function (docs) {
+      state.sales = docs || [];
+      state.sales.sort(function (a, b) { return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0); });
+      paintLastSales();
+    }).catch(function () {});
+  }
+
+  function paintLastSales() {
+    var el = ui.$("sales-last");
+    if (!el) return;
+    if (!state.sales.length) { ui.hideEl(el); return; }
+    ui.showEl(el);
+    var html = '<div class="lg-card-title">3 dernières ventes</div>';
+    for (var i = 0; i < state.sales.length && i < 3; i++) {
+      var s = state.sales[i];
+      html +=
+        '<div class="lg-list-item" style="padding:8px 0;border-bottom:1px solid #eee">' +
+          '<div class="lg-list-item-main">' +
+            '<div class="lg-list-item-title">' + ui.escapeHtml(ui.formatMoney(s.total)) + '</div>' +
+            '<div class="lg-list-item-meta">' + ui.escapeHtml(ui.formatDate(s.createdAt)) + '</div>' +
+          '</div>' +
+          '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="sales-print" data-arg="' + ui.escapeHtml(s.id) + '">Reçu</button>' +
+        '</div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function printReceipt(saleId) {
+    var sale = null;
+    for (var i = 0; i < state.sales.length; i++) if (state.sales[i].id === saleId) sale = state.sales[i];
+    if (!sale) return;
+    var p = state.ctx.profile || {};
+    var items = sale.items || [];
+    var lines = "";
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      lines += "<tr><td>" + ui.escapeHtml(it.name) + " ×" + (it.quantity || 1) + "</td><td style='text-align:right'>" + ui.escapeHtml(ui.formatMoney((it.price || 0) * (it.quantity || 1))) + "</td></tr>";
+    }
+    var w = window.open("", "_blank", "width=320,height=600");
+    if (!w) { ui.toast("Autorisez les popups pour imprimer", "error"); return; }
+    w.document.write(
+      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Reçu</title>" +
+      "<style>body{font-family:monospace;font-size:12px;padding:12px}table{width:100%}h2{text-align:center;margin:0}</style></head><body>" +
+      "<h2>" + ui.escapeHtml(p.establishmentName || "NACK") + "</h2>" +
+      "<p style='text-align:center'>" + ui.escapeHtml(ui.formatDate(sale.createdAt)) + "</p>" +
+      "<table>" + lines + "</table>" +
+      "<p style='text-align:right;font-weight:bold'>Total : " + ui.escapeHtml(ui.formatMoney(sale.total)) + "</p>" +
+      (p.customMessage ? "<p style='text-align:center'>" + ui.escapeHtml(p.customMessage) + "</p>" : "") +
+      "</body></html>"
+    );
+    w.document.close();
+    w.focus();
+    w.print();
   }
 
   function pendingOrders() {
@@ -136,6 +226,7 @@
     for (var i = 0; i < state.products.length; i++) {
       var p = state.products[i];
       if ((Number(p.quantity) || 0) <= 0) continue;
+      if (state.category !== "all" && (p.category || "Autre") !== state.category) continue;
       var hay = ((p.name || "") + " " + (p.category || "")).toLowerCase();
       if (q && hay.indexOf(q) === -1) continue;
       count++;
@@ -318,7 +409,10 @@
       items: items, total: cartTotal(), paymentMethod: method,
       createdAt: Date.now(), tableZone: table || "Caisse"
     };
-    api.createDoc(salesPath(), sale).then(function () {
+    var saleId = null;
+    api.createDoc(salesPath(), sale).then(function (doc) {
+      saleId = doc && doc.id;
+      sale.id = saleId;
       var chain = Promise.resolve();
       for (var i = 0; i < items.length; i++) {
         (function (it) {
@@ -343,9 +437,11 @@
       ui.toast("Vente enregistrée", "ok");
       loadProducts();
       loadOrders();
+      loadRecentSales();
       paintCartPanel();
       paintFloatBar();
       if (state.ctx.refreshStats) state.ctx.refreshStats();
+      if (saleId) printReceipt(saleId);
     }).catch(function (err) { ui.toast(err.message || "Erreur vente", "error"); })
       .then(function () { ui.setLoading(btn, false); });
   }
@@ -400,10 +496,7 @@
     ui.toast("Commande chargée — ajustez et encaissez", "ok");
   }
 
-  function payOrder(id) {
-    loadOrderToCart(id);
-    openCartModal();
-  }
+  function payOrder(id) { loadOrderToCart(id); openCartModal(); }
 
   function cancelOrder(id) {
     api.patchDoc(ordersPath() + "/" + id, { status: "cancelled", updatedAt: Date.now() }, ["status", "updatedAt"]).then(function () {
@@ -414,10 +507,10 @@
 
   global.NACK_LIGHT.views = global.NACK_LIGHT.views || {};
   global.NACK_LIGHT.views.sales = {
-    render: render, setTab: setTab,
+    render: render, setTab: setTab, setCategory: setCategory,
     addToCart: addToCart, decCart: decCart, removeCart: removeCart, clearCart: clearCart,
     openCartModal: openCartModal, checkout: checkout, holdOrder: holdOrder,
     loadOrderToCart: loadOrderToCart, payOrder: payOrder, cancelOrder: cancelOrder,
-    refreshOrders: loadOrders
+    printReceipt: printReceipt, refreshOrders: loadOrders
   };
 })(window);

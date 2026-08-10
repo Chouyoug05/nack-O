@@ -45,10 +45,9 @@
     ui.setLoading(btn, true);
     api.findAgentByCode(code, role).then(function (token) {
       if (!token) { ui.toast("Code ou rôle incorrect", "error"); return; }
-      var base = api.publicBase();
-      var path = role === "serveur" ? "/serveur/" : role === "caissier" ? "/caisse/" :
-        role === "cuisinier" ? "/cuisine/" : "/agent-evenement/";
-      window.location.href = base + path + token;
+      var hash = role === "serveur" ? "#/serveur/" : role === "caissier" ? "#/caisse/" :
+        role === "cuisinier" ? "#/cuisine/" : "#/agent-event/";
+      window.location.href = api.lightHref(hash + token);
     }).catch(function (err) {
       ui.toast(err.message || "Erreur connexion équipe", "error");
     }).then(function () { ui.setLoading(btn, false); });
