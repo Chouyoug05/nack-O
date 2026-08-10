@@ -6,36 +6,96 @@
   <meta name="theme-color" content="#dc2626" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="NACK!" />
-  <title>NACK Pro — Mode léger</title>
+  <title>NACK Pro</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="icon" href="../Design%20sans%20titre.svg" type="image/svg+xml" />
 </head>
 <body>
   <div id="screen-login" class="lg-login">
     <div class="lg-login-box">
-      <div class="lg-login-logo">N</div>
+      <img class="lg-nack-logo lg-lg" id="login-nack-logo" src="../icons/icon-192x192.png" alt="NACK!" onerror="this.style.display='none';document.getElementById('login-nack-fallback').style.display='flex';" />
+      <div id="login-nack-fallback" class="lg-login-logo" style="display:none">N</div>
       <h1>NACK Pro</h1>
-      <p class="subtitle">Mode léger — appareils anciens</p>
-      <div class="lg-banner">Plateforme native HTML / CSS / JS. Même design, sans React.</div>
-      <form id="login-form" action="javascript:void(0)">
-        <div class="lg-field">
-          <label class="lg-label" for="login-email">Email</label>
-          <input class="lg-input" id="login-email" type="email" autocomplete="username" required />
-        </div>
-        <div class="lg-field">
-          <label class="lg-label" for="login-password">Mot de passe</label>
-          <input class="lg-input" id="login-password" type="password" autocomplete="current-password" required />
-        </div>
-        <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="login-submit">Se connecter</button>
-      </form>
+      <p class="subtitle">Plateforme de gestion gabonaise</p>
+
+      <div class="lg-login-types">
+        <button type="button" class="lg-login-type active" data-action="login-type" data-arg="manager">
+          <span data-icon="user"></span><span>Gérant</span>
+        </button>
+        <button type="button" class="lg-login-type" data-action="login-type" data-arg="team">
+          <span data-icon="users"></span><span>Équipe</span>
+        </button>
+        <button type="button" class="lg-login-type" data-action="login-type" data-arg="affiliate">
+          <span data-icon="gift"></span><span>Affilié</span>
+        </button>
+      </div>
+
+      <p class="lg-login-type-title" id="login-type-title">Se connecter</p>
+
+      <div id="login-panel-manager">
+        <form id="login-form" action="javascript:void(0)">
+          <div class="lg-field">
+            <label class="lg-label" for="login-email">Email</label>
+            <input class="lg-input" id="login-email" type="email" autocomplete="username" required />
+          </div>
+          <div class="lg-field">
+            <label class="lg-label" for="login-password">Mot de passe</label>
+            <input class="lg-input" id="login-password" type="password" autocomplete="current-password" required />
+          </div>
+          <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="login-submit">Se connecter</button>
+        </form>
+      </div>
+
+      <div id="login-panel-team" style="display:none">
+        <form id="team-login-form" action="javascript:void(0)">
+          <div class="lg-field">
+            <label class="lg-label" for="team-role">Votre rôle</label>
+            <select class="lg-select" id="team-role" required>
+              <option value="">Choisir un rôle</option>
+              <option value="serveur">Serveur</option>
+              <option value="caissier">Caissier</option>
+              <option value="cuisinier">Cuisinier</option>
+              <option value="agent-evenement">Agent événement</option>
+            </select>
+          </div>
+          <div class="lg-field">
+            <label class="lg-label" for="team-code">Code d'agent</label>
+            <input class="lg-input" id="team-code" placeholder="Ex: AGT-XXXX-XXXX" autocomplete="off" required />
+            <p class="lg-field-hint">Demandez votre code à votre gérant</p>
+          </div>
+          <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="team-login-submit">Accéder à mon interface</button>
+        </form>
+      </div>
+
+      <div id="login-panel-affiliate" style="display:none">
+        <form id="affiliate-login-form" action="javascript:void(0)">
+          <div class="lg-field">
+            <label class="lg-label" for="aff-id">Code ou WhatsApp</label>
+            <input class="lg-input" id="aff-id" placeholder="Ex: AFF-XXXX ou +241..." autocomplete="off" required />
+          </div>
+          <div class="lg-field">
+            <label class="lg-label" for="aff-pass">Mot de passe</label>
+            <input class="lg-input" id="aff-pass" type="password" autocomplete="off" required />
+          </div>
+          <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="aff-submit">Accéder à mon espace</button>
+        </form>
+        <p class="lg-field-hint" style="text-align:center;margin-top:10px">
+          Pas encore partenaire ? <a href="../register?mode=affiliate">Devenir affilié</a>
+        </p>
+      </div>
     </div>
+  </div>
+
+  <div id="screen-affiliate" class="lg-affiliate lg-hidden" style="display:none">
+    <div id="affiliate-root"></div>
   </div>
 
   <div id="screen-app" class="lg-app lg-hidden" style="display:none">
     <header class="lg-header">
       <div class="lg-header-left">
-        <button type="button" class="lg-back lg-hidden" id="hdr-back" data-action="back" aria-label="Retour" style="display:none">‹</button>
-        <div class="lg-brand lg-hidden" id="hdr-brand" style="display:none">
+        <button type="button" class="lg-back lg-hidden" id="hdr-back" data-action="back" aria-label="Retour" style="display:none"></button>
+        <img class="lg-nack-logo" id="hdr-nack-logo" src="../icons/icon-192x192.png" alt="NACK" />
+        <div class="lg-brand" id="hdr-brand">
           <div class="lg-avatar" id="hdr-avatar">N</div>
           <span id="hdr-brand-name">NACK</span>
         </div>
@@ -47,17 +107,17 @@
     </header>
     <main class="lg-main" id="view-root"></main>
     <nav class="lg-bottom-nav" id="bottom-nav">
-      <button type="button" data-action="nav" data-arg="home" class="active"><span class="nav-ico">🏠</span>Accueil</button>
-      <button type="button" data-action="nav" data-arg="stock"><span class="nav-ico">📦</span>Stock</button>
-      <button type="button" data-action="nav" data-arg="sales"><span class="nav-ico">🛒</span>Vente</button>
-      <button type="button" data-action="nav" data-arg="events"><span class="nav-ico">📅</span>Events</button>
-      <button type="button" data-action="nav" data-arg="profile"><span class="nav-ico">👤</span>Profil</button>
+      <button type="button" data-action="nav" data-arg="home" class="active"><span class="nav-ico" data-icon="home"></span>Accueil</button>
+      <button type="button" data-action="nav" data-arg="stock"><span class="nav-ico" data-icon="package"></span>Stock</button>
+      <button type="button" data-action="nav" data-arg="sales" id="nav-sales"><span class="nav-ico" data-icon="cart"></span>Vente</button>
+      <button type="button" data-action="nav" data-arg="events"><span class="nav-ico" data-icon="calendar"></span>Événements</button>
+      <button type="button" data-action="nav" data-arg="profile"><span class="nav-ico" data-icon="user"></span>Profil</button>
     </nav>
   </div>
 
   <div id="modal-manager-overlay" class="lg-modal-overlay lg-hidden" data-action="close-modal" data-arg="modal-manager" style="display:none"></div>
-  <div id="modal-manager" class="lg-modal lg-hidden" role="dialog" aria-modal="true" style="display:none">
-    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-manager" aria-label="Fermer">×</button>
+  <div id="modal-manager" class="lg-modal lg-hidden" role="dialog" style="display:none">
+    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-manager">×</button>
     <h2>Vérification du gérant</h2>
     <p class="lg-modal-desc">Saisissez votre code gérant pour autoriser cette action.</p>
     <form id="mgr-form" action="javascript:void(0)">
@@ -73,8 +133,8 @@
   </div>
 
   <div id="modal-product-overlay" class="lg-modal-overlay lg-hidden" data-action="close-modal" data-arg="modal-product" style="display:none"></div>
-  <div id="modal-product" class="lg-modal lg-hidden" role="dialog" aria-modal="true" style="display:none">
-    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-product" aria-label="Fermer">×</button>
+  <div id="modal-product" class="lg-modal lg-hidden" role="dialog" style="display:none">
+    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-product">×</button>
     <h2>Ajouter un produit</h2>
     <p class="lg-modal-desc">Renseignez les informations de base.</p>
     <form id="product-form" action="javascript:void(0)">
@@ -90,25 +150,27 @@
   </div>
 
   <div id="modal-cart-overlay" class="lg-modal-overlay lg-hidden" data-action="close-modal" data-arg="modal-cart" style="display:none"></div>
-  <div id="modal-cart" class="lg-modal lg-hidden" role="dialog" aria-modal="true" style="display:none">
-    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-cart" aria-label="Fermer">×</button>
-    <h2>Panier</h2>
+  <div id="modal-cart" class="lg-modal lg-hidden" role="dialog" style="display:none">
+    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-cart">×</button>
+    <h2>Encaissement</h2>
     <div id="cart-body"></div>
     <div class="lg-modal-actions">
       <button type="button" class="lg-btn lg-btn-secondary" data-action="cart-cancel">Fermer</button>
-      <button type="button" class="lg-btn lg-btn-nack" id="cart-pay" data-action="cart-pay">Encaisser</button>
+      <button type="button" class="lg-btn lg-btn-nack" id="cart-pay" data-action="cart-pay">Confirmer</button>
     </div>
   </div>
 
   <div id="modal-event-overlay" class="lg-modal-overlay lg-hidden" data-action="close-modal" data-arg="modal-event" style="display:none"></div>
-  <div id="modal-event" class="lg-modal lg-hidden" role="dialog" aria-modal="true" style="display:none">
-    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-event" aria-label="Fermer">×</button>
+  <div id="modal-event" class="lg-modal lg-hidden" role="dialog" style="display:none">
+    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-event">×</button>
     <h2>Nouvel événement</h2>
     <form id="event-form" action="javascript:void(0)">
       <div class="lg-field"><label class="lg-label" for="ev-title">Titre</label><input class="lg-input" id="ev-title" required /></div>
+      <div class="lg-field"><label class="lg-label" for="ev-desc">Description</label><textarea class="lg-textarea" id="ev-desc" rows="3"></textarea></div>
       <div class="lg-field"><label class="lg-label" for="ev-date">Date</label><input class="lg-input" id="ev-date" type="date" required /></div>
       <div class="lg-field"><label class="lg-label" for="ev-time">Heure</label><input class="lg-input" id="ev-time" type="time" /></div>
       <div class="lg-field"><label class="lg-label" for="ev-location">Lieu</label><input class="lg-input" id="ev-location" /></div>
+      <div class="lg-field"><label class="lg-label" for="ev-capacity">Capacité max</label><input class="lg-input" id="ev-capacity" type="number" min="1" /></div>
       <div class="lg-field"><label class="lg-label" for="ev-price">Prix billet (XAF)</label><input class="lg-input" id="ev-price" type="number" min="0" required /></div>
       <div class="lg-modal-actions">
         <button type="button" class="lg-btn lg-btn-secondary" data-action="ev-cancel">Annuler</button>
@@ -117,12 +179,51 @@
     </form>
   </div>
 
+  <div id="modal-team-overlay" class="lg-modal-overlay lg-hidden" data-action="close-modal" data-arg="modal-team" style="display:none"></div>
+  <div id="modal-team" class="lg-modal lg-hidden" role="dialog" style="display:none">
+    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-team">×</button>
+    <h2 id="team-modal-title">Ajouter un équipier</h2>
+    <form id="team-form" action="javascript:void(0)">
+      <input type="hidden" id="team-form-role" value="" />
+      <input type="hidden" id="team-form-id" value="" />
+      <div class="lg-field"><label class="lg-label" for="team-first">Prénom</label><input class="lg-input" id="team-first" required /></div>
+      <div class="lg-field"><label class="lg-label" for="team-last">Nom</label><input class="lg-input" id="team-last" required /></div>
+      <div class="lg-field"><label class="lg-label" for="team-phone">Téléphone</label><input class="lg-input" id="team-phone" required /></div>
+      <div class="lg-field"><label class="lg-label" for="team-email">Email (optionnel)</label><input class="lg-input" id="team-email" type="email" /></div>
+      <div class="lg-modal-actions">
+        <button type="button" class="lg-btn lg-btn-secondary" data-action="team-cancel">Annuler</button>
+        <button type="submit" class="lg-btn lg-btn-nack" id="team-form-submit">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="modal-profile-overlay" class="lg-modal-overlay lg-hidden" data-action="close-modal" data-arg="modal-profile" style="display:none"></div>
+  <div id="modal-profile" class="lg-modal lg-hidden" role="dialog" style="display:none">
+    <button type="button" class="lg-modal-close" data-action="close-modal" data-arg="modal-profile">×</button>
+    <h2>Modifier l'établissement</h2>
+    <form id="profile-form" action="javascript:void(0)">
+      <div class="lg-field"><label class="lg-label" for="prof-est-name">Nom établissement</label><input class="lg-input" id="prof-est-name" required /></div>
+      <div class="lg-field"><label class="lg-label" for="prof-est-type">Type</label><input class="lg-input" id="prof-est-type" /></div>
+      <div class="lg-field"><label class="lg-label" for="prof-owner">Gérant</label><input class="lg-input" id="prof-owner" required /></div>
+      <div class="lg-field"><label class="lg-label" for="prof-phone">Téléphone</label><input class="lg-input" id="prof-phone" /></div>
+      <div class="lg-field"><label class="lg-label" for="prof-whatsapp">WhatsApp</label><input class="lg-input" id="prof-whatsapp" /></div>
+      <div class="lg-field"><label class="lg-label" for="prof-address">Adresse</label><input class="lg-input" id="prof-address" /></div>
+      <div class="lg-field"><label class="lg-label" for="prof-logo">Logo (URL)</label><input class="lg-input" id="prof-logo" /></div>
+      <div class="lg-modal-actions">
+        <button type="button" class="lg-btn lg-btn-secondary" data-action="prof-cancel">Annuler</button>
+        <button type="submit" class="lg-btn lg-btn-nack" id="prof-save">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+
   <div id="lg-toast" class="lg-toast lg-hidden" style="display:none"></div>
 
   <script src="js/config.js"></script>
+  <script src="js/icons.js"></script>
   <script src="js/sha256.js"></script>
   <script src="js/api.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/login.js"></script>
   <script src="js/views/home.js"></script>
   <script src="js/views/stock.js"></script>
   <script src="js/views/sales.js"></script>

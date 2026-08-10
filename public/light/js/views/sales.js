@@ -1,41 +1,132 @@
 (function (global) {
-  var ui, api, state;
+  var ui, api, state, icon;
 
   function render(root, ctx) {
     ui = global.NACK_LIGHT.ui;
     api = global.NACK_LIGHT.api;
-    var prevCart = (state && state.cart) ? state.cart : {};
-    state = { ctx: ctx, products: [], cart: prevCart, root: root, query: "" };
+    icon = global.NACK_LIGHT.icon;
+    var prev = state || {};
+    state = {
+      ctx: ctx,
+      products: [],
+      orders: [],
+      cart: prev.cart || {},
+      tab: prev.tab || "caisse",
+      tableNumber: prev.tableNumber || "",
+      editingOrderId: prev.editingOrderId || null,
+      query: ""
+    };
 
     root.innerHTML =
-      '<div class="lg-search"><input class="lg-input" id="sales-search" type="search" placeholder="Rechercher…"></div>' +
-      '<div id="sales-grid" class="lg-loading">Chargement…</div>' +
-      '<div id="sales-cart-bar" class="lg-cart-bar lg-hidden" data-action="open-cart" role="button" style="display:none">' +
-        '<span id="cart-count">0 article(s)</span>' +
-        '<span id="cart-total">0 XAF</span>' +
-      '</div>';
+      '<div class="lg-tabs">' +
+        '<button type="button" class="lg-tab' + (state.tab === "caisse" ? " active" : "") + '" data-action="sales-tab" data-arg="caisse">Caisse</button>' +
+        '<button type="button" class="lg-tab' + (state.tab === "orders" ? " active" : "") + '" data-action="sales-tab" data-arg="orders" id="sales-orders-tab">' +
+          'Commandes en cours<span class="lg-tab-badge" id="orders-badge" style="display:none">0</span></button>' +
+      '</div>' +
+      '<div id="sales-panel"></div>';
 
-    var search = ui.$("sales-search");
-    if (search) {
-      search.oninput = function () {
-        state.query = String(search.value || "").toLowerCase();
-        paintGrid();
-      };
-    }
+    if (state.tab === "orders") paintOrdersPanel();
+    else paintCaissePanel();
     loadProducts();
+    loadOrders();
   }
 
   function productsPath() { return api.dataRoot(state.ctx.profile, state.ctx.uid) + "/products"; }
   function salesPath() { return api.dataRoot(state.ctx.profile, state.ctx.uid) + "/sales"; }
+  function ordersPath() { return api.dataRoot(state.ctx.profile, state.ctx.uid) + "/orders"; }
+
+  function setTab(tab) {
+    state.tab = tab;
+    var tabs = document.querySelectorAll(".lg-tab");
+    for (var i = 0; i < tabs.length; i++) {
+      var t = tabs[i];
+      var arg = t.getAttribute("data-arg");
+      var cls = "lg-tab";
+      if (arg === tab) cls += " active";
+      t.className = cls;
+    }
+    if (tab === "orders") paintOrdersPanel();
+    else paintCaissePanel();
+  }
+
+  function paintCaissePanel() {
+    var panel = ui.$("sales-panel");
+    if (!panel) return;
+    panel.innerHTML =
+      '<div class="lg-search"><input class="lg-input" id="sales-search" type="search" placeholder="Rechercher un produit…"></div>' +
+      '<div class="lg-field" style="margin-bottom:12px">' +
+        '<label class="lg-label" for="sales-table">Table / Zone (commande en cours)</label>' +
+        '<input class="lg-input" id="sales-table" placeholder="Ex: Table 5, Terrasse…" value="' + ui.escapeHtml(state.tableNumber) + '">' +
+      '</div>' +
+      '<div id="sales-cart-panel"></div>' +
+      '<div id="sales-grid" class="lg-loading">Chargement…</div>' +
+      '<div id="sales-float" class="lg-sales-float lg-hidden" style="display:none"></div>';
+
+    ui.$("sales-search").oninput = function () {
+      state.query = String(ui.$("sales-search").value || "").toLowerCase();
+      paintGrid();
+    };
+    ui.$("sales-table").oninput = function () {
+      state.tableNumber = String(ui.$("sales-table").value || "");
+    };
+    paintCartPanel();
+    paintGrid();
+    paintFloatBar();
+  }
+
+  function paintOrdersPanel() {
+    var panel = ui.$("sales-panel");
+    if (!panel) return;
+    panel.innerHTML = '<div id="orders-list" class="lg-loading">Chargement des commandes…</div>';
+    paintOrdersList();
+  }
 
   function loadProducts() {
     api.listDocs(productsPath(), 200).then(function (docs) {
       state.products = docs || [];
-      paintGrid();
+      if (state.tab === "caisse") paintGrid();
     }).catch(function (err) {
       var el = ui.$("sales-grid");
       if (el) el.innerHTML = '<div class="lg-empty">' + ui.escapeHtml(err.message) + '</div>';
     });
+  }
+
+  function loadOrders() {
+    api.listDocs(ordersPath(), 100).then(function (docs) {
+      state.orders = docs || [];
+      state.orders.sort(function (a, b) { return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0); });
+      updateOrdersBadge();
+      if (state.tab === "orders") paintOrdersList();
+    }).catch(function () { updateOrdersBadge(); });
+  }
+
+  function pendingOrders() {
+    var out = [];
+    for (var i = 0; i < state.orders.length; i++) {
+      if ((state.orders[i].status || "pending") === "pending") out.push(state.orders[i]);
+    }
+    return out;
+  }
+
+  function updateOrdersBadge() {
+    var n = pendingOrders().length;
+    var badge = ui.$("orders-badge");
+    var nav = ui.$("nav-sales");
+    if (badge) {
+      if (n > 0) { badge.style.display = "inline-block"; badge.textContent = String(n); }
+      else badge.style.display = "none";
+    }
+    if (nav) {
+      var old = nav.querySelector(".lg-nav-badge");
+      if (old) old.parentNode.removeChild(old);
+      if (n > 0) {
+        var b = document.createElement("span");
+        b.className = "lg-nav-badge";
+        b.textContent = String(n);
+        nav.appendChild(b);
+      }
+    }
+    if (global.NACK_LIGHT.setPendingOrdersCount) global.NACK_LIGHT.setPendingOrdersCount(n);
   }
 
   function paintGrid() {
@@ -52,12 +143,10 @@
         '<div><div class="lg-product-tile" data-action="add-cart" data-arg="' + ui.escapeHtml(p.id) + '" role="button">' +
           '<div style="font-weight:700;font-size:0.9rem">' + ui.escapeHtml(p.name || "") + '</div>' +
           '<div class="lg-list-item-meta">Stock ' + (Number(p.quantity) || 0) + '</div>' +
-          '<div class="price">' + ui.escapeHtml(ui.formatMoney(p.price)) + '</div>' +
-        '</div></div>';
+          '<div class="price">' + ui.escapeHtml(ui.formatMoney(p.price)) + '</div></div></div>';
     }
     html += '</div>';
     el.innerHTML = count ? html : '<div class="lg-empty">Aucun produit disponible</div>';
-    updateCartBar();
   }
 
   function findProduct(id) {
@@ -65,28 +154,8 @@
     return null;
   }
 
-  function addToCart(id) {
-    if (!state) return;
-    var p = findProduct(id);
-    if (!p) return;
-    var line = state.cart[id];
-    var qty = line ? line.quantity + 1 : 1;
-    if (qty > (Number(p.quantity) || 0)) { ui.toast("Stock insuffisant", "error"); return; }
-    state.cart[id] = { id: p.id, name: p.name, price: Number(p.price) || 0, quantity: qty };
-    updateCartBar();
-    ui.toast(p.name + " ajouté", "ok");
-  }
-
-  function decCart(id) {
-    if (!state || !state.cart[id]) return;
-    if (state.cart[id].quantity <= 1) delete state.cart[id];
-    else state.cart[id].quantity -= 1;
-    updateCartBar();
-  }
-
   function cartItems() {
     var items = [];
-    if (!state) return items;
     for (var id in state.cart) if (Object.prototype.hasOwnProperty.call(state.cart, id)) items.push(state.cart[id]);
     return items;
   }
@@ -97,17 +166,80 @@
     return t;
   }
 
-  function updateCartBar() {
-    var bar = ui.$("sales-cart-bar");
+  function addToCart(id) {
+    var p = findProduct(id);
+    if (!p) return;
+    var line = state.cart[id];
+    var qty = line ? line.quantity + 1 : 1;
+    if (qty > (Number(p.quantity) || 0)) { ui.toast("Stock insuffisant", "error"); return; }
+    state.cart[id] = { id: p.id, name: p.name, price: Number(p.price) || 0, quantity: qty, category: p.category || "" };
+    paintCartPanel();
+    paintFloatBar();
+  }
+
+  function decCart(id) {
+    if (!state.cart[id]) return;
+    if (state.cart[id].quantity <= 1) delete state.cart[id];
+    else state.cart[id].quantity -= 1;
+    paintCartPanel();
+    paintFloatBar();
+  }
+
+  function removeCart(id) {
+    delete state.cart[id];
+    paintCartPanel();
+    paintFloatBar();
+  }
+
+  function clearCart() {
+    state.cart = {};
+    state.editingOrderId = null;
+    paintCartPanel();
+    paintFloatBar();
+  }
+
+  function paintCartPanel() {
+    var panel = ui.$("sales-cart-panel");
+    if (!panel) return;
+    var items = cartItems();
+    if (!items.length) { panel.innerHTML = ""; return; }
+    var html = '<div class="lg-cart-panel"><div class="lg-cart-panel-title">Panier</div>';
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      html +=
+        '<div class="lg-cart-line">' +
+          '<div class="lg-list-item-main">' +
+            '<div class="lg-list-item-title">' + ui.escapeHtml(it.name) + '</div>' +
+            '<div class="lg-list-item-meta">' + ui.escapeHtml(ui.formatMoney(it.price)) + '</div>' +
+          '</div>' +
+          '<div class="lg-qty">' +
+            '<button type="button" class="lg-btn-icon-only" data-action="cart-dec" data-arg="' + ui.escapeHtml(it.id) + '">' + icon("minus", 18) + '</button>' +
+            '<span style="min-width:24px;text-align:center;font-weight:700">' + it.quantity + '</span>' +
+            '<button type="button" class="lg-btn-icon-only" data-action="cart-inc" data-arg="' + ui.escapeHtml(it.id) + '">' + icon("plus", 18) + '</button>' +
+            '<button type="button" class="lg-btn-icon-only" data-action="cart-remove" data-arg="' + ui.escapeHtml(it.id) + '" title="Supprimer">' + icon("trash", 18) + '</button>' +
+          '</div></div>';
+    }
+    html +=
+      '<div class="lg-cart-total-row"><span>Total</span><span>' + ui.escapeHtml(ui.formatMoney(cartTotal())) + '</span></div>' +
+      '<div class="lg-row-actions" style="margin-top:12px">' +
+        '<button type="button" class="lg-btn lg-btn-secondary lg-btn-block" data-action="hold-order">Mettre en attente</button>' +
+        '<button type="button" class="lg-btn lg-btn-nack lg-btn-block" data-action="open-cart">Encaisser</button>' +
+      '</div></div>';
+    panel.innerHTML = html;
+  }
+
+  function paintFloatBar() {
+    var bar = ui.$("sales-float");
     if (!bar) return;
     var items = cartItems(), n = 0;
     for (var i = 0; i < items.length; i++) n += items[i].quantity;
     if (!n) { ui.hideEl(bar); return; }
     ui.showEl(bar);
     bar.style.display = "flex";
-    var c = ui.$("cart-count"), t = ui.$("cart-total");
-    if (c) c.textContent = n + " article(s)";
-    if (t) t.textContent = ui.formatMoney(cartTotal());
+    bar.innerHTML =
+      '<button type="button" class="lg-btn-icon-only" data-action="cart-clear" title="Vider">' + icon("trash", 22) + '</button>' +
+      '<div class="lg-sales-float-total">' + ui.escapeHtml(ui.formatMoney(cartTotal())) + '</div>' +
+      '<button type="button" class="lg-btn-icon-only lg-pay-btn" data-action="open-cart" title="Encaisser">' + icon("credit", 22) + '</button>';
   }
 
   function openCartModal() {
@@ -121,19 +253,16 @@
       html +=
         '<div class="lg-list-item">' +
           '<div class="lg-list-item-main">' +
-            '<div class="lg-list-item-title">' + ui.escapeHtml(it.name) + '</div>' +
+            '<div class="lg-list-item-title">' + ui.escapeHtml(it.name) + ' × ' + it.quantity + '</div>' +
             '<div class="lg-list-item-meta">' + ui.escapeHtml(ui.formatMoney(it.price * it.quantity)) + '</div>' +
-          '</div>' +
-          '<div class="lg-qty">' +
-            '<button type="button" data-action="cart-dec" data-arg="' + ui.escapeHtml(it.id) + '">−</button>' +
-            '<span>' + it.quantity + '</span>' +
-            '<button type="button" data-action="cart-inc" data-arg="' + ui.escapeHtml(it.id) + '">+</button>' +
-          '</div>' +
-        '</div>';
+          '</div></div>';
+    }
+    if (state.tableNumber) {
+      html += '<p class="lg-card-desc" style="margin-top:8px">Table : <strong>' + ui.escapeHtml(state.tableNumber) + '</strong></p>';
     }
     html +=
-      '<div style="margin-top:12px;font-weight:700;text-align:right">Total : ' + ui.escapeHtml(ui.formatMoney(cartTotal())) + '</div>' +
-      '<div class="lg-section-title">Paiement</div>' +
+      '<div class="lg-cart-total-row"><span>Total</span><span>' + ui.escapeHtml(ui.formatMoney(cartTotal())) + '</span></div>' +
+      '<div class="lg-section-title">Mode de paiement</div>' +
       '<div class="lg-pay-options">' +
         '<label><input type="radio" name="pay-method" value="cash" checked> Espèces</label>' +
         '<label><input type="radio" name="pay-method" value="mobile"> Mobile</label>' +
@@ -149,14 +278,46 @@
     return "cash";
   }
 
+  function holdOrder() {
+    var items = cartItems();
+    if (!items.length) { ui.toast("Panier vide", "error"); return; }
+    var table = state.tableNumber || (ui.$("sales-table") && ui.$("sales-table").value || "").trim();
+    if (!table) { ui.toast("Indiquez une table ou zone", "error"); return; }
+    var payload = {
+      orderNumber: Math.floor(Date.now() % 100000),
+      tableNumber: table,
+      items: items,
+      total: cartTotal(),
+      status: "pending",
+      createdAt: Date.now(),
+      agentCode: "caisse-light",
+      agentName: (state.ctx.profile && state.ctx.profile.ownerName) || "Gérant"
+    };
+    var chain = state.editingOrderId
+      ? api.patchDoc(ordersPath() + "/" + state.editingOrderId, payload, ["tableNumber", "items", "total", "status", "createdAt"])
+      : api.createDoc(ordersPath(), payload);
+    chain.then(function () {
+      state.cart = {};
+      state.editingOrderId = null;
+      state.tableNumber = table;
+      paintCartPanel();
+      paintFloatBar();
+      loadOrders();
+      ui.toast("Commande en attente — Table " + table, "ok");
+    }).catch(function (err) { ui.toast(err.message || "Erreur", "error"); });
+  }
+
   function checkout() {
-    if (!state || !state.ctx) return;
     var items = cartItems();
     if (!items.length) { ui.toast("Panier vide", "error"); return; }
     var method = selectedPayMethod();
     var btn = ui.$("cart-pay");
     ui.setLoading(btn, true);
-    var sale = { items: items, total: cartTotal(), paymentMethod: method, createdAt: Date.now() };
+    var table = state.tableNumber || "";
+    var sale = {
+      items: items, total: cartTotal(), paymentMethod: method,
+      createdAt: Date.now(), tableZone: table || "Caisse"
+    };
     api.createDoc(salesPath(), sale).then(function () {
       var chain = Promise.resolve();
       for (var i = 0; i < items.length; i++) {
@@ -169,21 +330,94 @@
           });
         })(items[i]);
       }
+      if (state.editingOrderId) {
+        chain = chain.then(function () {
+          return api.patchDoc(ordersPath() + "/" + state.editingOrderId, { status: "sent", updatedAt: Date.now() }, ["status", "updatedAt"]);
+        });
+      }
       return chain;
     }).then(function () {
       state.cart = {};
-      updateCartBar();
+      state.editingOrderId = null;
       ui.closeModal("modal-cart");
       ui.toast("Vente enregistrée", "ok");
       loadProducts();
+      loadOrders();
+      paintCartPanel();
+      paintFloatBar();
       if (state.ctx.refreshStats) state.ctx.refreshStats();
-    }).catch(function (err) {
-      ui.toast(err.message || "Erreur vente", "error");
-    }).then(function () { ui.setLoading(btn, false); });
+    }).catch(function (err) { ui.toast(err.message || "Erreur vente", "error"); })
+      .then(function () { ui.setLoading(btn, false); });
+  }
+
+  function paintOrdersList() {
+    var el = ui.$("orders-list");
+    if (!el) return;
+    var pending = pendingOrders();
+    if (!pending.length) {
+      el.innerHTML = '<div class="lg-empty">Aucune commande en cours</div>';
+      return;
+    }
+    var html = "";
+    for (var i = 0; i < pending.length; i++) {
+      var o = pending[i];
+      var items = o.items || [];
+      var names = [];
+      for (var j = 0; j < items.length && j < 4; j++) {
+        names.push((items[j].name || "") + " ×" + (items[j].quantity || 1));
+      }
+      html +=
+        '<div class="lg-card">' +
+          '<div class="lg-card-title">Table ' + ui.escapeHtml(o.tableNumber || "—") + '</div>' +
+          '<div class="lg-card-desc">' + ui.escapeHtml(names.join(", ")) + '</div>' +
+          '<div style="margin-top:8px;font-weight:700;color:#dc2626">' + ui.escapeHtml(ui.formatMoney(o.total)) + '</div>' +
+          '<div class="lg-row-actions" style="margin-top:10px">' +
+            '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="edit-order" data-arg="' + ui.escapeHtml(o.id) + '">Modifier</button>' +
+            '<button type="button" class="lg-btn lg-btn-nack lg-btn-sm" data-action="pay-order" data-arg="' + ui.escapeHtml(o.id) + '">Encaisser</button>' +
+            '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="cancel-order" data-arg="' + ui.escapeHtml(o.id) + '">Annuler</button>' +
+          '</div></div>';
+    }
+    el.innerHTML = html;
+  }
+
+  function loadOrderToCart(id) {
+    var order = null;
+    for (var i = 0; i < state.orders.length; i++) if (state.orders[i].id === id) order = state.orders[i];
+    if (!order) return;
+    state.cart = {};
+    var items = order.items || [];
+    for (var j = 0; j < items.length; j++) {
+      var it = items[j];
+      var pid = it.id || it.name;
+      state.cart[pid] = {
+        id: pid, name: it.name, price: Number(it.price) || 0,
+        quantity: Number(it.quantity) || 1, category: it.category || ""
+      };
+    }
+    state.tableNumber = order.tableNumber || "";
+    state.editingOrderId = id;
+    setTab("caisse");
+    ui.toast("Commande chargée — ajustez et encaissez", "ok");
+  }
+
+  function payOrder(id) {
+    loadOrderToCart(id);
+    openCartModal();
+  }
+
+  function cancelOrder(id) {
+    api.patchDoc(ordersPath() + "/" + id, { status: "cancelled", updatedAt: Date.now() }, ["status", "updatedAt"]).then(function () {
+      loadOrders();
+      ui.toast("Commande annulée", "ok");
+    }).catch(function (err) { ui.toast(err.message || "Erreur", "error"); });
   }
 
   global.NACK_LIGHT.views = global.NACK_LIGHT.views || {};
   global.NACK_LIGHT.views.sales = {
-    render: render, checkout: checkout, addToCart: addToCart, decCart: decCart, openCartModal: openCartModal
+    render: render, setTab: setTab,
+    addToCart: addToCart, decCart: decCart, removeCart: removeCart, clearCart: clearCart,
+    openCartModal: openCartModal, checkout: checkout, holdOrder: holdOrder,
+    loadOrderToCart: loadOrderToCart, payOrder: payOrder, cancelOrder: cancelOrder,
+    refreshOrders: loadOrders
   };
 })(window);

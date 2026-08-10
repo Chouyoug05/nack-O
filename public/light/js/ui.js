@@ -199,6 +199,20 @@
     showEl: showEl, hideEl: hideEl,
     installGlobalTaps: installGlobalTaps,
     requireManagerAuth: requireManagerAuth, submitManagerAuth: submitManagerAuth,
-    setLoading: setLoading, copyText: copyText
+    setLoading: setLoading, copyText: copyText,
+    paintNavIcons: paintNavIcons
   };
+
+  function paintNavIcons() {
+    var iconFn = global.NACK_LIGHT && global.NACK_LIGHT.icon;
+    if (!iconFn) return;
+    var nodes = document.querySelectorAll("[data-icon]");
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var name = n.getAttribute("data-icon");
+      if (name) n.innerHTML = iconFn(name, 22);
+    }
+    var back = $("hdr-back");
+    if (back) back.innerHTML = iconFn("chevL", 22);
+  }
 })(window);

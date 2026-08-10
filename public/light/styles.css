@@ -433,3 +433,166 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
   font-size: 0.8rem; font-weight: 600; cursor: pointer; background: #fff;
 }
 .lg-pay-options input { margin-right: 4px; }
+
+/* --- Logos & icônes --- */
+.lg-nack-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+  flex-shrink: 0;
+}
+.lg-nack-logo.lg-lg { width: 72px; height: 72px; border-radius: 18px; margin: 0 auto 12px; }
+.lg-svg { display: inline-block; vertical-align: middle; }
+.lg-menu-icon .lg-svg { width: 26px; height: 26px; }
+.lg-bottom-nav .lg-svg { width: 22px; height: 22px; display: block; margin: 0 auto 2px; }
+.lg-btn-icon {
+  display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  gap: 6px;
+}
+.lg-btn-icon-only {
+  width: 40px; height: 40px; padding: 0; min-height: 40px;
+  display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+}
+
+.lg-welcome {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 12px; margin-bottom: 16px;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px; box-shadow: var(--shadow-card);
+}
+.lg-welcome-est { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; background: var(--nack-beige-light); flex-shrink: 0; }
+.lg-welcome-est-letter {
+  width: 52px; height: 52px; border-radius: 14px; background: var(--nack-red); color: #fff;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  font-weight: 800; font-size: 1.25rem; flex-shrink: 0;
+}
+
+/* --- Onglets (Vente / Commandes) --- */
+.lg-tabs {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  gap: 8px; margin-bottom: 12px;
+}
+.lg-tab {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  padding: 10px 8px; border: 1px solid var(--border); border-radius: 10px;
+  background: #fff; font-weight: 600; font-size: 0.85rem; cursor: pointer; text-align: center;
+}
+.lg-tab.active { background: var(--nack-red); color: #fff; border-color: var(--nack-red); }
+.lg-tab-badge {
+  display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px;
+  border-radius: 999px; background: rgba(255,255,255,0.25); font-size: 0.7rem;
+}
+.lg-tab:not(.active) .lg-tab-badge { background: var(--nack-red); color: #fff; }
+
+/* --- Panier inline (style app React) --- */
+.lg-cart-panel {
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-card); padding: 12px; margin-bottom: 12px;
+}
+.lg-cart-panel-title { font-weight: 700; margin-bottom: 8px; font-size: 0.95rem; }
+.lg-cart-line {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);
+}
+.lg-cart-line:last-child { border-bottom: none; }
+.lg-cart-total-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  font-weight: 800; font-size: 1.1rem; padding-top: 10px; margin-top: 4px;
+  border-top: 2px solid var(--border); color: var(--nack-red);
+}
+
+.lg-sales-float {
+  position: fixed; left: 12px; right: 12px; bottom: 68px; z-index: 44;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 10px; background: rgba(220,38,38,0.95); color: #fff;
+  border-radius: 16px; padding: 10px 12px; box-shadow: var(--shadow-button);
+}
+.lg-sales-float-total {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; text-align: center;
+  font-size: 1.35rem; font-weight: 800;
+}
+.lg-sales-float .lg-btn-icon-only { background: rgba(0,0,0,0.2); color: #fff; border: none; border-radius: 12px; }
+.lg-sales-float .lg-pay-btn { background: #16a34a; color: #fff; border: none; }
+
+.lg-qr-box {
+  text-align: center; padding: 16px; background: var(--nack-beige-light);
+  border-radius: var(--radius); margin: 12px 0;
+}
+.lg-qr-box img { margin: 0 auto; width: 200px; height: 200px; border: 4px solid #fff; border-radius: 12px; }
+
+.lg-steps { margin: 12px 0; }
+.lg-step {
+  display: -webkit-box; display: -webkit-flex; display: flex; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+}
+.lg-step-num {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--nack-red); color: #fff;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  font-weight: 700; font-size: 0.8rem; flex-shrink: 0;
+}
+
+.lg-filter-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  gap: 8px; margin-bottom: 12px; -webkit-flex-wrap: wrap; flex-wrap: wrap;
+}
+.lg-filter-row .lg-select { -webkit-box-flex: 1; -webkit-flex: 1; flex: 1; min-width: 120px; }
+
+.lg-nav-badge {
+  position: absolute; top: 6px; right: 8px; min-width: 16px; height: 16px;
+  padding: 0 4px; border-radius: 999px; background: var(--nack-red); color: #fff;
+  font-size: 0.65rem; font-weight: 700; line-height: 16px; text-align: center;
+}
+.lg-bottom-nav button { position: relative; }
+
+/* --- Portail connexion (3 comptes) --- */
+.lg-login-types {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  gap: 6px; margin: 16px 0 12px; padding: 4px;
+  background: #fff; border: 1px solid var(--border); border-radius: 12px;
+}
+.lg-login-type {
+  -webkit-box-flex: 1; -webkit-flex: 1; flex: 1;
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 4px; padding: 10px 4px; border: none; border-radius: 10px;
+  background: transparent; cursor: pointer; font-size: 0.75rem; font-weight: 600; color: var(--muted);
+}
+.lg-login-type.active { background: var(--nack-red); color: #fff; box-shadow: var(--shadow-button); }
+.lg-login-type .lg-svg { opacity: 0.85; }
+.lg-login-type-title { font-weight: 700; font-size: 1rem; margin-bottom: 12px; text-align: center; }
+.lg-field-hint { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+.lg-affiliate { max-width: 640px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+.lg-affiliate-header {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  gap: 10px; margin-bottom: 16px;
+}
+.lg-affiliate-header .lg-btn { margin-left: auto; }
+
+.lg-menu-icon.team { background: #dbeafe; color: #2563eb; }
+
+.lg-profile-row {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 0.9rem;
+}
+.lg-profile-row:last-child { border-bottom: none; }
+.lg-profile-row span:first-child { color: var(--muted); flex-shrink: 0; }
+.lg-profile-row span:last-child { text-align: right; font-weight: 600; word-break: break-word; }

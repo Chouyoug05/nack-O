@@ -231,11 +231,130 @@
     } catch (e) { return ""; }
   }
 
+  function resolvePaymentProxy() {
+    var base = publicBase();
+    return base + "/.netlify/functions/create-payment-link";
+  }
+
+  function getPublicDoc(path) {
+    return xhr("GET", FS_BASE + "/" + path + "?key=" + API_KEY, null, null).then(docToObj).catch(function () { return null; });
+  }
+
+  function runPublicQuery(structuredQuery) {
+    return xhr("POST", FS_BASE + ":runQuery?key=" + API_KEY, { structuredQuery: structuredQuery }, { "Content-Type": "application/json" }).then(function (res) {
+      var rows = res || [], out = [];
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].document) out.push(docToObj(rows[i].document));
+      }
+      return out;
+    });
+  }
+
+  function setDoc(path, data, createOnly) {
+    var qs = createOnly ? "?currentDocument.exists=false" : "";
+    return withToken(function (token) {
+      return xhr("PATCH", FS_BASE + "/" + path + qs, { fields: toFsFields(data) }, authHeaders(token)).then(docToObj);
+    });
+  }
+
+  function teamPath(uid) { return "profiles/" + uid + "/team"; }
+
+  function findAgentByCode(agentCode, role) {
+    return runPublicQuery({
+      from: [{ collectionId: "agentTokens" }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: "agentCode" },
+          op: "EQUAL",
+          value: { stringValue: agentCode }
+        }
+      },
+      limit: 1
+    }).then(function (docs) {
+      if (docs.length && docs[0].role === role) return docs[0].id;
+      return runPublicQuery({
+        from: [{ collectionId: "team", allDescendants: true }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "agentCode" },
+            op: "EQUAL",
+            value: { stringValue: agentCode }
+          }
+        },
+        limit: 1
+      }).then(function (teamDocs) {
+        if (!teamDocs.length) return null;
+        var data = teamDocs[0];
+        if (data.role !== role) return null;
+        return data.agentToken || agentCode;
+      });
+    });
+  }
+
+  function loginAffiliate(identifier, password) {
+    var id = String(identifier || "").trim();
+    var pass = String(password || "").trim();
+    if (!id || !pass) return Promise.reject(new Error("Code et mot de passe requis"));
+    var code = id.toUpperCase();
+    return getPublicDoc("affiliates/" + code).then(function (doc) {
+      if (doc && doc.id) {
+        if (doc.password && doc.password !== pass) throw new Error("Mot de passe incorrect");
+        return doc;
+      }
+      return runPublicQuery({
+        from: [{ collectionId: "affiliates" }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: "whatsapp" },
+            op: "EQUAL",
+            value: { stringValue: id }
+          }
+        },
+        limit: 1
+      }).then(function (docs) {
+        if (!docs.length) throw new Error("Identifiant inconnu");
+        var aff = docs[0];
+        if (aff.password && aff.password !== pass) throw new Error("Mot de passe incorrect");
+        return aff;
+      });
+    });
+  }
+
+  function queryReferrals(code) {
+    return runPublicQuery({
+      from: [{ collectionId: "profiles" }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: "referredBy" },
+          op: "EQUAL",
+          value: { stringValue: code }
+        }
+      }
+    });
+  }
+
+  function createPaymentLink(params) {
+    return xhr("POST", resolvePaymentProxy(), params, { "Content-Type": "application/json" }).then(function (res) {
+      if (typeof res === "string") {
+        try { res = JSON.parse(res); } catch (e) { throw new Error(res); }
+      }
+      if (res && res.link) return res.link;
+      throw new Error("Lien de paiement introuvable");
+    });
+  }
+
+  function patchProfile(uid, data, maskFields) {
+    return patchDoc("profiles/" + uid, data, maskFields);
+  }
+
   global.NACK_LIGHT.api = {
     xhr: xhr, getSession: getSession, saveSession: saveSession, clearSession: clearSession,
     signIn: signIn, refreshIdToken: refreshIdToken,
     getDoc: getDoc, listDocs: listDocs, createDoc: createDoc, patchDoc: patchDoc, deleteDoc: deleteDoc,
-    dataRoot: dataRoot, publicBase: publicBase,
+    setDoc: setDoc, getPublicDoc: getPublicDoc, runPublicQuery: runPublicQuery,
+    findAgentByCode: findAgentByCode, loginAffiliate: loginAffiliate, queryReferrals: queryReferrals,
+    createPaymentLink: createPaymentLink, patchProfile: patchProfile, teamPath: teamPath,
+    dataRoot: dataRoot, publicBase: publicBase, resolvePaymentProxy: resolvePaymentProxy,
     getProfile: function (uid) { return getDoc("profiles/" + uid); }
   };
 })(window);

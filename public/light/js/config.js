@@ -15,8 +15,19 @@ window.NACK_LIGHT.STORAGE_KEYS = {
   uid: "nack_light_uid",
   email: "nack_light_email",
   managerAuthUntil: "nack_manager_auth_until",
-  forceLight: "nack_force_light"
+  forceLight: "nack_force_light",
+  affiliateSession: "nack_affiliate_session"
 };
+window.NACK_LIGHT.PLANS = {
+  transition: { name: "Standard", price: 3000 },
+  "transition-pro-max": { name: "Premium", price: 7500 }
+};
+window.NACK_LIGHT.DURATIONS = [
+  { value: "month", label: "1 mois" },
+  { value: "quarter", label: "3 mois" },
+  { value: "semester", label: "6 mois (-10%)" },
+  { value: "year", label: "12 mois (2 mois offerts)" }
+];
 /* Alias rétrocompat si une ancienne clé forçait le mode */
 try {
   if (localStorage.getItem("nack_force_legacy") === "1") {

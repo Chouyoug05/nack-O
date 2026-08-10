@@ -2,6 +2,7 @@
   var api = global.NACK_LIGHT.api;
   var ui = global.NACK_LIGHT.ui;
   var views = global.NACK_LIGHT.views;
+  var pendingOrdersCount = 0;
 
   var state = {
     view: "home",
@@ -23,9 +24,15 @@
     profile: "Mon Profil"
   };
 
+  global.NACK_LIGHT.setPendingOrdersCount = function (n) {
+    pendingOrdersCount = n || 0;
+  };
+
   function boot() {
+    ui.paintNavIcons();
     bindForms();
     ui.installGlobalTaps(handleAction);
+    if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.init) global.NACK_LIGHT.login.init();
     var session = api.getSession();
     if (session && session.idToken && session.uid) {
       state.uid = session.uid;
@@ -34,12 +41,38 @@
       loadProfile().then(function () {
         navigate("home");
         refreshStats();
+        prefetchOrdersCount();
       }).catch(function (err) {
         ui.toast(err.message || "Session invalide", "error");
         logout();
       });
     } else {
       showLogin();
+    }
+  }
+
+  function prefetchOrdersCount() {
+    if (!state.profile || !state.uid) return;
+    api.listDocs(api.dataRoot(state.profile, state.uid) + "/orders", 50).then(function (docs) {
+      var n = 0;
+      for (var i = 0; i < (docs || []).length; i++) {
+        if ((docs[i].status || "pending") === "pending") n++;
+      }
+      global.NACK_LIGHT.setPendingOrdersCount(n);
+      updateNavSalesBadge(n);
+    }).catch(function () {});
+  }
+
+  function updateNavSalesBadge(n) {
+    var nav = ui.$("nav-sales");
+    if (!nav) return;
+    var old = nav.querySelector(".lg-nav-badge");
+    if (old) old.parentNode.removeChild(old);
+    if (n > 0) {
+      var b = document.createElement("span");
+      b.className = "lg-nav-badge";
+      b.textContent = String(n);
+      nav.appendChild(b);
     }
   }
 
@@ -51,6 +84,18 @@
     });
     bindForm("event-form", function () {
       if (views.events && views.events.submitEvent) views.events.submitEvent();
+    });
+    bindForm("team-login-form", function () {
+      if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.doTeamLogin) global.NACK_LIGHT.login.doTeamLogin();
+    });
+    bindForm("affiliate-login-form", function () {
+      if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.doAffiliateLogin) global.NACK_LIGHT.login.doAffiliateLogin();
+    });
+    bindForm("team-form", function () {
+      if (views.team && views.team.submitMember) views.team.submitMember();
+    });
+    bindForm("profile-form", function () {
+      if (views.profile && views.profile.saveProfile) views.profile.saveProfile();
     });
   }
 
@@ -84,16 +129,31 @@
         if (views.sales && views.sales.addToCart) views.sales.addToCart(arg);
         break;
       case "cart-inc":
-        if (views.sales && views.sales.addToCart) {
-          views.sales.addToCart(arg);
-          views.sales.openCartModal();
-        }
+        if (views.sales && views.sales.addToCart) views.sales.addToCart(arg);
         break;
       case "cart-dec":
-        if (views.sales && views.sales.decCart) {
-          views.sales.decCart(arg);
-          views.sales.openCartModal();
-        }
+        if (views.sales && views.sales.decCart) views.sales.decCart(arg);
+        break;
+      case "cart-remove":
+        if (views.sales && views.sales.removeCart) views.sales.removeCart(arg);
+        break;
+      case "cart-clear":
+        if (views.sales && views.sales.clearCart) views.sales.clearCart();
+        break;
+      case "hold-order":
+        if (views.sales && views.sales.holdOrder) views.sales.holdOrder();
+        break;
+      case "sales-tab":
+        if (views.sales && views.sales.setTab) views.sales.setTab(arg);
+        break;
+      case "edit-order":
+        if (views.sales && views.sales.loadOrderToCart) views.sales.loadOrderToCart(arg);
+        break;
+      case "pay-order":
+        if (views.sales && views.sales.payOrder) views.sales.payOrder(arg);
+        break;
+      case "cancel-order":
+        if (views.sales && views.sales.cancelOrder) views.sales.cancelOrder(arg);
         break;
       case "add-product":
         ui.requireManagerAuth(state.profile, function () {
@@ -115,14 +175,48 @@
       case "stock-dec":
         if (views.stock && views.stock.adjustStock) views.stock.adjustStock(arg, -1);
         break;
-      case "stock-filter-zero":
-        if (views.stock && views.stock.toggleZeroFilter) views.stock.toggleZeroFilter();
+      case "stock-toggle-zero":
+        if (views.stock && views.stock.toggleZero) views.stock.toggleZero();
         break;
       case "reports-period":
         if (views.reports && views.reports.setPeriod) views.reports.setPeriod(arg);
         break;
       case "copy-text":
         ui.copyText(arg);
+        break;
+      case "login-type":
+        if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.setLoginType) global.NACK_LIGHT.login.setLoginType(arg);
+        break;
+      case "aff-logout":
+        if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.affiliateLogout) global.NACK_LIGHT.login.affiliateLogout();
+        break;
+      case "team-add-role":
+        ui.requireManagerAuth(state.profile, function () {
+          if (views.team && views.team.openAddModal) views.team.openAddModal(arg);
+        });
+        break;
+      case "team-edit":
+        ui.requireManagerAuth(state.profile, function () {
+          if (views.team && views.team.openEditModal) views.team.openEditModal(arg);
+        });
+        break;
+      case "team-regen":
+        if (views.team && views.team.regenerateCodes) views.team.regenerateCodes(arg);
+        break;
+      case "team-cancel":
+        ui.closeModal("modal-team");
+        break;
+      case "profile-tab":
+        if (views.profile && views.profile.setTab) views.profile.setTab(arg);
+        break;
+      case "profile-edit":
+        if (views.profile && views.profile.openEditModal) views.profile.openEditModal();
+        break;
+      case "profile-pay":
+        if (views.profile && views.profile.payNow) views.profile.payNow(arg);
+        break;
+      case "prof-cancel":
+        ui.closeModal("modal-profile");
         break;
       default:
         console.warn("[NACK Light] action inconnue:", action);
@@ -134,9 +228,11 @@
   function showLogin() {
     ui.showEl(ui.$("screen-login"));
     ui.hideEl(ui.$("screen-app"));
+    ui.hideEl(ui.$("screen-affiliate"));
   }
   function showAppShell() {
     ui.hideEl(ui.$("screen-login"));
+    ui.hideEl(ui.$("screen-affiliate"));
     ui.showEl(ui.$("screen-app"));
   }
 
@@ -154,6 +250,7 @@
       showAppShell();
       navigate("home");
       refreshStats();
+      prefetchOrdersCount();
       ui.toast("Connexion réussie", "ok");
     }).catch(function (err) {
       ui.toast(err.message || "Échec de connexion", "error");
@@ -175,12 +272,20 @@
     if (brand) brand.textContent = name;
     var letter = (name.charAt(0) || "N").toUpperCase();
     var logo = state.profile && state.profile.logoUrl;
-    ["hdr-avatar", "hdr-avatar-right"].forEach(function (id) {
-      var el = ui.$(id);
-      if (!el) return;
-      if (logo) el.innerHTML = '<img src="' + ui.escapeHtml(logo) + '" alt="" style="width:100%;height:100%;border-radius:10px;object-fit:cover">';
-      else el.textContent = letter;
-    });
+    var ownerLetter = ((state.profile && state.profile.ownerName) || "G").charAt(0).toUpperCase();
+
+    var estAvatar = ui.$("hdr-avatar");
+    if (estAvatar) {
+      if (logo) estAvatar.innerHTML = '<img src="' + ui.escapeHtml(logo) + '" alt="" style="width:100%;height:100%;border-radius:10px;object-fit:cover">';
+      else { estAvatar.textContent = letter; estAvatar.style.background = "#dc2626"; }
+    }
+    var right = ui.$("hdr-avatar-right");
+    if (right) {
+      right.textContent = ownerLetter;
+      right.style.background = "#6C757D";
+    }
+    var hdrBrand = ui.$("hdr-brand");
+    if (hdrBrand) ui.showEl(hdrBrand);
   }
 
   function ctx() {
@@ -191,6 +296,10 @@
       stats: state.stats,
       onNavigate: navigate,
       onLogout: logout,
+      onProfileUpdate: function (profile) {
+        state.profile = profile;
+        updateHeader();
+      },
       onStats: function (partial) {
         for (var k in partial) {
           if (Object.prototype.hasOwnProperty.call(partial, k)) state.stats[k] = partial[k];
@@ -211,15 +320,13 @@
     var titleEl = ui.$("hdr-title");
     if (titleEl) titleEl.textContent = TITLES[view] || "NACK Pro";
     setHidden(ui.$("hdr-back"), view === "home");
-    setHidden(ui.$("hdr-brand"), view !== "home");
 
     var nav = ui.$("bottom-nav");
     if (nav) {
       var buttons = nav.querySelectorAll("[data-action='nav']");
       for (var i = 0; i < buttons.length; i++) {
         var b = buttons[i];
-        var arg = b.getAttribute("data-arg");
-        if (arg === view) {
+        if (b.getAttribute("data-arg") === view) {
           if (b.className.indexOf("active") === -1) b.className += " active";
         } else {
           b.className = String(b.className || "").replace(/\bactive\b/g, "");
@@ -231,6 +338,7 @@
     if (!main) return;
     var renderer = views[view];
     if (renderer && renderer.render) renderer.render(main, ctx());
+    updateNavSalesBadge(pendingOrdersCount);
   }
 
   function refreshStats() {
