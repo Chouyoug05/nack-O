@@ -203,7 +203,7 @@
       var names = [];
       for (var k = 0; k < items.length && k < 3; k++) names.push((items[k].name || "") + "×" + (items[k].quantity || 1));
       html +=
-        '<div class="lg-list-item">' +
+        '<div class="lg-list-item lg-sale-row" data-action="reports-print-one" data-arg="' + ui.escapeHtml(sale.id) + '" role="button">' +
           '<div class="lg-list-item-main">' +
             '<div class="lg-list-item-title">' + ui.escapeHtml(ui.formatMoney(sale.total)) + '</div>' +
             '<div class="lg-list-item-meta">' + ui.escapeHtml(ui.formatDate(sale.createdAt)) +
@@ -211,7 +211,7 @@
               (names.length ? "<br>" + ui.escapeHtml(names.join(", ")) : "") +
             '</div>' +
           '</div>' +
-          '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="reports-print-one" data-arg="' + ui.escapeHtml(sale.id) + '">Reçu</button>' +
+          '<span class="lg-sale-receipt-btn">' + (global.NACK_LIGHT.icon ? global.NACK_LIGHT.icon("download", 16) : "") + ' Reçu</span>' +
         '</div>';
     }
     list.innerHTML = html;
@@ -221,6 +221,10 @@
     var sale = null;
     for (var i = 0; i < state.sales.length; i++) if (state.sales[i].id === saleId) sale = state.sales[i];
     if (!sale) { ui.toast("Vente introuvable", "error"); return; }
+    if (global.NACK_LIGHT.receipt && global.NACK_LIGHT.receipt.downloadReceipt) {
+      global.NACK_LIGHT.receipt.downloadReceipt(state.ctx.profile, sale, { print: true });
+      return;
+    }
     openReceiptWindow([sale], false);
   }
 

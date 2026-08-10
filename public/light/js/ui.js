@@ -219,6 +219,10 @@
     var back = $("hdr-back");
     if (back) back.innerHTML = iconFn("chevL", 22);
     var notif = $("hdr-notif-btn");
-    if (notif) notif.innerHTML = iconFn("clock", 20);
+    if (notif) {
+      var ico = notif.querySelector(".lg-notif-ico");
+      if (ico) ico.innerHTML = iconFn("bell", 20);
+      else notif.innerHTML = iconFn("bell", 20) + '<span class="lg-notif-badge" id="hdr-notif-badge" style="display:none">0</span>';
+    }
   }
 })(window);

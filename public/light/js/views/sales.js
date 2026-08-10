@@ -129,9 +129,12 @@
         if (catsEl) catsEl.innerHTML = buildCategoryTabs();
         paintGrid();
       }
+      var fromCache = state.products.length && state.products[0] && state.products[0]._fromCache;
+      if (fromCache) ui.toast("Produits chargés depuis le cache hors ligne", "ok");
     }).catch(function (err) {
       var el = ui.$("sales-grid");
-      if (el) el.innerHTML = '<div class="lg-empty">' + ui.escapeHtml(err.message) + '</div>';
+      if (el) el.innerHTML = '<div class="lg-empty">' + ui.escapeHtml(err.message) +
+        '<br><span class="lg-card-desc">Ouvrez le stock une fois en ligne pour activer le cache hors ligne.</span></div>';
     });
   }
 
@@ -167,12 +170,12 @@
     for (var i = 0; i < state.sales.length && i < limit; i++) {
       var s = state.sales[i];
       html +=
-        '<div class="lg-list-item" style="padding:8px 0;border-bottom:1px solid #eee">' +
+        '<div class="lg-list-item lg-sale-row" data-action="sales-print" data-arg="' + ui.escapeHtml(s.id) + '" role="button">' +
           '<div class="lg-list-item-main">' +
             '<div class="lg-list-item-title">' + ui.escapeHtml(ui.formatMoney(s.total)) + '</div>' +
             '<div class="lg-list-item-meta">' + ui.escapeHtml(ui.formatDate(s.createdAt)) + '</div>' +
           '</div>' +
-          '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="sales-print" data-arg="' + ui.escapeHtml(s.id) + '">Reçu</button>' +
+          '<span class="lg-sale-receipt-btn">' + (global.NACK_LIGHT.icon ? global.NACK_LIGHT.icon("download", 16) : "") + ' Reçu</span>' +
         '</div>';
     }
     el.innerHTML = html;
@@ -181,7 +184,11 @@
   function printReceipt(saleId) {
     var sale = null;
     for (var i = 0; i < state.sales.length; i++) if (state.sales[i].id === saleId) sale = state.sales[i];
-    if (!sale) return;
+    if (!sale) { ui.toast("Vente introuvable", "error"); return; }
+    if (global.NACK_LIGHT.receipt && global.NACK_LIGHT.receipt.downloadReceipt) {
+      global.NACK_LIGHT.receipt.downloadReceipt(state.ctx.profile, sale, { print: true });
+      return;
+    }
     var p = state.ctx.profile || {};
     var items = sale.items || [];
     var lines = "";

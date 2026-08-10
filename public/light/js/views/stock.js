@@ -91,6 +91,7 @@
   }
 
   function loadProducts() {
+    var listEl = ui.$("stock-list");
     api.listDocs(colPath(), 200).then(function (docs) {
       state.products = docs || [];
       buildCategories();
@@ -99,8 +100,22 @@
       paintLimitMsg();
       paintList();
       if (state.ctx.onStats) state.ctx.onStats({ productsCount: state.products.length });
+      var fromCache = state.products.length && state.products[0] && state.products[0]._fromCache;
+      if (fromCache) {
+        ui.toast("Stock chargé depuis le cache hors ligne", "ok");
+        var bar = document.getElementById("lg-offline-bar");
+        if (bar) {
+          bar.style.display = "block";
+          bar.textContent = "Hors ligne — stock affiché depuis le cache local";
+        }
+      }
     }).catch(function (err) {
-      ui.$("stock-list").innerHTML = '<div class="lg-empty">Impossible de charger le stock.<br>' + ui.escapeHtml(err.message) + '</div>';
+      if (listEl) {
+        listEl.innerHTML =
+          '<div class="lg-empty">Impossible de charger le stock.<br>' +
+          ui.escapeHtml(err.message || "Erreur") +
+          '<br><br><span class="lg-card-desc">Connectez-vous une fois en ligne pour enregistrer le stock en cache, puis il restera disponible hors ligne.</span></div>';
+      }
     });
   }
 

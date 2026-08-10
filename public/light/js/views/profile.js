@@ -316,14 +316,23 @@
   }
 
   function paintAbout(panel, p) {
+    var pwa = global.NACK_LIGHT.pwa || {};
+    var installed = pwa.isStandalone && pwa.isStandalone();
+    var installBtn = installed
+      ? '<div class="lg-card-desc" style="margin-top:8px">Application déjà installée sur cet appareil.</div>'
+      : '<button type="button" class="lg-btn lg-btn-nack lg-btn-block" style="margin-top:8px" data-action="pwa-install">' +
+          (icon ? icon("download", 16) : "") + ' Installer l\'application</button>';
     panel.innerHTML =
       '<div class="lg-card">' +
         '<div class="lg-card-title">Notre histoire</div>' +
         '<p class="lg-card-desc">NACK Pro est la plateforme gabonaise de gestion pour bars, restaurants et commerces.</p>' +
       '</div>' +
       '<div class="lg-card">' +
-        row("Version", "1.0.0") +
+        row("Version", "1.0.0 Light") +
         row("Support", "WhatsApp NACK") +
+        '<div class="lg-card-title" style="margin-top:12px">Application</div>' +
+        '<p class="lg-card-desc">Installez NACK sur votre tablette pour un accès rapide et hors ligne.</p>' +
+        installBtn +
       '</div>' +
       '<a class="lg-btn lg-btn-outline lg-btn-block" style="text-align:center;display:block" href="https://wa.me/24104746847" target="_blank" rel="noopener">Nous contacter</a>' +
       '<a class="lg-btn lg-btn-secondary lg-btn-block" style="margin-top:8px;text-align:center;display:block" href="https://chouyoug.com" target="_blank" rel="noopener">Chouyoug Design</a>' +

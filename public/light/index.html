@@ -8,7 +8,9 @@
   <meta name="apple-mobile-web-app-title" content="NACK!" />
   <title>NACK Pro</title>
   <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="/favicon.png" type="image/png" />
   <link rel="icon" href="../Design%20sans%20titre.svg" type="image/svg+xml" />
 </head>
 <body>
@@ -126,7 +128,10 @@
       </div>
       <div class="lg-title" id="hdr-title">NACK Pro</div>
       <div class="lg-header-right">
-        <button type="button" class="lg-btn-icon-only" id="hdr-notif-btn" data-action="nav" data-arg="notifications" aria-label="Notifications"></button>
+        <button type="button" class="lg-notif-btn" id="hdr-notif-btn" data-action="nav" data-arg="notifications" aria-label="Notifications">
+          <span class="lg-notif-ico" data-icon="bell"></span>
+          <span class="lg-notif-badge" id="hdr-notif-badge" style="display:none">0</span>
+        </button>
         <button type="button" class="lg-profile-btn" id="hdr-profile-btn" data-action="nav" data-arg="profile" aria-label="Mon profil">
           <span class="lg-profile-avatar" id="hdr-profile-avatar">N</span>
         </button>
@@ -261,6 +266,7 @@
   <script src="js/icons.js"></script>
   <script src="js/establishment.js"></script>
   <script src="js/sha256.js"></script>
+  <script src="js/offline.js"></script>
   <script src="js/api.js"></script>
   <script src="js/subscription.js"></script>
   <script src="js/upload.js"></script>
@@ -292,7 +298,7 @@
   <script src="js/public/payment-result.js"></script>
   <script src="js/tutorial.js"></script>
   <script src="js/pwa.js"></script>
-  <script src="js/offline.js"></script>
+  <script src="js/receipt.js"></script>
   <script src="js/whatsapp.js"></script>
   <script src="js/location.js"></script>
   <script src="js/app.js"></script>

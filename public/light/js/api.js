@@ -25,10 +25,11 @@
           if (req.status >= 200 && req.status < 300) resolve(data);
           else {
             var msg = (data && data.error && (data.error.message || data.error.status)) || ("HTTP " + req.status);
+            if (req.status === 0) msg = "Erreur réseau (hors ligne ou connexion coupée)";
             reject(new Error(msg));
           }
         };
-        req.onerror = function () { reject(new Error("Erreur réseau")); };
+        req.onerror = function () { reject(new Error("Erreur réseau (hors ligne ou connexion coupée)")); };
         req.ontimeout = function () { reject(new Error("Délai dépassé")); };
         if (body != null) {
           if (typeof body === "string") req.send(body);
@@ -262,11 +263,25 @@
 
   function getDoc(path) {
     return withToken(function (token) {
-      return xhr("GET", FS_BASE + "/" + path, null, authHeaders(token)).then(docToObj);
+      return xhr("GET", FS_BASE + "/" + path, null, authHeaders(token)).then(function (doc) {
+        var off = global.NACK_LIGHT.offline;
+        if (off && off.setCache) off.setCache("doc:" + path, doc);
+        return doc;
+      });
+    }).catch(function (err) {
+      var off = global.NACK_LIGHT.offline;
+      if (off && off.getCache) {
+        var cached = off.getCache("doc:" + path);
+        if (cached && cached.data) {
+          cached.data._fromCache = true;
+          return cached.data;
+        }
+      }
+      throw err;
     });
   }
 
-  function listDocs(path, pageSize) {
+  function listDocsRaw(path, pageSize) {
     var qs = pageSize ? ("?pageSize=" + pageSize) : "";
     return withToken(function (token) {
       return xhr("GET", FS_BASE + "/" + path + qs, null, authHeaders(token)).then(function (res) {
@@ -277,13 +292,62 @@
     });
   }
 
-  function createDoc(path, data) {
+  function listDocs(path, pageSize) {
+    return listDocsRaw(path, pageSize).then(function (out) {
+      var off = global.NACK_LIGHT.offline;
+      if (off && off.setCache) off.setCache(path, out);
+      return out;
+    }).catch(function (err) {
+      var off = global.NACK_LIGHT.offline;
+      if (off && off.getCache) {
+        var cached = off.getCache(path);
+        if (cached && cached.data && cached.data.length != null) {
+          var copy = cached.data.slice();
+          for (var i = 0; i < copy.length; i++) copy[i]._fromCache = true;
+          return copy;
+        }
+      }
+      throw err;
+    });
+  }
+
+  function createDocRaw(path, data) {
     return withToken(function (token) {
       return xhr("POST", FS_BASE + "/" + path, { fields: toFsFields(data) }, authHeaders(token)).then(docToObj);
     });
   }
 
-  function patchDoc(path, data, maskFields) {
+  function createDoc(path, data) {
+    var off = global.NACK_LIGHT.offline;
+    if (off && !off.isOnline()) {
+      var localId = "local_" + Date.now();
+      var localDoc = {};
+      for (var k in data) if (Object.prototype.hasOwnProperty.call(data, k)) localDoc[k] = data[k];
+      localDoc.id = localId;
+      localDoc._pendingSync = true;
+      off.enqueue({ method: "create", path: path, data: data, localId: localId });
+      if (off.upsertCachedDoc) off.upsertCachedDoc(path, localDoc);
+      return Promise.resolve(localDoc);
+    }
+    return createDocRaw(path, data).then(function (doc) {
+      if (off && off.upsertCachedDoc) off.upsertCachedDoc(path, doc);
+      return doc;
+    }).catch(function (err) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+        var localId2 = "local_" + Date.now();
+        var localDoc2 = {};
+        for (var k2 in data) if (Object.prototype.hasOwnProperty.call(data, k2)) localDoc2[k2] = data[k2];
+        localDoc2.id = localId2;
+        localDoc2._pendingSync = true;
+        off.enqueue({ method: "create", path: path, data: data, localId: localId2 });
+        if (off.upsertCachedDoc) off.upsertCachedDoc(path, localDoc2);
+        return localDoc2;
+      }
+      throw err;
+    });
+  }
+
+  function patchDocRaw(path, data, maskFields) {
     var qs = "";
     if (maskFields && maskFields.length) {
       var parts = [];
@@ -295,9 +359,57 @@
     });
   }
 
-  function deleteDoc(path) {
+  function patchDoc(path, data, maskFields) {
+    var off = global.NACK_LIGHT.offline;
+    var col = off && off.collectionOfDoc ? off.collectionOfDoc(path) : path.replace(/\/[^/]+$/, "");
+    var docId = path.split("/").pop();
+    function applyLocal() {
+      if (off && off.patchCachedDoc) off.patchCachedDoc(col, docId, data);
+      var out = { id: docId };
+      for (var k in data) if (Object.prototype.hasOwnProperty.call(data, k)) out[k] = data[k];
+      out._pendingSync = true;
+      return out;
+    }
+    if (off && !off.isOnline()) {
+      off.enqueue({ method: "patch", path: path, data: data, maskFields: maskFields });
+      return Promise.resolve(applyLocal());
+    }
+    return patchDocRaw(path, data, maskFields).then(function (doc) {
+      if (off && off.patchCachedDoc) off.patchCachedDoc(col, docId, data);
+      return doc;
+    }).catch(function (err) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+        off.enqueue({ method: "patch", path: path, data: data, maskFields: maskFields });
+        return applyLocal();
+      }
+      throw err;
+    });
+  }
+
+  function deleteDocRaw(path) {
     return withToken(function (token) {
       return xhr("DELETE", FS_BASE + "/" + path, null, authHeaders(token));
+    });
+  }
+
+  function deleteDoc(path) {
+    var off = global.NACK_LIGHT.offline;
+    var col = off && off.collectionOfDoc ? off.collectionOfDoc(path) : path.replace(/\/[^/]+$/, "");
+    var docId = path.split("/").pop();
+    if (off && !off.isOnline()) {
+      off.enqueue({ method: "delete", path: path });
+      if (off.removeCachedDoc) off.removeCachedDoc(col, docId);
+      return Promise.resolve();
+    }
+    return deleteDocRaw(path).then(function () {
+      if (off && off.removeCachedDoc) off.removeCachedDoc(col, docId);
+    }).catch(function (err) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+        off.enqueue({ method: "delete", path: path });
+        if (off.removeCachedDoc) off.removeCachedDoc(col, docId);
+        return;
+      }
+      throw err;
     });
   }
 
@@ -350,6 +462,41 @@
   }
 
   function setDoc(path, data, createOnly) {
+    var off = global.NACK_LIGHT.offline;
+    function setRaw() {
+      var qs = createOnly ? "?currentDocument.exists=false" : "";
+      return withToken(function (token) {
+        return xhr("PATCH", FS_BASE + "/" + path + qs, { fields: toFsFields(data) }, authHeaders(token)).then(docToObj);
+      });
+    }
+    if (off && !off.isOnline()) {
+      off.enqueue({ method: "set", path: path, data: data, createOnly: createOnly });
+      var col = off.collectionOfDoc ? off.collectionOfDoc(path) : path.replace(/\/[^/]+$/, "");
+      var local = { id: path.split("/").pop() };
+      for (var k in data) if (Object.prototype.hasOwnProperty.call(data, k)) local[k] = data[k];
+      local._pendingSync = true;
+      if (off.upsertCachedDoc) off.upsertCachedDoc(col, local);
+      if (off.setCache) off.setCache("doc:" + path, local);
+      return Promise.resolve(local);
+    }
+    return setRaw().then(function (doc) {
+      if (off && off.setCache) off.setCache("doc:" + path, doc);
+      return doc;
+    }).catch(function (err) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+        off.enqueue({ method: "set", path: path, data: data, createOnly: createOnly });
+        var col2 = off.collectionOfDoc ? off.collectionOfDoc(path) : path.replace(/\/[^/]+$/, "");
+        var local2 = { id: path.split("/").pop() };
+        for (var k2 in data) if (Object.prototype.hasOwnProperty.call(data, k2)) local2[k2] = data[k2];
+        local2._pendingSync = true;
+        if (off.upsertCachedDoc) off.upsertCachedDoc(col2, local2);
+        return local2;
+      }
+      throw err;
+    });
+  }
+
+  function setDocRaw(path, data, createOnly) {
     var qs = createOnly ? "?currentDocument.exists=false" : "";
     return withToken(function (token) {
       return xhr("PATCH", FS_BASE + "/" + path + qs, { fields: toFsFields(data) }, authHeaders(token)).then(docToObj);
@@ -618,6 +765,7 @@
     signIn: signIn, signUp: signUp, resetPassword: resetPassword, refreshIdToken: refreshIdToken,
     getDoc: getDoc, listDocs: listDocs, createDoc: createDoc, patchDoc: patchDoc, deleteDoc: deleteDoc,
     setDoc: setDoc, getPublicDoc: getPublicDoc, runPublicQuery: runPublicQuery, runQuery: runQuery,
+    _rawCreateDoc: createDocRaw, _rawPatchDoc: patchDocRaw, _rawDeleteDoc: deleteDocRaw, _rawSetDoc: setDocRaw,
     findAgentByCode: findAgentByCode, loginAffiliate: loginAffiliate, queryReferrals: queryReferrals,
     createPaymentLink: createPaymentLink, patchProfile: patchProfile, teamPath: teamPath,
     isAdmin: isAdmin, startPolling: startPolling, stopPolling: stopPolling, exportCsv: exportCsv,

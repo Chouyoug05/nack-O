@@ -677,6 +677,47 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
 .lg-profile-avatar.has-img { background: var(--nack-beige-light); padding: 0; }
 .lg-profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
 
+.lg-notif-btn {
+  position: relative;
+  width: 40px; height: 40px; padding: 0; min-height: 40px;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: #fff; color: var(--foreground); cursor: pointer;
+  display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.lg-notif-btn:hover { background: #f9fafb; border-color: #d1d5db; }
+.lg-notif-btn.has-unread {
+  border-color: rgba(220, 38, 38, 0.35);
+  background: #fef2f2; color: var(--nack-red);
+}
+.lg-notif-ico { display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex; line-height: 0; }
+.lg-notif-ico .lg-svg { display: block; width: 20px; height: 20px; }
+.lg-notif-badge {
+  position: absolute; top: -4px; right: -4px;
+  min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: 999px; background: var(--nack-red); color: #fff;
+  font-size: 0.65rem; font-weight: 700; line-height: 1;
+  display: none;
+  -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  border: 2px solid #fff; box-sizing: border-box;
+}
+.lg-sale-row {
+  cursor: pointer; border-radius: 10px; padding: 10px 8px !important;
+  margin: 0 -4px; transition: background 0.12s ease;
+}
+.lg-sale-row:hover { background: #f9fafb; }
+.lg-sale-receipt-btn {
+  display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex;
+  -webkit-box-align: center; align-items: center; gap: 4px;
+  font-size: 0.75rem; font-weight: 600; color: var(--nack-red);
+  white-space: nowrap; flex-shrink: 0;
+}
+.lg-sale-receipt-btn .lg-svg { width: 16px; height: 16px; }
+.lg-menu-icon.notifications { color: #ca8a04; background: #fef9c3; }
+
 /* Thème boutique / commerce — bleu */
 body.lg-theme-boutique {
   --nack-red: #2563eb;
@@ -711,11 +752,6 @@ body.lg-theme-boutique .lg-progress-step.done { background: #2563eb; }
 .lg-offline-bar {
   background: #fef3c7; color: #92400e; text-align: center; padding: 8px 12px;
   font-size: 0.85rem; font-weight: 600; position: sticky; top: 0; z-index: 50;
-}
-.lg-pwa-banner {
-  background: var(--nack-red); color: #fff; padding: 10px 16px; text-align: center;
-  font-size: 0.85rem; display: -webkit-box; display: -webkit-flex; display: flex;
-  -webkit-box-align: center; align-items: center; -webkit-box-pack: justify; justify-content: space-between; gap: 8px;
 }
 .lg-unread { border-left: 3px solid var(--nack-red); }
 .lg-route { min-height: 100vh; padding: 16px; max-width: 960px; margin: 0 auto; }
@@ -756,11 +792,24 @@ body.lg-theme-boutique .lg-progress-step.done { background: #2563eb; }
 .lg-route { max-width: 960px; margin: 0 auto; min-height: 100vh; padding: 16px; padding-bottom: 32px; }
 .lg-pwa-banner {
   position: fixed; bottom: 16px; left: 16px; right: 16px; z-index: 9000;
-  background: var(--card); border: 2px solid rgba(220, 38, 38, 0.2); border-radius: var(--radius);
-  box-shadow: var(--shadow-card); padding: 14px;
+  max-width: 520px; margin: 0 auto;
+  background: #fff; border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12); padding: 14px;
 }
-.lg-pwa-inner { display: -webkit-box; display: -webkit-flex; display: flex; gap: 12px; -webkit-box-align: center; -webkit-align-items: center; align-items: center; -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between; flex-wrap: wrap; }
-.lg-pwa-inner p { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+.lg-pwa-inner {
+  display: -webkit-box; display: -webkit-flex; display: flex;
+  gap: 12px; -webkit-box-align: center; -webkit-align-items: center; align-items: center;
+  -webkit-box-pack: justify; -webkit-justify-content: space-between; justify-content: space-between;
+  flex-wrap: wrap;
+}
+.lg-pwa-ico {
+  width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+  background: var(--nack-red) url("../icons/icon-192x192.png") center/cover no-repeat;
+}
+.lg-pwa-text { -webkit-box-flex: 1; flex: 1; min-width: 160px; }
+.lg-pwa-text strong { display: block; font-size: 0.95rem; }
+.lg-pwa-inner p { font-size: 0.8rem; color: var(--muted); margin: 4px 0 0; line-height: 1.4; }
+.lg-pwa-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .lg-admin-list .lg-card { margin-bottom: 10px; }
 .lg-modal-progress { font-size: 0.85rem; color: var(--muted); margin: 12px 0; text-align: center; }
 

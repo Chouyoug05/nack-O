@@ -34,16 +34,20 @@
   }
 
   function updateBadge() {
+    var badge = ui.$("hdr-notif-badge");
     var btn = ui.$("hdr-notif-btn");
-    if (!btn) return;
     var n = unreadCount();
-    var old = btn.querySelector(".lg-nav-badge");
-    if (old) old.parentNode.removeChild(old);
-    if (n > 0) {
-      var b = document.createElement("span");
-      b.className = "lg-nav-badge";
-      b.textContent = String(n);
-      btn.appendChild(b);
+    if (badge) {
+      if (n > 0) {
+        badge.style.display = "flex";
+        badge.textContent = n > 9 ? "9+" : String(n);
+      } else {
+        badge.style.display = "none";
+      }
+    }
+    if (btn) {
+      if (n > 0) btn.className = "lg-notif-btn has-unread";
+      else btn.className = "lg-notif-btn";
     }
   }
 

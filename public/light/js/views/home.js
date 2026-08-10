@@ -30,7 +30,7 @@
         card("menu", lbl.menu, "qrcode", "menu") +
         card("events", "Événements", "calendar", "events") +
         card("customers", "Clients", "heart", "customers") +
-        card("notifications", "Notifications", "clock", "reports") +
+        card("notifications", "Notifications", "bell", "notifications") +
         card("profile", "Mon Profil", "user", "profile") +
         (ctx.isAdmin ? card("admin", "Administration", "shield", "sales") : "") +
         card("logout", "Déconnexion", "logout", "logout") +

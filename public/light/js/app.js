@@ -269,6 +269,11 @@
   function handleAction(action, arg) {
     switch (action) {
       case "nav": navigate(arg); break;
+      case "pwa-install":
+        if (global.NACK_LIGHT.pwa && global.NACK_LIGHT.pwa.openInstallHelp) {
+          global.NACK_LIGHT.pwa.openInstallHelp();
+        }
+        break;
       case "back": navigate("home"); break;
       case "logout": logout(); break;
       case "close-modal": ui.closeModal(arg); break;
@@ -625,6 +630,16 @@
     maybeSubscriptionGate();
     maybeTrialWelcome();
     if (state.uid) api.pingRegisteredTablet(state.uid);
+    if (global.NACK_LIGHT.offline) {
+      if (global.NACK_LIGHT.offline.warmCollections) {
+        global.NACK_LIGHT.offline.warmCollections(api, state.profile, state.uid);
+      }
+      if (global.NACK_LIGHT.offline.flushQueue) {
+        global.NACK_LIGHT.offline.flushQueue().then(function (res) {
+          if (res && res.done > 0) ui.toast(res.done + " action(s) synchronisée(s)", "ok");
+        }).catch(function () {});
+      }
+    }
     if (global.NACK_LIGHT.locationDialog) {
       global.NACK_LIGHT.locationDialog.maybeShow(state.profile, state.uid, function (p) {
         state.profile = p;
