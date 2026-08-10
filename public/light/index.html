@@ -57,9 +57,9 @@
               <label class="lg-label" for="login-password">Mot de passe</label>
               <input class="lg-input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required />
             </div>
-            <p class="lg-login-forgot"><a href="#/forgot">Mot de passe oublié ?</a></p>
+            <p class="lg-login-forgot"><a href="#/forgot" data-action="route-nav" data-arg="forgot">Mot de passe oublié ?</a></p>
             <button type="submit" class="lg-btn lg-btn-nack lg-btn-block lg-btn-login" id="login-submit">Se connecter</button>
-            <p class="lg-login-footer">Pas encore de compte ? <a href="#/register">S'inscrire</a></p>
+            <p class="lg-login-footer">Pas encore de compte ? <a href="#/register" data-action="route-nav" data-arg="register">S'inscrire</a></p>
           </form>
         </div>
 
@@ -122,16 +122,14 @@
     <header class="lg-header">
       <div class="lg-header-left">
         <button type="button" class="lg-back lg-hidden" id="hdr-back" data-action="back" aria-label="Retour" style="display:none"></button>
-        <img class="lg-nack-logo" id="hdr-nack-logo" src="../icons/icon-192x192.png" alt="NACK" />
-        <div class="lg-brand" id="hdr-brand">
-          <div class="lg-avatar" id="hdr-avatar">N</div>
-          <span id="hdr-brand-name">NACK</span>
-        </div>
+        <img class="lg-nack-logo" id="hdr-nack-logo" src="../Design%20sans%20titre.svg" alt="NACK" onerror="this.src='../icons/icon-192x192.png'" />
       </div>
       <div class="lg-title" id="hdr-title">NACK Pro</div>
       <div class="lg-header-right">
         <button type="button" class="lg-btn-icon-only" id="hdr-notif-btn" data-action="nav" data-arg="notifications" aria-label="Notifications"></button>
-        <button type="button" class="lg-avatar" id="hdr-avatar-right" data-action="nav" data-arg="profile" style="width:32px;height:32px;font-size:0.75rem;border:none;cursor:pointer">N</button>
+        <button type="button" class="lg-profile-btn" id="hdr-profile-btn" data-action="nav" data-arg="profile" aria-label="Mon profil">
+          <span class="lg-profile-avatar" id="hdr-profile-avatar">N</span>
+        </button>
       </div>
     </header>
     <main class="lg-main" id="view-root"></main>
@@ -261,6 +259,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/icons.js"></script>
+  <script src="js/establishment.js"></script>
   <script src="js/sha256.js"></script>
   <script src="js/api.js"></script>
   <script src="js/subscription.js"></script>

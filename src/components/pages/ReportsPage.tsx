@@ -441,6 +441,27 @@ const ReportsPage = () => {
     }
   };
 
+  const handleDownloadReceipts = () => {
+    const sales = (current.sales || []).slice(0, 50);
+    if (!sales.length) return;
+    const name = profile?.establishmentName || "NACK";
+    const blocks = sales.map((sale) => {
+      const items = (sale.items || []) as SaleItem[];
+      const lines = items.map((it) =>
+        `<tr><td>${String(it.name || "")} ×${Number(it.quantity) || 1}</td><td style="text-align:right">${Number((it.price || 0) * (it.quantity || 1)).toLocaleString("fr-FR")} XAF</td></tr>`
+      ).join("");
+      const date = new Date(Number(sale.createdAt) || Date.now()).toLocaleString("fr-FR");
+      return `<div class="receipt"><h2>${name}</h2><p style="text-align:center">${date}</p><table>${lines}</table><p style="text-align:right;font-weight:bold">Total : ${Number(sale.total || 0).toLocaleString("fr-FR")} XAF</p></div>`;
+    }).join("");
+    const w = window.open("", "_blank", "width=420,height=700");
+    if (!w) {
+      alert("Autorisez les popups pour télécharger les reçus");
+      return;
+    }
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reçus</title><style>body{font-family:monospace;font-size:12px;padding:12px}.receipt{max-width:280px;margin:0 auto 24px;padding-bottom:16px;border-bottom:1px dashed #999;page-break-after:always}table{width:100%}h2{text-align:center;margin:0}</style></head><body>${blocks}<script>window.onload=function(){try{window.print()}catch(e){}}<\/script></body></html>`);
+    w.document.close();
+  };
+
   const formatAmount = (amount: number) => {
     // Forcer l'affichage dans Chrome en utilisant le formatage explicite
     const num = Number(amount) || 0;
@@ -790,7 +811,7 @@ const ReportsPage = () => {
         </section>
 
         {/* Export buttons */}
-        <div className="flex gap-2 justify-center">
+        <div className="flex flex-wrap gap-2 justify-center">
           <Button variant="outline" size="sm" className="gap-2" onClick={() => handleExport('csv')}>
             <Download size={16} />
             Exporter CSV
@@ -798,6 +819,10 @@ const ReportsPage = () => {
           <Button variant="outline" size="sm" className="gap-2" onClick={() => handleExport('pdf')}>
             <Download size={16} />
             Exporter PDF
+          </Button>
+          <Button variant="nack" size="sm" className="gap-2" onClick={handleDownloadReceipts}>
+            <Download size={16} />
+            Télécharger reçus
           </Button>
         </div>
       </main>

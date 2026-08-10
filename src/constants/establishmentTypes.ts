@@ -29,8 +29,17 @@ export const ESTABLISHMENT_TYPES: EstablishmentTypeConfig[] = [
   { value: "nightclub", label: "Boîte de nuit", main: "restauration", icon: Music },
   { value: "restaurant-bar", label: "Restaurant-Bar", main: "restauration", icon: UtensilsCrossed },
   { value: "hotel-bar", label: "Bar d'hôtel", main: "restauration", icon: Hotel },
-  { value: "boutique", label: "Boutique (Vêtements, Électronique...)", main: "boutique", icon: ShoppingBag },
-  { value: "commerce", label: "Commerce (Marché, Alimentation, Cosmétique...)", main: "commerce", icon: Store },
+  { value: "friperie", label: "Friperie", main: "boutique", icon: ShoppingBag },
+  { value: "boutique-vetements", label: "Boutique vêtements", main: "boutique", icon: ShoppingBag },
+  { value: "boutique-chaussures", label: "Boutique chaussures", main: "boutique", icon: ShoppingBag },
+  { value: "boutique-electronique", label: "Boutique électronique", main: "boutique", icon: ShoppingBag },
+  { value: "boutique-accessoires", label: "Boutique accessoires", main: "boutique", icon: ShoppingBag },
+  { value: "boutique-maison", label: "Articles maison & déco", main: "boutique", icon: ShoppingBag },
+  { value: "boutique", label: "Boutique généraliste", main: "boutique", icon: ShoppingBag },
+  { value: "commerce-alimentation", label: "Alimentation générale", main: "commerce", icon: Store },
+  { value: "commerce-cosmetique", label: "Cosmétique & beauté", main: "commerce", icon: Store },
+  { value: "commerce-marche", label: "Marché / stand", main: "commerce", icon: Store },
+  { value: "commerce", label: "Commerce général", main: "commerce", icon: Store },
   { value: "services", label: "Services (Imprimerie, Startup, Prestation...)", main: "services", icon: Briefcase },
   { value: "other", label: "Autre", main: "services", icon: HelpCircle },
 ];
@@ -59,7 +68,9 @@ export function isServiceBusiness(value: string | undefined | null): boolean {
 }
 
 export function isBoutique(value: string | undefined | null): boolean {
-  return value === "boutique" || value === "commerce";
+  if (!value) return false;
+  const main = getMainCategory(value);
+  return main?.id === "boutique" || main?.id === "commerce";
 }
 
 export function isSimpleBusiness(value: string | undefined | null): boolean {

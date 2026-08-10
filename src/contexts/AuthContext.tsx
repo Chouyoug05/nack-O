@@ -375,7 +375,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!user) return;
     const imei = getRememberedTabletImei(user.uid);
-    if (imei) touchTabletLastSeen(db, imei, user.uid).catch(() => undefined);
+    if (!imei) return;
+    touchTabletLastSeen(db, imei, user.uid).catch(() => undefined);
   }, [user]);
 
   // Ã‰couter l'Ã©tablissement actif en temps rÃ©el

@@ -66,6 +66,10 @@
     var el = start;
     while (el && el !== document && el !== document.body) {
       if (el.getAttribute) {
+        if (el.tagName && String(el.tagName).toUpperCase() === "A") {
+          var href = el.getAttribute("href") || "";
+          if (href.indexOf("#/") === 0 || href.indexOf("#") === 0) return null;
+        }
         var action = el.getAttribute("data-action");
         if (action) return el;
       }

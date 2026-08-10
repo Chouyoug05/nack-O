@@ -15,14 +15,15 @@
       calMonth: now.getMonth()
     };
     root.innerHTML =
-      '<div class="lg-row-actions">' +
+      '<div class="lg-row-actions lg-reports-actions">' +
         '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="reports-period" data-arg="day">Jour</button>' +
         '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="reports-period" data-arg="week">Semaine</button>' +
         '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="reports-period" data-arg="month">Mois</button>' +
       '</div>' +
-      '<div class="lg-row-actions" style="margin-top:8px">' +
+      '<div class="lg-row-actions lg-reports-actions" style="margin-top:8px">' +
         '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="reports-export-csv">Export CSV</button>' +
         '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="reports-export-pdf">Export PDF</button>' +
+        '<button type="button" class="lg-btn lg-btn-nack lg-btn-sm" data-action="reports-receipts">Télécharger reçus</button>' +
       '</div>' +
       '<div id="reports-summary" class="lg-stats"></div>' +
       '<div id="reports-top" class="lg-card" style="margin:12px 0"></div>' +
@@ -210,9 +211,61 @@
               (names.length ? "<br>" + ui.escapeHtml(names.join(", ")) : "") +
             '</div>' +
           '</div>' +
+          '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="reports-print-one" data-arg="' + ui.escapeHtml(sale.id) + '">Reçu</button>' +
         '</div>';
     }
     list.innerHTML = html;
+  }
+
+  function printOneReceipt(saleId) {
+    var sale = null;
+    for (var i = 0; i < state.sales.length; i++) if (state.sales[i].id === saleId) sale = state.sales[i];
+    if (!sale) { ui.toast("Vente introuvable", "error"); return; }
+    openReceiptWindow([sale], false);
+  }
+
+  function downloadReceipts() {
+    var filtered = filteredSales();
+    if (!filtered.length) { ui.toast("Aucune vente sur cette période", "error"); return; }
+    openReceiptWindow(filtered.slice(0, 50), true);
+  }
+
+  function openReceiptWindow(salesList, multi) {
+    var p = state.ctx.profile || {};
+    var blocks = "";
+    for (var i = 0; i < salesList.length; i++) {
+      var sale = salesList[i];
+      var items = sale.items || [];
+      var lines = "";
+      for (var j = 0; j < items.length; j++) {
+        var it = items[j];
+        lines += "<tr><td>" + ui.escapeHtml(it.name) + " ×" + (it.quantity || 1) + "</td><td style='text-align:right'>" +
+          ui.escapeHtml(ui.formatMoney((it.price || 0) * (it.quantity || 1))) + "</td></tr>";
+      }
+      blocks +=
+        "<div class='receipt'>" +
+          "<h2>" + ui.escapeHtml(p.establishmentName || "NACK") + "</h2>" +
+          "<p style='text-align:center'>" + ui.escapeHtml(ui.formatDate(sale.createdAt)) + "</p>" +
+          "<table>" + lines + "</table>" +
+          "<p style='text-align:right;font-weight:bold'>Total : " + ui.escapeHtml(ui.formatMoney(sale.total)) + "</p>" +
+          (p.customMessage ? "<p style='text-align:center'>" + ui.escapeHtml(p.customMessage) + "</p>" : "") +
+        "</div>";
+    }
+    var w = window.open("", "_blank", multi ? "width=420,height=700" : "width=320,height=600");
+    if (!w) { ui.toast("Autorisez les popups pour télécharger les reçus", "error"); return; }
+    w.document.write(
+      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Reçus NACK</title>" +
+      "<style>body{font-family:monospace;font-size:12px;padding:12px}" +
+      ".receipt{max-width:280px;margin:0 auto 24px;padding-bottom:16px;border-bottom:1px dashed #999;page-break-after:always}" +
+      "table{width:100%}h2{text-align:center;margin:0}" +
+      "@media print{.receipt{border:none}}</style></head><body>" +
+      blocks +
+      "<script>window.onload=function(){try{window.print();}catch(e){}}<\/script>" +
+      "</body></html>"
+    );
+    w.document.close();
+    w.focus();
+    ui.toast(multi ? "Reçus prêts à imprimer / enregistrer en PDF" : "Reçu ouvert", "ok");
   }
 
   function exportCsv() {
@@ -254,6 +307,7 @@
   global.NACK_LIGHT.views = global.NACK_LIGHT.views || {};
   global.NACK_LIGHT.views.reports = {
     render: render, setPeriod: setPeriod, calPrev: calPrev, calNext: calNext,
-    exportCsv: exportCsv, exportPdf: exportPdf
+    exportCsv: exportCsv, exportPdf: exportPdf,
+    downloadReceipts: downloadReceipts, printOneReceipt: printOneReceipt
   };
 })(window);

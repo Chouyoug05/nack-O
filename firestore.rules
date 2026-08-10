@@ -86,6 +86,62 @@ service cloud.firestore {
       }
     }
 
+    // Establishments (multi-établissements) — même logique que profiles
+    match /establishments/{estId} {
+      allow read: if true;
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow update, delete: if request.auth != null && (
+        resource.data.ownerUid == request.auth.uid || isAdmin()
+      );
+
+      match /products/{productId} {
+        allow read: if true;
+        allow write: if request.auth != null && (
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+          isAdmin()
+        );
+      }
+      match /orders/{orderId} {
+        allow read: if true;
+        allow write: if request.auth != null && (
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+          isAdmin()
+        );
+      }
+      match /events/{eventId} {
+        allow read: if true;
+        allow write: if request.auth != null && (
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+          isAdmin()
+        );
+        match /tickets/{ticketId} {
+          allow read: if true;
+          allow write: if request.auth != null && (
+            get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+            isAdmin()
+          );
+        }
+      }
+      match /barOrders/{orderId} {
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+          isAdmin()
+        );
+        allow create: if true;
+        allow update, delete: if request.auth != null && (
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+          isAdmin()
+        );
+      }
+      match /{document=**} {
+        allow read, write: if request.auth != null && (
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+          isAdmin()
+        );
+      }
+    }
+
     // Subscription plans: admin only read/write
     match /subscriptionPlans/{planId} {
       allow read, write: if isAdmin();

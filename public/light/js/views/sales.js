@@ -20,14 +20,16 @@
     };
 
     root.innerHTML =
-      '<div class="lg-tabs">' +
+      '<div class="lg-tabs lg-sales-tabs">' +
         '<button type="button" class="lg-tab' + (state.tab === "caisse" ? " active" : "") + '" data-action="sales-tab" data-arg="caisse">Caisse</button>' +
         '<button type="button" class="lg-tab' + (state.tab === "orders" ? " active" : "") + '" data-action="sales-tab" data-arg="orders" id="sales-orders-tab">' +
-          'Commandes en cours<span class="lg-tab-badge" id="orders-badge" style="display:none">0</span></button>' +
+          'Commandes<span class="lg-tab-badge" id="orders-badge" style="display:none">0</span></button>' +
+        '<button type="button" class="lg-tab' + (state.tab === "recent" ? " active" : "") + '" data-action="sales-tab" data-arg="recent">Dernières ventes</button>' +
       '</div>' +
       '<div id="sales-panel"></div>';
 
     if (state.tab === "orders") paintOrdersPanel();
+    else if (state.tab === "recent") paintRecentPanel();
     else paintCaissePanel();
     loadProducts();
     loadOrders();
@@ -47,6 +49,7 @@
       t.className = "lg-tab" + (arg === tab ? " active" : "");
     }
     if (tab === "orders") paintOrdersPanel();
+    else if (tab === "recent") paintRecentPanel();
     else paintCaissePanel();
   }
 
@@ -58,10 +61,10 @@
     var keys = ["all"];
     var sorted = Object.keys(cats).sort();
     for (var j = 0; j < sorted.length; j++) if (sorted[j] !== "all") keys.push(sorted[j]);
-    var html = '<div class="lg-row-actions" style="flex-wrap:wrap;margin-bottom:10px">';
+    var html = '<div class="lg-chip-row">';
     for (var k = 0; k < keys.length; k++) {
       var c = keys[k];
-      html += '<button type="button" class="lg-btn lg-btn-sm ' + (state.category === c ? "lg-btn-nack" : "lg-btn-secondary") +
+      html += '<button type="button" class="lg-chip' + (state.category === c ? " active" : "") +
         '" data-action="sales-cat" data-arg="' + ui.escapeHtml(c) + '">' + ui.escapeHtml(c === "all" ? "Toutes" : c) + '</button>';
     }
     return html + '</div>';
@@ -71,7 +74,6 @@
     var panel = ui.$("sales-panel");
     if (!panel) return;
     panel.innerHTML =
-      '<div id="sales-last" class="lg-card" style="margin-bottom:12px;display:none"></div>' +
       '<div class="lg-search"><input class="lg-input" id="sales-search" type="search" placeholder="Rechercher un produit…"></div>' +
       '<div id="sales-cats"></div>' +
       '<div class="lg-field" style="margin-bottom:12px">' +
@@ -80,6 +82,7 @@
       '</div>' +
       '<div id="sales-cart-panel"></div>' +
       '<div id="sales-grid" class="lg-loading">Chargement…</div>' +
+      '<div id="sales-last" class="lg-card lg-sales-last" style="margin-top:16px;display:none"></div>' +
       '<div id="sales-float" class="lg-sales-float lg-hidden" style="display:none"></div>';
 
     ui.$("sales-search").oninput = function () {
@@ -95,6 +98,13 @@
     paintGrid();
     paintFloatBar();
     paintLastSales();
+  }
+
+  function paintRecentPanel() {
+    var panel = ui.$("sales-panel");
+    if (!panel) return;
+    panel.innerHTML = '<div id="sales-last" class="lg-card lg-sales-last"></div>';
+    paintLastSales(true);
   }
 
   function setCategory(cat) {
@@ -135,20 +145,26 @@
   }
 
   function loadRecentSales() {
-    api.listDocs(salesPath(), 20).then(function (docs) {
+    api.listDocs(salesPath(), 40).then(function (docs) {
       state.sales = docs || [];
       state.sales.sort(function (a, b) { return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0); });
-      paintLastSales();
+      if (state.tab === "recent") paintLastSales(true);
+      else paintLastSales(false);
     }).catch(function () {});
   }
 
-  function paintLastSales() {
+  function paintLastSales(forceShow) {
     var el = ui.$("sales-last");
     if (!el) return;
-    if (!state.sales.length) { ui.hideEl(el); return; }
+    if (!state.sales.length) {
+      if (forceShow) el.innerHTML = '<div class="lg-empty">Aucune vente récente</div>';
+      else ui.hideEl(el);
+      return;
+    }
     ui.showEl(el);
-    var html = '<div class="lg-card-title">3 dernières ventes</div>';
-    for (var i = 0; i < state.sales.length && i < 3; i++) {
+    var limit = forceShow ? 20 : 5;
+    var html = '<div class="lg-card-title">Dernières ventes</div>';
+    for (var i = 0; i < state.sales.length && i < limit; i++) {
       var s = state.sales[i];
       html +=
         '<div class="lg-list-item" style="padding:8px 0;border-bottom:1px solid #eee">' +
@@ -222,7 +238,7 @@
   function paintGrid() {
     var el = ui.$("sales-grid");
     if (!el) return;
-    var q = state.query || "", html = '<div class="lg-grid">', count = 0;
+    var q = state.query || "", html = '<div class="lg-grid lg-product-grid">', count = 0;
     for (var i = 0; i < state.products.length; i++) {
       var p = state.products[i];
       if ((Number(p.quantity) || 0) <= 0) continue;
@@ -230,8 +246,13 @@
       var hay = ((p.name || "") + " " + (p.category || "")).toLowerCase();
       if (q && hay.indexOf(q) === -1) continue;
       count++;
+      var img = p.imageUrl || p.photoUrl || p.image || "";
+      var imgHtml = img
+        ? '<img class="lg-product-img" src="' + ui.escapeHtml(img) + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">'
+        : '<div class="lg-product-img lg-product-img-ph">' + ui.escapeHtml(((p.name || "?").charAt(0) || "?").toUpperCase()) + '</div>';
       html +=
         '<div><div class="lg-product-tile" data-action="add-cart" data-arg="' + ui.escapeHtml(p.id) + '" role="button">' +
+          imgHtml +
           '<div style="font-weight:700;font-size:0.9rem">' + ui.escapeHtml(p.name || "") + '</div>' +
           '<div class="lg-list-item-meta">Stock ' + (Number(p.quantity) || 0) + '</div>' +
           '<div class="price">' + ui.escapeHtml(ui.formatMoney(p.price)) + '</div></div></div>';

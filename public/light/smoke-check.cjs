@@ -24,7 +24,8 @@ var app = fs.readFileSync("js/app.js", "utf8");
 var required = [
   "sales-tab", "cart-remove", "hold-order", "login-type", "team-add-role",
   "profile-tab", "profile-pay", "notif-read", "onb-next", "reg-next", "cust-detail",
-  "loc-save", "loc-geo", "loc-skip", "open-cgu"
+  "loc-save", "loc-geo", "loc-skip", "open-cgu", "route-nav",
+  "reports-receipts", "reports-print-one"
 ];
 required.forEach(function (a) {
   if (app.indexOf('case "' + a + '"') === -1) {

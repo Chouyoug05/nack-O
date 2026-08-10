@@ -1,25 +1,21 @@
 (function (global) {
   var ui, api, state;
+  var estLib = function () { return global.NACK_LIGHT.establishment || {}; };
 
-  var MAIN_CATEGORIES = [
-    { id: "restauration", label: "Restauration & Bar", desc: "Bar, Restaurant, Snack, Boîte de nuit..." },
-    { id: "boutique", label: "Boutique", desc: "Vêtements, Électronique, Accessoires..." },
-    { id: "commerce", label: "Commerce", desc: "Marché, Alimentation, Cosmétique..." },
-    { id: "services", label: "Services & Entreprise", desc: "Imprimerie, Startup, Prestation..." }
-  ];
+  function getMainCategories() { return estLib().MAIN_CATEGORIES || []; }
+  function getEstTypes() { return estLib().ESTABLISHMENT_TYPES || []; }
 
-  var ESTABLISHMENT_TYPES = [
-    { value: "bar", label: "Bar", main: "restauration" },
-    { value: "restaurant", label: "Restaurant", main: "restauration" },
-    { value: "snack", label: "Snack Bar", main: "restauration" },
-    { value: "nightclub", label: "Boîte de nuit", main: "restauration" },
-    { value: "restaurant-bar", label: "Restaurant-Bar", main: "restauration" },
-    { value: "hotel-bar", label: "Bar d'hôtel", main: "restauration" },
-    { value: "boutique", label: "Boutique", main: "boutique" },
-    { value: "commerce", label: "Commerce", main: "commerce" },
-    { value: "services", label: "Services", main: "services" },
-    { value: "other", label: "Autre", main: "services" }
-  ];
+  function routeRoot() { return ui.$("route-root"); }
+
+  function isShopFlow() {
+    return state.mainCategory === "boutique" || state.mainCategory === "commerce";
+  }
+
+  function applyRegisterTheme() {
+    if (estLib().applyTheme) {
+      estLib().applyTheme({ establishmentType: state.form.establishmentType || (isShopFlow() ? "boutique" : "restaurant") });
+    }
+  }
 
   function parseHashParams() {
     var out = {};
@@ -83,10 +79,12 @@
   }
 
   function paintManager(root) {
+    applyRegisterTheme();
+    var shop = isShopFlow();
     var html =
       '<div class="lg-login"><div class="lg-login-box" style="max-width:520px">' +
         '<img class="lg-login-logo-img" src="../Design%20sans%20titre.svg" alt="NACK!" onerror="this.src=\'../icons/icon-192x192.png\';this.className=\'lg-login-logo-img lg-login-logo-fallback\';">' +
-        '<h1>Créer un compte</h1>' +
+        '<h1>' + (shop ? "Créer ma boutique" : "Créer un compte") + '</h1>' +
         '<p class="subtitle">Étape ' + state.step + ' sur 5</p>' +
         progressBar() +
         '<div id="reg-step-panel"></div>' +
@@ -94,7 +92,7 @@
           (state.step > 1 ? '<button type="button" class="lg-btn lg-btn-secondary" data-action="reg-prev">Précédent</button>' : '<span></span>') +
           (state.step < 5 ? '<button type="button" class="lg-btn lg-btn-nack" data-action="reg-next">Suivant</button>' : '') +
         '</div>' +
-        '<p class="lg-field-hint" style="text-align:center;margin-top:12px">Déjà un compte ? <a href="' + ui.escapeHtml(api.lightHref("")) + '">Se connecter</a></p>' +
+        '<p class="lg-field-hint" style="text-align:center;margin-top:12px">Déjà un compte ? <a href="#/" data-action="route-nav" data-arg="">Se connecter</a></p>' +
       '</div></div>';
     root.innerHTML = html;
     paintManagerStep();
@@ -107,28 +105,31 @@
     if (state.step === 1) {
       if (!state.mainCategory) {
         var cats = "";
+        var MAIN_CATEGORIES = getMainCategories();
         for (var i = 0; i < MAIN_CATEGORIES.length; i++) {
           var c = MAIN_CATEGORIES[i];
           cats += '<button type="button" class="lg-type-card" data-action="reg-main-cat" data-arg="' + c.id + '">' +
             '<strong>' + ui.escapeHtml(c.label) + '</strong><span class="lg-card-desc">' + ui.escapeHtml(c.desc) + '</span></button>';
         }
-        panel.innerHTML = '<p class="lg-label">Quelle est l\'activité principale ? *</p><div class="lg-type-grid">' + cats + '</div>';
+        panel.innerHTML = '<p class="lg-label">Quelle est votre activité ? *</p><div class="lg-type-grid">' + cats + '</div>';
       } else {
         var types = "";
+        var ESTABLISHMENT_TYPES = getEstTypes();
         for (var j = 0; j < ESTABLISHMENT_TYPES.length; j++) {
           var t = ESTABLISHMENT_TYPES[j];
           if (t.main !== state.mainCategory) continue;
           types += '<button type="button" class="lg-type-card' + (f.establishmentType === t.value ? " active" : "") +
             '" data-action="reg-est-type" data-arg="' + t.value + '">' + ui.escapeHtml(t.label) + '</button>';
         }
+        var typeLabel = isShopFlow() ? "Type de boutique *" : "Type d'établissement *";
         panel.innerHTML =
           '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="reg-main-back">← Retour</button>' +
-          '<p class="lg-label" style="margin-top:12px">Type d\'établissement *</p><div class="lg-type-grid">' + types + '</div>';
+          '<p class="lg-label" style="margin-top:12px">' + typeLabel + '</p><div class="lg-type-grid">' + types + '</div>';
       }
     } else if (state.step === 2) {
-      var skipName = state.mainCategory === "commerce" || state.mainCategory === "boutique";
+      var nameLabel = isShopFlow() ? "Nom de la boutique *" : "Nom de l'établissement *";
       panel.innerHTML =
-        (skipName ? "" : '<div class="lg-field"><label class="lg-label">Nom établissement *</label><input class="lg-input" id="reg-est-name" value="' + ui.escapeHtml(f.establishmentName) + '"></div>') +
+        '<div class="lg-field"><label class="lg-label">' + nameLabel + '</label><input class="lg-input" id="reg-est-name" value="' + ui.escapeHtml(f.establishmentName) + '"></div>' +
         '<div class="lg-field"><label class="lg-label">Nom complet du gérant *</label><input class="lg-input" id="reg-owner" value="' + ui.escapeHtml(f.ownerName) + '"></div>';
     } else if (state.step === 3) {
       panel.innerHTML =
@@ -197,10 +198,7 @@
   function validateStep() {
     var f = state.form;
     if (state.step === 1) return !!f.establishmentType;
-    if (state.step === 2) {
-      if (state.mainCategory === "commerce" || state.mainCategory === "boutique") return !!f.ownerName;
-      return !!(f.establishmentName && f.ownerName);
-    }
+    if (state.step === 2) return !!(f.establishmentName && f.ownerName);
     if (state.step === 3) return !!(f.email && f.whatsapp);
     if (state.step === 4) return !!f.address;
     if (state.step === 5) {
@@ -213,25 +211,27 @@
     readStepFields();
     if (!validateStep()) { ui.toast("Veuillez remplir les champs requis", "error"); return; }
     state.step++;
-    var root = document.getElementById("auth-root");
+    var root = routeRoot();
     if (root) paint(root);
   }
 
   function prev() {
     readStepFields();
     state.step = Math.max(1, state.step - 1);
-    var root = document.getElementById("auth-root");
+    var root = routeRoot();
     if (root) paint(root);
   }
 
   function setMainCategory(id) {
     state.mainCategory = id || null;
     state.form.establishmentType = "";
+    applyRegisterTheme();
     paintManagerStep();
   }
 
   function setEstType(val) {
     state.form.establishmentType = val;
+    applyRegisterTheme();
     paintManagerStep();
   }
 
@@ -334,7 +334,7 @@
     }, true).then(function () {
       state.affiliateCode = code;
       state.affiliateStep = 2;
-      var root = document.getElementById("auth-root");
+      var root = routeRoot();
       if (root) paint(root);
       ui.toast("Compte créé !", "ok");
     }).catch(function (err) {

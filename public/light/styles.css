@@ -418,10 +418,46 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
 
 .lg-product-tile {
   background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
-  padding: 12px; text-align: center; cursor: pointer; box-shadow: var(--shadow-card); min-height: 100px;
+  padding: 10px; text-align: center; cursor: pointer; box-shadow: var(--shadow-card); min-height: 100px;
 }
 .lg-product-tile:active { background: var(--nack-beige-light); }
 .lg-product-tile .price { color: var(--nack-red); font-weight: 700; margin-top: 6px; font-size: 0.9rem; }
+.lg-product-img {
+  width: 100%; height: 72px; object-fit: cover; border-radius: 10px; margin-bottom: 8px;
+  background: var(--nack-beige-light);
+}
+.lg-product-img-ph {
+  display: -webkit-box; display: flex; -webkit-box-align: center; align-items: center;
+  -webkit-box-pack: center; justify-content: center;
+  font-weight: 800; font-size: 1.4rem; color: var(--muted);
+}
+.lg-chip-row {
+  display: -webkit-box; display: flex; -webkit-flex-wrap: wrap; flex-wrap: wrap;
+  gap: 8px; margin-bottom: 12px;
+}
+.lg-chip {
+  border: 1px solid var(--border); background: #fff; color: var(--foreground);
+  border-radius: 999px; padding: 6px 12px; font-size: 0.8rem; font-weight: 600;
+  min-height: 32px; cursor: pointer; -webkit-appearance: none; appearance: none;
+}
+.lg-chip.active { background: var(--nack-red); color: #fff; border-color: var(--nack-red); }
+.lg-sales-tabs .lg-tab { font-size: 0.8rem; padding: 8px 6px; }
+.lg-sales-last { margin-top: 16px; }
+
+@media (min-width: 700px) and (max-width: 1100px) {
+  .lg-btn { padding: 8px 12px; min-height: 40px; font-size: 0.88rem; }
+  .lg-btn-sm { padding: 6px 10px; min-height: 32px; font-size: 0.78rem; }
+  .lg-btn-block { width: auto; display: inline-block; min-width: 140px; }
+  .lg-row-actions .lg-btn-block { width: auto; -webkit-box-flex: 0; flex: 0 0 auto; }
+  .lg-menu-card { padding: 14px 10px; }
+  .lg-grid > * { width: 25%; padding: 5px; }
+  .lg-product-grid > * { width: 25%; }
+  .lg-chip { padding: 5px 10px; font-size: 0.75rem; }
+  .lg-tabs { gap: 6px; }
+  .lg-tab { padding: 8px 6px; font-size: 0.8rem; }
+  .lg-reports-actions { gap: 8px; }
+  .lg-reports-actions .lg-btn { -webkit-box-flex: 0; flex: 0 0 auto; width: auto; }
+}
 
 .lg-qty {
   display: -webkit-box; display: -webkit-flex; display: flex;
@@ -625,6 +661,34 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
 }
 .lg-support-ticket .lg-textarea { margin-top: 10px; min-height: 72px; }
 
+.lg-welcome-simple {
+  font-size: 1rem; font-weight: 600; margin-bottom: 14px; color: var(--foreground);
+}
+
+.lg-profile-btn {
+  border: none; background: transparent; padding: 0; cursor: pointer; line-height: 0;
+}
+.lg-profile-avatar {
+  width: 36px; height: 36px; border-radius: 50%; background: var(--nack-red); color: #fff;
+  display: -webkit-inline-box; display: -webkit-inline-flex; display: inline-flex;
+  -webkit-box-align: center; align-items: center; -webkit-box-pack: center; justify-content: center;
+  font-weight: 700; font-size: 0.85rem; overflow: hidden;
+}
+.lg-profile-avatar.has-img { background: var(--nack-beige-light); padding: 0; }
+.lg-profile-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+
+/* Thème boutique / commerce — bleu */
+body.lg-theme-boutique {
+  --nack-red: #2563eb;
+  --nack-red-light: #3b82f6;
+  --shadow-button: 0 4px 12px -2px rgba(37, 99, 235, 0.35);
+}
+body.lg-theme-boutique a { color: #2563eb; }
+body.lg-theme-boutique .lg-login-type.active,
+body.lg-theme-boutique .lg-login-type.active:hover { background: #2563eb; }
+body.lg-theme-boutique .lg-type-card.active { border-color: #2563eb; background: #eff6ff; color: #1e40af; }
+body.lg-theme-boutique .lg-progress-step.done { background: #2563eb; }
+
 .lg-affiliate { max-width: 640px; margin: 0 auto; padding: 16px; min-height: 100vh; }
 .lg-affiliate-header {
   display: -webkit-box; display: -webkit-flex; display: flex;
@@ -713,7 +777,7 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
 
 .lg-type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
 .lg-type-card { border: 2px solid var(--border); border-radius: 12px; padding: 12px; text-align: left; background: #fff; cursor: pointer; }
-.lg-type-card.active { border-color: var(--nack); background: #fef2f2; }
+.lg-type-card.active { border-color: var(--nack-red); background: #fef2f2; }
 
 .lg-check { display: flex; align-items: flex-start; gap: 8px; font-size: 0.85rem; margin: 10px 0; }
 .lg-code-box { font-size: 1.75rem; font-family: monospace; font-weight: 800; color: var(--nack); border: 2px dashed var(--nack); padding: 16px; border-radius: 12px; margin: 16px 0; }

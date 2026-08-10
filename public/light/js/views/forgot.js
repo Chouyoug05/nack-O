@@ -2,7 +2,7 @@
   var ui, api, state;
 
   function loginUrl() {
-    return api.lightHref("");
+    return "#/";
   }
 
   function render(root) {
@@ -21,7 +21,7 @@
           '<p class="subtitle">Nous avons envoyé un lien de réinitialisation à<br><strong>' + ui.escapeHtml(state.email) + '</strong></p>' +
           '<p class="lg-card-desc">Vérifiez votre boîte de réception et cliquez sur le lien pour réinitialiser votre mot de passe.</p>' +
           '<button type="button" class="lg-btn lg-btn-nack lg-btn-block" data-action="forgot-resend">Renvoyer l\'email</button>' +
-          '<a class="lg-btn lg-btn-outline lg-btn-block" style="margin-top:10px;text-align:center;display:block" href="' + ui.escapeHtml(loginUrl()) + '">Retour à la connexion</a>' +
+          '<a class="lg-btn lg-btn-outline lg-btn-block" style="margin-top:10px;text-align:center;display:block" href="#/" data-action="route-nav" data-arg="">Retour à la connexion</a>' +
         '</div></div>';
       return;
     }
@@ -35,7 +35,7 @@
           '<input class="lg-input" id="forgot-email" type="email" autocomplete="username" required /></div>' +
           '<button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="forgot-submit">Envoyer le lien</button>' +
         '</form>' +
-        '<a class="lg-btn lg-btn-outline lg-btn-block" style="margin-top:10px;text-align:center;display:block" href="' + ui.escapeHtml(loginUrl()) + '">Retour à la connexion</a>' +
+        '<a class="lg-btn lg-btn-outline lg-btn-block" style="margin-top:10px;text-align:center;display:block" href="#/" data-action="route-nav" data-arg="">Retour à la connexion</a>' +
       '</div></div>';
     var form = ui.$("forgot-form");
     if (form && form.getAttribute("data-bound") !== "1") {

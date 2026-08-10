@@ -157,6 +157,17 @@
     pendingOrdersCount = n || 0;
   };
 
+  function onHashChange() {
+    if (bootRoute()) return;
+    hideRouteShell();
+    var parts = parseHashRoute().parts;
+    if (!parts.length) {
+      var session = api.getSession();
+      if (session && session.idToken && session.uid) showAppShell();
+      else showLogin();
+    }
+  }
+
   function boot() {
     ui.paintNavIcons();
     bindForms();
@@ -165,10 +176,9 @@
     if (global.NACK_LIGHT.offline && global.NACK_LIGHT.offline.init) global.NACK_LIGHT.offline.init();
     if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.init) global.NACK_LIGHT.login.init();
 
-    if (bootRoute()) {
-      window.addEventListener("hashchange", function () { bootRoute(); }, false);
-      return;
-    }
+    window.addEventListener("hashchange", onHashChange, false);
+
+    if (bootRoute()) return;
     hideRouteShell();
 
     var session = api.getSession();
@@ -376,6 +386,12 @@
       case "reports-export-pdf":
         if (views.reports && views.reports.exportPdf) views.reports.exportPdf();
         break;
+      case "reports-receipts":
+        if (views.reports && views.reports.downloadReceipts) views.reports.downloadReceipts();
+        break;
+      case "reports-print-one":
+        if (views.reports && views.reports.printOneReceipt) views.reports.printOneReceipt(arg);
+        break;
       case "reports-cal-prev":
         if (views.reports && views.reports.calPrev) views.reports.calPrev();
         break;
@@ -572,6 +588,10 @@
       case "open-cgu":
         window.open(api.publicBase() + "/cgu", "_blank");
         break;
+      case "route-nav":
+        try { location.hash = "#/" + String(arg || "").replace(/^\//, ""); } catch (e) {}
+        bootRoute();
+        break;
       default:
         console.warn("[NACK Light] action inconnue:", action);
     }
@@ -590,6 +610,9 @@
     ui.showEl(ui.$("screen-login"));
     ui.hideEl(ui.$("screen-app"));
     ui.hideEl(ui.$("screen-affiliate"));
+    if (global.NACK_LIGHT.establishment && global.NACK_LIGHT.establishment.applyTheme) {
+      global.NACK_LIGHT.establishment.applyTheme(null);
+    }
     if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.setLoginType) {
       global.NACK_LIGHT.login.setLoginType("manager");
     }
@@ -679,25 +702,28 @@
   }
 
   function updateHeader() {
-    var name = (state.profile && state.profile.establishmentName) || "NACK";
-    var brand = ui.$("hdr-brand-name");
-    if (brand) brand.textContent = name;
-    var letter = (name.charAt(0) || "N").toUpperCase();
-    var logo = state.profile && state.profile.logoUrl;
-    var ownerLetter = ((state.profile && state.profile.ownerName) || "G").charAt(0).toUpperCase();
+    var profile = state.profile;
+    var name = (profile && profile.establishmentName) || "NACK Pro";
+    var est = global.NACK_LIGHT.establishment;
+    if (est && est.applyTheme) est.applyTheme(profile);
 
-    var estAvatar = ui.$("hdr-avatar");
-    if (estAvatar) {
-      if (logo) estAvatar.innerHTML = '<img src="' + ui.escapeHtml(logo) + '" alt="" style="width:100%;height:100%;border-radius:10px;object-fit:cover">';
-      else { estAvatar.textContent = letter; estAvatar.style.background = "#dc2626"; }
+    var titleEl = ui.$("hdr-title");
+    if (titleEl && state.view === "home") titleEl.textContent = name;
+
+    var logo = profile && profile.logoUrl;
+    var ownerName = (profile && profile.ownerName) || "";
+    var ownerLetter = (ownerName.charAt(0) || "G").toUpperCase();
+    var avatar = ui.$("hdr-profile-avatar");
+    if (avatar) {
+      if (logo) {
+        avatar.innerHTML = '<img src="' + ui.escapeHtml(logo) + '" alt="">';
+        avatar.className = "lg-profile-avatar has-img";
+      } else {
+        avatar.textContent = ownerLetter;
+        avatar.className = "lg-profile-avatar";
+        avatar.style.background = est && est.isShopProfile(profile) ? "#2563eb" : "#dc2626";
+      }
     }
-    var right = ui.$("hdr-avatar-right");
-    if (right) {
-      right.textContent = ownerLetter;
-      right.style.background = "#6C757D";
-    }
-    var hdrBrand = ui.$("hdr-brand");
-    if (hdrBrand) ui.showEl(hdrBrand);
   }
 
   function ctx() {
@@ -749,7 +775,11 @@
     }
     state.view = view;
     var titleEl = ui.$("hdr-title");
-    if (titleEl) titleEl.textContent = TITLES[view] || "NACK Pro";
+    if (titleEl) {
+      if (view === "home") titleEl.textContent = (state.profile && state.profile.establishmentName) || "NACK Pro";
+      else titleEl.textContent = TITLES[view] || "NACK Pro";
+    }
+    updateHeader();
     setHidden(ui.$("hdr-back"), view === "home" || view === "customer-detail");
 
     var nav = ui.$("bottom-nav");

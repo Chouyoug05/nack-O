@@ -3,37 +3,31 @@
     var ui = global.NACK_LIGHT.ui;
     var icon = global.NACK_LIGHT.icon;
     var api = global.NACK_LIGHT.api;
+    var est = global.NACK_LIGHT.establishment;
     var profile = ctx.profile || {};
     var stats = ctx.stats || { salesToday: 0, productsCount: 0, teamCount: 0 };
-    var est = profile.establishmentName || "NACK Pro";
     var owner = profile.ownerName || "";
-    var logo = profile.logoUrl;
-    var letter = (est.charAt(0) || "N").toUpperCase();
+    var lbl = est && est.labels ? est.labels(profile) : { products: "Produits", stock: "Stock", sales: "Vente", menu: "Menu Digital", team: "Équipe", welcome: "Bonjour" };
 
-    var welcome =
-      '<div class="lg-welcome">' +
-        (logo
-          ? '<img class="lg-welcome-est" src="' + ui.escapeHtml(logo) + '" alt="">'
-          : '<div class="lg-welcome-est-letter">' + ui.escapeHtml(letter) + '</div>') +
-        '<div><div style="font-weight:700;font-size:1rem">' + ui.escapeHtml(est) + '</div>' +
-        (owner ? '<div class="lg-card-desc">Bonjour, ' + ui.escapeHtml(owner) + '</div>' : '') +
-        '</div></div>';
+    var welcome = owner
+      ? '<div class="lg-welcome-simple">' + ui.escapeHtml(lbl.welcome) + ', ' + ui.escapeHtml(owner) + '</div>'
+      : "";
 
     root.innerHTML =
       welcome +
       '<div class="lg-stats">' +
-        '<div class="lg-stat"><div class="lg-stat-label">Vente du jour</div><div class="lg-stat-value">' + ui.escapeHtml(ui.formatMoney(stats.salesToday)) + '</div></div>' +
-        '<div class="lg-stat"><div class="lg-stat-label">Produits</div><div class="lg-stat-value">' + ui.escapeHtml(String(stats.productsCount)) + '</div></div>' +
-        '<div class="lg-stat"><div class="lg-stat-label">Équipe</div><div class="lg-stat-value">' + ui.escapeHtml(String(stats.teamCount)) + '</div></div>' +
+        '<div class="lg-stat"><div class="lg-stat-label">' + ui.escapeHtml(lbl.sales) + ' du jour</div><div class="lg-stat-value">' + ui.escapeHtml(ui.formatMoney(stats.salesToday)) + '</div></div>' +
+        '<div class="lg-stat"><div class="lg-stat-label">' + ui.escapeHtml(lbl.products) + '</div><div class="lg-stat-value">' + ui.escapeHtml(String(stats.productsCount)) + '</div></div>' +
+        '<div class="lg-stat"><div class="lg-stat-label">' + ui.escapeHtml(lbl.team) + '</div><div class="lg-stat-value">' + ui.escapeHtml(String(stats.teamCount)) + '</div></div>' +
       '</div>' +
       '<div id="home-foodcost"></div>' +
       '<div id="home-boutique"></div>' +
       '<div class="lg-grid" id="home-menu">' +
-        card("stock", "Stock", "package", "stock") +
-        card("sales", "Vente", "cart", "sales") +
+        card("stock", lbl.stock, "package", "stock") +
+        card("sales", lbl.sales, "cart", "sales") +
         card("reports", "Rapport", "chart", "reports") +
-        card("team", "Équipe", "users", "team") +
-        card("menu", "Menu Digital", "qrcode", "menu") +
+        card("team", lbl.team, "users", "team") +
+        card("menu", lbl.menu, "qrcode", "menu") +
         card("events", "Événements", "calendar", "events") +
         card("customers", "Clients", "heart", "customers") +
         card("notifications", "Notifications", "clock", "reports") +
@@ -42,13 +36,17 @@
         card("logout", "Déconnexion", "logout", "logout") +
       '</div>';
 
-    loadFoodCost(ctx);
-    paintBoutiqueHub(profile);
+    loadFoodCost(ctx, profile);
+    paintBoutiqueHub(profile, lbl);
   }
 
-  function loadFoodCost(ctx) {
+  function loadFoodCost(ctx, profile) {
     var el = document.getElementById("home-foodcost");
     if (!el || !ctx.uid) return;
+    if (global.NACK_LIGHT.establishment && global.NACK_LIGHT.establishment.isShopProfile(profile)) {
+      el.innerHTML = "";
+      return;
+    }
     var api = global.NACK_LIGHT.api;
     api.listDocs(api.dataRoot(ctx.profile, ctx.uid) + "/products", 200).then(function (docs) {
       var rows = [];
@@ -72,16 +70,16 @@
     }).catch(function () { el.innerHTML = ""; });
   }
 
-  function paintBoutiqueHub(profile) {
+  function paintBoutiqueHub(profile, lbl) {
     var el = document.getElementById("home-boutique");
     if (!el) return;
-    var type = (profile.establishmentType || "").toLowerCase();
-    if (type.indexOf("boutique") === -1 && type.indexOf("commerce") === -1) { el.innerHTML = ""; return; }
+    var est = global.NACK_LIGHT.establishment;
+    if (!est || !est.isShopProfile(profile)) { el.innerHTML = ""; return; }
     el.innerHTML =
-      '<div class="lg-section-title">Boutique — raccourcis</div>' +
+      '<div class="lg-section-title">Raccourcis boutique</div>' +
       '<div class="lg-grid">' +
-        hubCard("stock", "Produits") + hubCard("sales", "Ventes") + hubCard("customers", "Clients") +
-        hubCard("reports", "Statistiques") + hubCard("menu", "Boutique en ligne") +
+        hubCard("stock", lbl.stock) + hubCard("sales", lbl.sales) + hubCard("customers", "Clients") +
+        hubCard("reports", "Statistiques") + hubCard("menu", lbl.menu) +
       '</div>';
   }
 
