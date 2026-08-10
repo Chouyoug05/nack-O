@@ -2,8 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, createHashRouter, RouterProvider, Outlet, useLocation, Navigate } from "react-router-dom";
-import { lazy, Suspense, type ReactNode } from "react";
+import { createBrowserRouter, createHashRouter, RouterProvider, Outlet, useLocation, Navigate, useRouteError, isRouteErrorResponse } from "react-router-dom";
+import { Suspense, useEffect, type ReactNode } from "react";
 import { OrderProvider } from "@/contexts/OrderContext";
 import { EventProvider } from "@/contexts/EventContext";
 import PWAInstallButton from "@/components/PWAInstallButton";
@@ -25,23 +25,24 @@ import OfflineAuthBlock from "@/components/OfflineAuthBlock";
 import OfflineStatusBar from "@/components/OfflineStatusBar";
 import { isElectronRenderer } from "@/lib/platform";
 import { isProfileComplete } from "@/utils/profileComplete";
+import { lazyWithReload, isChunkLoadError, reloadOnceForStaleChunk } from "@/lib/lazyWithReload";
 
-const Dashboard = lazy(() => import("./pages/Dashboard"));
-const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const CompleteProfile = lazy(() => import("./pages/CompleteProfile"));
-const ConfigureTickets = lazy(() => import("./pages/ConfigureTickets"));
-const TeamPage = lazy(() => import("@/components/pages/TeamPage"));
-const CustomerDetailsPage = lazy(() => import("@/components/pages/CustomerDetailsPage"));
-const ClientDetailsPage = lazy(() => import("./pages/ClientDetailsPage"));
-const AffiliateDashboard = lazy(() => import("./pages/AffiliateDashboard"));
-const ServeurInterface = lazy(() => import("./pages/ServeurInterface"));
-const CaisseInterface = lazy(() => import("./pages/CaisseInterface"));
-const CuisineInterface = lazy(() => import("./pages/CuisineInterface"));
-const AgentEvenementInterface = lazy(() => import("./pages/AgentEvenementInterface"));
-const EventPublicPage = lazy(() => import("./pages/EventPublicPage"));
-const PublicOrderingPage = lazy(() => import("./pages/PublicOrderingPage"));
-const PaymentSuccess = lazy(() => import("./pages/PaymentSuccess"));
-const PaymentError = lazy(() => import("./pages/PaymentError"));
+const Dashboard = lazyWithReload(() => import("./pages/Dashboard"));
+const AdminDashboard = lazyWithReload(() => import("./pages/AdminDashboard"));
+const CompleteProfile = lazyWithReload(() => import("./pages/CompleteProfile"));
+const ConfigureTickets = lazyWithReload(() => import("./pages/ConfigureTickets"));
+const TeamPage = lazyWithReload(() => import("@/components/pages/TeamPage"));
+const CustomerDetailsPage = lazyWithReload(() => import("@/components/pages/CustomerDetailsPage"));
+const ClientDetailsPage = lazyWithReload(() => import("./pages/ClientDetailsPage"));
+const AffiliateDashboard = lazyWithReload(() => import("./pages/AffiliateDashboard"));
+const ServeurInterface = lazyWithReload(() => import("./pages/ServeurInterface"));
+const CaisseInterface = lazyWithReload(() => import("./pages/CaisseInterface"));
+const CuisineInterface = lazyWithReload(() => import("./pages/CuisineInterface"));
+const AgentEvenementInterface = lazyWithReload(() => import("./pages/AgentEvenementInterface"));
+const EventPublicPage = lazyWithReload(() => import("./pages/EventPublicPage"));
+const PublicOrderingPage = lazyWithReload(() => import("./pages/PublicOrderingPage"));
+const PaymentSuccess = lazyWithReload(() => import("./pages/PaymentSuccess"));
+const PaymentError = lazyWithReload(() => import("./pages/PaymentError"));
 
 const queryClient = new QueryClient();
 
@@ -54,6 +55,38 @@ const FullscreenLoader = () => (
 const LazyBoundary = ({ children }: { children: ReactNode }) => (
   <Suspense fallback={<FullscreenLoader />}>{children}</Suspense>
 );
+
+/** Catch React Router « Unexpected Application Error » (chunks post-déploiement). */
+const RouteErrorFallback = () => {
+  const error = useRouteError();
+  const message = isRouteErrorResponse(error)
+    ? error.statusText
+    : error instanceof Error
+      ? error.message
+      : String(error || "");
+
+  useEffect(() => {
+    if (isChunkLoadError(error) || isChunkLoadError(message)) {
+      reloadOnceForStaleChunk();
+    }
+  }, [error, message]);
+
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-background px-4 text-center">
+      <NackLogo size="lg" showAdminButton={false} />
+      <p className="text-sm text-muted-foreground max-w-md">
+        Une mise à jour de l’application est disponible. Rechargez la page.
+      </p>
+      <button
+        type="button"
+        className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white"
+        onClick={() => window.location.reload()}
+      >
+        Recharger
+      </button>
+    </div>
+  );
+};
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
@@ -129,6 +162,7 @@ const routes = [
   {
     path: "/",
     element: <RootLayout />,
+    errorElement: <RouteErrorFallback />,
     children: [
       { index: true, element: <HomeRedirect /> },
       { path: "onboarding", element: <Onboarding /> },

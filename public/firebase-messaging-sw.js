@@ -5,7 +5,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compa
 // --- Offline / PWA cache (app shell) - ES5 compatible ---
 // v2 : le nom de cache est incrémenté à chaque déploiement pour forcer
 // le re-téléchargement de l'app shell et éviter de servir une version cassée.
-var APP_SHELL_CACHE = 'nack-app-shell-v3';
+var APP_SHELL_CACHE = 'nack-app-shell-v4';
 var APP_SHELL_URLS = [
   '/',
   '/index.html',
@@ -98,21 +98,55 @@ function handleNavigation(request) {
     });
 }
 
-// Assets: stale-while-revalidate. On sert le cache immédiatement (rapide),
-// et on met à jour en arrière-plan pour la prochaine visite.
-// Les noms de fichiers Vite sont content-hashed : l'ancienne version est
-// toujours valide pour l'index.html qui la référence.
+// Assets hashed Vite : network-first pour /assets/*.js|css (évite un index
+// frais qui pointe vers un chunk déjà périmé servi depuis le cache SW).
+// Autres assets : stale-while-revalidate.
 function handleAsset(request) {
-  // Les requêtes Range renvoient souvent un 206 — Cache.put refuse les réponses partielles
   if (request.headers && request.headers.get('range')) {
     return fetch(request);
   }
+
+  var pathname = '';
+  try {
+    pathname = new URL(request.url).pathname || '';
+  } catch (e) {
+    pathname = '';
+  }
+  var isHashedBundle =
+    pathname.indexOf('/assets/') === 0 &&
+    (/\.m?js$/i.test(pathname) || /\.css$/i.test(pathname));
+
+  if (isHashedBundle) {
+    return fetch(request)
+      .then(function (fresh) {
+        if (fresh && fresh.status === 200) {
+          caches.open(APP_SHELL_CACHE).then(function (cache) {
+            cache.put(request, fresh.clone()).catch(function () {});
+          }).catch(function () {});
+          return fresh;
+        }
+        // 404 après déploiement : ne pas servir une vieille copie du même URL
+        // (les hashes changent ; une 404 signifie vraiment « absent »).
+        return caches.open(APP_SHELL_CACHE).then(function (cache) {
+          return cache.delete(request).catch(function () {}).then(function () {
+            return fresh;
+          });
+        });
+      })
+      .catch(function () {
+        return caches.open(APP_SHELL_CACHE).then(function (cache) {
+          return cache.match(request).then(function (cached) {
+            return cached || NETWORK_ERROR_RESPONSE;
+          });
+        });
+      });
+  }
+
   return caches.open(APP_SHELL_CACHE).then(function (cache) {
     return cache.match(request).then(function (cached) {
       var networkFetch = fetch(request).then(function (fresh) {
         try {
           var url = new URL(request.url);
-          // Uniquement 200 complet (pas 206 Partial Content)
           if (fresh && fresh.status === 200 && url.origin === self.location.origin) {
             cache.put(request, fresh.clone()).catch(function () { /* ignore quota / 206 */ });
           }
