@@ -57,7 +57,8 @@ import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
 import { searchGoogleImages } from "@/utils/productImageSearch";
 import { sha256Hex } from "@/lib/sha256";
-import DialogErrorBoundary from "@/components/DialogErrorBoundary";
+import ManagerAuthDialog from "@/components/ManagerAuthDialog";
+import { useManagerAuth } from "@/hooks/useManagerAuth";
 
 interface Product {
   id: string;
@@ -243,59 +244,9 @@ const StockPage = () => {
   });
 
   // --- Manager authentication (password prompt) ---
-  const [isManagerAuthOpen, setIsManagerAuthOpen] = useState(false);
-  const [managerCode, setManagerCode] = useState("");
-  const [isAuthChecking, setIsAuthChecking] = useState(false);
-  const [postAuthActionRefState] = useState<null | (() => void)>(null);
-  const postAuthActionRef = { current: postAuthActionRefState as undefined | (() => void) } as { current: undefined | (() => void) };
-  const [authValidUntil, setAuthValidUntil] = useState<number>(() => {
-    try {
-      const raw = sessionStorage.getItem('nack_manager_auth_until');
-      return raw ? Number(raw) : 0;
-    } catch { return 0; }
-  });
-
-  const rememberAuthWindow = (ms: number) => {
-    const until = Date.now() + ms;
-    setAuthValidUntil(until);
-    try { sessionStorage.setItem('nack_manager_auth_until', String(until)); } catch { /* ignore */ }
-  };
-
-  const requireManagerAuth = (action: () => void) => {
-    // Si aucun code gérant n'est configuré, pas de vérification requise
-    if (!profile?.managerPinHash) { action(); return; }
-    if (Date.now() < authValidUntil) { action(); return; }
-    postAuthActionRef.current = action;
-    setManagerCode("");
-    setIsManagerAuthOpen(true);
-  };
-
-  const digestSha256Hex = (text: string) => sha256Hex(text);
-
-  const submitManagerAuth = async () => {
-    if (!profile?.managerPinHash) {
-      setIsManagerAuthOpen(false);
-      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
-      return;
-    }
-    if (!managerCode) {
-      toast({ title: "Code requis", description: "Veuillez saisir votre code gérant.", variant: "destructive" });
-      return;
-    }
-    setIsAuthChecking(true);
-    try {
-      const hash = await digestSha256Hex(managerCode);
-      if (hash !== profile.managerPinHash) throw new Error('bad');
-      rememberAuthWindow(10 * 60 * 1000); // 10 minutes
-      setIsManagerAuthOpen(false);
-      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
-      toast({ title: "Vérification réussie", description: "Vous pouvez modifier le stock pendant 10 minutes." });
-    } catch {
-      toast({ title: "Code incorrect", description: "Le code gérant ne correspond pas.", variant: "destructive" });
-    } finally {
-      setIsAuthChecking(false);
-    }
-  };
+  // Logique centralisée dans useManagerAuth : ouverture de la modale, fenêtre de
+  // validité (sessionStorage partagé), soumission + hash SHA-256.
+  const { requireManagerAuth } = useManagerAuth(profile);
 
   // --- Security code management UI ---
   const [isSecurityDialogOpen, setIsSecurityDialogOpen] = useState(false);
@@ -2434,29 +2385,7 @@ const StockPage = () => {
       </Dialog>
 
       {/* Manager Auth Dialog (Optionnel) */}
-      < Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen} >
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle>Vérification du gérant</DialogTitle>
-            <DialogDescription>
-              Saisissez votre <strong>code gérant</strong> pour autoriser l'ajout/la modification du stock.<br />
-              Ce code n’est <strong>pas</strong> votre mot de passe de compte. Il est <strong>optionnel</strong> et utile si vous partagez le compte gérant.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogErrorBoundary onClose={() => setIsManagerAuthOpen(false)}>
-            <div className="space-y-3 py-2">
-              <Label htmlFor="mgr-code">Code gérant</Label>
-              <Input id="mgr-code" type="password" value={managerCode} onChange={(e) => setManagerCode(e.target.value)} />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)}>Annuler</Button>
-              <Button onClick={submitManagerAuth} disabled={isAuthChecking} className="bg-gradient-primary text-white">
-                {isAuthChecking ? 'Vérification…' : 'Vérifier'}
-              </Button>
-            </div>
-          </DialogErrorBoundary>
-        </DialogContent>
-      </Dialog >
+      <ManagerAuthDialog />
 
       {/* Security Code Dialog */}
       < Dialog open={isSecurityDialogOpen} onOpenChange={setIsSecurityDialogOpen} >

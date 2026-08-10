@@ -25,11 +25,7 @@ import {
   Mic,
   Music,
   DollarSign,
-  Settings,
-  ShieldCheck,
-  RefreshCw,
-  Eye,
-  EyeOff
+  Settings
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,8 +37,8 @@ import { generateEventTicket } from "@/utils/ticketGenerator";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 import { clipboardCopy } from "@/lib/clipboard";
-import { sha256Hex } from "@/lib/sha256";
-import DialogErrorBoundary from "@/components/DialogErrorBoundary";
+import ManagerAuthDialog from "@/components/ManagerAuthDialog";
+import { useManagerAuth } from "@/hooks/useManagerAuth";
 type NewEventPayload = {
   title: string;
   description: string;
@@ -413,62 +409,10 @@ const EventsPage = () => {
     setReserveForm({ name: "", email: "", phone: "", quantity: 1 });
   };
 
-  // --- Manager authentication (PIN) logic copied from StockPage ---
-  const [isManagerAuthOpen, setIsManagerAuthOpen] = useState(false);
-  const [managerCode, setManagerCode] = useState("");
-  const [isAuthChecking, setIsAuthChecking] = useState(false);
-  const [postAuthActionRefState] = useState<null | (() => void)>(null);
-  const postAuthActionRef = { current: postAuthActionRefState as undefined | (() => void) } as { current: undefined | (() => void) };
-  const [authValidUntil, setAuthValidUntil] = useState<number>(() => {
-    try {
-      const raw = sessionStorage.getItem('nack_manager_auth_until');
-      return raw ? Number(raw) : 0;
-    } catch { return 0; }
-  });
-
-  const rememberAuthWindow = (ms: number) => {
-    const until = Date.now() + ms;
-    setAuthValidUntil(until);
-    try { sessionStorage.setItem('nack_manager_auth_until', String(until)); } catch { /* ignore */ }
-  };
-
-  const requireManagerAuth = (action: () => void) => {
-    if (!profile?.managerPinHash) { action(); return; }
-    if (Date.now() < authValidUntil) { action(); return; }
-    postAuthActionRef.current = action;
-    setManagerCode("");
-    setIsManagerAuthOpen(true);
-  };
-
-  const digestSha256Hex = (text: string) => sha256Hex(text);
-
-  const submitManagerAuth = async () => {
-    if (!profile?.managerPinHash) {
-      setIsManagerAuthOpen(false);
-      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
-      return;
-    }
-    if (!managerCode) {
-      toast({ title: "Code requis", description: "Veuillez saisir votre code gérant.", variant: "destructive" });
-      return;
-    }
-    setIsAuthChecking(true);
-    try {
-      const hash = await digestSha256Hex(managerCode);
-      if (hash !== profile.managerPinHash) throw new Error('bad');
-      rememberAuthWindow(10 * 60 * 1000); // 10 minutes
-      setIsManagerAuthOpen(false);
-      const fn = postAuthActionRef.current; postAuthActionRef.current = undefined; if (fn) fn();
-      toast({ title: "Vérification réussie", description: "Action autorisée pendant 10 minutes." });
-    } catch {
-      toast({ title: "Code incorrect", description: "Le code gérant ne correspond pas.", variant: "destructive" });
-    } finally {
-      setIsAuthChecking(false);
-    }
-  };
-
-  const [showPin, setShowPin] = useState(false);
-
+  // --- Manager authentication (PIN) ---
+  // Logique centralisée dans useManagerAuth : ouverture de la modale, fenêtre de
+  // validité (sessionStorage partagé), soumission + hash SHA-256.
+  const { requireManagerAuth } = useManagerAuth(profile);
 
   const totalRevenue = events.reduce((total, event) => {
     return total + (event.ticketsSold * event.ticketPrice);
@@ -1120,57 +1064,11 @@ const EventsPage = () => {
       )}
 
       {/* Manager Auth Dialog */}
-      <Dialog open={isManagerAuthOpen} onOpenChange={setIsManagerAuthOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-nack-red" />
-              Code gérant requis
-            </DialogTitle>
-            <DialogDescription>
-              Veuillez saisir votre code de sécurité pour autoriser cette action.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogErrorBoundary onClose={() => setIsManagerAuthOpen(false)}>
-            <div className="py-4 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="manager-pin">Code de sécurité</Label>
-                <div className="relative">
-                  <Input
-                    id="manager-pin"
-                    type={showPin ? "text" : "password"}
-                    value={managerCode}
-                    onChange={(e) => setManagerCode(e.target.value)}
-                    placeholder="Saisissez votre code..."
-                    autoFocus
-                    onKeyDown={(e) => e.key === 'Enter' && submitManagerAuth()}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPin(!showPin)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsManagerAuthOpen(false)} disabled={isAuthChecking}>
-                Annuler
-              </Button>
-              <Button onClick={submitManagerAuth} disabled={isAuthChecking || !managerCode} className="bg-nack-red text-white">
-                {isAuthChecking ? (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                    Vérification...
-                  </>
-                ) : "Valider"}
-              </Button>
-            </div>
-          </DialogErrorBoundary>
-        </DialogContent>
-      </Dialog>
+      <ManagerAuthDialog
+        title="Code gérant requis"
+        description="Veuillez saisir votre code de sécurité pour autoriser cette action."
+        showToggle={true}
+      />
     </div>
   );
 };
