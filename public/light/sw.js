@@ -1,5 +1,5 @@
 /* Service worker NACK Light — fallback si le SW racine n'est pas dispo */
-var CACHE = "nack-light-shell-v1";
+var CACHE = "nack-light-shell-v2";
 var SHELL = [
   "./",
   "./index.html",
