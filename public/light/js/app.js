@@ -454,6 +454,12 @@
       case "prof-delete-account":
         if (views.profile && views.profile.deleteAccount) views.profile.deleteAccount();
         break;
+      case "prof-tablet-save":
+        if (views.profile && views.profile.registerTabletDevice) views.profile.registerTabletDevice();
+        break;
+      case "prof-support-send":
+        if (views.profile && views.profile.sendSupportTicket) views.profile.sendSupportTicket();
+        break;
       case "onb-skip":
         if (views.onboarding && views.onboarding.skip) views.onboarding.skip();
         break;
@@ -595,6 +601,7 @@
     maybeTutorial();
     maybeSubscriptionGate();
     maybeTrialWelcome();
+    if (state.uid) api.pingRegisteredTablet(state.uid);
     if (global.NACK_LIGHT.locationDialog) {
       global.NACK_LIGHT.locationDialog.maybeShow(state.profile, state.uid, function (p) {
         state.profile = p;

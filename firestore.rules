@@ -109,5 +109,26 @@ service cloud.firestore {
       // Seuls les admins peuvent mettre à jour ou supprimer
       allow update, delete: if isAdmin();
     }
+
+    // Tablettes enregistrées (IMEI) — traçabilité par établissement
+    match /tablets/{tabletId} {
+      allow read: if request.auth != null &&
+        (resource.data.ownerUid == request.auth.uid || isAdmin());
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null &&
+        (resource.data.ownerUid == request.auth.uid || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    // Tickets support — contact utilisateur ↔ admin
+    match /supportTickets/{ticketId} {
+      allow create: if request.auth != null &&
+        request.resource.data.ownerUid == request.auth.uid;
+      allow read: if request.auth != null &&
+        (resource.data.ownerUid == request.auth.uid || isAdmin());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
   }
 }

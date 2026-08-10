@@ -1,4 +1,5 @@
 ﻿import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
+import { getRememberedTabletImei, touchTabletLastSeen } from "@/lib/tabletsSupport";
 import { auth, db } from "@/lib/firebase";
 import {
   GoogleAuthProvider,
@@ -369,6 +370,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       unsubProfile();
       unsubAdmin();
     };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const imei = getRememberedTabletImei(user.uid);
+    if (imei) touchTabletLastSeen(db, imei, user.uid).catch(() => undefined);
   }, [user]);
 
   // Ã‰couter l'Ã©tablissement actif en temps rÃ©el

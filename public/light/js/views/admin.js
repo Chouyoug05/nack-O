@@ -3,6 +3,8 @@
 
   var TABS = [
     { id: "users", label: "Utilisateurs" },
+    { id: "tablets", label: "Tablettes" },
+    { id: "support", label: "Support" },
     { id: "products", label: "Produits" },
     { id: "orders", label: "Commandes" },
     { id: "events", label: "Événements" },
@@ -64,6 +66,8 @@
     if (panel) panel.innerHTML = '<div class="lg-loading">Chargement…</div>';
     var loaders = {
       users: loadUsers,
+      tablets: loadTablets,
+      support: loadSupport,
       products: loadProducts,
       orders: loadOrders,
       events: loadEvents,
@@ -86,6 +90,10 @@
       rows = rows.filter(function (r) {
         return JSON.stringify(r).toLowerCase().indexOf(q) !== -1;
       });
+    }
+    if (state.tab === "support") {
+      paintSupportPanel(panel, rows);
+      return;
     }
     if (!rows.length) {
       panel.innerHTML = '<div class="lg-empty">Aucune donnée</div>';
@@ -128,6 +136,90 @@
         var data = {}; data[field] = val === "true" ? true : val === "false" ? false : val;
         api.patchDoc(path, data, [field]).then(function () { ui.toast("Mis à jour", "ok"); loadTab(state.tab); })
           .catch(function (e) { ui.toast(e.message, "error"); });
+      };
+    }
+  }
+
+  function loadTablets() {
+    api.listAllTablets().then(function (docs) {
+      state.data.tablets = (docs || []).map(function (d) {
+        var seen = d.lastSeenAt ? ui.formatDate(d.lastSeenAt) : "—";
+        return {
+          _id: d.id, id: d.id, imei: d.imei || d.id,
+          _title: (d.establishmentName || d.ownerName || "Établissement") + " — " + (d.label || "Tablette"),
+          _meta: "IMEI " + (d.imei || d.id) + " • " + (d.ownerName || d.email || d.ownerUid || "—") + " • Vue " + seen,
+          ownerUid: d.ownerUid, whatsapp: d.whatsapp, status: d.status || "active"
+        };
+      });
+      paintPanel();
+    }).catch(failPanel);
+  }
+
+  function loadSupport() {
+    api.listAllSupportTickets().then(function (docs) {
+      state.data.support = (docs || []).map(function (d) {
+        return {
+          _id: d.id, id: d.id,
+          _title: d.subject || "Ticket",
+          _meta: (d.establishmentName || d.ownerName || d.ownerUid || "—") + " • " + (d.status || "open"),
+          subject: d.subject, message: d.message, status: d.status,
+          adminReply: d.adminReply, ownerUid: d.ownerUid,
+          establishmentName: d.establishmentName, ownerName: d.ownerName,
+          whatsapp: d.whatsapp, email: d.email, tabletImei: d.tabletImei,
+          createdAt: d.createdAt
+        };
+      });
+      paintPanel();
+    }).catch(failPanel);
+  }
+
+  function paintSupportPanel(panel, rows) {
+    var html = "";
+    for (var i = 0; i < rows.length && i < 50; i++) {
+      var r = rows[i];
+      var wa = r.whatsapp ? "https://wa.me/" + String(r.whatsapp).replace(/\D/g, "") : "";
+      html +=
+        '<div class="lg-card lg-support-ticket" data-ticket-id="' + ui.escapeHtml(r.id) + '">' +
+          '<div class="lg-list-item-title">' + ui.escapeHtml(r.subject || "Ticket") + '</div>' +
+          '<div class="lg-card-desc">' + ui.escapeHtml(r.establishmentName || r.ownerName || r.ownerUid || "—") +
+            (r.tabletImei ? " • IMEI " + ui.escapeHtml(r.tabletImei) : "") + '</div>' +
+          '<div class="lg-card-desc"><strong>Utilisateur :</strong> ' + ui.escapeHtml(r.message || "") + '</div>' +
+          '<div class="lg-card-desc">Statut : ' + ui.escapeHtml(r.status || "open") + ' • ' + ui.escapeHtml(ui.formatDate(r.createdAt)) + '</div>' +
+          (r.adminReply ? '<div class="lg-support-reply"><strong>Votre réponse :</strong> ' + ui.escapeHtml(r.adminReply) + '</div>' : '') +
+          '<textarea class="lg-textarea adm-reply-input" data-reply-for="' + ui.escapeHtml(r.id) + '" placeholder="Répondre à l\'utilisateur…"></textarea>' +
+          '<div class="lg-row-actions">' +
+            '<button type="button" class="lg-btn lg-btn-nack lg-btn-sm" data-adm-reply="' + ui.escapeHtml(r.id) + '">Répondre</button>' +
+            '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-adm-status="' + ui.escapeHtml(r.id) + '" data-adm-status-val="resolved">Marquer résolu</button>' +
+            (wa ? '<a class="lg-btn lg-btn-outline lg-btn-sm" href="' + ui.escapeHtml(wa) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') +
+          '</div></div>';
+    }
+    panel.innerHTML = html || '<div class="lg-empty">Aucun ticket support</div>';
+    bindSupportActions();
+  }
+
+  function bindSupportActions() {
+    var replies = state.root.querySelectorAll("[data-adm-reply]");
+    for (var i = 0; i < replies.length; i++) {
+      replies[i].onclick = function () {
+        var id = this.getAttribute("data-adm-reply");
+        var ta = state.root.querySelector('[data-reply-for="' + id + '"]');
+        var text = ta ? String(ta.value || "").trim() : "";
+        if (!text) { ui.toast("Saisissez une réponse", "error"); return; }
+        api.replySupportTicket(id, state.ctx.uid, text, "in_progress").then(function () {
+          ui.toast("Réponse envoyée", "ok");
+          loadTab("support");
+        }).catch(function (e) { ui.toast(e.message, "error"); });
+      };
+    }
+    var statuses = state.root.querySelectorAll("[data-adm-status]");
+    for (var j = 0; j < statuses.length; j++) {
+      statuses[j].onclick = function () {
+        var id = this.getAttribute("data-adm-status");
+        var val = this.getAttribute("data-adm-status-val") || "resolved";
+        api.patchDoc("supportTickets/" + id, { status: val, updatedAt: Date.now() }, ["status", "updatedAt"]).then(function () {
+          ui.toast("Statut mis à jour", "ok");
+          loadTab("support");
+        }).catch(function (e) { ui.toast(e.message, "error"); });
       };
     }
   }

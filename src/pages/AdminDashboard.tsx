@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft, Edit, X, FileText, Copy, MessageCircle } from "lucide-react";
+import { AlertCircle, Bell, CheckCircle, Clock, Gift, Search, Users, Wrench, CreditCard, Download, Package, ShoppingCart, Calendar, QrCode, Star, TrendingUp, Eye, Trash2, Settings, ArrowLeft, Edit, X, FileText, Copy, MessageCircle, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -45,6 +45,7 @@ import {
 } from "@/utils/exportAdminData";
 import type { DisbursementRequest } from "@/types/payment";
 import QRCode from "qrcode";
+import { AdminSupportView, AdminTabletsView } from "@/components/admin/AdminTabletsSupportViews";
 
 function AffiliateQRCell({ url }: { url: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -172,10 +173,10 @@ const AdminDashboard = () => {
 
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
-  const initialView = (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements'].includes(viewParam))
+  const initialView = (viewParam && ['menu', 'users', 'tablets', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam))
     ? viewParam as typeof activeView
     : 'menu';
-  const [activeView, setActiveView] = useState<"menu" | "users" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "disbursements">(initialView);
+  const [activeView, setActiveView] = useState<"menu" | "users" | "tablets" | "support" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "customers" | "disbursements" | "affiliates">(initialView);
   const [isSendingNotifications, setIsSendingNotifications] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState<{
     transition: { name: string; price: number; features: SubscriptionFeatures };
@@ -199,7 +200,7 @@ const AdminDashboard = () => {
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
     const viewParam = searchParams.get('view');
-    if (viewParam && ['menu', 'users', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam)) {
+    if (viewParam && ['menu', 'users', 'tablets', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam)) {
       setActiveView(viewParam as typeof activeView);
     }
   }, [searchParams]);
@@ -1978,6 +1979,22 @@ const AdminDashboard = () => {
           <p className="text-sm text-muted-foreground">{stats.total} total</p>
         </button>
         <button
+          onClick={() => navigate('/admin?view=tablets')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Smartphone size={48} className="text-slate-700 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Tablettes</h2>
+          <p className="text-sm text-muted-foreground">Suivi IMEI</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=support')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <MessageCircle size={48} className="text-rose-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Support</h2>
+          <p className="text-sm text-muted-foreground">Tickets utilisateurs</p>
+        </button>
+        <button
           onClick={() => navigate('/admin?view=products')}
           className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
         >
@@ -3648,6 +3665,16 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-gradient-secondary">
       {activeView === "menu" && renderMenuView()}
       {activeView === "users" && renderUsersView()}
+      {activeView === "tablets" && (
+        <div className="p-4 md:p-6">
+          <AdminTabletsView search={search} />
+        </div>
+      )}
+      {activeView === "support" && (
+        <div className="p-4 md:p-6">
+          <AdminSupportView search={search} />
+        </div>
+      )}
       {activeView === "products" && renderProductsView()}
       {activeView === "orders" && renderOrdersView()}
       {activeView === "events" && renderEventsView()}

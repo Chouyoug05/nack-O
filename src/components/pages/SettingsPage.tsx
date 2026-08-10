@@ -45,6 +45,7 @@ import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
 import { TermsAndConditions } from "@/components/TermsAndConditions";
+import { SupportSettingsPanel, TabletsSettingsPanel } from "@/components/settings/TabletsSupportSettings";
 import { receiptsColRef, paymentsColRef, productsColRef, salesColRef, lossesColRef, eventsColRef, teamColRef, ordersColRef, notificationsColRef } from "@/lib/collections";
 import { db } from "@/lib/firebase";
 import { getDocs, query, orderBy, deleteDoc, writeBatch, collection } from "firebase/firestore";
@@ -548,9 +549,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       </Card>
 
       <Tabs defaultValue="subscription" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 h-auto">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 h-auto">
           <TabsTrigger value="subscription" className="text-xs sm:text-sm px-2 py-3 h-auto">Abonnement</TabsTrigger>
           <TabsTrigger value="establishment" className="text-xs sm:text-sm px-2 py-3 h-auto">Ã‰tablissement</TabsTrigger>
+          <TabsTrigger value="tablets" className="text-xs sm:text-sm px-2 py-3 h-auto">Tablettes</TabsTrigger>
+          <TabsTrigger value="support" className="text-xs sm:text-sm px-2 py-3 h-auto">Support</TabsTrigger>
           <TabsTrigger value="security" className="text-xs sm:text-sm px-2 py-3 h-auto">Ã€ propos</TabsTrigger>
           <TabsTrigger value="data" className="text-xs sm:text-sm px-2 py-3 h-auto">DonnÃ©es</TabsTrigger>
         </TabsList>
@@ -1460,6 +1463,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="tablets">
+          <TabletsSettingsPanel />
+        </TabsContent>
+
+        <TabsContent value="support">
+          <SupportSettingsPanel />
         </TabsContent>
 
         {/* About Tab (formerly Security) */}

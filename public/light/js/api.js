@@ -337,6 +337,18 @@
     });
   }
 
+  function runQuery(structuredQuery) {
+    return withToken(function (token) {
+      return xhr("POST", FS_BASE + ":runQuery", { structuredQuery: structuredQuery }, authHeaders(token)).then(function (res) {
+        var rows = res || [], out = [];
+        for (var i = 0; i < rows.length; i++) {
+          if (rows[i].document) out.push(docToObj(rows[i].document));
+        }
+        return out;
+      });
+    });
+  }
+
   function setDoc(path, data, createOnly) {
     var qs = createOnly ? "?currentDocument.exists=false" : "";
     return withToken(function (token) {
@@ -468,17 +480,157 @@
     a.click();
   }
 
+  function sanitizeImei(v) {
+    return String(v || "").replace(/\D/g, "").slice(0, 15);
+  }
+
+  function validateImei(v) {
+    var s = sanitizeImei(v);
+    return s.length >= 14 && s.length <= 15;
+  }
+
+  function tabletStorageKey(uid) {
+    return "nack_tablet_imei_" + uid;
+  }
+
+  function rememberTabletImei(uid, imei) {
+    try { localStorage.setItem(tabletStorageKey(uid), sanitizeImei(imei)); } catch (e) {}
+  }
+
+  function getRememberedTabletImei(uid) {
+    try { return localStorage.getItem(tabletStorageKey(uid)) || ""; } catch (e) { return ""; }
+  }
+
+  function registerTablet(uid, profile, imeiInput, label) {
+    var imei = sanitizeImei(imeiInput);
+    if (!validateImei(imei)) return Promise.reject(new Error("IMEI invalide (14 ou 15 chiffres)"));
+    var now = Date.now();
+    var data = {
+      imei: imei,
+      ownerUid: uid,
+      establishmentName: (profile && profile.establishmentName) || "",
+      ownerName: (profile && profile.ownerName) || "",
+      email: (profile && profile.email) || "",
+      phone: (profile && profile.phone) || "",
+      whatsapp: (profile && profile.whatsapp) || "",
+      label: label || "Tablette principale",
+      userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+      platform: typeof navigator !== "undefined" ? navigator.platform : "",
+      registeredAt: now,
+      lastSeenAt: now,
+      status: "active"
+    };
+    return setDoc("tablets/" + imei, data, false).then(function () {
+      rememberTabletImei(uid, imei);
+      return data;
+    });
+  }
+
+  function touchTabletLastSeen(uid, imeiInput) {
+    var imei = sanitizeImei(imeiInput);
+    if (!imei || !uid) return Promise.resolve();
+    return patchDoc("tablets/" + imei, { lastSeenAt: Date.now(), ownerUid: uid }, ["lastSeenAt", "ownerUid"]).catch(function () {});
+  }
+
+  function listTabletsByOwner(uid) {
+    return runQuery({
+      from: [{ collectionId: "tablets" }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: "ownerUid" },
+          op: "EQUAL",
+          value: { stringValue: uid }
+        }
+      },
+      limit: 50
+    });
+  }
+
+  function listAllTablets() {
+    return runQuery({ from: [{ collectionId: "tablets" }], limit: 500 });
+  }
+
+  function createSupportTicket(uid, profile, input) {
+    var subject = String((input && input.subject) || "").trim();
+    var message = String((input && input.message) || "").trim();
+    if (!subject || !message) return Promise.reject(new Error("Sujet et message requis"));
+    var now = Date.now();
+    var data = {
+      ownerUid: uid,
+      establishmentName: (profile && profile.establishmentName) || "",
+      ownerName: (profile && profile.ownerName) || "",
+      email: (profile && profile.email) || "",
+      whatsapp: (profile && profile.whatsapp) || "",
+      tabletImei: input && input.tabletImei ? sanitizeImei(input.tabletImei) : "",
+      subject: subject,
+      message: message,
+      status: "open",
+      createdAt: now,
+      updatedAt: now
+    };
+    return createDoc("supportTickets", data);
+  }
+
+  function listSupportTicketsByOwner(uid) {
+    return runQuery({
+      from: [{ collectionId: "supportTickets" }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: "ownerUid" },
+          op: "EQUAL",
+          value: { stringValue: uid }
+        }
+      },
+      limit: 50
+    }).then(function (docs) {
+      docs.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      return docs;
+    });
+  }
+
+  function listAllSupportTickets() {
+    return runQuery({ from: [{ collectionId: "supportTickets" }], limit: 200 }).then(function (docs) {
+      docs.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      return docs;
+    });
+  }
+
+  function replySupportTicket(ticketId, adminUid, reply, status) {
+    var text = String(reply || "").trim();
+    if (!text) return Promise.reject(new Error("Réponse requise"));
+    return patchDoc("supportTickets/" + ticketId, {
+      adminReply: text,
+      adminRepliedAt: Date.now(),
+      adminUid: adminUid,
+      status: status || "in_progress",
+      updatedAt: Date.now()
+    }, ["adminReply", "adminRepliedAt", "adminUid", "status", "updatedAt"]);
+  }
+
+  function pingRegisteredTablet(uid) {
+    var imei = getRememberedTabletImei(uid);
+    if (!imei) return Promise.resolve();
+    return touchTabletLastSeen(uid, imei);
+  }
+
   global.NACK_LIGHT.api = {
     xhr: xhr, getSession: getSession, saveSession: saveSession, clearSession: clearSession,
     signIn: signIn, signUp: signUp, resetPassword: resetPassword, refreshIdToken: refreshIdToken,
     getDoc: getDoc, listDocs: listDocs, createDoc: createDoc, patchDoc: patchDoc, deleteDoc: deleteDoc,
-    setDoc: setDoc, getPublicDoc: getPublicDoc, runPublicQuery: runPublicQuery,
+    setDoc: setDoc, getPublicDoc: getPublicDoc, runPublicQuery: runPublicQuery, runQuery: runQuery,
     findAgentByCode: findAgentByCode, loginAffiliate: loginAffiliate, queryReferrals: queryReferrals,
     createPaymentLink: createPaymentLink, patchProfile: patchProfile, teamPath: teamPath,
     isAdmin: isAdmin, startPolling: startPolling, stopPolling: stopPolling, exportCsv: exportCsv,
     dataRoot: dataRoot, ownerDataRoot: ownerDataRoot, publicBase: publicBase, resolvePaymentProxy: resolvePaymentProxy,
     publicListDocs: publicListDocs, publicCreateDoc: publicCreateDoc, publicPatchDoc: publicPatchDoc,
     resolveAgentToken: resolveAgentToken,
+    sanitizeImei: sanitizeImei, validateImei: validateImei,
+    registerTablet: registerTablet, touchTabletLastSeen: touchTabletLastSeen,
+    listTabletsByOwner: listTabletsByOwner, listAllTablets: listAllTablets,
+    createSupportTicket: createSupportTicket, listSupportTicketsByOwner: listSupportTicketsByOwner,
+    listAllSupportTickets: listAllSupportTickets, replySupportTicket: replySupportTicket,
+    pingRegisteredTablet: pingRegisteredTablet, rememberTabletImei: rememberTabletImei,
+    getRememberedTabletImei: getRememberedTabletImei,
     getProfile: function (uid) { return getDoc("profiles/" + uid); },
     getPublicProfile: function (uid) { return getPublicDoc("profiles/" + uid); },
     lightHref: function (hash) {

@@ -618,6 +618,12 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
   text-align: center; color: var(--muted); font-size: 0.9rem; margin: 0 0 18px; line-height: 1.4;
 }
 .lg-field-hint { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+.lg-tabs-wrap { -webkit-flex-wrap: wrap; flex-wrap: wrap; }
+.lg-support-reply {
+  margin-top: 10px; padding: 10px 12px; border-radius: 10px;
+  background: #eff6ff; border: 1px solid #bfdbfe; font-size: 0.85rem; color: #1e3a8a;
+}
+.lg-support-ticket .lg-textarea { margin-top: 10px; min-height: 72px; }
 
 .lg-affiliate { max-width: 640px; margin: 0 auto; padding: 16px; min-height: 100vh; }
 .lg-affiliate-header {

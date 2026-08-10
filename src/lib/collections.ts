@@ -115,4 +115,10 @@ export const disbursementRequestsColRef = (db: Firestore): CollectionReference =
 export const affiliatesColRef = (db: Firestore): CollectionReference =>
   collection(db, "affiliates") as CollectionReference;
 
+export const tabletsColRef = (db: Firestore): CollectionReference =>
+  collection(db, "tablets") as CollectionReference;
+
+export const supportTicketsColRef = (db: Firestore): CollectionReference =>
+  collection(db, "supportTickets") as CollectionReference;
+
 export const affiliateDocRef = (db: Firestore, code: string) => doc(db, "affiliates", code.toUpperCase()); 

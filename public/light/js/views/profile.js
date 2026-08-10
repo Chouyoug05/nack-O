@@ -6,12 +6,14 @@
     api = global.NACK_LIGHT.api;
     icon = global.NACK_LIGHT.icon;
     sub = global.NACK_LIGHT.subscription || {};
-    state = { ctx: ctx, tab: "subscription", duration: "month", establishments: [] };
+    state = { ctx: ctx, tab: "subscription", duration: "month", establishments: [], tablets: [], tickets: [], tabletsLoading: false, ticketsLoading: false };
 
     root.innerHTML =
-      '<div class="lg-tabs" id="profile-tabs">' +
+      '<div class="lg-tabs lg-tabs-wrap" id="profile-tabs">' +
         '<button type="button" class="lg-tab active" data-action="profile-tab" data-arg="subscription">Abonnement</button>' +
         '<button type="button" class="lg-tab" data-action="profile-tab" data-arg="establishment">Établissement</button>' +
+        '<button type="button" class="lg-tab" data-action="profile-tab" data-arg="tablets">Tablettes</button>' +
+        '<button type="button" class="lg-tab" data-action="profile-tab" data-arg="support">Support</button>' +
         '<button type="button" class="lg-tab" data-action="profile-tab" data-arg="tickets">Tickets</button>' +
         '<button type="button" class="lg-tab" data-action="profile-tab" data-arg="data">Données</button>' +
         '<button type="button" class="lg-tab" data-action="profile-tab" data-arg="about">À propos</button>' +
@@ -30,7 +32,35 @@
       var t = tabs[i];
       t.className = "lg-tab" + (t.getAttribute("data-arg") === tab ? " active" : "");
     }
+    if (tab === "tablets") loadTablets();
+    else if (tab === "support") { loadTablets(); loadSupportTickets(); }
     paintPanel();
+  }
+
+  function loadTablets() {
+    if (!state.ctx.uid) return;
+    state.tabletsLoading = true;
+    api.listTabletsByOwner(state.ctx.uid).then(function (docs) {
+      state.tablets = docs || [];
+      state.tabletsLoading = false;
+      if (state.tab === "tablets") paintPanel();
+    }).catch(function () {
+      state.tabletsLoading = false;
+      if (state.tab === "tablets") paintPanel();
+    });
+  }
+
+  function loadSupportTickets() {
+    if (!state.ctx.uid) return;
+    state.ticketsLoading = true;
+    api.listSupportTicketsByOwner(state.ctx.uid).then(function (docs) {
+      state.tickets = docs || [];
+      state.ticketsLoading = false;
+      if (state.tab === "support") paintPanel();
+    }).catch(function () {
+      state.ticketsLoading = false;
+      if (state.tab === "support") paintPanel();
+    });
   }
 
   function loadEstablishments() {
@@ -84,6 +114,8 @@
     var p = state.ctx.profile || {};
     if (state.tab === "subscription") paintSubscription(panel, p);
     else if (state.tab === "establishment") paintEstablishment(panel, p);
+    else if (state.tab === "tablets") paintTablets(panel, p);
+    else if (state.tab === "support") paintSupport(panel, p);
     else if (state.tab === "tickets") paintTickets(panel, p);
     else if (state.tab === "about") paintAbout(panel, p);
     else paintData(panel, p);
@@ -188,6 +220,99 @@
         '<div class="lg-field"><label class="lg-label">Mentions légales</label><textarea class="lg-textarea" id="tk-legal" rows="3">' + ui.escapeHtml(p.legalMentions || "") + '</textarea></div>' +
         '<button type="button" class="lg-btn lg-btn-nack lg-btn-block" data-action="prof-tickets-save">Enregistrer</button>' +
       '</div>';
+  }
+
+  function paintTablets(panel, p) {
+    var remembered = api.getRememberedTabletImei(state.ctx.uid);
+    var listHtml = "";
+    if (state.tabletsLoading) {
+      listHtml = '<div class="lg-loading">Chargement…</div>';
+    } else if (!state.tablets.length) {
+      listHtml = '<div class="lg-empty">Aucune tablette enregistrée</div>';
+    } else {
+      for (var i = 0; i < state.tablets.length; i++) {
+        var t = state.tablets[i];
+        var seen = t.lastSeenAt ? formatDate(t.lastSeenAt) : "—";
+        listHtml +=
+          '<div class="lg-list-item">' +
+            '<div class="lg-list-item-main">' +
+              '<div class="lg-list-item-title">' + ui.escapeHtml(t.label || "Tablette") + '</div>' +
+              '<div class="lg-card-desc">IMEI : ' + ui.escapeHtml(t.imei || t.id) + '</div>' +
+              '<div class="lg-card-desc">Dernière activité : ' + ui.escapeHtml(seen) + ' • ' + ui.escapeHtml(t.status || "active") + '</div>' +
+            '</div></div>';
+      }
+    }
+    panel.innerHTML =
+      '<div class="lg-card">' +
+        '<div class="lg-card-title">Enregistrer une tablette</div>' +
+        '<p class="lg-card-desc">Saisissez l\'IMEI de votre tablette pour permettre le suivi et le support technique.</p>' +
+        '<div class="lg-field"><label class="lg-label">IMEI (15 chiffres)</label>' +
+          '<input class="lg-input lg-input-mono" id="tab-imei" inputmode="numeric" placeholder="Ex: 356789012345678" maxlength="15" value="' + ui.escapeHtml(remembered) + '"></div>' +
+        '<div class="lg-field"><label class="lg-label">Nom de la tablette</label>' +
+          '<input class="lg-input" id="tab-label" placeholder="Ex: Tablette caisse"></div>' +
+        '<button type="button" class="lg-btn lg-btn-nack lg-btn-block" data-action="prof-tablet-save">Enregistrer cette tablette</button>' +
+      '</div>' +
+      '<div class="lg-section-title">Mes tablettes</div>' + listHtml;
+  }
+
+  function paintSupport(panel, p) {
+    var tabletOpts = '<option value="">— Aucune / non liée —</option>';
+    for (var i = 0; i < state.tablets.length; i++) {
+      var t = state.tablets[i];
+      tabletOpts += '<option value="' + ui.escapeHtml(t.imei || t.id) + '">' + ui.escapeHtml((t.label || "Tablette") + " (" + (t.imei || t.id) + ")") + '</option>';
+    }
+    var ticketsHtml = "";
+    if (state.ticketsLoading) {
+      ticketsHtml = '<div class="lg-loading">Chargement…</div>';
+    } else if (!state.tickets.length) {
+      ticketsHtml = '<div class="lg-empty">Aucun ticket support</div>';
+    } else {
+      for (var j = 0; j < state.tickets.length; j++) {
+        var tk = state.tickets[j];
+        ticketsHtml +=
+          '<div class="lg-card">' +
+            '<div class="lg-list-item-title">' + ui.escapeHtml(tk.subject || "Ticket") + '</div>' +
+            '<div class="lg-card-desc">' + ui.escapeHtml(tk.message || "") + '</div>' +
+            '<div class="lg-card-desc">Statut : <strong>' + ui.escapeHtml(tk.status || "open") + '</strong> • ' + ui.escapeHtml(formatDate(tk.createdAt)) + '</div>' +
+            (tk.adminReply
+              ? '<div class="lg-support-reply"><strong>Réponse admin :</strong> ' + ui.escapeHtml(tk.adminReply) + '</div>'
+              : '<div class="lg-card-desc">En attente de réponse administrateur</div>') +
+          '</div>';
+      }
+    }
+    panel.innerHTML =
+      '<div class="lg-card">' +
+        '<div class="lg-card-title">Contacter le support</div>' +
+        '<p class="lg-card-desc">Décrivez votre problème. L\'administrateur NACK vous répondra directement.</p>' +
+        '<div class="lg-field"><label class="lg-label">Sujet</label><input class="lg-input" id="sup-subject" placeholder="Ex: Tablette ne se connecte plus"></div>' +
+        '<div class="lg-field"><label class="lg-label">Tablette concernée</label><select class="lg-select" id="sup-tablet">' + tabletOpts + '</select></div>' +
+        '<div class="lg-field"><label class="lg-label">Message</label><textarea class="lg-textarea" id="sup-message" placeholder="Décrivez le problème en détail…"></textarea></div>' +
+        '<button type="button" class="lg-btn lg-btn-nack lg-btn-block" data-action="prof-support-send">Envoyer au support</button>' +
+      '</div>' +
+      '<div class="lg-section-title">Mes demandes</div>' + ticketsHtml;
+  }
+
+  function registerTabletDevice() {
+    var imei = (ui.$("tab-imei") && ui.$("tab-imei").value) || "";
+    var label = (ui.$("tab-label") && ui.$("tab-label").value || "").trim();
+    api.registerTablet(state.ctx.uid, state.ctx.profile, imei, label).then(function () {
+      ui.toast("Tablette enregistrée", "ok");
+      loadTablets();
+    }).catch(function (err) { ui.toast(err.message || "Erreur", "error"); });
+  }
+
+  function sendSupportTicket() {
+    var subject = (ui.$("sup-subject") && ui.$("sup-subject").value) || "";
+    var message = (ui.$("sup-message") && ui.$("sup-message").value) || "";
+    var tabletImei = ui.$("sup-tablet") ? ui.$("sup-tablet").value : "";
+    api.createSupportTicket(state.ctx.uid, state.ctx.profile, {
+      subject: subject, message: message, tabletImei: tabletImei
+    }).then(function () {
+      ui.toast("Ticket envoyé au support", "ok");
+      if (ui.$("sup-subject")) ui.$("sup-subject").value = "";
+      if (ui.$("sup-message")) ui.$("sup-message").value = "";
+      loadSupportTickets();
+    }).catch(function (err) { ui.toast(err.message || "Erreur", "error"); });
   }
 
   function paintAbout(panel, p) {
@@ -375,6 +500,8 @@
     saveProfile: saveProfile, saveTickets: saveTickets, payNow: payNow,
     switchEstablishment: switchEstablishment, openCreateEst: openCreateEst,
     createEstablishment: createEstablishment, backupLocal: backupLocal,
-    exportProducts: exportProducts, resetData: resetData, deleteAccount: deleteAccount
+    exportProducts: exportProducts, resetData: resetData, deleteAccount: deleteAccount,
+    registerTabletDevice: registerTabletDevice, sendSupportTicket: sendSupportTicket,
+    loadTablets: loadTablets
   };
 })(window);
