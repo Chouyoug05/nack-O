@@ -662,10 +662,14 @@
 
   function profileIncomplete(profile) {
     if (!profile) return true;
-    if (!profile.establishmentName || !profile.ownerName) return true;
-    if (!profile.whatsapp && !profile.phone) return true;
-    return false;
+    var name = String(profile.establishmentName || "").trim();
+    var owner = String(profile.ownerName || "").trim();
+    // Critère unique : nom établissement + gérant. WhatsApp/téléphone restent demandés au premier remplissage du formulaire,
+    // mais ne doivent plus forcer un retour permanent sur « Compléter le profil ».
+    return !name || !owner;
   }
+
+  global.NACK_LIGHT.profileIncomplete = profileIncomplete;
 
   function maybeTrialWelcome() {
     if (!state.profile || state.profile.plan !== "trial") return;

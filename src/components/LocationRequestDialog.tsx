@@ -25,8 +25,31 @@ const LocationRequestDialog = () => {
     // Afficher le dialog si le profil existe mais n'a pas de géolocalisation et qu'on ne l'a pas encore demandé
     if (profile && !profile.locationAsked && (!profile.latitude || !profile.longitude)) {
       setIsOpen(true);
+    } else {
+      setIsOpen(false);
     }
   }, [profile]);
+
+  const handleSkipLocation = async () => {
+    try {
+      await saveProfile({
+        establishmentName: profile?.establishmentName || "",
+        establishmentType: profile?.establishmentType || "",
+        ownerName: profile?.ownerName || "",
+        email: profile?.email || "",
+        phone: profile?.phone || "",
+        whatsapp: profile?.whatsapp,
+        logoUrl: profile?.logoUrl,
+        latitude: profile?.latitude,
+        longitude: profile?.longitude,
+        address: profile?.address,
+        locationAsked: true,
+      });
+    } catch {
+      // ne pas bloquer la session
+    }
+    setIsOpen(false);
+  };
 
   // Recherche d'adresses avec autocomplétion
   const handleAddressInputChange = async (value: string) => {
@@ -195,7 +218,7 @@ const LocationRequestDialog = () => {
   if (!profile) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) void handleSkipLocation(); }}>
       <DialogContent className="w-[95vw] max-w-[500px] mx-auto max-h-[90vh] overflow-y-auto p-0 gap-0">
         {/* Header avec illustration */}
         <div className="relative bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700 p-6 sm:p-8 text-white">
@@ -369,6 +392,15 @@ const LocationRequestDialog = () => {
                 </p>
               </div>
             )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              className="h-12 text-muted-foreground"
+              onClick={() => void handleSkipLocation()}
+            >
+              Plus tard
+            </Button>
           </div>
 
           {/* Note */}

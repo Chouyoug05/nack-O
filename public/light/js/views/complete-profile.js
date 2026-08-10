@@ -12,6 +12,16 @@
     { value: "other", label: "Autre" }
   ];
 
+  function isComplete(profile) {
+    if (global.NACK_LIGHT.profileIncomplete) return !global.NACK_LIGHT.profileIncomplete(profile);
+    if (!profile) return false;
+    return !!(String(profile.establishmentName || "").trim() && String(profile.ownerName || "").trim());
+  }
+
+  function goApp(hash) {
+    window.location.href = api.lightHref(hash || "");
+  }
+
   function render(root) {
     ui = global.NACK_LIGHT.ui;
     api = global.NACK_LIGHT.api;
@@ -26,16 +36,22 @@
       terms: false
     };
     if (!session.idToken) {
-      window.location.href = api.lightHref("");
+      goApp("");
       return;
     }
     api.getProfile(session.uid).then(function (p) {
-      if (p && p.establishmentName) {
-        window.location.href = api.lightHref("");
+      if (isComplete(p)) {
+        goApp("");
         return;
       }
       if (p) {
+        state.form.establishmentName = p.establishmentName || "";
+        state.form.establishmentType = p.establishmentType || "";
         state.form.ownerName = p.ownerName || "";
+        state.form.phone = p.phone || "";
+        state.form.whatsapp = p.whatsapp || "";
+        state.form.address = p.address || "";
+        state.form.logoUrl = p.logoUrl || "";
         state.form.email = p.email || session.email || "";
       }
       paint(root);
@@ -101,17 +117,22 @@
     var uid = state.uid;
     var now = Date.now();
     api.patchProfile(uid, data, ["establishmentName", "establishmentType", "ownerName", "phone", "whatsapp", "address", "logoUrl", "email", "updatedAt"]).then(function () {
-      return api.patchDoc("establishments/" + uid, {
+      // Sync établissement : ne doit pas bloquer la sortie du formulaire
+      return api.setDoc("establishments/" + uid, {
+        id: uid,
+        ownerUid: uid,
         name: data.establishmentName,
         type: data.establishmentType,
         ownerName: data.ownerName,
         phone: data.phone,
         whatsapp: data.whatsapp,
-        updatedAt: now
-      }, ["name", "type", "ownerName", "phone", "whatsapp", "updatedAt"]);
+        email: data.email || "",
+        updatedAt: now,
+        createdAt: now
+      }, false).catch(function () { return null; });
     }).then(function () {
       ui.toast("Profil enregistré", "ok");
-      window.location.href = api.lightHref("#/configure-tickets");
+      goApp("#/configure-tickets");
     }).catch(function (err) {
       ui.toast(err.message || "Erreur", "error");
     }).then(function () { ui.setLoading(btn, false); });

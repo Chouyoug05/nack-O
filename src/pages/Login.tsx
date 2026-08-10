@@ -13,6 +13,7 @@ import { db } from "@/lib/firebase";
 import { agentTokensTopColRef } from "@/lib/collections";
 import { getDoc, doc, collectionGroup, query, where, limit, getDocs } from "firebase/firestore";
 import { getFriendlyErrorMessage } from "@/utils/authErrors";
+import { isProfileComplete } from "@/utils/profileComplete";
 
 type LoginType = 'manager' | 'team' | 'affiliate';
 type TeamRole = 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
@@ -37,7 +38,7 @@ const Login = () => {
   useEffect(() => {
     if (user && !profileLoading && !isAdminLoading) {
       if (isAdmin) navigate('/admin', { replace: true });
-      else if (profile) navigate('/dashboard', { replace: true });
+      else if (isProfileComplete(profile)) navigate('/dashboard', { replace: true });
       else navigate('/complete-profile', { replace: true });
     }
   }, [user, profile, profileLoading, isAdmin, isAdminLoading, navigate]);

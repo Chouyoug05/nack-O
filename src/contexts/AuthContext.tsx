@@ -322,7 +322,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                 }
               } catch { /* ignore */ }
               if (rsnap.exists()) {
-                window.location.replace(join('/dashboard'));
+                const data = rsnap.data() as { establishmentName?: string; ownerName?: string };
+                const complete = !!(String(data.establishmentName || "").trim() && String(data.ownerName || "").trim());
+                window.location.replace(join(complete ? '/dashboard' : '/complete-profile'));
                 return;
               } else {
                 window.location.replace(join('/complete-profile'));

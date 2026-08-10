@@ -24,6 +24,7 @@ import { useOfflineCacheWarmup } from "@/hooks/useOfflineCacheWarmup";
 import OfflineAuthBlock from "@/components/OfflineAuthBlock";
 import OfflineStatusBar from "@/components/OfflineStatusBar";
 import { isElectronRenderer } from "@/lib/platform";
+import { isProfileComplete } from "@/utils/profileComplete";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
@@ -64,7 +65,7 @@ const RequireProfile = ({ children }: { children: React.ReactNode }) => {
   const { user, profile, profileLoading } = useAuth();
   if (profileLoading) return <FullscreenLoader />;
   if (!user) return <Navigate to="/login" replace />;
-  if (!profile) return <Navigate to="/complete-profile" replace />;
+  if (!isProfileComplete(profile)) return <Navigate to="/complete-profile" replace />;
   return <>{children}</>;
 };
 
@@ -87,11 +88,11 @@ const HomeRedirect = () => {
     return <FullscreenLoader />;
   }
 
-  if (user && (isAdmin || profile)) {
+  if (user && (isAdmin || isProfileComplete(profile))) {
     return <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />;
   }
 
-  if (user && !profile && !isAdmin) {
+  if (user && !isProfileComplete(profile) && !isAdmin) {
     return <Navigate to="/complete-profile" replace />;
   }
 

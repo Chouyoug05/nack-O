@@ -15,6 +15,7 @@ import { Search, Navigation, MapPin, Loader2, Building2 } from "lucide-react";
 import { ESTABLISHMENT_TYPES, getEstablishmentLabel } from "@/constants/establishmentTypes";
 import { Checkbox } from "@/components/ui/checkbox";
 import TermsAndConditions from "@/components/TermsAndConditions";
+import { isProfileComplete } from "@/utils/profileComplete";
 
 const CompleteProfile = () => {
   const { user, profile, profileLoading, saveProfile, isAdmin, isAdminLoading } = useAuth();
@@ -44,17 +45,36 @@ const CompleteProfile = () => {
   const [locationError, setLocationError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Si admin, rediriger vers /admin mÃªme sans profil
+    // Si admin, rediriger vers /admin même sans profil
     if (user && !isAdminLoading && isAdmin) {
       navigate("/admin", { replace: true });
     }
   }, [user, isAdmin, isAdminLoading, navigate]);
 
   useEffect(() => {
-    if (!profileLoading && profile) {
+    // Uniquement si le profil est vraiment complet — un doc vide (inscription) doit rester ici
+    if (!profileLoading && isProfileComplete(profile)) {
       navigate("/dashboard", { replace: true });
     }
   }, [profileLoading, profile, navigate]);
+
+  useEffect(() => {
+    if (!profile) return;
+    setFormData((prev) => ({
+      ...prev,
+      establishmentName: profile.establishmentName || prev.establishmentName,
+      establishmentType: profile.establishmentType || prev.establishmentType,
+      ownerName: profile.ownerName || prev.ownerName,
+      email: profile.email || prev.email || user?.email || "",
+      phone: profile.phone || prev.phone,
+      whatsapp: profile.whatsapp || prev.whatsapp,
+      logoUrl: profile.logoUrl || prev.logoUrl,
+      address: profile.address || prev.address,
+      latitude: profile.latitude ?? prev.latitude,
+      longitude: profile.longitude ?? prev.longitude,
+    }));
+    if (profile.address) setAddressInput(profile.address);
+  }, [profile, user?.email]);
 
   const handleAddressInputChange = async (value: string) => {
     setAddressInput(value);
