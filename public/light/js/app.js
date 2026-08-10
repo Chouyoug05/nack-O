@@ -630,6 +630,14 @@
     maybeSubscriptionGate();
     maybeTrialWelcome();
     if (state.uid) api.pingRegisteredTablet(state.uid);
+    if (api.migrateEstablishmentCollectionsToProfile && state.uid) {
+      api.migrateEstablishmentCollectionsToProfile(state.uid, state.profile).then(function (n) {
+        if (n > 0) {
+          ui.toast("Synchronisation: " + n + " document(s)", "ok");
+          refreshStats();
+        }
+      }).catch(function () {});
+    }
     if (global.NACK_LIGHT.offline) {
       if (global.NACK_LIGHT.offline.warmCollections) {
         global.NACK_LIGHT.offline.warmCollections(api, state.profile, state.uid);
@@ -714,9 +722,14 @@
   function loadProfile() {
     return api.getProfile(state.uid).then(function (profile) {
       if (!profile) throw new Error("Profil introuvable");
-      state.profile = profile;
-      updateHeader();
-      return profile;
+      var enrich = api.enrichProfileFromEstablishment
+        ? api.enrichProfileFromEstablishment(state.uid, profile)
+        : Promise.resolve(profile);
+      return enrich.then(function (p) {
+        state.profile = p || profile;
+        updateHeader();
+        return state.profile;
+      });
     });
   }
 

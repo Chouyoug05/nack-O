@@ -150,8 +150,133 @@
   }
 
   function ownerDataRoot(ownerUid, profile) {
-    if (profile && profile.activeEstablishmentId) return "establishments/" + profile.activeEstablishmentId;
+    // Aligné sur Pro : données métier sous profiles/{uid}
     return "profiles/" + ownerUid;
+  }
+
+  function dataRoot(profile, uid) {
+    // Même source que la version Pro (React StockPage/SalesPage) :
+    // profiles/{uid}/products|sales|... — pas establishments/...
+    return "profiles/" + uid;
+  }
+
+  var EST_MIGRATE_COLS = [
+    "products", "sales", "orders", "losses", "events", "team",
+    "customers", "notifications", "barOrders", "tables"
+  ];
+
+  function copyDocFields(d) {
+    var payload = {};
+    for (var k in d) {
+      if (!Object.prototype.hasOwnProperty.call(d, k)) continue;
+      if (k === "id" || k === "_path" || k === "_fromCache" || k === "_pendingSync") continue;
+      payload[k] = d[k];
+    }
+    return payload;
+  }
+
+  /** Si Lite a écrit sous establishments/ alors que Pro lit profiles/, on rapatrie. */
+  function migrateEstablishmentCollectionsToProfile(uid, profile) {
+    if (!uid) return Promise.resolve(0);
+    var eids = [];
+    var active = profile && profile.activeEstablishmentId;
+    if (active) eids.push(String(active));
+    if (eids.indexOf(String(uid)) === -1) eids.push(String(uid));
+
+    var totalMoved = 0;
+    var chain = Promise.resolve();
+
+    function migrateCol(eid, col) {
+      var fromPath = "establishments/" + eid + "/" + col;
+      var toPath = "profiles/" + uid + "/" + col;
+      return Promise.all([
+        listDocsRaw(fromPath, 200).catch(function () { return []; }),
+        listDocsRaw(toPath, 5).catch(function () { return []; })
+      ]).then(function (pair) {
+        var fromDocs = pair[0] || [];
+        var toDocs = pair[1] || [];
+        if (!fromDocs.length || toDocs.length > 0) return 0;
+        var ops = [];
+        for (var i = 0; i < fromDocs.length; i++) {
+          var d = fromDocs[i];
+          var payload = copyDocFields(d);
+          if (d.id) {
+            ops.push(setDocRaw(toPath + "/" + d.id, payload, false).catch(function () { return null; }));
+          } else {
+            ops.push(createDocRaw(toPath, payload).catch(function () { return null; }));
+          }
+        }
+        return Promise.all(ops).then(function (res) {
+          var n = 0;
+          for (var j = 0; j < res.length; j++) if (res[j]) n++;
+          return n;
+        });
+      });
+    }
+
+    for (var i = 0; i < eids.length; i++) {
+      (function (eid) {
+        for (var c = 0; c < EST_MIGRATE_COLS.length; c++) {
+          (function (col) {
+            chain = chain.then(function () {
+              return migrateCol(eid, col).then(function (n) {
+                totalMoved += n || 0;
+              });
+            });
+          })(EST_MIGRATE_COLS[c]);
+        }
+      })(eids[i]);
+    }
+
+    return chain.then(function () { return totalMoved; });
+  }
+
+  /** Remplit le profil depuis establishments/ si des champs nom/gérant manquent. */
+  function enrichProfileFromEstablishment(uid, profile) {
+    if (!profile || !uid) return Promise.resolve(profile);
+    var needName = !String(profile.establishmentName || "").trim();
+    var needOwner = !String(profile.ownerName || "").trim();
+    if (!needName && !needOwner) return Promise.resolve(profile);
+    var eid = profile.activeEstablishmentId || uid;
+    return getDoc("establishments/" + eid).then(function (est) {
+      if (!est) return profile;
+      var patch = {};
+      var mask = [];
+      if (needName && est.name) {
+        profile.establishmentName = est.name;
+        patch.establishmentName = est.name;
+        mask.push("establishmentName");
+      }
+      if (needOwner && est.ownerName) {
+        profile.ownerName = est.ownerName;
+        patch.ownerName = est.ownerName;
+        mask.push("ownerName");
+      }
+      if (!profile.establishmentType && est.type) {
+        profile.establishmentType = est.type;
+        patch.establishmentType = est.type;
+        mask.push("establishmentType");
+      }
+      if (!profile.phone && est.phone) {
+        profile.phone = est.phone;
+        patch.phone = est.phone;
+        mask.push("phone");
+      }
+      if (!profile.whatsapp && est.whatsapp) {
+        profile.whatsapp = est.whatsapp;
+        patch.whatsapp = est.whatsapp;
+        mask.push("whatsapp");
+      }
+      if (!profile.logoUrl && est.logoUrl) {
+        profile.logoUrl = est.logoUrl;
+        patch.logoUrl = est.logoUrl;
+        mask.push("logoUrl");
+      }
+      if (!mask.length) return profile;
+      patch.updatedAt = Date.now();
+      mask.push("updatedAt");
+      return patchProfile(uid, patch, mask).then(function () { return profile; }).catch(function () { return profile; });
+    }).catch(function () { return profile; });
   }
 
   function publicListDocs(path, pageSize) {
@@ -264,17 +389,23 @@
   function getDoc(path) {
     return withToken(function (token) {
       return xhr("GET", FS_BASE + "/" + path, null, authHeaders(token)).then(function (doc) {
+        var obj = docToObj(doc);
         var off = global.NACK_LIGHT.offline;
-        if (off && off.setCache) off.setCache("doc:" + path, doc);
-        return doc;
+        if (off && off.setCache) off.setCache("doc:" + path, obj);
+        return obj;
       });
     }).catch(function (err) {
       var off = global.NACK_LIGHT.offline;
       if (off && off.getCache) {
         var cached = off.getCache("doc:" + path);
         if (cached && cached.data) {
-          cached.data._fromCache = true;
-          return cached.data;
+          // Ancien cache brut Firestore (fields.*) → convertir
+          var data = cached.data;
+          if (data && data.fields && !data.establishmentName && !data.name) {
+            data = docToObj(data);
+          }
+          if (data) data._fromCache = true;
+          return data;
         }
       }
       throw err;
@@ -411,11 +542,6 @@
       }
       throw err;
     });
-  }
-
-  function dataRoot(profile, uid) {
-    if (profile && profile.activeEstablishmentId) return "establishments/" + profile.activeEstablishmentId;
-    return "profiles/" + uid;
   }
 
   function publicBase() {
@@ -770,6 +896,8 @@
     createPaymentLink: createPaymentLink, patchProfile: patchProfile, teamPath: teamPath,
     isAdmin: isAdmin, startPolling: startPolling, stopPolling: stopPolling, exportCsv: exportCsv,
     dataRoot: dataRoot, ownerDataRoot: ownerDataRoot, publicBase: publicBase, resolvePaymentProxy: resolvePaymentProxy,
+    migrateEstablishmentCollectionsToProfile: migrateEstablishmentCollectionsToProfile,
+    enrichProfileFromEstablishment: enrichProfileFromEstablishment,
     publicListDocs: publicListDocs, publicCreateDoc: publicCreateDoc, publicPatchDoc: publicPatchDoc,
     resolveAgentToken: resolveAgentToken,
     sanitizeImei: sanitizeImei, validateImei: validateImei,
