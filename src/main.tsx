@@ -6,6 +6,24 @@ import "./lib/firebase";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { isElectronRenderer } from "@/lib/platform";
 
+/**
+ * Filet de sécurité : appareil ancien → plateforme native /light/
+ * (HTML/CSS/JS dans public/light — hors React).
+ */
+(function redirectLegacyToLightApp() {
+  try {
+    if (typeof window === "undefined") return;
+    const isLegacy = (window as unknown as { __NACK_LEGACY_BROWSER__?: boolean }).__NACK_LEGACY_BROWSER__ === true;
+    if (!isLegacy) return;
+    const path = window.location.pathname || "";
+    if (path.indexOf("/light") !== -1) return;
+    const base = (import.meta.env.BASE_URL || "/").replace(/\/?$/, "/");
+    window.location.replace(`${base}light/`);
+  } catch {
+    /* ignore */
+  }
+})();
+
 // Service worker (PWA + offline + notifications)
 // En production on enregistre le SW principal. En dev, on évite de garder un SW
 // qui peut mettre le serveur vite en cache.
@@ -108,8 +126,9 @@ if (typeof window !== "undefined") {
         '<div style="text-align:center;padding:1.5rem">' +
         '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 1rem"><rect width="48" height="48" rx="12" fill="#dc2626"/><text x="24" y="32" text-anchor="middle" fill="white" font-size="24" font-weight="bold" font-family="sans-serif">N</text></svg>' +
         '<h2 style="font-size:1.125rem;margin-bottom:0.5rem">Une erreur est survenue</h2>' +
-        '<p style="color:#666;font-size:0.875rem;margin-bottom:1rem">Essayez de recharger la page. Si le problème persiste, votre appareil est peut-être trop ancien.</p>' +
-        '<button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:#dc2626;color:white;border:none;border-radius:0.375rem;cursor:pointer;font-size:0.875rem">Recharger</button>' +
+        '<p style="color:#666;font-size:0.875rem;margin-bottom:1rem">Essayez le mode léger si votre appareil est ancien.</p>' +
+        '<p style="margin-bottom:0.75rem"><a href="' + ((import.meta.env.BASE_URL || "/").replace(/\/?$/, "/") + "light/") + '" style="display:inline-block;padding:0.5rem 1.5rem;background:#dc2626;color:white;border-radius:0.375rem;text-decoration:none;font-size:0.875rem">Mode léger</a></p>' +
+        '<button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:transparent;color:#dc2626;border:1px solid #dc2626;border-radius:0.375rem;cursor:pointer;font-size:0.875rem">Recharger</button>' +
         '</div>';
     }
     return false;
@@ -141,8 +160,9 @@ try {
       '<div style="text-align:center;padding:1.5rem">' +
       '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" style="margin:0 auto 1rem"><rect width="48" height="48" rx="12" fill="#dc2626"/><text x="24" y="32" text-anchor="middle" fill="white" font-size="24" font-weight="bold" font-family="sans-serif">N</text></svg>' +
       '<h2 style="font-size:1.125rem;margin-bottom:0.5rem">Appareil non compatible</h2>' +
-      '<p style="color:#666;font-size:0.875rem;margin-bottom:1rem">Votre navigateur ne peut pas exécuter NACK. Veuillez utiliser un navigateur plus récent.</p>' +
-      '<button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:#dc2626;color:white;border:none;border-radius:0.375rem;cursor:pointer;font-size:0.875rem">Recharger</button>' +
+      '<p style="color:#666;font-size:0.875rem;margin-bottom:1rem">Votre navigateur ne peut pas exécuter NACK React. Utilisez le mode léger.</p>' +
+      '<p style="margin-bottom:0.75rem"><a href="' + ((import.meta.env.BASE_URL || "/").replace(/\/?$/, "/") + "light/") + '" style="display:inline-block;padding:0.5rem 1.5rem;background:#dc2626;color:white;border-radius:0.375rem;text-decoration:none;font-size:0.875rem">Ouvrir le mode léger</a></p>' +
+      '<button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:transparent;color:#dc2626;border:1px solid #dc2626;border-radius:0.375rem;cursor:pointer;font-size:0.875rem">Recharger</button>' +
       '</div>';
   }
 }

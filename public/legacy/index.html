@@ -1,0 +1,13 @@
+/* Redirection rétrocompat : /legacy → /light */
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="refresh" content="0;url=../light/" />
+  <script>location.replace((function(){var p=location.pathname||'';var i=p.indexOf('/legacy');var base=i>=0?p.substring(0,i):'';if(base.slice(-1)!=='/')base+='/';return base+'light/';})());</script>
+  <title>Redirection NACK Light</title>
+</head>
+<body>
+  <p><a href="../light/">Continuer vers le mode léger</a></p>
+</body>
+</html>
