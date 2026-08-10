@@ -11,6 +11,7 @@
     email: null,
     stats: { salesToday: 0, productsCount: 0, teamCount: 0 }
   };
+  var viewStack = [];
 
   var TITLES = {
     home: "NACK Pro",
@@ -178,6 +179,19 @@
 
     window.addEventListener("hashchange", onHashChange, false);
 
+    // Si un téléchargement a navigué vers blob: (bug tablette), revenir à l'app
+    try {
+      if (location.protocol === "blob:") {
+        location.replace(api.lightHref(""));
+        return;
+      }
+    } catch (e) {}
+    window.addEventListener("pageshow", function () {
+      try {
+        if (location.protocol === "blob:") location.replace(api.lightHref(""));
+      } catch (e2) {}
+    }, false);
+
     if (bootRoute()) return;
     hideRouteShell();
 
@@ -274,7 +288,14 @@
           global.NACK_LIGHT.pwa.openInstallHelp();
         }
         break;
-      case "back": navigate("home"); break;
+      case "back":
+        if (viewStack.length) {
+          var prev = viewStack.pop();
+          navigate(prev, { replace: true });
+        } else {
+          navigate("home", { replace: true });
+        }
+        break;
       case "logout": logout(); break;
       case "close-modal": ui.closeModal(arg); break;
       case "mgr-cancel": ui.closeModal("modal-manager"); break;
@@ -644,7 +665,7 @@
       }
       if (global.NACK_LIGHT.offline.flushQueue) {
         global.NACK_LIGHT.offline.flushQueue().then(function (res) {
-          if (res && res.done > 0) ui.toast(res.done + " action(s) synchronisée(s)", "ok");
+          if (res && res.done > 0) ui.toast(res.done + " action(s) enregistrée(s)", "ok");
         }).catch(function () {});
       }
     }
@@ -691,7 +712,7 @@
 
   function doLogin() {
     if (typeof navigator !== "undefined" && !navigator.onLine) {
-      ui.toast("Connexion impossible hors ligne", "error");
+      ui.toast("Connexion impossible sans internet", "error");
       return;
     }
     var email = (ui.$("login-email") && ui.$("login-email").value || "").trim();
@@ -785,8 +806,13 @@
     if (hidden) ui.hideEl(el); else ui.showEl(el);
   }
 
-  function navigate(view) {
+  function navigate(view, opts) {
+    opts = opts || {};
     if (view === "admin" && views.admin && state.uid) {
+      if (!opts.replace && state.view && state.view !== "admin") {
+        viewStack.push(state.view);
+        if (viewStack.length > 24) viewStack.shift();
+      }
       try { location.hash = "#/admin"; } catch (e) {}
       state.view = "admin";
       var titleEl = ui.$("hdr-title");
@@ -805,11 +831,16 @@
       ui.openModal("modal-subscription");
       return;
     }
+    if (!opts.replace && state.view && state.view !== view) {
+      viewStack.push(state.view);
+      if (viewStack.length > 24) viewStack.shift();
+    }
+    if (view === "home") viewStack = [];
     state.view = view;
-    var titleEl = ui.$("hdr-title");
-    if (titleEl) {
-      if (view === "home") titleEl.textContent = (state.profile && state.profile.establishmentName) || "NACK Pro";
-      else titleEl.textContent = TITLES[view] || "NACK Pro";
+    var titleEl2 = ui.$("hdr-title");
+    if (titleEl2) {
+      if (view === "home") titleEl2.textContent = (state.profile && state.profile.establishmentName) || "NACK Pro";
+      else titleEl2.textContent = TITLES[view] || "NACK Pro";
     }
     updateHeader();
     setHidden(ui.$("hdr-back"), view === "home" || view === "customer-detail");
@@ -827,10 +858,10 @@
       }
     }
 
-    var main = ui.$("view-root");
-    if (!main) return;
+    var mainEl = ui.$("view-root");
+    if (!mainEl) return;
     var renderer = views[view];
-    if (renderer && renderer.render) renderer.render(main, ctx());
+    if (renderer && renderer.render) renderer.render(mainEl, ctx());
     updateNavSalesBadge(pendingOrdersCount);
   }
 

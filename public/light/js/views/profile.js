@@ -331,7 +331,7 @@
         row("Version", "1.0.0 Light") +
         row("Support", "WhatsApp NACK") +
         '<div class="lg-card-title" style="margin-top:12px">Application</div>' +
-        '<p class="lg-card-desc">Installez NACK sur votre tablette pour un accès rapide et hors ligne.</p>' +
+        '<p class="lg-card-desc">Installez NACK sur votre tablette pour un accès plus rapide au quotidien.</p>' +
         installBtn +
       '</div>' +
       '<a class="lg-btn lg-btn-outline lg-btn-block" style="text-align:center;display:block" href="https://wa.me/24104746847" target="_blank" rel="noopener">Nous contacter</a>' +
@@ -453,7 +453,7 @@
   }
 
   function backupLocal() {
-    ui.toast("Sauvegarde locale effectuée (profil en cache)", "ok");
+    ui.toast("Sauvegarde effectuée sur cet appareil", "ok");
     try {
       localStorage.setItem("nack_light_backup_" + state.ctx.uid, JSON.stringify({
         profile: state.ctx.profile, savedAt: Date.now()
@@ -486,20 +486,33 @@
 
   function payNow(planType) {
     var uid = state.ctx.uid;
-    var base = api.publicBase();
+    var base = api.publicBase() || "https://nack.pro";
+    base = String(base).replace("://www.nack.pro", "://nack.pro");
     var txnId = "TXN-" + uid + "-" + Date.now();
-    var amount = calcPrice(planType, state.duration);
+    var amount = Math.round(Number(calcPrice(planType, state.duration)) || 0);
     var reference = "abonnement-" + planType;
-    ui.toast("Génération du lien de paiement…", "ok");
+    if (!amount || amount < 100) {
+      ui.toast("Montant invalide. Réessayez.", "error");
+      return;
+    }
+    ui.toast("Préparation du paiement…", "ok");
     api.createPaymentLink({
-      portefeuille: "", reference: reference + "-" + txnId.substring(0, 12),
-      redirect_success: base + "/payment/success?reference=" + reference + "&transactionId=" + txnId + "&duration=" + state.duration,
-      redirect_error: base + "/payment/error?transactionId=" + txnId,
-      amount: amount, logoURL: base + "/favicon.png", isTransfer: false
+      reference: reference + "-" + String(txnId).substring(0, 18),
+      redirect_success: base + "/payment/success?reference=" + encodeURIComponent(reference) + "&transactionId=" + encodeURIComponent(txnId) + "&duration=" + encodeURIComponent(state.duration || "month"),
+      redirect_error: base + "/payment/error?transactionId=" + encodeURIComponent(txnId),
+      amount: amount,
+      logoURL: base + "/favicon.png",
+      isTransfer: false
     }).then(function (link) {
-      window.location.href = link;
+      if (!link) throw new Error("Lien de paiement introuvable");
+      // Remplacer la page (évite historique bloqué sur tablette)
+      window.location.assign(link);
     }).catch(function (err) {
-      ui.toast(err.message || "Paiement indisponible", "error");
+      var msg = (err && err.message) ? err.message : "Paiement indisponible";
+      if (/HTTP 500|SingPay non configur|proxy/i.test(msg)) {
+        msg = "Paiement temporairement indisponible. Réessayez dans un instant.";
+      }
+      ui.toast(msg, "error");
     });
   }
 

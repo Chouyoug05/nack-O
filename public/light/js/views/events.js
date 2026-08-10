@@ -202,16 +202,21 @@
   function payExtra() {
     var extra = 1000;
     if (sub.PLANS && sub.PLANS.transition) extra = sub.PLANS.transition.features.eventsExtraPrice || 1000;
-    var uid = state.ctx.uid;
+    var base = (api.publicBase() || "https://nack.pro").replace("://www.nack.pro", "://nack.pro");
     var txnId = "EVT-EXTRA-" + Date.now();
+    ui.toast("Préparation du paiement…", "ok");
     api.createPaymentLink({
-      portefeuille: "", reference: "event-extra-" + txnId,
-      redirect_success: api.publicBase() + "/payment/success?reference=event-extra&transactionId=" + txnId,
-      redirect_error: api.publicBase() + "/payment/error?transactionId=" + txnId,
-      amount: extra, logoURL: api.publicBase() + "/favicon.png", isTransfer: false
+      reference: "event-extra-" + txnId,
+      redirect_success: base + "/payment/success?reference=event-extra&transactionId=" + encodeURIComponent(txnId),
+      redirect_error: base + "/payment/error?transactionId=" + encodeURIComponent(txnId),
+      amount: extra,
+      logoURL: base + "/favicon.png",
+      isTransfer: false
     }).then(function (link) {
-      window.location.href = link;
-    }).catch(function (err) { ui.toast(err.message || "Paiement indisponible", "error"); });
+      window.location.assign(link);
+    }).catch(function (err) {
+      ui.toast((err && err.message) || "Paiement indisponible", "error");
+    });
   }
 
   global.NACK_LIGHT.views = global.NACK_LIGHT.views || {};

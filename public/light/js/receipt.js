@@ -30,34 +30,56 @@
     );
   }
 
+  /** Téléchargement sans quitter l'app (évite blob: qui bloque le retour tablette). */
   function downloadHtml(html, filename) {
     try {
-      var blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      var blob = new Blob([html], { type: "application/octet-stream" });
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
       a.href = url;
       a.download = filename || "recu-nack.html";
+      a.rel = "noopener";
+      a.target = "_blank";
       a.style.display = "none";
       document.body.appendChild(a);
       a.click();
       setTimeout(function () {
         try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch (e) {}
-      }, 500);
+      }, 800);
       return true;
     } catch (e) { return false; }
   }
 
+  /** Impression via iframe invisible — ne crée pas d'onglet ni d'entrée d'historique. */
   function openPrint(html) {
-    var w = window.open("", "_blank", "width=360,height=640");
-    if (!w) return false;
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    setTimeout(function () { try { w.print(); } catch (e) {} }, 250);
-    return true;
+    try {
+      var iframe = document.getElementById("lg-print-frame");
+      if (!iframe) {
+        iframe = document.createElement("iframe");
+        iframe.id = "lg-print-frame";
+        iframe.setAttribute("aria-hidden", "true");
+        iframe.title = "Impression reçu";
+        iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+        document.body.appendChild(iframe);
+      }
+      var win = iframe.contentWindow;
+      if (!win) return false;
+      var doc = win.document;
+      doc.open();
+      doc.write(html);
+      doc.close();
+      setTimeout(function () {
+        try {
+          win.focus();
+          win.print();
+        } catch (e) {}
+      }, 350);
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 
-  /** Télécharge le reçu (fichier) et propose l'impression si possible */
   function downloadReceipt(profile, sale, opts) {
     var ui = global.NACK_LIGHT.ui;
     if (!sale) return false;
@@ -66,13 +88,11 @@
     var name = "recu-" + (sale.id || Date.now()) + ".html";
     var ok = downloadHtml(html, name);
     if (opts.print !== false) {
-      var printed = openPrint(html);
-      if (!printed && !ok) {
-        ui.toast("Autorisez les téléchargements / popups pour le reçu", "error");
-        return false;
-      }
+      openPrint(html);
     }
-    if (ok) ui.toast("Reçu téléchargé", "ok");
+    if (ok) ui.toast("Reçu enregistré", "ok");
+    else if (opts.print !== false) ui.toast("Impression du reçu…", "ok");
+    else ui.toast("Impossible d'enregistrer le reçu", "error");
     return true;
   }
 

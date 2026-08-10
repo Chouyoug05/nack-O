@@ -22,7 +22,7 @@ export const getFriendlyErrorMessage = (error: unknown): string => {
         case 'auth/operation-not-allowed':
             return "Inscription désactivée pour le moment.";
         case 'auth/network-request-failed':
-            return "Problème de connexion réseau. Vérifiez votre internet.";
+            return "Problème de connexion. Vérifiez votre internet.";
         case 'auth/too-many-requests':
             return "Trop de tentatives. Réessayez plus tard.";
         case 'auth/internal-error':

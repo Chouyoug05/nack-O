@@ -255,21 +255,22 @@
           (p.customMessage ? "<p style='text-align:center'>" + ui.escapeHtml(p.customMessage) + "</p>" : "") +
         "</div>";
     }
-    var w = window.open("", "_blank", multi ? "width=420,height=700" : "width=320,height=600");
-    if (!w) { ui.toast("Autorisez les popups pour télécharger les reçus", "error"); return; }
-    w.document.write(
+    var html =
       "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Reçus NACK</title>" +
       "<style>body{font-family:monospace;font-size:12px;padding:12px}" +
       ".receipt{max-width:280px;margin:0 auto 24px;padding-bottom:16px;border-bottom:1px dashed #999;page-break-after:always}" +
       "table{width:100%}h2{text-align:center;margin:0}" +
       "@media print{.receipt{border:none}}</style></head><body>" +
       blocks +
-      "<script>window.onload=function(){try{window.print();}catch(e){}}<\/script>" +
-      "</body></html>"
-    );
-    w.document.close();
-    w.focus();
-    ui.toast(multi ? "Reçus prêts à imprimer / enregistrer en PDF" : "Reçu ouvert", "ok");
+      "</body></html>";
+    var receipt = global.NACK_LIGHT.receipt;
+    if (receipt) {
+      if (receipt.downloadHtml) receipt.downloadHtml(html, multi ? "recus-nack.html" : "recu-nack.html");
+      if (receipt.openPrint) receipt.openPrint(html);
+      ui.toast(multi ? "Reçus prêts" : "Reçu prêt", "ok");
+      return;
+    }
+    ui.toast("Impossible d'ouvrir le reçu", "error");
   }
 
   function exportCsv() {
@@ -283,7 +284,7 @@
       rows.push([ui.formatDate(s.createdAt), s.total, s.paymentMethod || "cash", names.join("; ")]);
     }
     api.exportCsv("rapport_" + state.period + ".csv", rows);
-    ui.toast("Export CSV lancé", "ok");
+    ui.toast("Export lancé", "ok");
   }
 
   function exportPdf() {
@@ -291,21 +292,23 @@
     var profit = estimateProfit(filtered);
     var total = 0;
     for (var i = 0; i < filtered.length; i++) total += Number(filtered[i].total) || 0;
-    var w = window.open("", "_blank");
-    if (!w) { ui.toast("Autorisez les popups", "error"); return; }
     var rows = "";
     for (var j = 0; j < filtered.length; j++) {
       rows += "<tr><td>" + ui.escapeHtml(ui.formatDate(filtered[j].createdAt)) + "</td><td>" + ui.escapeHtml(ui.formatMoney(filtered[j].total)) + "</td></tr>";
     }
-    w.document.write(
+    var html =
       "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Rapport NACK</title>" +
       "<style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ddd;padding:6px}</style></head><body>" +
       "<h1>Rapport " + state.period + "</h1>" +
       "<p>CA : " + ui.escapeHtml(ui.formatMoney(total)) + " — Bénéfice est. : " + ui.escapeHtml(ui.formatMoney(profit.profit)) + "</p>" +
-      "<table><tr><th>Date</th><th>Total</th></tr>" + rows + "</table></body></html>"
-    );
-    w.document.close();
-    w.print();
+      "<table><tr><th>Date</th><th>Total</th></tr>" + rows + "</table></body></html>";
+    var receipt = global.NACK_LIGHT.receipt;
+    if (receipt && receipt.openPrint) {
+      receipt.openPrint(html);
+      ui.toast("Rapport prêt à imprimer", "ok");
+      return;
+    }
+    ui.toast("Impression indisponible", "error");
   }
 
   global.NACK_LIGHT.views = global.NACK_LIGHT.views || {};

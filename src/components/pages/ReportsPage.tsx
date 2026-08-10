@@ -453,13 +453,43 @@ const ReportsPage = () => {
       const date = new Date(Number(sale.createdAt) || Date.now()).toLocaleString("fr-FR");
       return `<div class="receipt"><h2>${name}</h2><p style="text-align:center">${date}</p><table>${lines}</table><p style="text-align:right;font-weight:bold">Total : ${Number(sale.total || 0).toLocaleString("fr-FR")} XAF</p></div>`;
     }).join("");
-    const w = window.open("", "_blank", "width=420,height=700");
-    if (!w) {
-      alert("Autorisez les popups pour télécharger les reçus");
-      return;
-    }
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reçus</title><style>body{font-family:monospace;font-size:12px;padding:12px}.receipt{max-width:280px;margin:0 auto 24px;padding-bottom:16px;border-bottom:1px dashed #999;page-break-after:always}table{width:100%}h2{text-align:center;margin:0}</style></head><body>${blocks}<script>window.onload=function(){try{window.print()}catch(e){}}<\/script></body></html>`);
-    w.document.close();
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reçus</title><style>body{font-family:monospace;font-size:12px;padding:12px}.receipt{max-width:280px;margin:0 auto 24px;padding-bottom:16px;border-bottom:1px dashed #999;page-break-after:always}table{width:100%}h2{text-align:center;margin:0}</style></head><body>${blocks}</body></html>`;
+
+    // Téléchargement sans naviguer (évite le blocage retour tablette)
+    try {
+      const blob = new Blob([html], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "recus-nack.html";
+      a.rel = "noopener";
+      a.style.display = "none";
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        try { document.body.removeChild(a); URL.revokeObjectURL(url); } catch { /* ignore */ }
+      }, 800);
+    } catch { /* ignore */ }
+
+    // Impression via iframe (pas de nouvel onglet)
+    try {
+      let iframe = document.getElementById("nack-print-frame") as HTMLIFrameElement | null;
+      if (!iframe) {
+        iframe = document.createElement("iframe");
+        iframe.id = "nack-print-frame";
+        iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;pointer-events:none;";
+        document.body.appendChild(iframe);
+      }
+      const doc = iframe.contentWindow?.document;
+      if (doc) {
+        doc.open();
+        doc.write(html);
+        doc.close();
+        setTimeout(() => {
+          try { iframe?.contentWindow?.focus(); iframe?.contentWindow?.print(); } catch { /* ignore */ }
+        }, 350);
+      }
+    } catch { /* ignore */ }
   };
 
   const formatAmount = (amount: number) => {

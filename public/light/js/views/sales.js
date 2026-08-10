@@ -130,11 +130,11 @@
         paintGrid();
       }
       var fromCache = state.products.length && state.products[0] && state.products[0]._fromCache;
-      if (fromCache) ui.toast("Produits chargés depuis le cache hors ligne", "ok");
+      if (fromCache) ui.toast("Produits affichés avec les dernières données enregistrées", "ok");
     }).catch(function (err) {
       var el = ui.$("sales-grid");
       if (el) el.innerHTML = '<div class="lg-empty">' + ui.escapeHtml(err.message) +
-        '<br><span class="lg-card-desc">Ouvrez le stock une fois en ligne pour activer le cache hors ligne.</span></div>';
+        '<br><span class="lg-card-desc">Ouvrez le stock une fois connecté pour préparer la vente sur cet appareil.</span></div>';
     });
   }
 
@@ -189,28 +189,7 @@
       global.NACK_LIGHT.receipt.downloadReceipt(state.ctx.profile, sale, { print: true });
       return;
     }
-    var p = state.ctx.profile || {};
-    var items = sale.items || [];
-    var lines = "";
-    for (var j = 0; j < items.length; j++) {
-      var it = items[j];
-      lines += "<tr><td>" + ui.escapeHtml(it.name) + " ×" + (it.quantity || 1) + "</td><td style='text-align:right'>" + ui.escapeHtml(ui.formatMoney((it.price || 0) * (it.quantity || 1))) + "</td></tr>";
-    }
-    var w = window.open("", "_blank", "width=320,height=600");
-    if (!w) { ui.toast("Autorisez les popups pour imprimer", "error"); return; }
-    w.document.write(
-      "<!DOCTYPE html><html><head><meta charset='utf-8'><title>Reçu</title>" +
-      "<style>body{font-family:monospace;font-size:12px;padding:12px}table{width:100%}h2{text-align:center;margin:0}</style></head><body>" +
-      "<h2>" + ui.escapeHtml(p.establishmentName || "NACK") + "</h2>" +
-      "<p style='text-align:center'>" + ui.escapeHtml(ui.formatDate(sale.createdAt)) + "</p>" +
-      "<table>" + lines + "</table>" +
-      "<p style='text-align:right;font-weight:bold'>Total : " + ui.escapeHtml(ui.formatMoney(sale.total)) + "</p>" +
-      (p.customMessage ? "<p style='text-align:center'>" + ui.escapeHtml(p.customMessage) + "</p>" : "") +
-      "</body></html>"
-    );
-    w.document.close();
-    w.focus();
-    w.print();
+    ui.toast("Impossible d'ouvrir le reçu", "error");
   }
 
   function pendingOrders() {

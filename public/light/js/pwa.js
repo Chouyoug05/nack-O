@@ -121,7 +121,7 @@
         '<div class="lg-pwa-ico" aria-hidden="true"></div>' +
         '<div class="lg-pwa-text">' +
           '<strong>Installer NACK</strong>' +
-          '<p>Accès rapide + hors ligne sur tablette</p>' +
+          '<p>Accès rapide depuis l\'écran d\'accueil</p>' +
         '</div>' +
         '<div class="lg-pwa-actions">' +
           '<button type="button" class="lg-btn lg-btn-nack lg-btn-sm" data-pwa-install>Installer</button>' +

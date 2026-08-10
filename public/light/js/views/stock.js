@@ -102,11 +102,11 @@
       if (state.ctx.onStats) state.ctx.onStats({ productsCount: state.products.length });
       var fromCache = state.products.length && state.products[0] && state.products[0]._fromCache;
       if (fromCache) {
-        ui.toast("Stock chargé depuis le cache hors ligne", "ok");
+        ui.toast("Stock affiché avec les dernières données enregistrées", "ok");
         var bar = document.getElementById("lg-offline-bar");
-        if (bar) {
+        if (bar && (!navigator.onLine)) {
           bar.style.display = "block";
-          bar.textContent = "Hors ligne — stock affiché depuis le cache local";
+          bar.textContent = "Mode sans internet — stock disponible";
         }
       }
     }).catch(function (err) {
@@ -114,7 +114,7 @@
         listEl.innerHTML =
           '<div class="lg-empty">Impossible de charger le stock.<br>' +
           ui.escapeHtml(err.message || "Erreur") +
-          '<br><br><span class="lg-card-desc">Connectez-vous une fois en ligne pour enregistrer le stock en cache, puis il restera disponible hors ligne.</span></div>';
+          '<br><br><span class="lg-card-desc">Connectez-vous une fois à internet pour enregistrer vos produits sur cet appareil.</span></div>';
       }
     });
   }

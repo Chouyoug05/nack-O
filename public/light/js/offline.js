@@ -144,7 +144,7 @@
         refreshBar();
         var msg = (err && err.message) || "";
         // Erreur réseau : garder la file
-        if (/HTTP 0|réseau|network|timeout|Délai/i.test(msg) || !isOnline()) {
+        if (/HTTP 0|réseau|network|Délai|joindre|trop de temps|timeout|Failed to fetch/i.test(msg) || !isOnline()) {
           return { done: done, left: getQueue().length, error: msg };
         }
         // Erreur métier : abandonner cette op pour ne pas bloquer la file
@@ -166,11 +166,11 @@
     if (offline) {
       bar.style.display = "block";
       bar.textContent = pending
-        ? "Hors ligne — stock en cache local (" + pending + " action(s) en attente)"
-        : "Hors ligne — lecture depuis le cache local";
+        ? "Mode sans internet — " + pending + " action(s) seront envoyées dès le retour du réseau"
+        : "Mode sans internet — vos données restent disponibles";
     } else if (pending) {
       bar.style.display = "block";
-      bar.textContent = "En ligne — synchronisation de " + pending + " action(s)…";
+      bar.textContent = "Envoi de " + pending + " action(s) en cours…";
     } else {
       bar.style.display = "none";
     }

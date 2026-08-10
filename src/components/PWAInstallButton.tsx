@@ -178,7 +178,7 @@ const PWAInstallButton = () => {
                 Installer NACK
               </h3>
               <p className="text-xs text-muted-foreground mb-3">
-                Installez l'app sur votre appareil pour un accès rapide et hors ligne
+                Installez l'app sur votre appareil pour un accès plus rapide au quotidien
               </p>
               <div className="flex gap-2">
                 <Button

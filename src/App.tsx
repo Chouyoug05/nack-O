@@ -132,8 +132,8 @@ const routes = [
     children: [
       { index: true, element: <HomeRedirect /> },
       { path: "onboarding", element: <Onboarding /> },
-      { path: "login", element: <><OfflineAuthBlock title="Connexion indisponible hors‑ligne" /><Login /></> },
-      { path: "register", element: <><OfflineAuthBlock title="Inscription indisponible hors‑ligne" /><Register /></> },
+      { path: "login", element: <><OfflineAuthBlock title="Connexion requise" /><Login /></> },
+      { path: "register", element: <><OfflineAuthBlock title="Inscription requise" /><Register /></> },
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "complete-profile", element: <LazyBoundary><RequireAuth><CompleteProfile /></RequireAuth></LazyBoundary> },
       { path: "configure-tickets", element: <LazyBoundary><RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth></LazyBoundary> },

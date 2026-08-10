@@ -54,18 +54,25 @@ export const handler: Handler = async (event) => {
       return json(400, { error: "Corps JSON invalide" });
     }
 
-    const amount = Number(input.amount);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    const amount = Math.round(Number(input.amount));
+    if (!Number.isFinite(amount) || amount < 100) {
       return json(400, { error: "Montant invalide", amount: input.amount });
     }
 
-    const payload = {
-      ...input,
+    const payload: Record<string, unknown> = {
+      reference: input.reference || `nack-${Date.now()}`,
+      redirect_success: input.redirect_success || input.redirectSuccess || "",
+      redirect_error: input.redirect_error || input.redirectError || "",
       amount,
+      logoURL: input.logoURL || "",
+      isTransfer: Boolean(input.isTransfer),
       portefeuille:
         (typeof input.portefeuille === "string" && input.portefeuille.trim()) ||
         SINGPAY_WALLET,
     };
+    const disbursement =
+      (typeof input.disbursement === "string" && input.disbursement.trim()) || "";
+    if (disbursement) payload.disbursement = disbursement;
 
     const res = await fetch(SINGPAY_ENDPOINT, {
       method: "POST",
@@ -81,10 +88,11 @@ export const handler: Handler = async (event) => {
 
     const text = await res.text();
     if (!res.ok) {
-      return json(res.status >= 400 && res.status < 600 ? res.status : 502, {
-        error: "SingPay a refusé la requête",
+      // Ne pas renvoyer un 500 opaque : message exploitable côté app
+      return json(502, {
+        error: "Le service de paiement a refusé la demande",
         status: res.status,
-        detail: text.slice(0, 800),
+        detail: text.slice(0, 500),
       });
     }
 

@@ -2,7 +2,7 @@ import { WifiOff } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 /**
- * Bandeau global : mode hors ligne, synchro Firestore au retour réseau.
+ * Bandeau global quand internet n'est pas disponible.
  */
 export default function OfflineStatusBar() {
   const { isOnline } = useOnlineStatus();
@@ -16,7 +16,7 @@ export default function OfflineStatusBar() {
     >
       <WifiOff className="h-4 w-4 shrink-0" aria-hidden />
       <span>
-        Hors ligne — vos actions sont enregistrées sur l’appareil et seront synchronisées avec le cloud dès que la connexion reviendra.
+        Pas d’internet pour le moment — vos actions restent enregistrées et seront envoyées dès le retour du réseau.
       </span>
     </div>
   );

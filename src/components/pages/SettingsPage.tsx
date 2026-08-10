@@ -386,10 +386,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
       await openPaymentUrl(link);
     } catch (error) {
-      console.error('Erreur crÃ©ation lien paiement:', error);
+      console.error('Erreur création lien paiement:', error);
+      const message = error instanceof Error ? error.message : "Réessayez dans quelques instants.";
       toast({
         title: "Paiement indisponible",
-        description: "RÃ©essayez dans quelques instants.",
+        description: message,
         variant: "destructive"
       });
     }

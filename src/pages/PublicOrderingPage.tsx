@@ -654,7 +654,7 @@ const PublicOrderingPage = () => {
       setReceiptQR(receiptQRDataUrl);
       setOrderComplete(true);
       if (queuedOffline) {
-        alert("Commande enregistrée hors ligne. Elle sera synchronisée automatiquement dès que la connexion reviendra.");
+        alert("Commande enregistrée. Elle sera envoyée automatiquement dès le retour d'internet.");
       }
 
     } catch (error) {

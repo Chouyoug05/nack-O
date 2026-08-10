@@ -11,11 +11,19 @@
     return new Promise(function (resolve, reject) {
       try {
         var req = new XMLHttpRequest();
+        // false = async; old Android parfois plus fiable sans withCredentials
         req.open(method, url, true);
-        req.timeout = 30000;
+        try { req.withCredentials = false; } catch (e0) {}
+        req.timeout = 45000;
         var h = headers || {};
+        var contentTypeSet = false;
         for (var k in h) {
-          if (Object.prototype.hasOwnProperty.call(h, k)) req.setRequestHeader(k, h[k]);
+          if (Object.prototype.hasOwnProperty.call(h, k)) {
+            try {
+              req.setRequestHeader(k, h[k]);
+              if (String(k).toLowerCase() === "content-type") contentTypeSet = true;
+            } catch (e1) {}
+          }
         }
         req.onreadystatechange = function () {
           if (req.readyState !== 4) return;
@@ -24,17 +32,33 @@
           try { data = text ? JSON.parse(text) : null; } catch (e) { data = { raw: text }; }
           if (req.status >= 200 && req.status < 300) resolve(data);
           else {
-            var msg = (data && data.error && (data.error.message || data.error.status)) || ("HTTP " + req.status);
-            if (req.status === 0) msg = "Erreur réseau (hors ligne ou connexion coupée)";
+            var msg = "HTTP " + req.status;
+            if (data) {
+              if (typeof data.error === "string") msg = data.error;
+              else if (data.error && (data.error.message || data.error.status)) {
+                msg = data.error.message || data.error.status;
+              } else if (typeof data.message === "string") msg = data.message;
+              if (data.detail && typeof data.detail === "string") msg += " — " + data.detail;
+              else if (data.hint && typeof data.hint === "string") msg += " — " + data.hint;
+            } else if (text && text.length < 200 && text.indexOf("<") === -1) {
+              msg = text;
+            }
+            if (req.status === 0) msg = "Impossible de joindre le serveur. Vérifiez votre connexion.";
             reject(new Error(msg));
           }
         };
-        req.onerror = function () { reject(new Error("Erreur réseau (hors ligne ou connexion coupée)")); };
-        req.ontimeout = function () { reject(new Error("Délai dépassé")); };
+        req.onerror = function () { reject(new Error("Impossible de joindre le serveur. Vérifiez votre connexion.")); };
+        req.ontimeout = function () { reject(new Error("La requête a pris trop de temps. Réessayez.")); };
         if (body != null) {
-          if (typeof body === "string") req.send(body);
-          else {
-            req.setRequestHeader("Content-Type", "application/json");
+          if (typeof body === "string") {
+            if (!contentTypeSet) {
+              try { req.setRequestHeader("Content-Type", "application/json;charset=UTF-8"); } catch (e2) {}
+            }
+            req.send(body);
+          } else {
+            if (!contentTypeSet) {
+              try { req.setRequestHeader("Content-Type", "application/json;charset=UTF-8"); } catch (e3) {}
+            }
             req.send(JSON.stringify(body));
           }
         } else req.send();
@@ -464,7 +488,7 @@
       if (off && off.upsertCachedDoc) off.upsertCachedDoc(path, doc);
       return doc;
     }).catch(function (err) {
-      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai|joindre|trop de temps|timeout|Failed to fetch/i.test((err && err.message) || ""))) {
         var localId2 = "local_" + Date.now();
         var localDoc2 = {};
         for (var k2 in data) if (Object.prototype.hasOwnProperty.call(data, k2)) localDoc2[k2] = data[k2];
@@ -509,7 +533,7 @@
       if (off && off.patchCachedDoc) off.patchCachedDoc(col, docId, data);
       return doc;
     }).catch(function (err) {
-      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai|joindre|trop de temps|timeout|Failed to fetch/i.test((err && err.message) || ""))) {
         off.enqueue({ method: "patch", path: path, data: data, maskFields: maskFields });
         return applyLocal();
       }
@@ -535,7 +559,7 @@
     return deleteDocRaw(path).then(function () {
       if (off && off.removeCachedDoc) off.removeCachedDoc(col, docId);
     }).catch(function (err) {
-      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai|joindre|trop de temps|timeout|Failed to fetch/i.test((err && err.message) || ""))) {
         off.enqueue({ method: "delete", path: path });
         if (off.removeCachedDoc) off.removeCachedDoc(col, docId);
         return;
@@ -544,21 +568,85 @@
     });
   }
 
+  function getPageOrigin() {
+    try {
+      if (window.location.origin) return String(window.location.origin);
+    } catch (e) {}
+    try {
+      return window.location.protocol + "//" + window.location.host;
+    } catch (e2) {
+      return "https://nack.pro";
+    }
+  }
+
   function publicBase() {
     try {
-      var origin = window.location.origin || "";
-      // /light/ → racine app
+      var origin = getPageOrigin().replace("://www.nack.pro", "://nack.pro");
       var path = window.location.pathname || "";
       var idx = path.indexOf("/light");
       var basePath = idx >= 0 ? path.substring(0, idx) : "";
-      if (basePath && basePath.charAt(basePath.length - 1) === "/") basePath = basePath.slice(0, -1);
+      if (basePath && basePath.charAt(basePath.length - 1) === "/") {
+        basePath = basePath.slice(0, -1);
+      }
       return origin + basePath;
-    } catch (e) { return ""; }
+    } catch (e) {
+      return "https://nack.pro";
+    }
   }
 
   function resolvePaymentProxy() {
-    var base = publicBase();
-    return base + "/.netlify/functions/create-payment-link";
+    // URL absolue obligatoire sur tablettes anciennes :
+    // une URL relative depuis /light/ devient /light/.netlify/... (cassé → erreur).
+    return "https://nack.pro/.netlify/functions/create-payment-link";
+  }
+
+  function createPaymentLink(params) {
+    params = params || {};
+    var amount = Math.round(Number(params.amount) || 0);
+    if (!amount || amount < 100) {
+      return Promise.reject(new Error("Montant de paiement invalide"));
+    }
+    var base = publicBase() || "https://nack.pro";
+    base = String(base).replace("://www.nack.pro", "://nack.pro");
+    var payload = {
+      reference: String(params.reference || ("nack-" + Date.now())),
+      redirect_success: String(params.redirect_success || (base + "/payment/success")),
+      redirect_error: String(params.redirect_error || (base + "/payment/error")),
+      amount: amount,
+      logoURL: String(params.logoURL || (base + "/favicon.png")),
+      isTransfer: params.isTransfer === true
+    };
+    if (params.portefeuille) payload.portefeuille = String(params.portefeuille);
+    if (params.disbursement) payload.disbursement = String(params.disbursement);
+
+    function postOnce(url) {
+      return xhr("POST", url, payload, {
+        "Content-Type": "application/json;charset=UTF-8",
+        Accept: "application/json"
+      });
+    }
+
+    return postOnce(resolvePaymentProxy()).then(function (res) {
+      if (typeof res === "string") {
+        try { res = JSON.parse(res); } catch (e) { throw new Error("Réponse paiement invalide"); }
+      }
+      if (res && res.link) return String(res.link);
+      throw new Error("Lien de paiement introuvable");
+    }).catch(function (err) {
+      // Second essai via chemin relatif racine (si DNS/apex bloqué sur le WebView)
+      var fallback = getPageOrigin().replace("://www.nack.pro", "://nack.pro") +
+        "/.netlify/functions/create-payment-link";
+      if (fallback.indexOf("nack.pro") !== -1 && fallback !== resolvePaymentProxy()) {
+        return postOnce(fallback).then(function (res) {
+          if (typeof res === "string") {
+            try { res = JSON.parse(res); } catch (e) { throw err; }
+          }
+          if (res && res.link) return String(res.link);
+          throw err;
+        });
+      }
+      throw err;
+    });
   }
 
   function getPublicDoc(path) {
@@ -609,7 +697,7 @@
       if (off && off.setCache) off.setCache("doc:" + path, doc);
       return doc;
     }).catch(function (err) {
-      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai/i.test((err && err.message) || ""))) {
+      if (off && (!off.isOnline() || /HTTP 0|réseau|network|Délai|joindre|trop de temps|timeout|Failed to fetch/i.test((err && err.message) || ""))) {
         off.enqueue({ method: "set", path: path, data: data, createOnly: createOnly });
         var col2 = off.collectionOfDoc ? off.collectionOfDoc(path) : path.replace(/\/[^/]+$/, "");
         var local2 = { id: path.split("/").pop() };
@@ -702,16 +790,6 @@
           value: { stringValue: code }
         }
       }
-    });
-  }
-
-  function createPaymentLink(params) {
-    return xhr("POST", resolvePaymentProxy(), params, { "Content-Type": "application/json" }).then(function (res) {
-      if (typeof res === "string") {
-        try { res = JSON.parse(res); } catch (e) { throw new Error(res); }
-      }
-      if (res && res.link) return res.link;
-      throw new Error("Lien de paiement introuvable");
     });
   }
 
