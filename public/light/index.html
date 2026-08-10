@@ -22,80 +22,90 @@
     </div>
   </div>
   <div id="screen-login" class="lg-login">
-    <div class="lg-login-box">
-      <img class="lg-nack-logo lg-lg" id="login-nack-logo" src="../icons/icon-192x192.png" alt="NACK!" onerror="this.style.display='none';document.getElementById('login-nack-fallback').style.display='flex';" />
-      <div id="login-nack-fallback" class="lg-login-logo" style="display:none">N</div>
-      <h1>NACK Pro</h1>
-      <p class="subtitle">Plateforme de gestion gabonaise</p>
+    <div class="lg-login-wrap">
+      <div class="lg-login-brand">
+        <img class="lg-login-logo-img" id="login-nack-logo" src="../Design%20sans%20titre.svg" alt="NACK!" onerror="this.onerror=null;this.src='../icons/icon-192x192.png';this.className='lg-login-logo-img lg-login-logo-fallback';" />
+        <p class="lg-login-tagline">Plateforme de gestion gabonaise</p>
+      </div>
 
-      <div class="lg-login-types">
-        <button type="button" class="lg-login-type active" data-action="login-type" data-arg="manager">
-          <span data-icon="user"></span><span>Gérant</span>
+      <div class="lg-login-types" id="login-types">
+        <button type="button" class="lg-login-type active" data-action="login-type" data-arg="manager" id="login-tab-manager">
+          <span class="lg-login-type-ico" data-icon="user"></span>
+          <span class="lg-login-type-label">Gérant</span>
         </button>
-        <button type="button" class="lg-login-type" data-action="login-type" data-arg="team">
-          <span data-icon="users"></span><span>Équipe</span>
+        <button type="button" class="lg-login-type" data-action="login-type" data-arg="team" id="login-tab-team">
+          <span class="lg-login-type-ico" data-icon="users"></span>
+          <span class="lg-login-type-label">Équipe</span>
         </button>
-        <button type="button" class="lg-login-type" data-action="login-type" data-arg="affiliate">
-          <span data-icon="gift"></span><span>Affilié</span>
+        <button type="button" class="lg-login-type" data-action="login-type" data-arg="affiliate" id="login-tab-affiliate">
+          <span class="lg-login-type-ico" data-icon="gift"></span>
+          <span class="lg-login-type-label">Affilié</span>
         </button>
       </div>
 
-      <p class="lg-login-type-title" id="login-type-title">Se connecter</p>
+      <div class="lg-login-card">
+        <h2 class="lg-login-type-title" id="login-type-title">Se connecter</h2>
+        <p class="lg-login-type-desc" id="login-type-desc">Accédez à votre espace de gestion</p>
 
-      <div id="login-panel-manager">
-        <form id="login-form" action="javascript:void(0)">
-          <div class="lg-field">
-            <label class="lg-label" for="login-email">Email</label>
-            <input class="lg-input" id="login-email" type="email" autocomplete="username" required />
-          </div>
-          <div class="lg-field">
-            <label class="lg-label" for="login-password">Mot de passe</label>
-            <input class="lg-input" id="login-password" type="password" autocomplete="current-password" required />
-          </div>
-          <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="login-submit">Se connecter</button>
-          <p class="lg-field-hint" style="text-align:center;margin-top:10px">
-            <a href="#/forgot">Mot de passe oublié</a> · <a href="#/register">S'inscrire</a>
-          </p>
-          <p class="lg-field-hint" style="text-align:center"><a href="#/onboarding">Découvrir NACK</a></p>
-        </form>
+        <div id="login-panel-manager">
+          <form id="login-form" action="javascript:void(0)">
+            <div class="lg-field">
+              <label class="lg-label" for="login-email">Email</label>
+              <input class="lg-input" id="login-email" type="email" placeholder="votre@email.com" autocomplete="username" required />
+            </div>
+            <div class="lg-field">
+              <label class="lg-label" for="login-password">Mot de passe</label>
+              <input class="lg-input" id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required />
+            </div>
+            <p class="lg-login-forgot"><a href="#/forgot">Mot de passe oublié ?</a></p>
+            <button type="submit" class="lg-btn lg-btn-nack lg-btn-block lg-btn-login" id="login-submit">Se connecter</button>
+            <p class="lg-login-footer">Pas encore de compte ? <a href="#/register">S'inscrire</a></p>
+          </form>
+        </div>
+
+        <div id="login-panel-team" class="lg-hidden" style="display:none">
+          <form id="team-login-form" action="javascript:void(0)">
+            <div class="lg-field">
+              <label class="lg-label" for="team-role">Votre rôle</label>
+              <select class="lg-select" id="team-role" required>
+                <option value="">Sélectionnez votre rôle</option>
+                <option value="serveur">Serveur</option>
+                <option value="caissier">Caissier</option>
+                <option value="cuisinier">Cuisinier</option>
+                <option value="agent-evenement">Agent événement</option>
+              </select>
+            </div>
+            <div class="lg-field">
+              <label class="lg-label" for="team-code">Code d'agent</label>
+              <input class="lg-input lg-input-mono" id="team-code" placeholder="Entrez votre code d'agent" autocomplete="off" required maxlength="20" />
+              <p class="lg-field-hint">Demandez votre code d'agent à votre gérant</p>
+            </div>
+            <button type="submit" class="lg-btn lg-btn-nack lg-btn-block lg-btn-login" id="team-login-submit">Se connecter</button>
+          </form>
+        </div>
+
+        <div id="login-panel-affiliate" class="lg-hidden" style="display:none">
+          <p class="lg-login-affiliate-intro">Vous êtes partenaire affilié Nack ? Connectez-vous pour voir vos parrainages et revenus.</p>
+          <form id="affiliate-login-form" action="javascript:void(0)">
+            <div class="lg-field">
+              <label class="lg-label" for="aff-id">Code ou WhatsApp</label>
+              <input class="lg-input" id="aff-id" placeholder="Ex: AFF-XXXX ou +241..." autocomplete="off" required />
+            </div>
+            <div class="lg-field">
+              <label class="lg-label" for="aff-pass">Mot de passe</label>
+              <input class="lg-input" id="aff-pass" type="password" autocomplete="off" required />
+            </div>
+            <button type="submit" class="lg-btn lg-btn-nack lg-btn-block lg-btn-login lg-btn-icon" id="aff-submit"><span data-icon="gift"></span> Accéder à mon espace affilié</button>
+          </form>
+          <p class="lg-login-footer">Envie de rejoindre l'aventure ? <a href="#/register?mode=affiliate">Devenir partenaire affilié</a></p>
+        </div>
       </div>
 
-      <div id="login-panel-team" style="display:none">
-        <form id="team-login-form" action="javascript:void(0)">
-          <div class="lg-field">
-            <label class="lg-label" for="team-role">Votre rôle</label>
-            <select class="lg-select" id="team-role" required>
-              <option value="">Choisir un rôle</option>
-              <option value="serveur">Serveur</option>
-              <option value="caissier">Caissier</option>
-              <option value="cuisinier">Cuisinier</option>
-              <option value="agent-evenement">Agent événement</option>
-            </select>
-          </div>
-          <div class="lg-field">
-            <label class="lg-label" for="team-code">Code d'agent</label>
-            <input class="lg-input" id="team-code" placeholder="Ex: AGT-XXXX-XXXX" autocomplete="off" required />
-            <p class="lg-field-hint">Demandez votre code à votre gérant</p>
-          </div>
-          <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="team-login-submit">Accéder à mon interface</button>
-        </form>
-      </div>
-
-      <div id="login-panel-affiliate" style="display:none">
-        <form id="affiliate-login-form" action="javascript:void(0)">
-          <div class="lg-field">
-            <label class="lg-label" for="aff-id">Code ou WhatsApp</label>
-            <input class="lg-input" id="aff-id" placeholder="Ex: AFF-XXXX ou +241..." autocomplete="off" required />
-          </div>
-          <div class="lg-field">
-            <label class="lg-label" for="aff-pass">Mot de passe</label>
-            <input class="lg-input" id="aff-pass" type="password" autocomplete="off" required />
-          </div>
-          <button type="submit" class="lg-btn lg-btn-nack lg-btn-block" id="aff-submit">Accéder à mon espace</button>
-        </form>
-        <p class="lg-field-hint" style="text-align:center;margin-top:10px">
-          Pas encore partenaire ? <a href="#/register?mode=affiliate">Devenir affilié</a>
-        </p>
+      <div class="lg-login-guide">
+        <div class="lg-login-guide-title"><span data-icon="info"></span> Comment se connecter ?</div>
+        <div class="lg-login-guide-row"><strong>Gérant :</strong> email et mot de passe</div>
+        <div class="lg-login-guide-row"><strong>Équipe :</strong> rôle + code d'agent (donné par le gérant)</div>
+        <div class="lg-login-guide-row"><strong>Affilié :</strong> code partenaire et mot de passe</div>
       </div>
     </div>
   </div>

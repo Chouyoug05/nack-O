@@ -339,24 +339,49 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
   -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
-  padding: 24px 16px;
+  padding: 20px 16px;
   background: -webkit-linear-gradient(315deg, #faf8f5 0%, #ebe4d8 100%);
   background: linear-gradient(135deg, #faf8f5 0%, #ebe4d8 100%);
 }
+.lg-login-wrap { width: 100%; max-width: 28rem; }
 .lg-login-box {
-  width: 100%; max-width: 380px; background: #fff; border-radius: var(--radius);
-  box-shadow: var(--shadow-card); padding: 28px 20px; border: 1px solid var(--border);
+  width: 100%; max-width: 28rem; background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-card); padding: 22px 18px; border: none;
 }
-.lg-login-logo {
-  width: 72px; height: 72px; margin: 0 auto 12px; border-radius: 18px;
-  background: var(--nack-red); color: #fff;
+.lg-login-box h1, .lg-login-box h2 { text-align: center; font-size: 1.25rem; margin: 0 0 6px; }
+.lg-login-box .subtitle { text-align: center; color: var(--muted); font-size: 0.875rem; margin: 0 0 16px; }
+.lg-login-brand { text-align: center; margin-bottom: 20px; }
+.lg-login-logo-img {
+  height: 48px; width: auto; max-width: 140px; margin: 0 auto 10px;
+  display: block; object-fit: contain;
+}
+.lg-login-logo-fallback { height: 40px; width: 40px; border-radius: 10px; }
+.lg-login-tagline { color: var(--muted); font-size: 0.875rem; margin: 0; }
+.lg-login-card {
+  background: #fff; border-radius: var(--radius);
+  box-shadow: var(--shadow-card); padding: 22px 18px; border: none;
+}
+.lg-login-card .lg-field { margin-bottom: 12px; }
+.lg-login-card .lg-input, .lg-login-card .lg-select { min-height: 44px; padding: 10px 12px; font-size: 0.9rem; }
+.lg-input-mono { font-family: monospace; text-align: center; letter-spacing: 0.04em; }
+.lg-btn-login { min-height: 44px; padding: 10px 16px; font-size: 0.9rem; }
+.lg-login-forgot { text-align: right; margin: -4px 0 12px; font-size: 0.85rem; }
+.lg-login-forgot a { color: var(--nack-red); text-decoration: none; }
+.lg-login-footer { text-align: center; font-size: 0.85rem; color: var(--muted); margin: 14px 0 0; }
+.lg-login-footer a { color: var(--nack-red); font-weight: 600; text-decoration: none; }
+.lg-login-affiliate-intro { font-size: 0.85rem; color: var(--muted); text-align: center; margin: 0 0 14px; line-height: 1.45; }
+.lg-login-guide {
+  margin-top: 20px; padding: 14px 16px; border-radius: 12px;
+  background: #eff6ff; border: 1px solid #bfdbfe; font-size: 0.78rem; color: #1e3a8a;
+}
+.lg-login-guide-title {
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
-  font-size: 2rem; font-weight: 800;
+  gap: 6px; font-weight: 700; font-size: 0.85rem; margin-bottom: 8px;
 }
-.lg-login-box h1 { text-align: center; font-size: 1.35rem; margin-bottom: 4px; }
-.lg-login-box .subtitle { text-align: center; color: var(--muted); font-size: 0.875rem; margin-bottom: 20px; }
+.lg-login-guide-title .lg-svg { width: 16px; height: 16px; flex-shrink: 0; }
+.lg-login-guide-row { margin-bottom: 4px; line-height: 1.4; }
+.lg-login-guide-row strong { font-weight: 700; }
 .lg-banner {
   background: #fff3cd; border: 1px solid #ffeeba; color: #856404;
   padding: 8px 12px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 14px; text-align: center;
@@ -443,7 +468,7 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
   background: #fff;
   flex-shrink: 0;
 }
-.lg-nack-logo.lg-lg { width: 72px; height: 72px; border-radius: 18px; margin: 0 auto 12px; }
+.lg-nack-logo.lg-lg { width: 48px; height: 48px; border-radius: 12px; margin: 0 auto 10px; }
 .lg-svg { display: inline-block; vertical-align: middle; }
 .lg-menu-icon .lg-svg { width: 26px; height: 26px; }
 .lg-bottom-nav .lg-svg { width: 22px; height: 22px; display: block; margin: 0 auto 2px; }
@@ -562,7 +587,7 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
 /* --- Portail connexion (3 comptes) --- */
 .lg-login-types {
   display: -webkit-box; display: -webkit-flex; display: flex;
-  gap: 6px; margin: 16px 0 12px; padding: 4px;
+  gap: 8px; margin: 0 0 20px; padding: 4px;
   background: #fff; border: 1px solid var(--border); border-radius: 12px;
 }
 .lg-login-type {
@@ -570,12 +595,28 @@ button, [data-action], .lg-menu-card, .lg-product-tile, .lg-fab, .lg-cart-bar, .
   display: -webkit-box; display: -webkit-flex; display: flex;
   -webkit-box-orient: vertical; -webkit-flex-direction: column; flex-direction: column;
   -webkit-box-align: center; -webkit-align-items: center; align-items: center;
-  gap: 4px; padding: 10px 4px; border: none; border-radius: 10px;
-  background: transparent; cursor: pointer; font-size: 0.75rem; font-weight: 600; color: var(--muted);
+  -webkit-box-pack: center; -webkit-justify-content: center; justify-content: center;
+  gap: 4px; padding: 12px 6px; border: none; border-radius: 8px;
+  background: transparent; cursor: pointer; font-size: 0.875rem; font-weight: 600;
+  color: #4b5563; min-height: 0; line-height: 1.2;
+  -webkit-tap-highlight-color: transparent;
 }
-.lg-login-type.active { background: var(--nack-red); color: #fff; box-shadow: var(--shadow-button); }
-.lg-login-type .lg-svg { opacity: 0.85; }
-.lg-login-type-title { font-weight: 700; font-size: 1rem; margin-bottom: 12px; text-align: center; }
+.lg-login-type:hover { background: #f9fafb; }
+.lg-login-type.active {
+  background: var(--nack-red); color: #fff;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+.lg-login-type.active:hover { background: var(--nack-red); }
+.lg-login-type-ico { display: -webkit-box; display: flex; line-height: 0; }
+.lg-login-type-ico .lg-svg { width: 18px; height: 18px; display: block; }
+.lg-login-type.active .lg-svg { opacity: 1; }
+.lg-login-type-label { font-size: 0.8125rem; font-weight: 600; white-space: nowrap; }
+.lg-login-type-title {
+  font-weight: 700; font-size: 1.35rem; margin: 0 0 6px; text-align: center; line-height: 1.2;
+}
+.lg-login-type-desc {
+  text-align: center; color: var(--muted); font-size: 0.9rem; margin: 0 0 18px; line-height: 1.4;
+}
 .lg-field-hint { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
 
 .lg-affiliate { max-width: 640px; margin: 0 auto; padding: 16px; min-height: 100vh; }

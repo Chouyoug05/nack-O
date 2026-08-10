@@ -85,7 +85,7 @@
   function paintManager(root) {
     var html =
       '<div class="lg-login"><div class="lg-login-box" style="max-width:520px">' +
-        '<img class="lg-nack-logo lg-lg" src="../icons/icon-192x192.png" alt="NACK!">' +
+        '<img class="lg-login-logo-img" src="../Design%20sans%20titre.svg" alt="NACK!" onerror="this.src=\'../icons/icon-192x192.png\';this.className=\'lg-login-logo-img lg-login-logo-fallback\';">' +
         '<h1>Créer un compte</h1>' +
         '<p class="subtitle">Étape ' + state.step + ' sur 5</p>' +
         progressBar() +

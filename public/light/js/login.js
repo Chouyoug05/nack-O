@@ -2,19 +2,50 @@
   var ui, api, icon;
   var affiliate = null;
 
+  var DESC = {
+    manager: "Accédez à votre espace de gestion",
+    team: "Connectez-vous avec votre code d'agent",
+    affiliate: "Consultez vos statistiques et revenus parrainage"
+  };
+
   function init() {
     ui = global.NACK_LIGHT.ui;
     api = global.NACK_LIGHT.api;
     icon = global.NACK_LIGHT.icon;
-    ui.paintNavIcons();
+    paintLoginIcons();
+    bindLoginTabs();
     paintLoginTypeTabs("manager");
     var sessionCode = null;
     try { sessionCode = localStorage.getItem(global.NACK_LIGHT.STORAGE_KEYS.affiliateSession); } catch (e) {}
     if (sessionCode) loadAffiliateDashboard(sessionCode);
   }
 
+  function paintLoginIcons() {
+    if (!icon) return;
+    var nodes = document.querySelectorAll("#screen-login [data-icon]");
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var name = n.getAttribute("data-icon");
+      var sz = (n.className || "").indexOf("lg-login-type-ico") >= 0 ? 18 : 16;
+      if (name) n.innerHTML = icon(name, sz);
+    }
+  }
+
+  function bindLoginTabs() {
+    var tabs = document.querySelectorAll(".lg-login-type");
+    for (var i = 0; i < tabs.length; i++) {
+      (function (btn) {
+        btn.onclick = function (e) {
+          if (e && e.preventDefault) e.preventDefault();
+          if (e && e.stopPropagation) e.stopPropagation();
+          setLoginType(btn.getAttribute("data-arg") || "manager");
+        };
+      })(tabs[i]);
+    }
+  }
+
   function paintLoginTypeTabs(active) {
-    var tabs = document.querySelectorAll("[data-action='login-type']");
+    var tabs = document.querySelectorAll(".lg-login-type");
     for (var i = 0; i < tabs.length; i++) {
       var t = tabs[i];
       var arg = t.getAttribute("data-arg");
@@ -23,7 +54,14 @@
     var panels = ["manager", "team", "affiliate"];
     for (var j = 0; j < panels.length; j++) {
       var p = ui.$("login-panel-" + panels[j]);
-      if (p) p.style.display = panels[j] === active ? "block" : "none";
+      if (!p) continue;
+      if (panels[j] === active) {
+        p.className = p.className.replace(/\blg-hidden\b/g, "").replace(/\s+/g, " ").trim();
+        p.style.display = "block";
+      } else {
+        if (p.className.indexOf("lg-hidden") === -1) p.className += " lg-hidden";
+        p.style.display = "none";
+      }
     }
     var title = ui.$("login-type-title");
     if (title) {
@@ -31,6 +69,8 @@
       else if (active === "team") title.textContent = "Connexion équipe";
       else title.textContent = "Espace affilié";
     }
+    var desc = ui.$("login-type-desc");
+    if (desc) desc.textContent = DESC[active] || DESC.manager;
   }
 
   function setLoginType(type) {
@@ -109,7 +149,7 @@
 
     root.innerHTML =
       '<div class="lg-affiliate-header">' +
-        '<img class="lg-nack-logo" src="../icons/icon-192x192.png" alt="NACK" style="width:40px;height:40px;border-radius:10px">' +
+        '<img class="lg-nack-logo" src="../Design%20sans%20titre.svg" alt="NACK" onerror="this.src=\'../icons/icon-192x192.png\'">' +
         '<span>Espace affilié</span>' +
         '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="aff-logout">Déconnexion</button>' +
       '</div>' +
@@ -140,6 +180,10 @@
     try { localStorage.removeItem(global.NACK_LIGHT.STORAGE_KEYS.affiliateSession); } catch (e) {}
     ui.hideEl(ui.$("screen-affiliate"));
     ui.showEl(ui.$("screen-login"));
+    paintLoginIcons();
+    bindLoginTabs();
+    paintLoginTypeTabs("manager");
+    if (global.NACK_LIGHT.offline && global.NACK_LIGHT.offline.refresh) global.NACK_LIGHT.offline.refresh();
   }
 
   global.NACK_LIGHT.login = {

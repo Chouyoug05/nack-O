@@ -33,7 +33,7 @@
     root.innerHTML =
       '<div class="lg-onboarding">' +
         '<div class="lg-onboarding-header">' +
-          '<img class="lg-nack-logo lg-lg" src="../icons/icon-192x192.png" alt="NACK!" onerror="this.style.display=\'none\'">' +
+          '<img class="lg-login-logo-img" src="../Design%20sans%20titre.svg" alt="NACK!" onerror="this.src=\'../icons/icon-192x192.png\';this.className=\'lg-login-logo-img lg-login-logo-fallback\';">' +
         '</div>' +
         '<div id="onboarding-body"></div>' +
         '<div class="lg-onboarding-dots" id="onboarding-dots"></div>' +

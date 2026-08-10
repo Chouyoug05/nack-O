@@ -16,7 +16,7 @@
     if (state.submitted) {
       root.innerHTML =
         '<div class="lg-login"><div class="lg-login-box">' +
-          '<img class="lg-nack-logo lg-lg" src="../icons/icon-192x192.png" alt="NACK!">' +
+          '<img class="lg-login-logo-img" src="../Design%20sans%20titre.svg" alt="NACK!" onerror="this.src=\'../icons/icon-192x192.png\';this.className=\'lg-login-logo-img lg-login-logo-fallback\';">' +
           '<h1>Email envoyé !</h1>' +
           '<p class="subtitle">Nous avons envoyé un lien de réinitialisation à<br><strong>' + ui.escapeHtml(state.email) + '</strong></p>' +
           '<p class="lg-card-desc">Vérifiez votre boîte de réception et cliquez sur le lien pour réinitialiser votre mot de passe.</p>' +
@@ -27,7 +27,7 @@
     }
     root.innerHTML =
       '<div class="lg-login"><div class="lg-login-box">' +
-        '<img class="lg-nack-logo lg-lg" src="../icons/icon-192x192.png" alt="NACK!">' +
+        '<img class="lg-login-logo-img" src="../Design%20sans%20titre.svg" alt="NACK!" onerror="this.src=\'../icons/icon-192x192.png\';this.className=\'lg-login-logo-img lg-login-logo-fallback\';">' +
         '<h1>Mot de passe oublié</h1>' +
         '<p class="subtitle">Saisissez votre email pour recevoir un lien de réinitialisation</p>' +
         '<form id="forgot-form" action="javascript:void(0)">' +

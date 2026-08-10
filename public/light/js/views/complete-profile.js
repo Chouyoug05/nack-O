@@ -51,7 +51,7 @@
     }
     root.innerHTML =
       '<div class="lg-login"><div class="lg-login-box" style="max-width:520px">' +
-        '<img class="lg-nack-logo lg-lg" src="../icons/icon-192x192.png" alt="NACK!">' +
+        '<img class="lg-login-logo-img" src="../Design%20sans%20titre.svg" alt="NACK!" onerror="this.src=\'../icons/icon-192x192.png\';this.className=\'lg-login-logo-img lg-login-logo-fallback\';">' +
         '<h1>Complétez votre profil</h1>' +
         '<p class="subtitle">Quelques informations pour configurer votre établissement</p>' +
         '<form id="complete-profile-form" action="javascript:void(0)">' +

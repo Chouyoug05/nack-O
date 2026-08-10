@@ -584,6 +584,9 @@
     ui.showEl(ui.$("screen-login"));
     ui.hideEl(ui.$("screen-app"));
     ui.hideEl(ui.$("screen-affiliate"));
+    if (global.NACK_LIGHT.login && global.NACK_LIGHT.login.setLoginType) {
+      global.NACK_LIGHT.login.setLoginType("manager");
+    }
     if (global.NACK_LIGHT.offline && global.NACK_LIGHT.offline.refresh) global.NACK_LIGHT.offline.refresh();
   }
   function afterSessionReady() {
