@@ -136,7 +136,7 @@ const PopoverContent = React.forwardRef<
       const triggerRect = trigger.getBoundingClientRect();
       const width = el.getBoundingClientRect().width || 320;
       const mw = window.innerWidth;
-      const top = Math.min(triggerRect.bottom + sideOffset, mw - 8);
+      const top = Math.min(triggerRect.bottom + sideOffset, window.innerHeight - 8);
       let left: number;
       if (align === "end") left = triggerRect.right - width;
       else if (align === "start") left = triggerRect.left;
@@ -193,7 +193,9 @@ const PopoverContent = React.forwardRef<
           className,
         )}
         {...props}
-      />
+      >
+        {children}
+      </PopoverPrimitive.Content>
     </PopoverPrimitive.Portal>
   );
 });

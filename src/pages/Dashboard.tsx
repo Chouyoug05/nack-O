@@ -330,14 +330,7 @@ const Dashboard = () => {
           </h1>
         )}
         <div className="flex items-center gap-2 md:gap-3">
-          <div className="relative">
-            <NotificationPanel size="sm" onNavigateToOrders={() => handleCardClick("bar-connectee")} />
-            {barPendingCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[18px] h-4 md:h-5 px-1 rounded-full bg-red-600 text-white text-[10px] md:text-xs font-bold flex items-center justify-center">
-                {barPendingCount}
-              </span>
-            )}
-          </div>
+          <NotificationPanel size="sm" onNavigateToOrders={() => handleCardClick("bar-connectee")} />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button

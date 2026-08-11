@@ -232,7 +232,7 @@ const DropdownMenuContent = React.forwardRef<
       const triggerRect = trigger.getBoundingClientRect();
       const width = el.getBoundingClientRect().width || 224;
       const mw = window.innerWidth;
-      const top = Math.min(triggerRect.bottom + sideOffset, mw - 8);
+      const top = Math.min(triggerRect.bottom + sideOffset, window.innerHeight - 8);
       if (align === "end") {
         const left = Math.max(8, Math.min(triggerRect.right - width, mw - width - 8));
         setPos({ top, left });
@@ -290,7 +290,9 @@ const DropdownMenuContent = React.forwardRef<
           className,
         )}
         {...props}
-      />
+      >
+        {children}
+      </DropdownMenuPrimitive.Content>
     </DropdownMenuPrimitive.Portal>
   );
 });
@@ -335,6 +337,7 @@ const DropdownMenuItem = React.forwardRef<
         className,
       )}
       {...props}
+      onClick={onClick}
     >
       {children}
     </DropdownMenuPrimitive.Item>
