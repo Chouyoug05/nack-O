@@ -10,9 +10,9 @@ function env(...keys: string[]): string {
   return "";
 }
 
-const SINGPAY_CLIENT_ID = env("SINGPAY_CLIENT_ID", "VITE_SINGPAY_CLIENT_ID");
-const SINGPAY_CLIENT_SECRET = env("SINGPAY_CLIENT_SECRET", "VITE_SINGPAY_CLIENT_SECRET");
-const SINGPAY_WALLET = env("SINGPAY_WALLET", "VITE_SINGPAY_WALLET");
+const SINGPAY_CLIENT_ID = env("SINGPAY_CLIENT_ID");
+const SINGPAY_CLIENT_SECRET = env("SINGPAY_CLIENT_SECRET");
+const SINGPAY_WALLET = env("SINGPAY_WALLET");
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -38,7 +38,7 @@ export const handler: Handler = async (event) => {
       return json(500, {
         error: "SingPay non configuré côté serveur",
         hint:
-          "Définissez SINGPAY_CLIENT_ID, SINGPAY_CLIENT_SECRET et SINGPAY_WALLET (ou les équivalents VITE_*) dans Netlify → Environment variables, puis redéployez.",
+          "Définissez SINGPAY_CLIENT_ID, SINGPAY_CLIENT_SECRET et SINGPAY_WALLET dans Netlify → Environment variables (sans préfixe VITE_), puis redéployez.",
         missing: {
           clientId: !SINGPAY_CLIENT_ID,
           clientSecret: !SINGPAY_CLIENT_SECRET,

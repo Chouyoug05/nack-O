@@ -986,7 +986,7 @@
     pingRegisteredTablet: pingRegisteredTablet, rememberTabletImei: rememberTabletImei,
     getRememberedTabletImei: getRememberedTabletImei,
     getProfile: function (uid) { return getDoc("profiles/" + uid); },
-    getPublicProfile: function (uid) { return getPublicDoc("profiles/" + uid); },
+    getPublicProfile: function (uid) { return getPublicDoc("publicProfiles/" + uid); },
     lightHref: function (hash) {
       var h = hash || "";
       if (h.charAt(0) !== "#") h = "#/" + h.replace(/^\//, "");

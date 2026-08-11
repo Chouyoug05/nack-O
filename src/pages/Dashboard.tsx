@@ -29,7 +29,7 @@ import NotificationPanel from "@/components/NotificationPanel";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import TeamPage from "@/components/pages/TeamPage";
 import { db } from "@/lib/firebase";
-import { productsColRef, salesColRef, teamColRef } from "@/lib/collections";
+import { productsColRef, salesColRef, teamColRef, ordersColRef } from "@/lib/collections";
 import { onSnapshot, orderBy, query, where, collection } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -174,6 +174,7 @@ const Dashboard = () => {
     teamCount: 0,
   });
   const [barPendingCount, setBarPendingCount] = useState<number>(0);
+  const [tablePendingCount, setTablePendingCount] = useState<number>(0);
   const [foodProducts, setFoodProducts] = useState<Array<{
     id: string;
     name: string;
@@ -252,6 +253,14 @@ const Dashboard = () => {
       unsubs.push(onSnapshot(pendingQ, (snap) => setBarPendingCount(snap.size)));
     } catch {
       setBarPendingCount(0);
+    }
+
+    // Commandes table / serveur en attente
+    try {
+      const tablePendingQ = query(ordersColRef(db, user.uid), where('status', '==', 'pending'));
+      unsubs.push(onSnapshot(tablePendingQ, (snap) => setTablePendingCount(snap.size)));
+    } catch {
+      setTablePendingCount(0);
     }
 
     return () => {
@@ -534,6 +543,11 @@ const Dashboard = () => {
                     {key === 'bar-connectee' && barPendingCount > 0 && (
                       <span className="absolute -top-1 -right-1 md:-top-2 md:-right-2 min-w-[20px] h-5 md:h-6 px-1.5 md:px-2 rounded-full bg-red-600 text-white text-xs md:text-sm font-bold flex items-center justify-center shadow-lg">
                         {barPendingCount}
+                      </span>
+                    )}
+                    {key === 'sales' && tablePendingCount > 0 && (
+                      <span className="absolute -top-1 -right-1 md:-top-2 md:-right-2 min-w-[20px] h-5 md:h-6 px-1.5 md:px-2 rounded-full bg-red-600 text-white text-xs md:text-sm font-bold flex items-center justify-center shadow-lg">
+                        {tablePendingCount}
                       </span>
                     )}
                   </button>

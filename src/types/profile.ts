@@ -41,6 +41,9 @@ export interface UserProfile {
   deliveryEnabled?: boolean;
   deliveryPrice?: number;
   fcmToken?: string;
+  /** IMEI assigné par l'admin — active le mode tablette restreint */
+  assignedTabletImei?: string | null;
+  assignedTabletLabel?: string | null;
   referredBy?: string;
   // Multi-établissement
   activeEstablishmentId?: string;

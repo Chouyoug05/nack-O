@@ -1,16 +1,16 @@
 import { useEffect, useRef } from "react";
 import { getDocs, query, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { productsColRef, barOrdersColRef } from "@/lib/collections";
+import { productsColRef, barOrdersColRef, ordersColRef } from "@/lib/collections";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { flushPendingOrders } from "@/lib/localSyncQueue";
 
 const PRELOAD_LIMIT = 200;
 
 /**
- * Précharge en arrière-plan les produits et commandes de l'établissement
- * quand l'utilisateur est connecté et en ligne, pour que le cache Firestore
- * contienne ces données en cas de passage hors ligne.
+ * Précharge en arrière-plan produits + commandes pour le mode hors-ligne,
+ * et synchronise la file d'attente au retour du réseau.
  */
 export function useOfflineCacheWarmup() {
   const { user, profile } = useAuth();
@@ -27,6 +27,7 @@ export function useOfflineCacheWarmup() {
       Promise.all([
         getDocs(query(productsColRef(db, uid), limit(PRELOAD_LIMIT))),
         getDocs(query(barOrdersColRef(db, uid), limit(PRELOAD_LIMIT))),
+        getDocs(query(ordersColRef(db, uid), limit(PRELOAD_LIMIT))),
       ]).catch(() => {
         warmedRef.current = false;
       });
@@ -35,4 +36,16 @@ export function useOfflineCacheWarmup() {
     const id = window.setTimeout(run, 1500);
     return () => clearTimeout(id);
   }, [user?.uid, profile, isOnline]);
+
+  useEffect(() => {
+    if (!user?.uid || !isOnline) return;
+
+    const flush = () => {
+      void flushPendingOrders(user.uid);
+    };
+
+    flush();
+    window.addEventListener("online", flush);
+    return () => window.removeEventListener("online", flush);
+  }, [user?.uid, isOnline]);
 }

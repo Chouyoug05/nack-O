@@ -1,66 +1,58 @@
-const admin = require('firebase-admin');
+const { admin } = require("./_firebaseAdmin");
+const { json, parseBody } = require("./_security");
 
-// On initialise l'admin Firebase une seule fois
-if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert({
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-        }),
-    });
-}
+exports.handler = async (event) => {
+  if (event.httpMethod === "OPTIONS") {
+    return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type" }, body: "" };
+  }
+  if (event.httpMethod !== "POST") {
+    return json(405, { error: "Method Not Allowed" });
+  }
 
-exports.handler = async (event, context) => {
-    // Optionnel: Vérifier l'origine ou un token secret pour la sécurité
+  const input = parseBody(event);
+  if (!input) return json(400, { error: "JSON invalide" });
 
-    if (event.httpMethod !== "POST") {
-        return { statusCode: 405, body: "Method Not Allowed" };
+  try {
+    const db = admin.firestore();
+    let token = typeof input.token === "string" ? input.token.trim() : "";
+
+    // Mode sécurisé : lookup FCM via establishmentId (le client n'envoie plus le token)
+    const establishmentId = typeof input.establishmentId === "string" ? input.establishmentId.trim() : "";
+    if (!token && establishmentId) {
+      const profSnap = await db.doc(`profiles/${establishmentId}`).get();
+      if (profSnap.exists) {
+        token = String(profSnap.data().fcmToken || "").trim();
+      }
     }
 
-    try {
-        const { token, title, body, data } = JSON.parse(event.body);
-
-        if (!token) {
-            return { statusCode: 400, body: "Missing FCM token" };
-        }
-
-        const message = {
-            notification: {
-                title: title || "Nack-O",
-                body: body || "Nouvelle notification",
-            },
-            data: data || {},
-            token: token,
-            android: {
-                priority: 'high',
-                notification: {
-                    sound: 'default',
-                    clickAction: 'FLUTTER_NOTIFICATION_CLICK',
-                },
-            },
-            webpush: {
-                headers: {
-                    Urgency: 'high',
-                },
-                notification: {
-                    icon: '/favicon.png',
-                    requireInteraction: true,
-                },
-            },
-        };
-
-        const response = await admin.messaging().send(message);
-
-        return {
-            statusCode: 200,
-            body: JSON.stringify({ success: true, messageId: response }),
-        };
-    } catch (error) {
-        console.error('Error sending notification:', error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ success: false, error: error.message }),
-        };
+    if (!token) {
+      return json(400, { error: "Aucun token de notification disponible" });
     }
+
+    const title = String(input.title || "Nack-O").slice(0, 120);
+    const body = String(input.body || "Nouvelle notification").slice(0, 240);
+    const data = input.data && typeof input.data === "object" ? input.data : {};
+
+    const message = {
+      notification: { title, body },
+      data: Object.fromEntries(
+        Object.entries(data).map(([k, v]) => [String(k), String(v)])
+      ),
+      token,
+      android: {
+        priority: "high",
+        notification: { sound: "default", clickAction: "FLUTTER_NOTIFICATION_CLICK" },
+      },
+      webpush: {
+        headers: { Urgency: "high" },
+        notification: { icon: "/favicon.png", requireInteraction: true },
+      },
+    };
+
+    const messageId = await admin.messaging().send(message);
+    return json(200, { success: true, messageId });
+  } catch (error) {
+    console.error("send-notification error:", error);
+    return json(500, { success: false, error: error.message || "Erreur envoi" });
+  }
 };

@@ -25,6 +25,7 @@ import {
   CreditCard
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { syncPublicProfile } from "@/lib/publicProfile";
 import { isFoodBusiness as _isFoodBusiness, isBoutique as _isBoutique, isServiceBusiness as _isServiceBusiness } from "@/constants/establishmentTypes";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
@@ -222,8 +223,10 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               const parsed = parseFloat(product.price.trim());
               priceValue = isNaN(parsed) ? 0 : parsed;
             }
-            // Only show products that are explicitly marked for the digital menu
-            return priceValue > 0 && product.showOnMenuDigital === true;
+            // Menu du jour : si au moins un produit est coché, n'afficher que ceux-là ; sinon tous
+            const hasMenuDuJour = allProducts.some(p => p.showOnMenuDigital === true);
+            if (hasMenuDuJour && product.showOnMenuDigital !== true) return false;
+            return priceValue > 0;
           });
           setProducts(productsInStock);
         } catch (error) {
@@ -242,6 +245,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       console.error('Erreur chargement données:', error);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !profile) return;
+    // Garantit que le menu QR a un publicProfiles à jour (nom, logo, paiements)
+    syncPublicProfile(db, { uid: user.uid, ...profile }).catch(() => undefined);
+  }, [user, profile]);
 
   useEffect(() => {
     if (!user) return;
@@ -372,6 +381,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
     setIsGeneratingQR(true);
     try {
+      await syncPublicProfile(db, { uid: user.uid, ...profile });
       const publicUrl = getPublicUrl();
 
       const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {

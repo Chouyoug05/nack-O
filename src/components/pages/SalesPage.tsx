@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import OrderManagement from "@/components/OrderManagement";
 import { 
@@ -33,7 +34,10 @@ import {
   Box,
   ShoppingBag,
   Lightbulb,
-  Grid3x3
+  Grid3x3,
+  Clock,
+  Download,
+  History,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -42,6 +46,8 @@ import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
 import { addDoc, doc as fsDoc, getDoc, onSnapshot, orderBy, query, runTransaction, where, updateDoc, writeBatch, doc as fsDocDirect } from "firebase/firestore";
 import type { ProductDoc, PaymentMethod, SaleDoc, SaleItem } from "@/types/inventory";
 import type { UserProfile } from "@/types/profile";
+import type { Order } from "@/types/order";
+import { enqueuePendingOrder } from "@/lib/localSyncQueue";
 
 interface Product {
   id: string;
@@ -76,17 +82,21 @@ interface Sale {
 
 const SalesPage = () => {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { isOnline } = useOnlineStatus();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isFormulaDialogOpen, setIsFormulaDialogOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
+  const [salesTab, setSalesTab] = useState<"caisse" | "orders" | "recent">("caisse");
+  const [tableNumber, setTableNumber] = useState("");
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
@@ -110,6 +120,15 @@ const SalesPage = () => {
       if (!Array.isArray(items) || !items.length) return false;
       setCart(items.map(it => ({ id: it.id, name: it.name, price: it.price, quantity: it.quantity, category: '', stock: 9999 })));
       setSelectedPayment('cash');
+      try {
+        const metaRaw = localStorage.getItem('nack_prefill_order_meta');
+        if (metaRaw) {
+          const meta = JSON.parse(metaRaw) as { orderId?: string; tableNumber?: string };
+          if (meta.orderId) setEditingOrderId(meta.orderId);
+          if (meta.tableNumber) setTableNumber(meta.tableNumber);
+        }
+      } catch { /* ignore */ }
+      setSalesTab('caisse');
       setIsCheckoutOpen(true);
       localStorage.removeItem('nack_prefill_cart');
       return true;
@@ -117,6 +136,29 @@ const SalesPage = () => {
       return false;
     }
   };
+
+  const loadOrderToCart = useCallback((order: Order, openCheckout = false) => {
+    setCart(order.items.map(it => ({
+      id: it.id,
+      name: it.name,
+      price: it.price,
+      quantity: it.quantity,
+      category: it.category || '',
+      stock: it.stock ?? 9999,
+    })));
+    setTableNumber(order.tableNumber || '');
+    setEditingOrderId(order.id);
+    setSalesTab('caisse');
+    if (openCheckout) {
+      setSelectedPayment('cash');
+      setIsCheckoutOpen(true);
+    } else {
+      toast({
+        title: "Commande chargée",
+        description: "Ajustez le panier puis encaissez ou remettez en attente.",
+      });
+    }
+  }, [toast]);
 
   useEffect(() => {
     if (!user) return;
@@ -162,18 +204,110 @@ const SalesPage = () => {
     try {
       const raw = localStorage.getItem('nack_prefill_cart');
       if (raw) {
-        const items = JSON.parse(raw) as Array<{ id: string; name: string; price: number; quantity: number }>;
-        if (Array.isArray(items) && items.length) {
-          setCart(items.map(it => ({ id: it.id, name: it.name, price: it.price, quantity: it.quantity, category: '', stock: 9999 })));
-          setSelectedPayment('cash');
-          setIsCheckoutOpen(true);
-          localStorage.removeItem('nack_prefill_cart');
-        }
+        applyPrefillFromStorage();
       }
     } catch {
       // ignore
     }
   }, []);
+
+  const printSaleReceipt = async (sale: Sale) => {
+    if (!user) return;
+    try {
+      const profileRef = fsDoc(db, 'profiles', user.uid);
+      const profileSnap = await getDoc(profileRef);
+      const profileData = profileSnap.exists() ? profileSnap.data() as UserProfile : null;
+      const thermalData = {
+        orderNumber: sale.orderNumber || `V-${sale.id.slice(-6)}`,
+        establishmentName: profileData?.establishmentName || 'Établissement',
+        establishmentLogo: profileData?.logoUrl,
+        tableZone: sale.tableZone || tableNumber.trim() || 'Caisse',
+        items: sale.items.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        total: sale.total,
+        createdAt: sale.createdAt,
+        companyName: profileData?.companyName,
+        fullAddress: profileData?.fullAddress,
+        businessPhone: profileData?.businessPhone || profileData?.phone,
+        rcsNumber: profileData?.rcsNumber,
+        nifNumber: profileData?.nifNumber,
+        legalMentions: profileData?.legalMentions,
+        customMessage: profileData?.customMessage,
+        ticketLogoUrl: profileData?.ticketLogoUrl,
+        showDeliveryMention: profileData?.showDeliveryMention,
+        showCSSMention: profileData?.showCSSMention,
+        cssPercentage: profileData?.cssPercentage,
+        ticketFooterMessage: profileData?.ticketFooterMessage,
+      };
+      const { printThermalTicket } = await import('@/utils/ticketThermal');
+      printThermalTicket(thermalData);
+    } catch (error) {
+      console.error('Erreur impression reçu:', error);
+      toast({ title: "Erreur", description: "Impossible d'ouvrir le reçu.", variant: "destructive" });
+    }
+  };
+
+  const holdOrder = async () => {
+    if (!user || cart.length === 0) {
+      toast({ title: "Panier vide", variant: "destructive" });
+      return;
+    }
+    const table = tableNumber.trim();
+    if (!table) {
+      toast({
+        title: "Table requise",
+        description: "Indiquez une table ou une zone avant de mettre en attente.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isHolding) return;
+
+    const payload = {
+      orderNumber: Math.floor(Date.now() % 100000),
+      tableNumber: table,
+      items: cart.map(ci => ({
+        id: ci.id,
+        name: ci.name,
+        price: ci.price,
+        quantity: ci.quantity,
+        category: ci.category || '',
+        stock: ci.stock,
+      })),
+      total: cartTotal,
+      status: 'pending' as const,
+      createdAt: Date.now(),
+      agentCode: 'caisse-pro',
+      agentName: profile?.ownerName || 'Gérant',
+    };
+
+    setIsHolding(true);
+    try {
+      if (editingOrderId) {
+        await updateDoc(fsDoc(ordersColRef(db, user.uid), editingOrderId), payload);
+      } else if (!isOnline) {
+        await enqueuePendingOrder({ ownerUid: user.uid, channel: 'orders', payload });
+      } else {
+        await addDoc(ordersColRef(db, user.uid), payload);
+      }
+      setCart([]);
+      setEditingOrderId(null);
+      toast({
+        title: "Commande en attente",
+        description: !isOnline
+          ? `Table ${table} — synchronisation au retour du réseau.`
+          : `Table ${table}`,
+      });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Erreur lors de la mise en attente";
+      toast({ title: "Erreur", description: message, variant: "destructive" });
+    } finally {
+      setIsHolding(false);
+    }
+  };
 
   // Produits vendables (avec prix - le stock n'est pas requis pour les menus/plats)
   const sellableProducts = products
@@ -374,21 +508,29 @@ const SalesPage = () => {
               const saleCol = salesColRef(db, ownerUidForWrites);
         // create new sale doc id
         const saleRef = fsDoc(saleCol);
-      const saleDoc: SaleDoc = { items: saleItems, total: cartTotal, paymentMethod: selectedPayment, createdAt: Date.now() };
+      const saleDoc: SaleDoc = {
+        items: saleItems,
+        total: cartTotal,
+        paymentMethod: selectedPayment,
+        createdAt: Date.now(),
+        tableZone: tableNumber.trim() || 'Caisse',
+      };
       batch.set(saleRef, saleDoc);
       await batch.commit();
 
-      // Marquer la commande source comme "Validée" si meta présent
+      // Marquer la commande source comme "Validée" si meta ou édition en cours
       try {
-        const metaRaw = localStorage.getItem('nack_prefill_order_meta');
-        if (metaRaw) {
-          const meta = JSON.parse(metaRaw) as { orderId?: string; ownerUid?: string };
-          if (meta.orderId) {
-            const owner = meta.ownerUid || user.uid;
-            await updateDoc(fsDoc(ordersColRef(db, owner), meta.orderId), { status: 'sent' });
-          }
-          localStorage.removeItem('nack_prefill_order_meta');
+        const orderIdToClose = editingOrderId || (() => {
+          const metaRaw = localStorage.getItem('nack_prefill_order_meta');
+          if (!metaRaw) return null;
+          const meta = JSON.parse(metaRaw) as { orderId?: string };
+          return meta.orderId || null;
+        })();
+        if (orderIdToClose) {
+          const owner = ownerUidForWrites;
+          await updateDoc(fsDoc(ordersColRef(db, owner), orderIdToClose), { status: 'sent' });
         }
+        localStorage.removeItem('nack_prefill_order_meta');
       } catch { /* ignore */ }
 
       toast({
@@ -411,7 +553,7 @@ const SalesPage = () => {
             orderNumber: `V-${Date.now()}`,
             establishmentName: profileData?.establishmentName || 'Établissement',
             establishmentLogo: profileData?.logoUrl,
-            tableZone: 'Caisse',
+            tableZone: tableNumber.trim() || 'Caisse',
             items: cart.map(item => ({
               name: item.name,
               quantity: item.quantity,
@@ -444,6 +586,7 @@ const SalesPage = () => {
       }
       
       setCart([]);
+      setEditingOrderId(null);
       setSelectedPayment(null);
       setIsCheckoutOpen(false);
     } catch (e: unknown) {
@@ -492,7 +635,28 @@ const SalesPage = () => {
 
   return (
     <div className="relative flex h-full min-h-[70vh] w-full flex-col">
+      <Tabs value={salesTab} onValueChange={(v) => setSalesTab(v as "caisse" | "orders" | "recent")} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsTrigger value="caisse" className="gap-2">
+            <ShoppingCart className="h-4 w-4" />
+            Caisse
+          </TabsTrigger>
+          <TabsTrigger value="orders" className="gap-2 relative">
+            <ClipboardList className="h-4 w-4" />
+            Commandes
+            {pendingCount > 0 && (
+              <Badge className="ml-1 h-5 min-w-[20px] rounded-full bg-red-600 px-1.5 text-xs text-white">
+                {pendingCount}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="recent" className="gap-2">
+            <History className="h-4 w-4" />
+            Dernières ventes
+          </TabsTrigger>
+        </TabsList>
 
+        <TabsContent value="caisse" className="mt-0">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-0">
         {/* Products Grid */}
         <div className="lg:col-span-2">
@@ -625,71 +789,27 @@ const SalesPage = () => {
         <div>
           <Card className="shadow-card border-0">
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Panier
-                {cart.length > 0 && (
-                  <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="bg-gradient-primary text-white shadow-button">
-                        Finaliser la vente
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-[90vw] sm:max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle>Finaliser la vente</DialogTitle>
-                        <DialogDescription style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
-                          Total: {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4 py-4">
-                        <div className="space-y-3">
-                          <p className="font-medium">Mode de paiement:</p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <Button
-                              variant={selectedPayment === 'card' ? 'default' : 'outline'}
-                              onClick={() => setSelectedPayment('card')}
-                            >
-                              <CreditCard size={20} />
-                              <span className="ml-2">Carte</span>
-                            </Button>
-                            <Button
-                              variant={selectedPayment === 'cash' ? 'default' : 'outline'}
-                              onClick={() => setSelectedPayment('cash')}
-                            >
-                              <Banknote size={20} />
-                              <span className="ml-2">Cash</span>
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="bg-nack-beige-light p-3 sm:p-4 rounded-lg max-h-40 overflow-y-auto">
-                          <h4 className="font-semibold mb-2 text-sm">Récapitulatif:</h4>
-                          {cart.map(item => (
-                            <div key={item.id + String(item.isFormula)} className="flex justify-between text-xs sm:text-sm">
-                              <span>{item.name} x{item.quantity}</span>
-                              <span style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
-                                {(item.price * item.quantity).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
-                              </span>
-                            </div>
-                          ))}
-                          <div className="border-t mt-2 pt-2 font-semibold text-sm">
-                            Total: <span style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
-                              {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex flex-col sm:flex-row justify-end gap-2">
-                        <Button variant="outline" onClick={() => setIsCheckoutOpen(false)} className="w-full sm:w-auto">
-                          Annuler
-                        </Button>
-                        <Button onClick={handleSale} disabled={isSaving} className="bg-gradient-primary text-white w-full sm:w-auto">
-                          Confirmer la vente
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+              <CardTitle className="flex items-center justify-between gap-2 flex-wrap">
+                <span>Panier</span>
+                {editingOrderId && (
+                  <Badge variant="outline" className="text-amber-700 border-amber-300">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Commande en cours
+                  </Badge>
                 )}
               </CardTitle>
+              <div className="mt-3">
+                <label htmlFor="sales-table" className="text-sm font-medium text-muted-foreground">
+                  Table / Zone (commande en cours)
+                </label>
+                <Input
+                  id="sales-table"
+                  placeholder="Ex: Table 5, Terrasse…"
+                  value={tableNumber}
+                  onChange={(e) => setTableNumber(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
             </CardHeader>
             <CardContent>
               {cart.length === 0 ? (
@@ -734,21 +854,100 @@ const SalesPage = () => {
                       </span>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      disabled={isHolding}
+                      onClick={holdOrder}
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Mettre en attente
+                    </Button>
+                    <Dialog open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-gradient-primary text-white shadow-button w-full">
+                          Encaisser
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-[90vw] sm:max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle>Finaliser la vente</DialogTitle>
+                          <DialogDescription style={{ display: 'block', visibility: 'visible', opacity: 1 }}>
+                            Total: {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                            {tableNumber.trim() ? ` • Table ${tableNumber.trim()}` : ''}
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-3">
+                            <p className="font-medium">Mode de paiement:</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <Button
+                                variant={selectedPayment === 'card' ? 'default' : 'outline'}
+                                onClick={() => setSelectedPayment('card')}
+                              >
+                                <CreditCard size={20} />
+                                <span className="ml-2">Carte</span>
+                              </Button>
+                              <Button
+                                variant={selectedPayment === 'cash' ? 'default' : 'outline'}
+                                onClick={() => setSelectedPayment('cash')}
+                              >
+                                <Banknote size={20} />
+                                <span className="ml-2">Cash</span>
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="bg-nack-beige-light p-3 sm:p-4 rounded-lg max-h-40 overflow-y-auto">
+                            <h4 className="font-semibold mb-2 text-sm">Récapitulatif:</h4>
+                            {cart.map(item => (
+                              <div key={item.id + String(item.isFormula)} className="flex justify-between text-xs sm:text-sm">
+                                <span>{item.name} x{item.quantity}</span>
+                                <span style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                                  {(item.price * item.quantity).toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                                </span>
+                              </div>
+                            ))}
+                            <div className="border-t mt-2 pt-2 font-semibold text-sm">
+                              Total: <span style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                                {cartTotal.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row justify-end gap-2">
+                          <Button variant="outline" onClick={() => setIsCheckoutOpen(false)} className="w-full sm:w-auto">
+                            Annuler
+                          </Button>
+                          <Button onClick={handleSale} disabled={isSaving} className="bg-gradient-primary text-white w-full sm:w-auto">
+                            Confirmer la vente
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Recent Sales */}
+          {/* Recent Sales preview */}
           <Card className="shadow-card border-0 mt-6">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Dernières ventes</CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setSalesTab('recent')}>
+                Tout voir
+              </Button>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
                 {sales.slice(0, 3).map((sale) => (
-                  <div key={sale.id} className="flex items-start gap-3 p-3 bg-nack-beige-light rounded-lg">
-                    {/* Images des produits */}
+                  <button
+                    key={sale.id}
+                    type="button"
+                    onClick={() => printSaleReceipt(sale)}
+                    className="flex w-full items-start gap-3 p-3 bg-nack-beige-light rounded-lg text-left hover:bg-nack-beige-light/80 transition-colors"
+                  >
                     <div className="flex gap-1 flex-shrink-0">
                       {sale.items.slice(0, 3).map((item, index) => {
                         const product = getProductById(item.id);
@@ -756,57 +955,33 @@ const SalesPage = () => {
                         return (
                           <div key={`${sale.id}-${item.id}-${index}`} className="w-8 h-8 rounded-md overflow-hidden bg-gray-100">
                             {imageUrl ? (
-                              <img 
-                                src={imageUrl} 
-                                alt={item.name} 
-                                className="w-full h-full object-cover" 
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                }}
-                              />
-                            ) : null}
-                            <div className={`w-full h-full flex items-center justify-center text-xs font-bold text-gray-600 ${imageUrl ? 'hidden' : ''}`}>
-                              {item.name.charAt(0).toUpperCase()}
-                            </div>
+                              <img src={imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-xs font-bold text-gray-600">
+                                {item.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
-                      {sale.items.length > 3 && (
-                        <div className="w-8 h-8 rounded-md bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600">
-                          +{sale.items.length - 3}
-                        </div>
-                      )}
                     </div>
-
-                    {/* Détails de la vente */}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">
                         {sale.items.map(item => `${item.name} x${item.quantity}`).join(', ')}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(sale.createdAt).toLocaleTimeString()} • {sale.paymentMethod === 'card' ? 'Carte' : 'Cash'}
-                        {sale.type === 'bar-connectee' && (
-                          <span className="ml-2 inline-flex items-center gap-1">
-                            <QrCode className="w-3 h-3" />
-                            Menu Digital
-                          </span>
-                        )}
                       </p>
-                      {sale.type === 'bar-connectee' && sale.establishmentName && (
-                        <p className="text-xs text-blue-600 font-medium">
-                          📍 {sale.establishmentName} • {sale.tableZone}
-                        </p>
-                      )}
                     </div>
-
-                    {/* Montant */}
-                    <div className="flex-shrink-0">
-                      <span className="font-semibold text-green-600" style={{ display: 'inline-block', visibility: 'visible', opacity: 1 }}>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="font-semibold text-green-600">
                         +{sale.total.toLocaleString('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} XAF
                       </span>
+                      <span className="text-xs text-nack-red flex items-center gap-1">
+                        <Download className="h-3 w-3" /> Reçu
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {sales.length === 0 && <p className="text-sm text-muted-foreground">Aucune vente récente</p>}
               </div>
@@ -814,14 +989,67 @@ const SalesPage = () => {
           </Card>
         </div>
       </div>
-      
-      {/* Barre flottante total / actions */}
+        </TabsContent>
+
+        <TabsContent value="orders" className="mt-0">
+          <OrderManagement
+            title="Commandes en attente"
+            description="Commandes serveur ou mises en attente depuis la caisse"
+            onGoToSales={() => setSalesTab("caisse")}
+            onLoadOrderToCart={(order) => loadOrderToCart(order, false)}
+            onPayOrder={(order) => loadOrderToCart(order, true)}
+          />
+        </TabsContent>
+
+        <TabsContent value="recent" className="mt-0">
+          <Card className="shadow-card border-0">
+            <CardHeader>
+              <CardTitle>Dernières ventes</CardTitle>
+              <CardDescription>Cliquez sur une vente pour imprimer ou télécharger le reçu</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {sales.slice(0, 20).map((sale) => (
+                  <button
+                    key={sale.id}
+                    type="button"
+                    onClick={() => printSaleReceipt(sale)}
+                    className="flex w-full items-center justify-between gap-3 p-4 bg-nack-beige-light rounded-lg text-left hover:bg-nack-beige-light/80 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">
+                        {sale.items.map(item => `${item.name} x${item.quantity}`).join(', ')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(sale.createdAt).toLocaleString('fr-FR')} • {sale.paymentMethod === 'card' ? 'Carte' : 'Cash'}
+                        {sale.tableZone ? ` • ${sale.tableZone}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <span className="font-bold text-green-600">
+                        {sale.total.toLocaleString('fr-FR')} XAF
+                      </span>
+                      <span className="text-sm text-nack-red flex items-center gap-1">
+                        <Download className="h-4 w-4" /> Reçu
+                      </span>
+                    </div>
+                  </button>
+                ))}
+                {sales.length === 0 && (
+                  <p className="text-center text-muted-foreground py-8">Aucune vente récente</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+      {/* Barre flottante total / actions (onglet Caisse uniquement) */}
       <div className="pointer-events-none fixed left-0 right-0 bottom-20 z-20 px-4 md:px-6">
-        {cart.length > 0 && (
+        {salesTab === 'caisse' && cart.length > 0 && (
           <div className="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl bg-nack-red/95 p-3 text-white shadow-2xl">
             <button
               className="flex h-16 w-16 items-center justify-center rounded-xl bg-red-700/80"
-              onClick={() => setCart([])}
+              onClick={() => { setCart([]); setEditingOrderId(null); }}
               title="Vider"
             >
               <Trash2 className="h-8 w-8" />

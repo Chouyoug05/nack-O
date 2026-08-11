@@ -9,19 +9,26 @@
 
     root.innerHTML = '<div class="lg-loading">Chargement du menu…</div>';
     Promise.all([
-      api.getPublicDoc("profiles/" + uid),
-      api.getPublicDoc("establishments/" + uid)
+      api.getPublicDoc("publicProfiles/" + uid).catch(function () { return null; }),
+      api.getPublicDoc("establishments/" + uid).catch(function () { return null; })
     ]).then(function (res) {
-      state.profile = res[0] && res[0].id ? res[0] : (res[1] && res[1].id ? res[1] : null);
-      if (!state.profile) throw new Error("Établissement introuvable");
-      state.collectionBase = res[0] && res[0].id ? "profiles" : "establishments";
+      var pub = res[0] && res[0].id ? res[0] : null;
+      var est = res[1] && res[1].id ? res[1] : null;
+      state.profile = pub || est || { id: uid, establishmentName: "Menu" };
+      // Produits toujours sous profiles/{uid} (lecture publique)
+      state.collectionBase = "profiles";
       return Promise.all([
-        api.publicListDocs(state.collectionBase + "/" + uid + "/products", 200),
-        api.publicListDocs(state.collectionBase + "/" + uid + "/tables", 50)
+        api.publicListDocs("profiles/" + uid + "/products", 200),
+        api.publicListDocs("profiles/" + uid + "/tables", 50)
       ]);
     }).then(function (res) {
-      state.products = (res[0] || []).filter(function (p) {
-        return p.showOnMenuDigital !== false && Number(p.price || 0) > 0;
+      var all = res[0] || [];
+      var hasMenu = all.some(function (p) { return p.showOnMenuDigital === true; });
+      state.products = all.filter(function (p) {
+        var priceOk = Number(p.price || 0) > 0;
+        if (!priceOk) return false;
+        if (hasMenu) return p.showOnMenuDigital === true;
+        return true;
       });
       state.tables = res[1] || [];
       paint();

@@ -3,6 +3,11 @@ import { collection, doc, type CollectionReference, type Firestore } from "fireb
 // --- Profils utilisateur (legacy) ---
 export const profileDocRef = (db: Firestore, uid: string) => doc(db, "profiles", uid);
 
+export const publicProfilesColRef = (db: Firestore): CollectionReference =>
+  collection(db, "publicProfiles") as CollectionReference;
+
+export const publicProfileDocRef = (db: Firestore, uid: string) => doc(db, "publicProfiles", uid);
+
 export const profilesColRef = (db: Firestore): CollectionReference =>
   collection(db, "profiles") as CollectionReference;
 
@@ -117,6 +122,9 @@ export const affiliatesColRef = (db: Firestore): CollectionReference =>
 
 export const tabletsColRef = (db: Firestore): CollectionReference =>
   collection(db, "tablets") as CollectionReference;
+
+export const tabletMessagesColRef = (db: Firestore, imei: string): CollectionReference =>
+  collection(db, "tablets", imei.replace(/\D/g, "").slice(0, 15), "messages") as CollectionReference;
 
 export const supportTicketsColRef = (db: Firestore): CollectionReference =>
   collection(db, "supportTickets") as CollectionReference;

@@ -26,6 +26,7 @@ import OfflineStatusBar from "@/components/OfflineStatusBar";
 import { isElectronRenderer } from "@/lib/platform";
 import { isProfileComplete } from "@/utils/profileComplete";
 import { lazyWithReload, isChunkLoadError, reloadOnceForStaleChunk } from "@/lib/lazyWithReload";
+import { isTabletRestrictedMode } from "@/lib/tabletMode";
 
 const Dashboard = lazyWithReload(() => import("./pages/Dashboard"));
 const AdminDashboard = lazyWithReload(() => import("./pages/AdminDashboard"));
@@ -43,6 +44,7 @@ const EventPublicPage = lazyWithReload(() => import("./pages/EventPublicPage"));
 const PublicOrderingPage = lazyWithReload(() => import("./pages/PublicOrderingPage"));
 const PaymentSuccess = lazyWithReload(() => import("./pages/PaymentSuccess"));
 const PaymentError = lazyWithReload(() => import("./pages/PaymentError"));
+const TabletInboxPage = lazyWithReload(() => import("./pages/TabletInboxPage"));
 
 const queryClient = new QueryClient();
 
@@ -88,6 +90,14 @@ const RouteErrorFallback = () => {
   );
 };
 
+const TabletAwareDashboard = () => {
+  const { user, profile, isAdmin } = useAuth();
+  if (user && !isAdmin && isTabletRestrictedMode(user.uid, profile)) {
+    return <Navigate to="/tablet-inbox" replace />;
+  }
+  return <Dashboard />;
+};
+
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   if (loading) return <FullscreenLoader />;
@@ -122,6 +132,9 @@ const HomeRedirect = () => {
   }
 
   if (user && (isAdmin || isProfileComplete(profile))) {
+    if (!isAdmin && isTabletRestrictedMode(user.uid, profile)) {
+      return <Navigate to="/tablet-inbox" replace />;
+    }
     return <Navigate to={isAdmin ? "/admin" : "/dashboard"} replace />;
   }
 
@@ -146,7 +159,8 @@ const RootLayout = () => {
     location.pathname === '/complete-profile' ||
     location.pathname === '/onboarding' ||
     location.pathname === '/login' ||
-    location.pathname === '/configure-tickets';
+    location.pathname === '/configure-tickets' ||
+    location.pathname === '/tablet-inbox';
   return (
     <>
       <OfflineStatusBar />
@@ -171,7 +185,8 @@ const routes = [
       { path: "forgot-password", element: <ForgotPassword /> },
       { path: "complete-profile", element: <LazyBoundary><RequireAuth><CompleteProfile /></RequireAuth></LazyBoundary> },
       { path: "configure-tickets", element: <LazyBoundary><RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth></LazyBoundary> },
-      { path: "dashboard", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><Dashboard /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
+      { path: "dashboard", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><TabletAwareDashboard /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
+      { path: "tablet-inbox", element: <LazyBoundary><RequireAuth><RequireProfile><TabletInboxPage /></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "team", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "customer/:customerId", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "admin-check", element: <AdminCheck /> },

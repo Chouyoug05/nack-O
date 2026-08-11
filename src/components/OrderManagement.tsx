@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useOrders } from "@/contexts/OrderContext";
 import { Order, OrderStatus } from "@/types/order";
-import { Clock, CheckCircle, XCircle, User } from "lucide-react";
+import { Clock, CheckCircle, XCircle, User, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -43,6 +43,8 @@ interface OrderManagementProps {
   ownerOverrideUid?: string;
   agentToken?: string;
   onGoToSales?: () => void;
+  onLoadOrderToCart?: (order: Order) => void;
+  onPayOrder?: (order: Order) => void;
 }
 
 const getManagerOrdersCacheKey = (uid: string) => `nack_m_orders_${uid}`;
@@ -72,6 +74,8 @@ const OrderManagement = ({
   ownerOverrideUid,
   agentToken,
   onGoToSales,
+  onLoadOrderToCart,
+  onPayOrder,
 }: OrderManagementProps) => {
   const { orders: localOrders, updateOrderStatus } = useOrders();
   const { toast } = useToast();
@@ -401,7 +405,27 @@ const OrderManagement = ({
     }
   };
 
-  // Trier les commandes : en attente d'abord, puis par date
+  const loadOrderForSales = (order: Order, openCheckout: boolean) => {
+    if (onLoadOrderToCart && !openCheckout) {
+      onLoadOrderToCart(order);
+      return;
+    }
+    if (onPayOrder && openCheckout) {
+      onPayOrder(order);
+      return;
+    }
+    try {
+      localStorage.setItem('nack_prefill_cart', JSON.stringify(
+        order.items.map(it => ({ id: it.id, name: it.name, price: it.price, quantity: it.quantity }))
+      ));
+      localStorage.setItem('nack_prefill_order_meta', JSON.stringify({
+        orderId: order.id,
+        ownerUid: uidToUse,
+        tableNumber: order.tableNumber,
+      }));
+    } catch { /* ignore */ }
+    onGoToSales?.();
+  };
   const sortedOrders = [...orders].sort((a, b) => {
     if (a.status === 'pending' && b.status !== 'pending') return -1;
     if (a.status !== 'pending' && b.status === 'pending') return 1;
@@ -469,16 +493,7 @@ const OrderManagement = ({
                 {order.items.map((item, index) => (
                   <div 
                     key={index} 
-                    className="flex justify-between text-sm bg-muted p-2 rounded cursor-pointer"
-                    onClick={() => {
-                      if (onGoToSales) {
-                        try {
-                          const prefill = [{ id: item.id, name: item.name, price: item.price, quantity: item.quantity }];
-                          localStorage.setItem('nack_prefill_cart', JSON.stringify(prefill));
-                        } catch { /* ignore */ }
-                        onGoToSales();
-                      }
-                    }}
+                    className="flex justify-between text-sm bg-muted p-2 rounded"
                   >
                     <span>{item.name} x{item.quantity}</span>
                     <span className="font-medium">{Number(item.price * item.quantity).toLocaleString()} XAF</span>
@@ -491,7 +506,26 @@ const OrderManagement = ({
               </div>
 
               {showActions && (
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {isOwnerAuthed && order.status === 'pending' && (onGoToSales || onLoadOrderToCart) && (
+                    <>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => loadOrderForSales(order, false)}
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Modifier
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => loadOrderForSales(order, true)}
+                      >
+                        Encaisser
+                      </Button>
+                    </>
+                  )}
                   {isOwnerAuthed && order.status === 'pending' && (
                     <select
                       className="border rounded px-2 text-sm h-9"
@@ -506,7 +540,7 @@ const OrderManagement = ({
                   {order.status === 'pending' && (
                   <Button
                     onClick={() => handleProcessOrder(order)}
-                    className="flex-1 bg-gradient-primary text-white shadow-button"
+                    className="flex-1 bg-gradient-primary text-white shadow-button min-w-[140px]"
                     disabled={processingIds.has(order.id)}
                     type="button"
                   >

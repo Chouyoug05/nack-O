@@ -14,7 +14,8 @@ import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 import { isFoodBusiness as isFoodBusinessFn } from "@/constants/establishmentTypes";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
-import { paymentsColRef, barOrdersColRef } from "@/lib/collections";
+import { sendOrderNotificationViaServer } from "@/lib/securePayment";
+import { barOrdersColRef } from "@/lib/collections";
 import { enqueuePendingOrder, flushPendingOrders } from "@/lib/localSyncQueue";
 import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 
@@ -63,12 +64,9 @@ interface Establishment {
   showCSSMention?: boolean;
   cssPercentage?: number;
   ticketFooterMessage?: string;
-  disbursementId?: string; // Disbursement ID pour recevoir les paiements
-  disbursementStatus?: 'pending' | 'approved' | 'rejected'; // Statut du Disbursement ID
-  airtelMoneyNumber?: string; // Numéro Airtel Money
-  deliveryEnabled?: boolean; // Livraison activée
-  deliveryPrice?: number; // Prix de livraison en XAF
-  fcmToken?: string; // Token pour les notifications push
+  paymentsEnabled?: boolean;
+  deliveryEnabled?: boolean;
+  deliveryPrice?: number;
 }
 
 const PublicOrderingPage = () => {
@@ -130,16 +128,19 @@ const PublicOrderingPage = () => {
     }
   }, [location.state]);
 
-  // Charger le thème du menu
+  // Charger le thème du menu (données métier sous profiles/{uid})
   useEffect(() => {
     if (!establishmentId) return;
 
     const loadTheme = async () => {
       try {
-        // Essayer le chemin establishments d'abord, puis profiles (legacy)
-        let themeDoc = await getDoc(doc(db, `establishments/${establishmentId}/menuDigital`, 'theme'));
+        let themeDoc = await getDoc(doc(db, `profiles/${establishmentId}/menuDigital`, 'theme'));
         if (!themeDoc.exists()) {
-          themeDoc = await getDoc(doc(db, `profiles/${establishmentId}/menuDigital`, 'theme'));
+          try {
+            themeDoc = await getDoc(doc(db, `establishments/${establishmentId}/menuDigital`, 'theme'));
+          } catch {
+            /* rules establishments/menuDigital peuvent refuser le public */
+          }
         }
         if (themeDoc.exists()) {
           setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
@@ -190,24 +191,26 @@ const PublicOrderingPage = () => {
       return cleanup;
     }
 
-    // Charger l'établissement (essayer establishments d'abord, puis profiles pour legacy)
+    // Produits / tables / commandes QR vivent sous profiles/{uid}
+    // (Stock, BarConnectée). establishments/{uid} peut exister comme shell vide.
     const loadEstablishmentData = async () => {
-      let estDoc = await getDoc(doc(db, 'establishments', establishmentId));
-      let base: 'establishments' | 'profiles' = 'establishments';
-
-      if (!estDoc.exists()) {
-        estDoc = await getDoc(doc(db, 'profiles', establishmentId));
-        base = 'profiles';
-      }
+      // Métadonnées publiques (sans secrets) + shell établissement éventuel.
+      // Les produits restent sous profiles/{uid}/products (lecture publique).
+      const [publicDoc, estDoc] = await Promise.all([
+        getDoc(doc(db, 'publicProfiles', establishmentId)).catch(() => null),
+        getDoc(doc(db, 'establishments', establishmentId)).catch(() => null),
+      ]);
 
       if (!isMountedRef.current) return;
-      if (!estDoc.exists()) {
-        setIsLoading(false);
-        return;
-      }
 
+      const data = {
+        ...(estDoc?.exists() ? estDoc.data() : {}),
+        ...(publicDoc?.exists() ? publicDoc.data() : {}),
+      };
+
+      // Toujours profiles : c'est là que Stock / Menu Digital écrivent les produits
+      const base: 'establishments' | 'profiles' = 'profiles';
       setCollectionBase(base);
-      const data = estDoc.data();
       setEstablishment({
         establishmentName: data.name || data.establishmentName || 'Établissement',
         establishmentType: data.type || data.establishmentType,
@@ -224,22 +227,21 @@ const PublicOrderingPage = () => {
         showCSSMention: data.showCSSMention,
         cssPercentage: data.cssPercentage,
         ticketFooterMessage: data.ticketFooterMessage,
-        disbursementId: data.disbursementId,
-        disbursementStatus: data.disbursementStatus,
-        airtelMoneyNumber: data.airtelMoneyNumber,
+        paymentsEnabled: data.paymentsEnabled === true,
         deliveryEnabled: data.deliveryEnabled,
         deliveryPrice: data.deliveryPrice,
-        fcmToken: data.fcmToken,
       } as Establishment);
 
       if (!isMountedRef.current) return;
 
-      // Charger les produits
       setupProductsAndTables(base);
     };
     loadEstablishmentData().catch(() => {
       if (!isMountedRef.current) return;
-      setIsLoading(false);
+      // Même sans publicProfiles, tenter le chargement des produits publics
+      setCollectionBase('profiles');
+      setEstablishment({ establishmentName: 'Établissement' } as Establishment);
+      setupProductsAndTables('profiles');
     });
 
     function setupProductsAndTables(base: 'establishments' | 'profiles') {
@@ -269,12 +271,12 @@ const PublicOrderingPage = () => {
         } as Product;
       });
 
+      // Prix + dispo ici ; le filtre "menu du jour" est appliqué dans filteredProducts
       const availableProducts = productsData.filter(p => {
         const priceValue = typeof p.price === 'number'
           ? p.price
           : parseFloat(String(p.price || '0')) || 0;
-        // Only show products that are explicitly marked for the digital menu
-        return priceValue > 0 && p.available !== false && p.showOnMenuDigital === true;
+        return priceValue > 0 && p.available !== false;
       });
 
       availableProducts.sort((a, b) => {
@@ -460,24 +462,16 @@ const PublicOrderingPage = () => {
       return;
     }
 
-    // Si paiement demandé mais pas de Disbursement ID configuré
-    if (withPayment && (!establishment?.disbursementId || establishment.disbursementStatus !== 'approved')) {
-      if (!establishment?.airtelMoneyNumber) {
-        // Demander le numéro Airtel Money
-        setShowAirtelNumberDialog(true);
-        return;
-      } else {
-        alert('Votre Disbursement ID est en attente de validation par l\'administration. Vous pouvez commander sans paiement pour l\'instant.');
-        return;
-      }
+    if (withPayment && !establishment?.paymentsEnabled) {
+      alert('Les paiements en ligne ne sont pas encore activés pour cet établissement. Vous pouvez commander sans paiement.');
+      return;
     }
 
     try {
       const orderNumberValue = `CMD${Date.now().toString().slice(-6)}`;
       const receiptNumber = `RCP${Date.now().toString().slice(-6)}`;
 
-      // Si paiement demandé et Disbursement ID configuré
-      if (withPayment && establishment?.disbursementId && establishment.disbursementStatus === 'approved') {
+      if (withPayment && establishment?.paymentsEnabled) {
         setIsProcessingPayment(true);
         try {
           const transactionId = `TXN-MENU-${establishmentId}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -489,11 +483,8 @@ const PublicOrderingPage = () => {
           const redirectError = appendElectronPaymentReturn(
             `${base}/payment/error?reference=${reference}&transactionId=${transactionId}&establishmentId=${establishmentId}`,
           );
-          // Utiliser le logo de l'établissement, ou un logo par défaut
           const logoURL = establishment?.logoUrl || `${base}/favicon.png`;
 
-          // Préparer les données de commande à stocker dans la transaction
-          // La commande sera créée seulement après paiement réussi
           const orderData: Record<string, unknown> = {
             orderNumber: orderNumberValue,
             receiptNumber,
@@ -510,63 +501,21 @@ const PublicOrderingPage = () => {
             }
           };
 
-          // Ajouter deliveryAddress seulement si c'est une livraison (éviter undefined)
           if (isDelivery && deliveryAddress) {
             orderData.deliveryAddress = deliveryAddress;
           }
 
-          // Créer une copie nettoyée de orderData pour la transaction (supprimer les undefined)
-          const cleanedOrderDataForPayment: Record<string, unknown> = { ...orderData };
-          // Supprimer deliveryAddress si undefined
-          if (cleanedOrderDataForPayment.deliveryAddress === undefined) {
-            delete cleanedOrderDataForPayment.deliveryAddress;
-          }
-
-          // Enregistrer la transaction de paiement avec les données de commande
-          // IMPORTANT: Le montant 'total' correspond au total de la commande (articles du panier),
-          // PAS au prix de l'abonnement mensuel. C'est calculé comme: sum(item.price * item.quantity)
-          // La commande sera créée seulement après paiement réussi dans PaymentSuccess.tsx
-          await addDoc(paymentsColRef(db, establishmentId), {
-            userId: establishmentId,
-            transactionId,
-            subscriptionType: 'menu-digital',
-            amount: total, // Montant de la commande (articles), pas l'abonnement
-            status: 'pending',
-            paymentMethod: 'airtel-money',
-            reference,
-            paymentLink: '',
-            redirectSuccess,
-            redirectError,
-            establishmentId,
-            disbursementId: establishment.disbursementId,
-            // Stocker les données de commande dans la transaction pour création après paiement
-            orderData: cleanedOrderDataForPayment,
-            createdAt: Date.now(),
-          });
-
-          // Créer le lien de paiement
-          // Le montant 'total' est le total de la commande (articles), calculé depuis le panier
           const paymentLink = await createMenuDigitalPaymentLink({
-            amount: total, // Total des articles commandés, pas le prix de l'abonnement
+            amount: total,
             reference,
             redirectSuccess,
             redirectError,
             logoURL,
-            disbursementId: establishment.disbursementId,
+            establishmentId: establishmentId!,
+            transactionId,
+            orderData,
           });
 
-          // Mettre à jour la transaction avec le lien
-          const paymentsRef = paymentsColRef(db, establishmentId);
-          const paymentsQuery = query(paymentsRef, orderBy('createdAt', 'desc'));
-          const paymentsSnapshot = await getDocs(paymentsQuery);
-          if (!paymentsSnapshot.empty) {
-            const latestPayment = paymentsSnapshot.docs[0];
-            await updateDoc(doc(db, `${collectionBase}/${establishmentId}/payments`, latestPayment.id), {
-              paymentLink,
-            });
-          }
-
-          // Rediriger vers le paiement
           await openPaymentUrl(paymentLink);
           return;
         } catch (error) {
@@ -614,24 +563,13 @@ const PublicOrderingPage = () => {
           queuedOffline = true;
         }
 
-        // Envoyer la notification push au gérant si le token est disponible
-        if (establishment?.fcmToken && !queuedOffline) {
-          try {
-            fetch('/.netlify/functions/send-notification', {
-              method: 'POST',
-              body: JSON.stringify({
-                token: establishment.fcmToken,
-                title: "Nouvelle commande",
-                body: `Commande #${orderNumberValue} - ${isDelivery ? 'Livraison' : selectedTable} - ${total.toLocaleString('fr-FR')} XAF`,
-                data: {
-                  orderNumber: orderNumberValue,
-                  type: 'NEW_ORDER'
-                }
-              })
-            }).catch(err => console.error('Erreur fetch notification:', err));
-          } catch (error) {
-            console.error('Erreur envoi notification:', error);
-          }
+        if (establishmentId && !queuedOffline) {
+          void sendOrderNotificationViaServer({
+            establishmentId,
+            title: "Nouvelle commande",
+            body: `Commande #${orderNumberValue} - ${isDelivery ? 'Livraison' : selectedTable} - ${total.toLocaleString('fr-FR')} XAF`,
+            data: { orderNumber: orderNumberValue, type: "NEW_ORDER" },
+          });
         }
       }
 
@@ -1031,7 +969,7 @@ const PublicOrderingPage = () => {
               >
                 Commander
               </Button>
-              {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
+              {establishment?.paymentsEnabled && (
                 <div className="flex flex-col items-stretch sm:items-end gap-1 flex-1 sm:flex-none">
                   <Button
                     onClick={() => {
@@ -1228,7 +1166,7 @@ const PublicOrderingPage = () => {
                 >
                   Commander
                 </Button>
-                {establishment?.disbursementId && establishment.disbursementStatus === 'approved' && (
+                {establishment?.paymentsEnabled && (
                   <div className="flex-1 flex flex-col gap-1">
                     <Button
                       onClick={() => {

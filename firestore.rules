@@ -1,190 +1,545 @@
 rules_version = '2';
+
 service cloud.firestore {
+
   match /databases/{database}/documents {
+
     function isAdmin() {
+
       return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+
     }
 
-    // Public mapping for resolving agents by token/code
+
+
+    function isOwner(userId) {
+
+      return request.auth != null && request.auth.uid == userId;
+
+    }
+
+
+
+    function ownerOnlySubscriptionFieldsChanged() {
+      // Champs réservés admin / serveur — le propriétaire NE PEUT PAS les modifier.
+      // OK pour le propriétaire : managerPinHash, disbursementStatus (demande pending),
+      // airtelMoneyNumber, nom, logo, etc.
+      return request.resource.data.diff(resource.data).affectedKeys().hasAny([
+        'plan', 'subscriptionEndsAt', 'lastPaymentAt', 'trialEndsAt', 'subscriptionType',
+        'eventsCount', 'extraEventsBilled', 'eventsResetAt',
+        'assignedTabletImei', 'assignedTabletLabel',
+        'disbursementId'
+      ]);
+    }
+
+
+    function validBarOrderCreate() {
+
+      return request.resource.data.keys().hasAll(['total', 'status', 'createdAt']) &&
+
+        request.resource.data.status == 'pending' &&
+
+        request.resource.data.total is number &&
+
+        request.resource.data.total >= 0 &&
+
+        request.resource.data.total <= 50000000 &&
+
+        request.resource.data.createdAt is int;
+
+    }
+
+
+
+    function validPaymentCreate() {
+
+      return request.resource.data.status == 'pending' &&
+
+        request.resource.data.amount is number &&
+
+        request.resource.data.amount >= 100 &&
+
+        request.resource.data.amount <= 50000000;
+
+    }
+
+
+
+    // --- Profil public (menu QR, carte) — sans données sensibles ---
+
+    match /publicProfiles/{userId} {
+
+      allow read: if true;
+
+      allow write: if isOwner(userId) || isAdmin();
+
+    }
+
+
+
+    // Tokens agents : lecture publique (token = secret dans l'URL), écriture propriétaire/admin
+
     match /agentTokens/{id} {
+
       allow read: if true;
-      allow write: if request.auth != null; // only authenticated app users write
-    }
 
-    // Admins registry: readable by the admin user himself; not writable from client
-    match /admins/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
-    }
-
-    // Public read for events and tickets
-    match /profiles/{userId}/events/{eventId} {
-      allow read: if true;
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      match /tickets/{ticketId} {
-        allow read: if true;
-        allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      }
-    }
-
-    // Products: public read, owner or admin write
-    match /profiles/{userId}/products/{productId} {
-      allow read: if true;
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Tables: public read for QR ordering, owner or admin write
-    match /profiles/{userId}/tables/{tableId} {
-      allow read: if true;
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Orders: public read; writes allowed for owner, valid agent token mapping, or admin
-    match /profiles/{userId}/orders/{orderId} {
-      allow read: if true;
-      allow write: if (
-        request.auth != null && (request.auth.uid == userId || isAdmin())
-      ) || (
-        // Validate that the request carries an agentToken that maps to this owner
-        // and that mapping exists in top-level agentTokens
-        exists(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)) &&
-        get(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)).data.ownerUid == userId
-      );
-    }
-
-    // BarOrders: public write for QR code ordering, owner/admin read
-    match /profiles/{userId}/barOrders/{orderId} {
-      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      allow create: if true; // Permettre à tout le monde de créer des commandes (QR code public)
-      allow update, delete: if request.auth != null && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Order cancellations: owner/admin only (audit log)
-    match /profiles/{userId}/orderCancellations/{cancellationId} {
-      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Team subcollection: owner or admin
-    match /profiles/{userId}/team/{memberId} {
-      allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-    }
-
-    // Profiles: public read for map functionality, owner/admin write
-    // Note: The locations.ts library filters sensitive data before returning
-    match /profiles/{userId} {
-      // Allow public read for QR code ordering functionality
-      allow read: if true;
-      // Only owner or admin can write
-      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      
-      // Note: Les sous-collections spécifiques (products, tables, orders, events) sont définies AVANT
-      // cette règle générale pour éviter les conflits. Cette règle générale ne s'applique qu'aux
-      // autres sous-collections non spécifiées (team, notifications, etc.)
-      match /{document=**} {
-        // Pour les autres sous-collections non spécifiées, seul le propriétaire ou admin peut accéder
-        allow read, write: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      }
-    }
-
-    // Establishments (multi-établissements) — même logique que profiles
-    match /establishments/{estId} {
-      allow read: if true;
       allow create: if request.auth != null &&
+
         request.resource.data.ownerUid == request.auth.uid;
+
       allow update, delete: if request.auth != null && (
+
         resource.data.ownerUid == request.auth.uid || isAdmin()
+
       );
+
+    }
+
+
+
+    match /admins/{uid} {
+
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow write: if false;
+
+    }
+
+
+
+    match /profiles/{userId}/events/{eventId} {
+
+      allow read: if true;
+
+      allow write: if isOwner(userId) || isAdmin();
+
+      match /tickets/{ticketId} {
+
+        allow read: if true;
+
+        allow write: if isOwner(userId) || isAdmin();
+
+      }
+
+    }
+
+
+
+    match /profiles/{userId}/products/{productId} {
+
+      allow read: if true;
+
+      allow write: if isOwner(userId) || isAdmin();
+
+    }
+
+
+
+    match /profiles/{userId}/tables/{tableId} {
+
+      allow read: if true;
+
+      allow write: if isOwner(userId) || isAdmin();
+
+    }
+
+
+
+    match /profiles/{userId}/menuDigital/{docId} {
+
+      allow read: if true;
+
+      allow write: if isOwner(userId) || isAdmin();
+
+    }
+
+
+
+    // Commandes internes : plus de lecture publique
+
+    match /profiles/{userId}/orders/{orderId} {
+
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow write: if (isOwner(userId) || isAdmin()) || (
+
+        exists(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)) &&
+
+        get(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)).data.ownerUid == userId
+
+      );
+
+    }
+
+
+
+    match /profiles/{userId}/barOrders/{orderId} {
+
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if validBarOrderCreate();
+
+      allow update, delete: if isOwner(userId) || isAdmin();
+
+    }
+
+
+
+    match /profiles/{userId}/payments/{paymentId} {
+
+      allow read: if isOwner(userId) || isAdmin();
+
+      allow create: if isOwner(userId) && validPaymentCreate();
+
+      allow update: if isAdmin() || (
+
+        isOwner(userId) &&
+
+        resource.data.status == 'pending' &&
+
+        request.resource.data.status == 'pending'
+
+      );
+
+      allow delete: if isAdmin();
+
+    }
+
+
+
+    match /profiles/{userId}/orderCancellations/{cancellationId} {
+
+      allow read, write: if isOwner(userId) || isAdmin();
+
+    }
+
+
+
+    match /profiles/{userId}/team/{memberId} {
+
+      allow read, write: if isOwner(userId) || isAdmin();
+
+    }
+
+
+
+    // Profil privé : propriétaire ou admin uniquement
+    match /profiles/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isAdmin() || (isOwner(userId) && !ownerOnlySubscriptionFieldsChanged());
+      allow delete: if isAdmin();
+    }
+
+    match /profiles/{userId}/notifications/{notificationId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /profiles/{userId}/sales/{saleId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /profiles/{userId}/losses/{lossId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /profiles/{userId}/receipts/{receiptId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /profiles/{userId}/customers/{customerId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /profiles/{userId}/config/{docId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+    match /profiles/{userId}/barConnectee/{docId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /establishments/{estId} {
+
+      allow read: if true;
+
+      allow create: if request.auth != null &&
+
+        request.resource.data.ownerUid == request.auth.uid;
+
+      allow update, delete: if request.auth != null && (
+
+        resource.data.ownerUid == request.auth.uid || isAdmin()
+
+      );
+
+
 
       match /products/{productId} {
+
         allow read: if true;
+
         allow write: if request.auth != null && (
+
           get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
           isAdmin()
+
         );
+
       }
+
+      match /tables/{tableId} {
+
+        allow read: if true;
+
+        allow write: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        );
+
+      }
+
+      match /menuDigital/{docId} {
+
+        allow read: if true;
+
+        allow write: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        );
+
+      }
+
       match /orders/{orderId} {
-        allow read: if true;
-        allow write: if request.auth != null && (
-          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
-          isAdmin()
-        );
-      }
-      match /events/{eventId} {
-        allow read: if true;
-        allow write: if request.auth != null && (
-          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
-          isAdmin()
-        );
-        match /tickets/{ticketId} {
-          allow read: if true;
-          allow write: if request.auth != null && (
-            get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
-            isAdmin()
-          );
-        }
-      }
-      match /barOrders/{orderId} {
+
         allow read: if request.auth != null && (
+
           get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
           isAdmin()
+
         );
-        allow create: if true;
+
+        allow write: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        );
+
+      }
+
+      match /events/{eventId} {
+
+        allow read: if true;
+
+        allow write: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        );
+
+        match /tickets/{ticketId} {
+
+          allow read: if true;
+
+          allow write: if request.auth != null && (
+
+            get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+            isAdmin()
+
+          );
+
+        }
+
+      }
+
+      match /barOrders/{orderId} {
+
+        allow read: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        );
+
+        allow create: if validBarOrderCreate();
+
         allow update, delete: if request.auth != null && (
+
           get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
           isAdmin()
+
         );
+
       }
+
+      match /payments/{paymentId} {
+
+        allow read: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        );
+
+        allow create: if request.auth != null &&
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid &&
+
+          validPaymentCreate();
+
+        allow update: if isAdmin();
+
+        allow delete: if isAdmin();
+
+      }
+
       match /{document=**} {
+
         allow read, write: if request.auth != null && (
+
           get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
           isAdmin()
+
         );
+
       }
+
     }
 
-    // Subscription plans: admin only read/write
+
+
     match /subscriptionPlans/{planId} {
+
       allow read, write: if isAdmin();
+
     }
 
-    // Affiliates: public read by code, public create (self-reg), admin update/delete
+
+
+    // Affiliés : lecture publique (sans mot de passe), écriture admin
+
     match /affiliates/{code} {
-      allow read, create: if true;
-      allow update, delete: if isAdmin();
+
+      allow read: if true;
+
+      allow create, update, delete: if isAdmin();
+
     }
 
-    // Disbursement requests: users can create, admins can read/write
+
+
+    // Hash mot de passe affilié — serveur uniquement (Admin SDK)
+
+    match /affiliateAuth/{code} {
+
+      allow read, write: if false;
+
+    }
+
+
+
     match /disbursementRequests/{requestId} {
-      // Les utilisateurs authentifiés peuvent créer leur propre demande
-      allow create: if request.auth != null && 
-                      request.resource.data.userId == request.auth.uid &&
-                      request.resource.data.status == 'pending';
-      // Les utilisateurs peuvent lire leur propre demande
-      allow read: if request.auth != null && 
-                   (resource.data.userId == request.auth.uid || isAdmin());
-      // Seuls les admins peuvent mettre à jour ou supprimer
+
+      allow create: if request.auth != null &&
+
+        request.resource.data.userId == request.auth.uid &&
+
+        request.resource.data.status == 'pending';
+
+      allow read: if request.auth != null &&
+
+        (resource.data.userId == request.auth.uid || isAdmin());
+
       allow update, delete: if isAdmin();
+
     }
 
-    // Tablettes enregistrées (IMEI) — traçabilité par établissement
+
+
     match /tablets/{tabletId} {
+
       allow read: if request.auth != null &&
+
         (resource.data.ownerUid == request.auth.uid || isAdmin());
-      allow create: if request.auth != null &&
-        request.resource.data.ownerUid == request.auth.uid;
+
+      allow create: if request.auth != null && (
+
+        (request.resource.data.ownerUid == request.auth.uid && request.resource.data.assignedByAdmin != true) ||
+
+        (isAdmin() && request.resource.data.assignedByAdmin == true)
+
+      );
+
       allow update: if request.auth != null &&
+
         (resource.data.ownerUid == request.auth.uid || isAdmin());
+
       allow delete: if isAdmin();
+
+
+
+      match /messages/{messageId} {
+
+        allow read: if request.auth != null && (
+
+          isAdmin() ||
+
+          get(/databases/$(database)/documents/tablets/$(tabletId)).data.ownerUid == request.auth.uid
+
+        );
+
+        allow create: if isAdmin();
+
+        allow update: if request.auth != null && (
+
+          isAdmin() ||
+
+          (
+
+            get(/databases/$(database)/documents/tablets/$(tabletId)).data.ownerUid == request.auth.uid &&
+
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['readAt'])
+
+          )
+
+        );
+
+        allow delete: if isAdmin();
+
+      }
+
     }
 
-    // Tickets support — contact utilisateur ↔ admin
+
+
     match /supportTickets/{ticketId} {
+
       allow create: if request.auth != null &&
+
         request.resource.data.ownerUid == request.auth.uid;
+
       allow read: if request.auth != null &&
+
         (resource.data.ownerUid == request.auth.uid || isAdmin());
+
       allow update: if isAdmin();
+
       allow delete: if isAdmin();
+
     }
+
   }
+
 }
+

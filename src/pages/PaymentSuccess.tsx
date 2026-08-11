@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { doc, updateDoc, addDoc, query, where, getDocs, getDoc, collectionGroup } from "firebase/firestore";
+import { completePaymentViaServer } from "@/lib/securePayment";
 import { notificationsColRef, paymentsColRef, receiptsColRef } from "@/lib/collections";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { SUBSCRIPTION_PLANS } from "@/utils/subscription";
@@ -36,243 +37,54 @@ const PaymentSuccess = () => {
 
         if (transactionId) {
           try {
-            // Chercher la transaction dans toutes les collections payments
-            const paymentsQuery = query(
-              collectionGroup(db, 'payments'),
-              where('transactionId', '==', transactionId)
-            );
-            const snapshot = await getDocs(paymentsQuery);
-
-            if (!snapshot.empty) {
-              const paymentDoc = snapshot.docs[0];
-              const paymentData = paymentDoc.data() as PaymentTransaction;
-
-              // Vérifier si la transaction est déjà complétée
-              if (paymentData.status === 'completed') {
-                console.warn(`PaymentSuccess: Transaction ${transactionId} déjà complétée. Ignorant le traitement dupliqué.`);
-                setTimeout(() => navigate('/', { replace: true }), 2000);
-                return;
-              }
-
-              // Mettre à jour la transaction
-              await updateDoc(paymentDoc.ref, {
-                status: 'completed',
-                paidAt: Date.now(),
-                updatedAt: Date.now(),
-              });
-
-              // CRÉER le billet seulement après paiement réussi
-              // Les données du billet sont stockées dans ticketData de la transaction
-              if (paymentData.ticketData && paymentData.eventId && paymentData.establishmentId) {
-                const { eventTicketsColRef, eventsColRef } = await import('@/lib/collections');
-                const { increment } = await import('firebase/firestore');
-
-                const td = paymentData.ticketData as { customerName?: string; customerEmail?: string; customerPhone?: string; quantity?: number; totalAmount?: number };
-                const qty = Number(td.quantity ?? 0);
-
-                // Créer le billet avec le statut 'paid' directement
-                const ticket: TicketDoc = {
-                  customerName: String(td.customerName ?? ''),
-                  customerEmail: String(td.customerEmail ?? ''),
-                  customerPhone: String(td.customerPhone ?? ''),
-                  quantity: qty,
-                  totalAmount: Number(td.totalAmount ?? 0),
-                  status: 'paid',
-                  purchaseDate: Date.now(),
-                };
-
-                const ticketsCol = eventTicketsColRef(db, paymentData.establishmentId, paymentData.eventId);
-                await addDoc(ticketsCol, ticket);
-
-                // Mettre à jour le compteur de billets vendus
-                const evtRef = doc(eventsColRef(db, paymentData.establishmentId), paymentData.eventId);
-                await updateDoc(evtRef, {
-                  ticketsSold: increment(qty)
+            const result = await completePaymentViaServer(transactionId);
+            if (result.establishmentId) {
+              const pubDoc = await getDoc(doc(db, 'publicProfiles', result.establishmentId));
+              if (pubDoc.exists()) {
+                const d = pubDoc.data();
+                setEstablishmentInfo({
+                  name: d.establishmentName || 'Établissement',
+                  logoUrl: d.logoUrl,
                 });
-
-                // Charger les infos de l'établissement pour l'affichage
-                const profileDoc = await getDoc(doc(db, 'profiles', paymentData.establishmentId));
-                if (profileDoc.exists()) {
-                  const profileData = profileDoc.data();
-                  setEstablishmentInfo({
-                    name: profileData.establishmentName || 'Établissement',
-                    logoUrl: profileData.logoUrl,
-                  });
-                }
               }
-
-              // Rediriger vers la page d'accueil après 3 secondes
-              scheduleNav(() => {
-                navigate('/', { replace: true });
-              }, 3000);
-              return;
             }
+            scheduleNav(() => navigate('/', { replace: true }), 3000);
+            return;
           } catch (error) {
             console.error('Erreur traitement paiement billet événement:', error);
           }
         }
 
-        // Redirection par défaut si erreur
         scheduleNav(() => navigate('/', { replace: true }), 3000);
         return;
       }
 
       if (isMenuDigitalPayment) {
-        // Charger les informations de l'établissement depuis la transaction
         const transactionId = searchParams.get('transactionId') || '';
-        const orderId = searchParams.get('orderId') || '';
 
         if (transactionId) {
           try {
-            // Chercher la transaction dans toutes les collections payments
-            const paymentsQuery = query(
-              collectionGroup(db, 'payments'),
-              where('transactionId', '==', transactionId)
-            );
-            const snapshot = await getDocs(paymentsQuery);
-
-            if (!snapshot.empty) {
-              const paymentData = snapshot.docs[0].data() as PaymentTransaction;
-              const establishmentId = paymentData.establishmentId;
-
-              if (establishmentId) {
-                // Charger les infos de l'établissement
-                const profileDoc = await getDoc(doc(db, 'profiles', establishmentId));
-                if (profileDoc.exists()) {
-                  const profileData = profileDoc.data();
-                  setEstablishmentInfo({
-                    name: profileData.establishmentName || 'Établissement',
-                    logoUrl: profileData.logoUrl,
-                  });
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Erreur chargement établissement:', error);
-          }
-        }
-
-        // Mettre à jour la transaction et la commande même sans authentification
-        try {
-          const transactionId = searchParams.get('transactionId') || '';
-
-          if (transactionId) {
-            const paymentsQuery = query(
-              collectionGroup(db, 'payments'),
-              where('transactionId', '==', transactionId)
-            );
-            const snapshot = await getDocs(paymentsQuery);
-
-            if (!snapshot.empty) {
-              const paymentDoc = snapshot.docs[0];
-              const paymentData = paymentDoc.data() as PaymentTransaction;
-
-              // Mettre à jour la transaction
-              await updateDoc(paymentDoc.ref, {
-                status: 'completed',
-                paidAt: Date.now(),
-                updatedAt: Date.now(),
-              });
-
-              // CRÉER la commande seulement après paiement réussi
-              // Les données de commande sont stockées dans orderData de la transaction
-              if (paymentData.orderData && paymentData.establishmentId) {
-                const { barOrdersColRef } = await import('@/lib/collections');
-
-                // Différencier les commandes sur place et les livraisons
-                // - Sur place (avec table) : status 'pending' pour apparaître dans les commandes clients
-                // - Livraison : status 'paid' car déjà payée et livrée
-                const isDelivery = paymentData.orderData.isDelivery === true;
-                const orderStatus = isDelivery ? 'paid' : 'pending';
-
-                // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
-                const cleanedOrderData: Record<string, unknown> = {
-                  orderNumber: paymentData.orderData?.orderNumber,
-                  receiptNumber: paymentData.orderData?.receiptNumber,
-                  tableZone: paymentData.orderData?.tableZone,
-                  items: paymentData.orderData?.items,
-                  total: paymentData.orderData?.total,
-                  status: orderStatus,
-                  createdAt: paymentData.orderData?.createdAt,
-                  isDelivery: (paymentData.orderData as Record<string, unknown>)?.isDelivery === true,
-                  deliveryPrice: (paymentData.orderData as Record<string, unknown>)?.deliveryPrice ?? 0,
-                  customerInfo: (paymentData.orderData as Record<string, unknown>)?.customerInfo,
-                  paidAt: Date.now(),
-                  paymentMethod: 'airtel-money',
-                  paymentTransactionId: transactionId,
-                };
-
-                // Ajouter deliveryAddress seulement si défini et non undefined
-                const od = paymentData.orderData as Record<string, unknown> | undefined;
-                if (od?.deliveryAddress !== undefined && od?.deliveryAddress !== null) {
-                  cleanedOrderData.deliveryAddress = od.deliveryAddress;
-                }
-
-                // Créer la commande avec le statut approprié
-                const orderDocRef = await addDoc(barOrdersColRef(db, paymentData.establishmentId!), cleanedOrderData);
-
-                // Envoyer la notification push au gérant si le token est disponible
-                try {
-                  const profDoc = await getDoc(doc(db, 'profiles', paymentData.establishmentId!));
-                  if (profDoc.exists()) {
-                    const profData = profDoc.data();
-                    if (profData.fcmToken) {
-                      const orderNum = (cleanedOrderData as { orderNumber?: string | number }).orderNumber;
-                      const tableZone = (cleanedOrderData as { tableZone?: string }).tableZone;
-                      const totalAmount = (cleanedOrderData as { total?: number }).total;
-                      const body = `Commande PAYÉE #${orderNum} - ${tableZone} - ${Number(totalAmount).toLocaleString('fr-FR')} XAF`;
-                      fetch('/.netlify/functions/send-notification', {
-                        method: 'POST',
-                        body: JSON.stringify({
-                          token: profData.fcmToken,
-                          title: "Nouvelle commande payée",
-                          body: body,
-                          data: {
-                            orderNumber: String((cleanedOrderData as { orderNumber?: string | number }).orderNumber),
-                            type: 'NEW_PAID_ORDER'
-                          }
-                        })
-                      }).catch(err => console.error('Erreur fetch notification success:', err));
-                    }
-                  }
-                } catch (notiErr) {
-                  console.error('Erreur trigger notification payment success:', notiErr);
-                }
-
-                // Mettre à jour la transaction avec l'ID de la commande créée
-                await updateDoc(paymentDoc.ref, {
-                  orderId: orderDocRef.id,
-                });
-              } else if (orderId && paymentData.establishmentId) {
-                // Fallback : si orderId existe déjà (ancien système), mettre à jour
-                const orderRef = doc(db, `profiles/${paymentData.establishmentId}/barOrders`, orderId);
-                await updateDoc(orderRef, {
-                  status: 'paid',
-                  paidAt: Date.now(),
-                  paymentMethod: 'airtel-money',
-                  paymentTransactionId: transactionId,
+            const result = await completePaymentViaServer(transactionId);
+            const estId = result.establishmentId || searchParams.get('establishmentId') || '';
+            if (estId) {
+              const pubDoc = await getDoc(doc(db, 'publicProfiles', estId));
+              if (pubDoc.exists()) {
+                const d = pubDoc.data();
+                setEstablishmentInfo({
+                  name: d.establishmentName || 'Établissement',
+                  logoUrl: d.logoUrl,
                 });
               }
-
-              // Rediriger vers le menu après 3 secondes
               scheduleNav(() => {
-                if (paymentData.establishmentId) {
-                  navigate(`/commande/${paymentData.establishmentId}`, {
-                    replace: true,
-                    state: { paymentSuccess: true }
-                  });
-                } else {
-                  navigate('/', { replace: true });
-                }
+                navigate(`/commande/${estId}`, { replace: true, state: { paymentSuccess: true } });
               }, 3000);
               return;
             }
+          } catch (error) {
+            console.error('Erreur traitement paiement menu digital:', error);
           }
-        } catch (error) {
-          console.error('Erreur traitement paiement menu digital:', error);
         }
 
-        // Redirection par défaut si erreur - essayer de récupérer l'établissement depuis l'URL
         const establishmentIdFromUrl = searchParams.get('establishmentId');
         if (establishmentIdFromUrl) {
           scheduleNav(() => navigate(`/commande/${establishmentIdFromUrl}`, {
@@ -280,7 +92,6 @@ const PaymentSuccess = () => {
             state: { paymentSuccess: true }
           }), 3000);
         } else {
-          // Si on ne peut pas récupérer l'établissement, rediriger vers la page d'accueil
           scheduleNav(() => navigate('/', { replace: true }), 3000);
         }
         return;
@@ -510,79 +321,13 @@ const PaymentSuccess = () => {
           }
         }
 
-        // Gérer les paiements Menu Digital différemment
-        if (isMenuDigitalPayment && paymentTransaction) {
-          const paymentData = paymentTransaction as PaymentTransaction;
-
-          // Mettre à jour la transaction de paiement
-          await updateDoc(doc(paymentsRef, paymentTransaction.id), {
-            status: 'completed',
-            paidAt: now,
-            updatedAt: now,
-          });
-
-          // CRÉER la commande seulement après paiement réussi
-          // Les données de commande sont stockées dans orderData de la transaction
-          if (paymentData.orderData && paymentTransaction.establishmentId) {
-            try {
-              const { barOrdersColRef } = await import('@/lib/collections');
-
-              // Différencier les commandes sur place et les livraisons
-              // - Sur place (avec table) : status 'pending' pour apparaître dans les commandes clients
-              // - Livraison : status 'paid' car déjà payée et livrée
-              const isDelivery = paymentData.orderData.isDelivery === true;
-              const orderStatus = isDelivery ? 'paid' : 'pending';
-
-              // Nettoyer l'objet orderData pour supprimer les valeurs undefined (Firestore ne les accepte pas)
-              const cleanedOrderData: Record<string, unknown> = {
-                orderNumber: paymentData.orderData?.orderNumber,
-                receiptNumber: paymentData.orderData?.receiptNumber,
-                tableZone: paymentData.orderData?.tableZone,
-                items: paymentData.orderData?.items,
-                total: paymentData.orderData?.total,
-                status: orderStatus,
-                createdAt: paymentData.orderData?.createdAt,
-                isDelivery: (paymentData.orderData as Record<string, unknown>)?.isDelivery === true,
-                deliveryPrice: (paymentData.orderData as Record<string, unknown>)?.deliveryPrice ?? 0,
-                customerInfo: (paymentData.orderData as Record<string, unknown>)?.customerInfo,
-                paidAt: now,
-                paymentMethod: 'airtel-money',
-                paymentTransactionId: transactionId,
-              };
-
-              // Ajouter deliveryAddress seulement si défini et non undefined
-              const od2 = paymentData.orderData as Record<string, unknown> | undefined;
-              if (od2?.deliveryAddress !== undefined && od2?.deliveryAddress !== null) {
-                cleanedOrderData.deliveryAddress = od2.deliveryAddress;
-              }
-
-              // Créer la commande avec le statut approprié
-              const orderDocRef = await addDoc(barOrdersColRef(db, paymentTransaction.establishmentId!), cleanedOrderData);
-
-              // Mettre à jour la transaction avec l'ID de la commande créée
-              await updateDoc(doc(paymentsRef, paymentTransaction.id), {
-                orderId: orderDocRef.id,
-              });
-            } catch (error) {
-              console.error('Erreur création commande après paiement:', error);
-            }
-          } else if (orderId && paymentTransaction.establishmentId) {
-            // Fallback : si orderId existe déjà (ancien système), mettre à jour
-            try {
-              const { barOrdersColRef } = await import('@/lib/collections');
-              const orderRef = doc(db, `profiles/${paymentTransaction.establishmentId}/barOrders`, orderId);
-              await updateDoc(orderRef, {
-                status: 'paid',
-                paidAt: now,
-                paymentMethod: 'airtel-money',
-                paymentTransactionId: transactionId,
-              });
-            } catch (error) {
-              console.error('Erreur mise à jour commande:', error);
-            }
+        // Gérer les paiements Menu Digital (utilisateur authentifié)
+        if (isMenuDigitalPayment && paymentTransaction && transactionId) {
+          try {
+            await completePaymentViaServer(transactionId);
+          } catch (error) {
+            console.error('Erreur confirmation paiement menu digital:', error);
           }
-
-          // Rediriger vers la page de commande avec un message de succès
           scheduleNav(() => {
             if (paymentTransaction.establishmentId) {
               navigate(`/commande/${paymentTransaction.establishmentId}`, {
@@ -624,78 +369,17 @@ const PaymentSuccess = () => {
 
         // TOUJOURS mettre 30 jours à partir de maintenant, jamais accumuler
 
-        // Mettre à jour le profil avec le type d'abonnement
-        const updateData: {
-          plan: 'active';
-          subscriptionType: 'transition' | 'transition-pro-max';
-          subscriptionEndsAt: number;
-          lastPaymentAt: number;
-          updatedAt: number;
-          eventsCount?: number;
-          eventsResetAt?: number;
-        } = {
-          plan: 'active',
-          subscriptionType: subscriptionType as 'transition' | 'transition-pro-max',
-          subscriptionEndsAt: newSubscriptionEndsAt,
-          lastPaymentAt: now,
-          updatedAt: now,
-        };
-
-        // Pour Pro Max, initialiser/réinitialiser le compteur d'événements si nécessaire
-        if (subscriptionType === 'transition-pro-max') {
-          // Si on est dans une nouvelle période (abonnement expiré ou première souscription), réinitialiser
-          if (!profile?.subscriptionEndsAt || profile.subscriptionEndsAt <= now) {
-            updateData.eventsCount = 0;
-            updateData.eventsResetAt = newSubscriptionEndsAt;
-          } else {
-            // Garder les valeurs actuelles si on prolonge un abonnement existant
-            if (profile.eventsCount !== undefined) updateData.eventsCount = profile.eventsCount;
-            if (profile.eventsResetAt !== undefined) updateData.eventsResetAt = profile.eventsResetAt;
+        // Activation abonnement via serveur (champs protégés Firestore)
+        if (transactionId) {
+          try {
+            await completePaymentViaServer(transactionId);
+          } catch (error) {
+            console.error('Erreur confirmation abonnement:', error);
+            throw error;
           }
         }
 
-        await updateDoc(doc(db, "profiles", user.uid), updateData);
-
-        // Forcer le rafraîchissement du profil dans AuthContext pour activer immédiatement les fonctionnalités
-        // Le AuthContext écoute déjà les changements via onSnapshot, donc cette mise à jour
-        // devrait automatiquement déclencher le rafraîchissement du profil et activer les fonctionnalités
-
-        // Enregistrer ou mettre à jour la transaction de paiement
-        let finalTransactionId = transactionId;
-        try {
-          if (paymentTransaction) {
-            // Mettre à jour la transaction existante
-            await updateDoc(doc(paymentsRef, paymentTransaction.id), {
-              status: 'completed',
-              paidAt: now,
-              subscriptionEndsAt: newSubscriptionEndsAt,
-              updatedAt: now,
-            });
-            finalTransactionId = paymentTransaction.transactionId;
-            console.log(`PaymentSuccess: Transaction ${finalTransactionId} mise à jour avec succès`);
-          } else {
-            // Créer une nouvelle transaction (cas où transactionId manquant)
-            const newTransactionId = transactionId || `TXN-${user.uid}-${Date.now()}`;
-            const newTransactionRef = await addDoc(paymentsRef, {
-              userId: user.uid,
-              transactionId: newTransactionId,
-              subscriptionType,
-              amount,
-              status: 'completed',
-              paymentMethod: 'airtel-money',
-              reference: reference || `abonnement-${subscriptionType}`,
-              createdAt: now,
-              paidAt: now,
-              subscriptionEndsAt: newSubscriptionEndsAt,
-            } as Omit<PaymentTransaction, 'id'>);
-            finalTransactionId = newTransactionId;
-            console.log(`PaymentSuccess: Nouvelle transaction ${finalTransactionId} créée avec succès`);
-          }
-        } catch (error) {
-          console.error('Erreur enregistrement transaction:', error);
-          // Ne pas bloquer le processus si l'enregistrement échoue, mais logger l'erreur
-          throw new Error(`Échec de l'enregistrement de la transaction: ${error instanceof Error ? error.message : String(error)}`);
-        }
+        let finalTransactionId = transactionId || paymentTransaction?.transactionId || `TXN-${user.uid}-${Date.now()}`;
 
         // Notification de paiement réussi
         try {

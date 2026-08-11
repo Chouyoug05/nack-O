@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { db } from "@/lib/firebase";
-import { affiliateDocRef, profilesColRef } from "@/lib/collections";
-import { getDoc, query, where, getDocs } from "firebase/firestore";
+import { affiliateDocRef } from "@/lib/collections";
+import { getDoc } from "firebase/firestore";
 import type { AffiliateDoc, UserProfile } from "@/types/profile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,15 @@ const AffiliateDashboard = () => {
 
   const fetchReferrals = async (affiliateCode: string) => {
     try {
-      const q = query(profilesColRef(db), where("referredBy", "==", affiliateCode));
-      const snap = await getDocs(q);
-      const list = snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile));
-      setReferrals(list);
+      const res = await fetch("/.netlify/functions/affiliate-referrals", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: affiliateCode }),
+      });
+      const data = await res.json();
+      if (data.referrals) {
+        setReferrals(data.referrals as UserProfile[]);
+      }
     } catch (err) {
       console.error("Erreur lors de la récupération des parrainages:", err);
     }
@@ -98,34 +103,21 @@ const AffiliateDashboard = () => {
     setError(null);
 
     try {
-      let affiliateDoc: AffiliateDoc | null = null;
-      let codeToUse = identifier.toUpperCase();
-
-      // 1. Essayer par code directement
-      const directSnap = await getDoc(affiliateDocRef(db, codeToUse));
-      if (directSnap.exists()) {
-        affiliateDoc = { id: directSnap.id, ...directSnap.data() } as AffiliateDoc;
-      } else {
-        // 2. Essayer par numéro WhatsApp
-        const { affiliatesColRef } = await import("@/lib/collections");
-        const q = query(affiliatesColRef(db), where("whatsapp", "==", identifier));
-        const snap = await getDocs(q);
-        if (!snap.empty) {
-          affiliateDoc = { id: snap.docs[0].id, ...snap.docs[0].data() } as AffiliateDoc;
-          codeToUse = affiliateDoc.code;
-        }
+      const res = await fetch("/.netlify/functions/affiliate-auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ identifier, password }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setError(data.error || "Identifiant ou mot de passe incorrect.");
+        return;
       }
-
-      if (affiliateDoc && (!affiliateDoc.password || affiliateDoc.password === password)) {
-        // Succès
-        localStorage.setItem("nack_affiliate_session", codeToUse);
-        setSessionCode(codeToUse);
-        setSearchParams({ code: codeToUse });
-      } else if (affiliateDoc) {
-        setError("Mot de passe incorrect.");
-      } else {
-        setError("Identifiant (code ou numéro) inconnu.");
-      }
+      const codeToUse = data.code as string;
+      localStorage.setItem("nack_affiliate_session", codeToUse);
+      setSessionCode(codeToUse);
+      setSearchParams({ code: codeToUse });
+      if (data.affiliate) setAffiliate(data.affiliate as AffiliateDoc);
     } catch (err) {
       console.error(err);
       setError("Erreur lors de la connexion.");

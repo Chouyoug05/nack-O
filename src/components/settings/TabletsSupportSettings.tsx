@@ -1,71 +1,25 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Smartphone, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
-import {
-  createSupportTicket,
-  getRememberedTabletImei,
-  listSupportTicketsByOwner,
-  listTabletsByOwner,
-  registerTablet,
-  type SupportTicketDoc,
-  type TabletDoc,
-} from "@/lib/tabletsSupport";
-
-function formatWhen(ts?: number) {
-  if (!ts) return "—";
-  try {
-    return new Date(ts).toLocaleString("fr-FR");
-  } catch {
-    return "—";
-  }
-}
+import { getAssignedTabletImei } from "@/lib/tabletsSupport";
 
 export function TabletsSettingsPanel() {
-  const { user, profile } = useAuth();
-  const { toast } = useToast();
-  const [imei, setImei] = useState("");
-  const [label, setLabel] = useState("Tablette principale");
-  const [tablets, setTablets] = useState<Array<TabletDoc & { id: string }>>([]);
-  const [loading, setLoading] = useState(false);
-
-  const reload = async () => {
-    if (!user) return;
-    const docs = await listTabletsByOwner(db, user.uid);
-    setTablets(docs);
-  };
+  const { profile } = useAuth();
+  const navigate = useNavigate();
+  const [assignedImei, setAssignedImei] = useState("");
 
   useEffect(() => {
-    if (!user) return;
-    setImei(getRememberedTabletImei(user.uid));
-    reload().catch(() => undefined);
-  }, [user]);
-
-  const onSave = async () => {
-    if (!user || !profile) return;
-    setLoading(true);
-    try {
-      await registerTablet(db, user.uid, profile, imei, label);
-      toast({ title: "Tablette enregistrée", description: "L'IMEI est enregistré pour le suivi technique." });
-      await reload();
-    } catch (e: unknown) {
-      toast({
-        title: "Erreur",
-        description: e instanceof Error ? e.message : "Enregistrement impossible",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+    setAssignedImei(getAssignedTabletImei(profile));
+  }, [profile]);
 
   return (
     <div className="space-y-6">
@@ -73,57 +27,33 @@ export function TabletsSettingsPanel() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Smartphone size={20} className="text-nack-red" />
-            Enregistrer une tablette
+            Tablette assignée
           </CardTitle>
           <CardDescription>
-            Saisissez l&apos;IMEI de la tablette pour permettre à l&apos;administrateur NACK de la retracer en cas de problème.
+            L&apos;assignation IMEI est effectuée par l&apos;administrateur NACK depuis Paramètres admin.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="tablet-imei">IMEI (14-15 chiffres)</Label>
-            <Input
-              id="tablet-imei"
-              inputMode="numeric"
-              maxLength={15}
-              className="font-mono"
-              placeholder="356789012345678"
-              value={imei}
-              onChange={(e) => setImei(e.target.value.replace(/\D/g, "").slice(0, 15))}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="tablet-label">Nom de la tablette</Label>
-            <Input
-              id="tablet-label"
-              placeholder="Ex: Tablette caisse"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-          </div>
-          <Button variant="nack" className="w-full" disabled={loading} onClick={onSave}>
-            {loading ? "Enregistrement…" : "Enregistrer cette tablette"}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="shadow-card border-0">
-        <CardHeader>
-          <CardTitle>Mes tablettes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {tablets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Aucune tablette enregistrée.</p>
-          ) : (
-            tablets.map((t) => (
-              <div key={t.id} className="rounded-lg border p-3 space-y-1">
-                <div className="font-semibold">{t.label || "Tablette"}</div>
-                <div className="text-sm text-muted-foreground font-mono">IMEI : {t.imei || t.id}</div>
-                <div className="text-xs text-muted-foreground">
-                  Dernière activité : {formatWhen(t.lastSeenAt)} • {t.status || "active"}
+          {assignedImei ? (
+            <>
+              <div className="rounded-lg border p-4 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold">{profile?.assignedTabletLabel || "Tablette NACK"}</span>
+                  <Badge className="bg-nack-red/10 text-nack-red border-nack-red/20">Assignée par NACK</Badge>
                 </div>
+                <div className="text-sm font-mono text-muted-foreground">IMEI : {assignedImei}</div>
+                <p className="text-sm text-muted-foreground">
+                  Ce compte reçoit les reçus, messages et notifications envoyés par l&apos;administrateur pour cette tablette.
+                </p>
               </div>
-            ))
+              <Button variant="nack" className="w-full" onClick={() => navigate("/tablet-inbox")}>
+                Ouvrir la boîte tablette
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Aucune tablette assignée à ce compte. Contactez l&apos;administrateur NACK pour qu&apos;il enregistre l&apos;IMEI de votre appareil.
+            </p>
           )}
         </CardContent>
       </Card>
@@ -137,17 +67,16 @@ export function SupportSettingsPanel() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [tabletImei, setTabletImei] = useState("");
-  const [tablets, setTablets] = useState<Array<TabletDoc & { id: string }>>([]);
-  const [tickets, setTickets] = useState<Array<SupportTicketDoc & { id: string }>>([]);
+  const [tickets, setTickets] = useState<Array<import("@/lib/tabletsSupport").SupportTicketDoc & { id: string }>>([]);
   const [loading, setLoading] = useState(false);
+
+  const assignedImei = getAssignedTabletImei(profile);
 
   const reload = async () => {
     if (!user) return;
-    const [tabDocs, ticketDocs] = await Promise.all([
-      listTabletsByOwner(db, user.uid),
-      listSupportTicketsByOwner(db, user.uid),
-    ]);
-    setTablets(tabDocs);
+    const ticketDocs = await import("@/lib/tabletsSupport").then((m) =>
+      m.listSupportTicketsByOwner(db, user.uid)
+    );
     setTickets(ticketDocs);
   };
 
@@ -159,7 +88,12 @@ export function SupportSettingsPanel() {
     if (!user || !profile) return;
     setLoading(true);
     try {
-      await createSupportTicket(db, user.uid, profile, { subject, message, tabletImei });
+      const { createSupportTicket } = await import("@/lib/tabletsSupport");
+      await createSupportTicket(db, user.uid, profile, {
+        subject,
+        message,
+        tabletImei: tabletImei || assignedImei,
+      });
       toast({ title: "Ticket envoyé", description: "L'administrateur NACK vous répondra bientôt." });
       setSubject("");
       setMessage("");
@@ -197,22 +131,11 @@ export function SupportSettingsPanel() {
               onChange={(e) => setSubject(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <Label>Tablette concernée</Label>
-            <Select value={tabletImei || "__none__"} onValueChange={(v) => setTabletImei(v === "__none__" ? "" : v)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir une tablette" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Aucune / non liée</SelectItem>
-                {tablets.map((t) => (
-                  <SelectItem key={t.id} value={t.imei || t.id}>
-                    {(t.label || "Tablette") + " (" + (t.imei || t.id) + ")"}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {assignedImei && (
+            <p className="text-sm text-muted-foreground">
+              Tablette assignée : <span className="font-mono">{assignedImei}</span>
+            </p>
+          )}
           <div className="space-y-2">
             <Label htmlFor="support-message">Message</Label>
             <Textarea
@@ -259,4 +182,13 @@ export function SupportSettingsPanel() {
       </Card>
     </div>
   );
+}
+
+function formatWhen(ts?: number) {
+  if (!ts) return "—";
+  try {
+    return new Date(ts).toLocaleString("fr-FR");
+  } catch {
+    return "—";
+  }
 }

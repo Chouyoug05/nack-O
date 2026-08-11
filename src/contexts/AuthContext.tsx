@@ -1,5 +1,6 @@
 ﻿import { createContext, useContext, useCallback, useEffect, useMemo, useState } from "react";
-import { getRememberedTabletImei, touchTabletLastSeen } from "@/lib/tabletsSupport";
+import { getAssignedTabletImei, touchTabletLastSeen } from "@/lib/tabletsSupport";
+import { syncPublicProfile } from "@/lib/publicProfile";
 import { auth, db } from "@/lib/firebase";
 import {
   GoogleAuthProvider,
@@ -354,6 +355,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (snap.exists()) {
         const data = snap.data() as UserProfile;
         setProfile(data);
+        syncPublicProfile(db, data).catch(() => undefined);
         if (data.establishments) {
           setEstablishments(data.establishments);
         }
@@ -376,10 +378,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     if (!user) return;
-    const imei = getRememberedTabletImei(user.uid);
+    const imei = getAssignedTabletImei(profile);
     if (!imei) return;
     touchTabletLastSeen(db, imei, user.uid).catch(() => undefined);
-  }, [user]);
+  }, [user, profile]);
 
   // Ã‰couter l'Ã©tablissement actif en temps rÃ©el
   useEffect(() => {
@@ -523,7 +525,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
     const clean = removeUndefinedFields(payload);
     await setDoc(ref, clean, { merge: true });
-    setProfile({ ...(profile || { uid: currentUser.uid, createdAt: now }), ...(clean as UserProfile) });
+    const merged = { ...(profile || { uid: currentUser.uid, createdAt: now }), ...(clean as UserProfile) };
+    setProfile(merged);
+    syncPublicProfile(db, merged).catch(() => undefined);
 
     // Sync avec l'Ã©tablissement actif
     const eid = payload.activeEstablishmentId || profile?.activeEstablishmentId;

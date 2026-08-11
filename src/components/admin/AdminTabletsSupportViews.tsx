@@ -65,6 +65,9 @@ export function AdminTabletsView({ search }: { search: string }) {
                 {t.ownerName || "—"} • {t.email || t.whatsapp || t.ownerUid} • Dernière activité {formatWhen(t.lastSeenAt)}
               </div>
               <Badge variant="secondary">{t.status || "active"}</Badge>
+              {t.assignedByAdmin && (
+                <Badge className="ml-2 bg-nack-red/10 text-nack-red border-nack-red/20">Assignée admin</Badge>
+              )}
             </div>
           ))
         )}

@@ -27,6 +27,10 @@ export type TabletDoc = {
   registeredAt: number;
   lastSeenAt: number;
   status: TabletStatus;
+  /** true = assignée par l'admin (mode tablette restreint pour le compte) */
+  assignedByAdmin?: boolean;
+  assignedByAdminUid?: string;
+  assignedAt?: number;
 };
 
 export type SupportTicketDoc = {
@@ -93,6 +97,69 @@ export async function registerTablet(
   };
   await setDoc(doc(tabletsColRef(db), imei), payload, { merge: true });
   return payload;
+}
+
+/** Assignation admin → compte utilisateur (seul cas activant le mode tablette). */
+export async function assignTabletByAdmin(
+  db: Firestore,
+  adminUid: string,
+  ownerUid: string,
+  profile: Partial<TabletDoc & { establishmentName?: string; ownerName?: string; email?: string; phone?: string; whatsapp?: string }>,
+  imeiInput: string,
+  label?: string
+) {
+  const imei = sanitizeImei(imeiInput);
+  if (!validateImei(imei)) throw new Error("IMEI invalide (14 ou 15 chiffres requis)");
+  const now = Date.now();
+  const payload: TabletDoc = {
+    imei,
+    ownerUid,
+    establishmentName: profile.establishmentName || "",
+    ownerName: profile.ownerName || "",
+    email: profile.email || "",
+    phone: profile.phone || "",
+    whatsapp: profile.whatsapp || "",
+    label: label || "Tablette NACK",
+    userAgent: "",
+    platform: "",
+    registeredAt: now,
+    lastSeenAt: now,
+    status: "active",
+    assignedByAdmin: true,
+    assignedByAdminUid: adminUid,
+    assignedAt: now,
+  };
+  await setDoc(doc(tabletsColRef(db), imei), payload, { merge: true });
+  await updateDoc(doc(db, "profiles", ownerUid), {
+    assignedTabletImei: imei,
+    assignedTabletLabel: label || "Tablette NACK",
+    updatedAt: now,
+  });
+  return payload;
+}
+
+export async function unassignTabletByAdmin(db: Firestore, ownerUid: string, imeiInput: string) {
+  const imei = sanitizeImei(imeiInput);
+  if (!imei) throw new Error("IMEI requis");
+  await updateDoc(doc(db, "profiles", ownerUid), {
+    assignedTabletImei: null,
+    assignedTabletLabel: null,
+    updatedAt: Date.now(),
+  });
+  await updateDoc(doc(tabletsColRef(db), imei), {
+    assignedByAdmin: false,
+    status: "blocked",
+    updatedAt: Date.now(),
+  }).catch(() => undefined);
+}
+
+export async function listAdminAssignedTablets(db: Firestore) {
+  const all = await listAllTablets(db);
+  return all.filter((t) => t.assignedByAdmin === true && t.status !== "blocked");
+}
+
+export function getAssignedTabletImei(profile: { assignedTabletImei?: string | null } | null | undefined): string {
+  return sanitizeImei(profile?.assignedTabletImei || "");
 }
 
 export async function touchTabletLastSeen(db: Firestore, imeiInput: string, ownerUid: string) {

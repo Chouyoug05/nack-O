@@ -37,7 +37,7 @@ const EventPopup = ({ event, isOpen, onClose }: EventPopupProps) => {
     const fetchOwnerProfile = async () => {
       if (event.ownerUid) {
         try {
-          const profileRef = doc(db, 'profiles', event.ownerUid);
+          const profileRef = doc(db, 'publicProfiles', event.ownerUid);
           const profileSnap = await getDoc(profileRef);
           if (profileSnap.exists()) {
             const data = profileSnap.data();

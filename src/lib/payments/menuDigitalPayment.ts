@@ -1,36 +1,39 @@
-/**
- * Fonctions de paiement pour les commandes Menu Digital
- * Utilise SingPay avec Disbursement ID pour recevoir l'argent sur Airtel Money
- */
-
 import { createSubscriptionPaymentLink, type CreatePaymentLinkParams } from "./singpay";
 
 export interface CreateMenuDigitalPaymentParams {
-  amount: number; // Montant en XAF
+  amount: number;
   reference: string;
   redirectSuccess: string;
   redirectError: string;
   logoURL: string;
-  disbursementId: string; // Disbursement ID de l'établissement
+  establishmentId: string;
+  transactionId: string;
+  orderData: Record<string, unknown>;
 }
 
 /**
- * Crée un lien de paiement pour une commande Menu Digital
- * L'argent sera automatiquement transféré sur le compte Airtel Money de l'établissement
+ * Crée un paiement menu digital via le serveur (disbursementId jamais exposé au client).
  */
 export async function createMenuDigitalPaymentLink(
   params: CreateMenuDigitalPaymentParams
 ): Promise<string> {
-  const paymentParams: CreatePaymentLinkParams = {
+  const { initMenuPaymentViaServer } = await import("@/lib/securePayment");
+  const result = await initMenuPaymentViaServer({
+    establishmentId: params.establishmentId,
     amount: params.amount,
     reference: params.reference,
+    transactionId: params.transactionId,
     redirectSuccess: params.redirectSuccess,
     redirectError: params.redirectError,
     logoURL: params.logoURL,
-    isTransfer: false,
-    disbursement: params.disbursementId, // Utiliser le Disbursement ID de l'établissement
-  };
-
-  return await createSubscriptionPaymentLink(paymentParams);
+    orderData: params.orderData,
+  });
+  return result.link;
 }
 
+/** Abonnements — proxy Netlify existant (utilisateur authentifié). */
+export async function createSubscriptionPaymentLinkFromParams(
+  params: CreatePaymentLinkParams & { disbursement?: string }
+): Promise<string> {
+  return createSubscriptionPaymentLink(params);
+}

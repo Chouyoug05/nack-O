@@ -1,7 +1,7 @@
 import { db } from "./firebase";
-import { profilesColRef } from "./collections";
+import { publicProfilesColRef } from "./collections";
 import { query, where, getDocs, orderBy, onSnapshot } from "firebase/firestore";
-import type { UserProfile } from "@/types/profile";
+import type { PublicProfile } from "@/lib/publicProfile";
 
 /**
  * Interface pour un établissement avec localisation
@@ -46,7 +46,7 @@ export async function getAllEstablishmentsWithLocation(): Promise<EstablishmentW
   try {
     // Essayer d'abord avec une requête optimisée (si index existe)
     const q = query(
-      profilesColRef(db),
+      publicProfilesColRef(db),
       where("latitude", "!=", null),
       where("longitude", "!=", null),
       orderBy("establishmentName")
@@ -56,7 +56,7 @@ export async function getAllEstablishmentsWithLocation(): Promise<EstablishmentW
     const establishments: EstablishmentWithLocation[] = [];
 
     snapshot.forEach((doc) => {
-      const data = doc.data() as UserProfile;
+      const data = doc.data() as PublicProfile;
       if (data.latitude && data.longitude) {
         establishments.push({
           uid: data.uid,
@@ -76,12 +76,12 @@ export async function getAllEstablishmentsWithLocation(): Promise<EstablishmentW
     console.error("Erreur lors de la récupération des établissements:", error);
     // Si la requête avec where échoue (index manquant), récupérer tous les profils et filtrer
     try {
-      const q = query(profilesColRef(db), orderBy("establishmentName"));
+      const q = query(publicProfilesColRef(db), orderBy("establishmentName"));
       const snapshot = await getDocs(q);
       const establishments: EstablishmentWithLocation[] = [];
 
       snapshot.forEach((doc) => {
-        const data = doc.data() as UserProfile;
+        const data = doc.data() as PublicProfile;
         // Accepter les établissements avec adresse même sans coordonnées GPS
         if ((data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') || data.address) {
           establishments.push({
@@ -117,7 +117,7 @@ export function subscribeToEstablishmentsWithLocation(
   // Essayer d'abord avec une requête optimisée
   try {
     const q = query(
-      profilesColRef(db),
+      publicProfilesColRef(db),
       where("latitude", "!=", null),
       where("longitude", "!=", null),
       orderBy("establishmentName")
@@ -128,7 +128,7 @@ export function subscribeToEstablishmentsWithLocation(
       (snapshot) => {
         const establishments: EstablishmentWithLocation[] = [];
         snapshot.forEach((doc) => {
-          const data = doc.data() as UserProfile;
+          const data = doc.data() as PublicProfile;
           if (data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
             establishments.push({
               uid: data.uid,
@@ -149,13 +149,13 @@ export function subscribeToEstablishmentsWithLocation(
       (error) => {
         console.error("Erreur lors de l'écoute des établissements:", error);
         // Fallback: récupérer tous les profils et filtrer (inclure ceux avec adresse même sans GPS)
-        const q = query(profilesColRef(db), orderBy("establishmentName"));
+        const q = query(publicProfilesColRef(db), orderBy("establishmentName"));
         return onSnapshot(
           q,
           (snapshot) => {
             const establishments: EstablishmentWithLocation[] = [];
             snapshot.forEach((doc) => {
-              const data = doc.data() as UserProfile;
+              const data = doc.data() as PublicProfile;
               // Accepter les établissements avec coordonnées GPS OU avec adresse
               if ((data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') || data.address) {
                 establishments.push({
@@ -183,11 +183,11 @@ export function subscribeToEstablishmentsWithLocation(
     );
   } catch (error) {
     // Fallback immédiat si la requête n'est pas supportée
-    const q = query(profilesColRef(db), orderBy("establishmentName"));
+    const q = query(publicProfilesColRef(db), orderBy("establishmentName"));
     return onSnapshot(q, (snapshot) => {
       const establishments: EstablishmentWithLocation[] = [];
       snapshot.forEach((doc) => {
-        const data = doc.data() as UserProfile;
+        const data = doc.data() as PublicProfile;
         // Accepter les établissements avec coordonnées GPS OU avec adresse
         if ((data.latitude && data.longitude && typeof data.latitude === 'number' && typeof data.longitude === 'number') || data.address) {
           establishments.push({

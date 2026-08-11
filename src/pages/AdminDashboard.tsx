@@ -46,6 +46,7 @@ import {
 import type { DisbursementRequest } from "@/types/payment";
 import QRCode from "qrcode";
 import { AdminSupportView, AdminTabletsView } from "@/components/admin/AdminTabletsSupportViews";
+import { AdminSettingsTabletsPanel } from "@/components/admin/AdminSettingsTabletsPanel";
 
 function AffiliateQRCell({ url }: { url: string }) {
   const [src, setSrc] = useState<string | null>(null);
@@ -173,10 +174,10 @@ const AdminDashboard = () => {
 
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
-  const initialView = (viewParam && ['menu', 'users', 'tablets', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam))
+  const initialView = (viewParam && ['menu', 'users', 'tablets', 'settings', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam))
     ? viewParam as typeof activeView
     : 'menu';
-  const [activeView, setActiveView] = useState<"menu" | "users" | "tablets" | "support" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "customers" | "disbursements" | "affiliates">(initialView);
+  const [activeView, setActiveView] = useState<"menu" | "users" | "tablets" | "settings" | "support" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "customers" | "disbursements" | "affiliates">(initialView);
   const [isSendingNotifications, setIsSendingNotifications] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState<{
     transition: { name: string; price: number; features: SubscriptionFeatures };
@@ -200,7 +201,7 @@ const AdminDashboard = () => {
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
     const viewParam = searchParams.get('view');
-    if (viewParam && ['menu', 'users', 'tablets', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam)) {
+    if (viewParam && ['menu', 'users', 'tablets', 'settings', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam)) {
       setActiveView(viewParam as typeof activeView);
     }
   }, [searchParams]);
@@ -833,6 +834,12 @@ const AdminDashboard = () => {
         disbursementStatus: 'approved',
         updatedAt: Date.now(),
       });
+
+      const profileSnap = await getDoc(doc(db, 'profiles', userId));
+      if (profileSnap.exists()) {
+        const { syncPublicProfile } = await import('@/lib/publicProfile');
+        await syncPublicProfile(db, { uid: userId, ...(profileSnap.data() as UserProfile) });
+      }
 
       // Envoyer une notification à l'utilisateur
       const profile = allProfiles.find(p => p.uid === userId);
@@ -1979,12 +1986,20 @@ const AdminDashboard = () => {
           <p className="text-sm text-muted-foreground">{stats.total} total</p>
         </button>
         <button
+          onClick={() => navigate('/admin?view=settings')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <Settings size={48} className="text-slate-700 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Paramètres</h2>
+          <p className="text-sm text-muted-foreground">Tablettes & IMEI</p>
+        </button>
+        <button
           onClick={() => navigate('/admin?view=tablets')}
           className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
         >
-          <Smartphone size={48} className="text-slate-700 transition-transform group-hover:scale-110" />
-          <h2 className="text-lg font-semibold text-gray-900">Tablettes</h2>
-          <p className="text-sm text-muted-foreground">Suivi IMEI</p>
+          <Smartphone size={48} className="text-gray-500 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Suivi IMEI</h2>
+          <p className="text-sm text-muted-foreground">Lecture seule</p>
         </button>
         <button
           onClick={() => navigate('/admin?view=support')}
@@ -3668,6 +3683,11 @@ const AdminDashboard = () => {
       {activeView === "tablets" && (
         <div className="p-4 md:p-6">
           <AdminTabletsView search={search} />
+        </div>
+      )}
+      {activeView === "settings" && (
+        <div className="p-4 md:p-6">
+          <AdminSettingsTabletsPanel search={search} />
         </div>
       )}
       {activeView === "support" && (
