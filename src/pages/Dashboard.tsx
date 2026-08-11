@@ -15,8 +15,8 @@ import {
 } from "lucide-react";
 import { Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { isFoodBusiness as _isFoodBusiness, isServiceBusiness as _isServiceBusiness, isBoutique as _isBoutique } from "@/constants/establishmentTypes";
-import BoutiqueHub from "@/components/pages/BoutiqueHub";
+import { isFoodBusiness as _isFoodBusiness } from "@/constants/establishmentTypes";
+import { getDashboardCopy, getVisibleDashboardKeys, type DashboardActionKey } from "@/lib/dashboardCopy";
 import SalesPage from "@/components/pages/SalesPage";
 import StockPage from "@/components/pages/StockPage";
 import ReportsPage from "@/components/pages/ReportsPage";
@@ -64,10 +64,10 @@ const fallbackStats: StatCard[] = [
   },
 ];
 
-type ActionKey = "sales" | "stock" | "reports" | "profile" | "team" | "bar-connectee" | "events" | "customers";
+type ActionKey = Exclude<DashboardActionKey, "logout">;
 
 type MenuCard = {
-  key: ActionKey | "logout";
+  key: DashboardActionKey;
   title: string;
   description: string;
   icon: ComponentType<{ size?: number | string; className?: string }>;
@@ -76,97 +76,40 @@ type MenuCard = {
   accentColor: string;
 };
 
-const menuCards: MenuCard[] = [
-  {
-    key: "stock",
-    title: "Stock",
-    description: "",
-    icon: Package,
-    hint: "",
-    accentBg: "",
-    accentColor: "text-[#6F42C1]",
-  },
-  {
-    key: "sales",
-    title: "Vente",
-    description: "",
-    icon: ShoppingCart,
-    hint: "",
-    accentBg: "",
-    accentColor: "text-[#28A745]",
-  },
-  {
-    key: "reports",
-    title: "Rapport",
-    description: "",
-    icon: BarChart3,
-    hint: "",
-    accentBg: "",
-    accentColor: "text-[#0D6EFD]",
-  },
-  {
-    key: "team",
-    title: "Équipe",
-    description: "",
-    icon: Users,
-    hint: "Gérer",
-    accentBg: "",
-    accentColor: "text-[#0D6EFD]",
-  },
-  {
-    key: "bar-connectee",
-    title: "Menu Digital",
-    description: "",
-    icon: QrCode,
-    hint: "QR",
-    accentBg: "",
-    accentColor: "text-[#FD7E14]",
-  },
-  {
-    key: "events",
-    title: "Événements",
-    description: "",
-    icon: Calendar,
-    hint: "",
-    accentBg: "",
-    accentColor: "text-[#E91E63]",
-  },
-  {
-    key: "customers",
-    title: "Clients",
-    description: "Favoris & Fidélité",
-    icon: Heart,
-    hint: "",
-    accentBg: "",
-    accentColor: "text-[#FF6B9D]",
-  },
-  {
-    key: "profile",
-    title: "Mon Profil",
-    description: "",
-    icon: User2,
-    hint: "",
-    accentBg: "",
-    accentColor: "text-[#6C757D]",
-  },
-  {
-    key: "logout",
-    title: "Déconnexion",
-    description: "",
-    icon: LogOut,
-    hint: "",
-    accentBg: "",
-    accentColor: "text-[#DC3545]",
-  },
-];
+const MENU_CARD_META: Record<
+  DashboardActionKey,
+  Omit<MenuCard, "key" | "title" | "description" | "hint">
+> = {
+  stock: { icon: Package, accentBg: "", accentColor: "text-[#6F42C1]" },
+  sales: { icon: ShoppingCart, accentBg: "", accentColor: "text-[#28A745]" },
+  reports: { icon: BarChart3, accentBg: "", accentColor: "text-[#0D6EFD]" },
+  team: { icon: Users, accentBg: "", accentColor: "text-[#0D6EFD]" },
+  "bar-connectee": { icon: QrCode, accentBg: "", accentColor: "text-[#FD7E14]" },
+  events: { icon: Calendar, accentBg: "", accentColor: "text-[#E91E63]" },
+  customers: { icon: Heart, accentBg: "", accentColor: "text-[#FF6B9D]" },
+  profile: { icon: User2, accentBg: "", accentColor: "text-[#6C757D]" },
+  logout: { icon: LogOut, accentBg: "", accentColor: "text-[#DC3545]" },
+};
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { logout, user, profile } = useAuth();
   const isFoodBusiness = _isFoodBusiness(profile?.establishmentType);
-  const isServiceBusiness = _isServiceBusiness(profile?.establishmentType);
-  const isBoutique = _isBoutique(profile?.establishmentType);
-  const isSimpleBusiness = isBoutique || isServiceBusiness;
+  const dashCopy = getDashboardCopy(profile?.establishmentType);
+  const visibleKeys = getVisibleDashboardKeys(profile?.establishmentType);
+
+  const menuCards: MenuCard[] = visibleKeys.map((key) => {
+    const meta = MENU_CARD_META[key];
+    const labels = dashCopy.tiles[key];
+    return {
+      key,
+      title: labels.title,
+      description: labels.description || "",
+      hint: labels.hint,
+      ...meta,
+    };
+  });
+
   const [activeAction, setActiveAction] = useState<ActionKey | "menu">("menu");
   const [statsValues, setStatsValues] = useState({
     salesToday: 0,
@@ -270,15 +213,15 @@ const Dashboard = () => {
 
   const stats: StatCard[] = [
     {
-      label: "Vente du jour",
+      label: dashCopy.kpiSales,
       value: `${statsValues.salesToday.toLocaleString()} XAF`,
     },
     {
-      label: "Produits en stock",
+      label: dashCopy.kpiStock,
       value: String(statsValues.productsCount),
     },
     {
-      label: "Équipe active",
+      label: dashCopy.kpiTeam,
       value: String(statsValues.teamCount),
     },
   ];
@@ -522,9 +465,6 @@ const Dashboard = () => {
       {activeAction === "menu" ? (
         <main className="p-4 md:p-6 lg:p-8 pt-2 md:pt-4 lg:pt-6 flex-1">
           <div className="w-full max-w-7xl mx-auto">
-            {isSimpleBusiness ? (
-              <BoutiqueHub onNavigate={(action) => setActiveAction(action as ActionKey)} />
-            ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4 md:gap-6 lg:gap-8">
                 {menuCards.map(({ key, title, icon: Icon, hint, accentColor }) => (
                   <button
@@ -553,7 +493,6 @@ const Dashboard = () => {
                   </button>
                 ))}
               </div>
-            )}
           </div>
         </main>
       ) : (

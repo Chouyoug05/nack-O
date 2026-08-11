@@ -27,6 +27,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { syncPublicProfile } from "@/lib/publicProfile";
 import { isFoodBusiness as _isFoodBusiness, isBoutique as _isBoutique, isServiceBusiness as _isServiceBusiness } from "@/constants/establishmentTypes";
+import { getDashboardCopy } from "@/lib/dashboardCopy";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
 import { clipboardCopy } from "@/lib/clipboard";
@@ -90,6 +91,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   const isBoutique = _isBoutique(profile?.establishmentType);
   const isServiceBusiness = _isServiceBusiness(profile?.establishmentType);
   const isSimpleBusiness = !isFoodBusiness;
+  const dashCopy = getDashboardCopy(profile?.establishmentType);
   // State local pour gérer les onglets si pas fourni en props
   const [localActiveTab, setLocalActiveTab] = useState<string>("qr-code");
 
@@ -812,9 +814,9 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               }
             }}
           >
-            {isFoodBusiness ? "Menu Digital" : "Catalogue Connecté"}
+            {dashCopy.catalogPageTitle}
           </h2>
-          <p className="text-sm text-muted-foreground">Gérez les commandes QR de vos clients</p>
+          <p className="text-sm text-muted-foreground">{dashCopy.catalogPageSubtitle}</p>
         </div>
       </div>
 
