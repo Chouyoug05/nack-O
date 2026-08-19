@@ -507,8 +507,8 @@ const PaymentSuccess = () => {
           </div>
         )}
         <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg text-sm text-blue-800">
-          <p className="font-semibold mb-1">💳 Paiement par Airtel Money</p>
-          <p className="text-xs">Le paiement est disponible uniquement via <strong>Airtel Money</strong> pour le moment.</p>
+          <p className="font-semibold mb-1">💳 Paiement par SingPay</p>
+          <p className="text-xs">Le paiement est traité par SingPay : Airtel Money, Moov Money, etc.</p>
         </div>
       </div>
     </div>

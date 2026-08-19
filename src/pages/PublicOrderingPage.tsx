@@ -84,6 +84,7 @@ const PublicOrderingPage = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedTable, setSelectedTable] = useState<string>("");
   const [showTableDialog, setShowTableDialog] = useState(false);
+  const [showPaymentChoiceDialog, setShowPaymentChoiceDialog] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string>("");
   const [receiptQR, setReceiptQR] = useState<string>("");
@@ -443,6 +444,32 @@ const PublicOrderingPage = () => {
     setShowAirtelNumberDialog(false);
     setAirtelNumberInput("");
     alert('Le paiement en ligne n\'est pas encore disponible pour cet établissement. L\'établissement doit configurer son Disbursement ID depuis son interface d\'administration. Vous pouvez commander sans paiement pour l\'instant.');
+  };
+
+  // Valider la table/livraison puis demander le choix de paiement (en ligne ou sur place)
+  const proceedToCheckout = () => {
+    if (!isDelivery && !selectedTable) {
+      alert('Veuillez sélectionner une table ou activer la livraison.');
+      setShowTableDialog(true);
+      return;
+    }
+    if (isDelivery && !deliveryAddress.trim()) {
+      alert('Veuillez saisir votre adresse de livraison.');
+      setShowTableDialog(true);
+      return;
+    }
+    setShowPaymentChoiceDialog(true);
+  };
+
+  // Paiement en ligne direct (SingPay) quand le choix est déjà fait
+  const payOnline = () => {
+    setShowPaymentChoiceDialog(false);
+    if (!establishment?.paymentsEnabled) {
+      alert('Les paiements en ligne ne sont pas encore activés pour cet établissement. Vous pouvez commander et payer sur place.');
+      placeOrder(false);
+      return;
+    }
+    void placeOrder(true);
   };
 
   const placeOrder = async (withPayment: boolean = false) => {
@@ -969,7 +996,7 @@ const PublicOrderingPage = () => {
                   if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
                     setShowTableDialog(true);
                   } else {
-                    placeOrder(false);
+                    proceedToCheckout();
                   }
                 }}
                 variant="outline"
@@ -978,31 +1005,6 @@ const PublicOrderingPage = () => {
               >
                 Commander
               </Button>
-              {establishment?.paymentsEnabled && (
-                <div className="flex flex-col items-stretch sm:items-end gap-1 flex-1 sm:flex-none">
-                  <Button
-                    onClick={() => {
-                      if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
-                        setShowTableDialog(true);
-                      } else {
-                        placeOrder(true);
-                      }
-                    }}
-                    disabled={isProcessingPayment}
-                    className="px-4 sm:px-6 text-white text-sm sm:text-base w-full sm:w-auto"
-                    style={{ backgroundColor: menuTheme.primaryColor }}
-                  >
-                    {isProcessingPayment ? 'Traitement...' : (
-                      <>
-                        <CreditCard className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-                        <span className="hidden sm:inline">Payer </span>
-                        {total.toLocaleString('fr-FR')} XAF
-                      </>
-                    )}
-                  </Button>
-                  <p className="text-xs text-gray-500 text-center sm:text-right">💳 Airtel Money uniquement</p>
-                </div>
-              )}
             </div>
           </div>
         </footer>
@@ -1165,40 +1167,97 @@ const PublicOrderingPage = () => {
                   onClick={() => {
                     if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
                       setShowTableDialog(false);
-                      placeOrder(false);
+                      proceedToCheckout();
                     }
                   }}
                   disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable)}
-                  variant="outline"
-                  className="flex-1"
-                  style={{ borderColor: menuTheme.primaryColor, color: menuTheme.primaryColor }}
+                  className="flex-1 text-white"
+                  style={{ backgroundColor: menuTheme.primaryColor }}
                 >
-                  Commander
+                  Continuer
                 </Button>
-                {establishment?.paymentsEnabled && (
-                  <div className="flex-1 flex flex-col gap-1">
-                    <Button
-                      onClick={() => {
-                        if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
-                          setShowTableDialog(false);
-                          placeOrder(true);
-                        }
-                      }}
-                      disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable) || isProcessingPayment}
-                      className="w-full text-white"
-                      style={{ backgroundColor: menuTheme.primaryColor }}
-                    >
-                      {isProcessingPayment ? '...' : (
-                        <>
-                          <CreditCard className="w-4 h-4 mr-2" />
-                          Payer
-                        </>
-                      )}
-                    </Button>
-                    <p className="text-xs text-center text-gray-500">💳 Airtel Money uniquement</p>
-                  </div>
-                )}
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog choix de paiement : en ligne (SingPay) ou sur place */}
+      <Dialog open={showPaymentChoiceDialog} onOpenChange={setShowPaymentChoiceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2" style={{ color: menuTheme.primaryColor }}>
+              <CreditCard className="w-5 h-5" />
+              Comment souhaitez-vous payer ?
+            </DialogTitle>
+            <DialogDescription>
+              {isDelivery ? 'Choisissez le mode de paiement pour votre livraison.' : 'Choisissez le mode de paiement pour votre commande.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={payOnline}
+              onKeyDown={(e) => { if (e.key === 'Enter') payOnline(); }}
+              className="flex items-start gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all hover:shadow-md"
+              style={{ borderColor: menuTheme.primaryColor }}
+            >
+              <div className="mt-1">
+                <CreditCard className="w-5 h-5" style={{ color: menuTheme.primaryColor }} />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold">Payer en ligne à la commande</p>
+                <p className="text-sm text-gray-600">
+                  {isDelivery
+                    ? 'Réglez maintenant en ligne via SingPay, la livraison est déjà payée.'
+                    : 'Réglez immédiatement en ligne via SingPay.'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">💳 Airtel Money, Moov Money, etc.</p>
+              </div>
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setShowPaymentChoiceDialog(false);
+                void placeOrder(false);
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setShowPaymentChoiceDialog(false); void placeOrder(false); } }}
+              className="flex items-start gap-3 rounded-xl border-2 border-gray-200 p-4 cursor-pointer transition-all hover:shadow-md"
+            >
+              <div className="mt-1">
+                <ShoppingBag className="w-5 h-5 text-gray-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold">Payer sur place</p>
+                <p className="text-sm text-gray-600">
+                  {isDelivery
+                    ? 'Réglez à la réception de votre commande.'
+                    : 'Réglez directement à votre table, au comptoir ou à la caisse.'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowPaymentChoiceDialog(false)}
+                className="flex-1"
+              >
+                Retour
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowPaymentChoiceDialog(false);
+                  void placeOrder(false);
+                }}
+                className="flex-1 text-white"
+                style={{ backgroundColor: menuTheme.primaryColor }}
+              >
+                Commander sur place
+              </Button>
             </div>
           </div>
         </DialogContent>
