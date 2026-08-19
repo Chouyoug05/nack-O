@@ -76,3 +76,54 @@ export function isBoutique(value: string | undefined | null): boolean {
 export function isSimpleBusiness(value: string | undefined | null): boolean {
   return isBoutique(value) || isServiceBusiness(value);
 }
+
+/**
+ * Catégories de produits proposées selon le type d'établissement.
+ * - Restauration & Bar : uniquement les catégories alimentaires/boissons.
+ * - Boutique / Commerce : catégories marchandises (vêtements, accessoires...).
+ * - Services : catégories génériques.
+ * "Autre" est toujours présent pour ne jamais bloquer la création de produit.
+ */
+export function getCategoriesForEstablishment(value: string | undefined | null): string[] {
+  if (isFoodBusiness(value)) {
+    return [
+      "Boisson alcoolisée",
+      "Boisson non alcoolisée",
+      "Plat / Repas",
+      "Snack",
+      "Dessert",
+      "Entrée",
+      "Autre",
+    ];
+  }
+  if (isBoutique(value)) {
+    return [
+      "Vêtements",
+      "Accessoires",
+      "Chaussures",
+      "Maison & Déco",
+      "Cosmétiques",
+      "Électronique",
+      "Jeux & Jouets",
+      "Alimentation",
+      "Autre",
+    ];
+  }
+  return [
+    "Boisson alcoolisée",
+    "Boisson non alcoolisée",
+    "Plat / Repas",
+    "Snack",
+    "Dessert",
+    "Entrée",
+    "Vêtements",
+    "Accessoires",
+    "Chaussures",
+    "Maison & Déco",
+    "Cosmétiques",
+    "Électronique",
+    "Jeux & Jouets",
+    "Alimentation",
+    "Autre",
+  ];
+}

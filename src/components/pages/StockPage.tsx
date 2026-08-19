@@ -45,7 +45,13 @@ import {
   Copy,
   Download,
   ArrowDown,
-  ArrowUp
+  ArrowUp,
+  Watch,
+  Footprints,
+  Home,
+  Smartphone,
+  Gamepad2,
+  ShoppingBasket
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -59,6 +65,7 @@ import { searchGoogleImages } from "@/utils/productImageSearch";
 import { sha256Hex } from "@/lib/sha256";
 import ManagerAuthDialog from "@/components/ManagerAuthDialog";
 import { useManagerAuth } from "@/hooks/useManagerAuth";
+import { getCategoriesForEstablishment } from "@/constants/establishmentTypes";
 
 interface Product {
   id: string;
@@ -293,7 +300,7 @@ const StockPage = () => {
     }
   };
 
-  const categories = ["Boisson alcoolisée", "Boisson non alcoolisée", "Plat / Repas", "Snack", "Dessert", "Entrée", "Vêtements", "Accessoires", "Chaussures", "Maison & Déco", "Cosmétiques", "Électronique", "Jeux & Jouets", "Alimentation", "Autre"];
+  const categories = getCategoriesForEstablishment(profile?.establishmentType);
 
   const subCategories: Record<string, string[]> = {
     "Vêtements": ["T-shirts", "Chemises", "Pantalons", "Robes", "Shorts", "Sweats", "Manteaux", "Sous-vêtements", "Sport", "Autre"],
@@ -1531,15 +1538,24 @@ const StockPage = () => {
                 <h3 className="text-2xl font-bold text-center">Qu'est-ce que c'est ?</h3>
                 <p className="text-center text-muted-foreground text-lg">Choisissez le type de produit</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {[
-                    { cat: "Boisson alcoolisée", icon: Wine, color: "bg-purple-50 border-purple-200 hover:bg-purple-100" },
-                    { cat: "Boisson non alcoolisée", icon: GlassWater, color: "bg-blue-50 border-blue-200 hover:bg-blue-100" },
-                    { cat: "Plat / Repas", icon: Pizza, color: "bg-orange-50 border-orange-200 hover:bg-orange-100" },
-                    { cat: "Snack", icon: Cookie, color: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" },
-                    { cat: "Dessert", icon: IceCream, color: "bg-pink-50 border-pink-200 hover:bg-pink-100" },
-                    { cat: "Entrée", icon: Utensils, color: "bg-green-50 border-green-200 hover:bg-green-100" },
-                    { cat: "Autre", icon: Package, color: "bg-slate-50 border-slate-200 hover:bg-slate-100" }
-                  ].map(({ cat, icon: Icon, color }) => (
+{[
+                      { cat: "Boisson alcoolisée", icon: Wine, color: "bg-purple-50 border-purple-200 hover:bg-purple-100" },
+                      { cat: "Boisson non alcoolisée", icon: GlassWater, color: "bg-blue-50 border-blue-200 hover:bg-blue-100" },
+                      { cat: "Plat / Repas", icon: Pizza, color: "bg-orange-50 border-orange-200 hover:bg-orange-100" },
+                      { cat: "Snack", icon: Cookie, color: "bg-yellow-50 border-yellow-200 hover:bg-yellow-100" },
+                      { cat: "Dessert", icon: IceCream, color: "bg-pink-50 border-pink-200 hover:bg-pink-100" },
+                      { cat: "Entrée", icon: Utensils, color: "bg-green-50 border-green-200 hover:bg-green-100" },
+                      { cat: "Vêtements", icon: Shirt, color: "bg-indigo-50 border-indigo-200 hover:bg-indigo-100" },
+                      { cat: "Accessoires", icon: Watch, color: "bg-amber-50 border-amber-200 hover:bg-amber-100" },
+                      { cat: "Chaussures", icon: Footprints, color: "bg-teal-50 border-teal-200 hover:bg-teal-100" },
+                      { cat: "Maison & Déco", icon: Home, color: "bg-rose-50 border-rose-200 hover:bg-rose-100" },
+                      { cat: "Cosmétiques", icon: Sparkles, color: "bg-fuchsia-50 border-fuchsia-200 hover:bg-fuchsia-100" },
+                      { cat: "Électronique", icon: Smartphone, color: "bg-cyan-50 border-cyan-200 hover:bg-cyan-100" },
+                      { cat: "Jeux & Jouets", icon: Gamepad2, color: "bg-lime-50 border-lime-200 hover:bg-lime-100" },
+                      { cat: "Alimentation", icon: ShoppingBasket, color: "bg-emerald-50 border-emerald-200 hover:bg-emerald-100" },
+                      { cat: "Autre", icon: Package, color: "bg-slate-50 border-slate-200 hover:bg-slate-100" }
+].filter(({ cat }) => categories.includes(cat) || (editingProduct && cat === newProduct.category))
+                    .map(({ cat, icon: Icon, color }) => (
                     <button
                       key={cat}
                       type="button"
@@ -1553,6 +1569,17 @@ const StockPage = () => {
                       <span className="text-lg font-semibold">{cat}</span>
                     </button>
                   ))}
+                  {editingProduct && newProduct.category && !categories.includes(newProduct.category) && (
+                    <button
+                      key={`current-${newProduct.category}`}
+                      type="button"
+                      onClick={() => setFormStep(2)}
+                      className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 p-6 transition-all ring-4 ring-green-500 ${newProduct.category === 'Autre' ? 'bg-slate-50 border-slate-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}
+                    >
+                      <Package size={48} className="text-gray-700" />
+                      <span className="text-lg font-semibold">{newProduct.category}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}
