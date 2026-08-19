@@ -189,10 +189,10 @@ const Dashboard = () => {
       }
     ));
 
-    // Menu Digital pending orders count
+    // Menu Digital pending orders count (source de vérité : orders source 'qr')
     try {
-      const barOrdersRef = collection(db, `profiles/${user.uid}/barOrders`);
-      const pendingQ = query(barOrdersRef, where('status', '==', 'pending'));
+      const barOrdersRef = collection(db, `profiles/${user.uid}/orders`);
+      const pendingQ = query(barOrdersRef, where('status', '==', 'pending'), where('source', '==', 'qr'));
       unsubs.push(onSnapshot(pendingQ, (snap) => setBarPendingCount(snap.size)));
     } catch {
       setBarPendingCount(0);

@@ -356,15 +356,16 @@ const AdminDashboard = () => {
             }
           });
 
-          // Commandes normales
+          // Commandes normales (orders hors source 'qr')
           const ordersRef = ordersColRef(db, profile.uid);
           const ordersSnap = await getDocs(ordersRef);
-          totalOrders += ordersSnap.size;
+          const allOrdersDocs = ordersSnap.docs;
+          totalOrders += allOrdersDocs.filter(d => (d.data() as { source?: string }).source !== 'qr').length;
 
-          // Commandes Bar Connectée
+          // Commandes Bar Connectée / Menu Digital (orders source 'qr' + legacy barOrders)
           const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
           const barOrdersSnap = await getDocs(barOrdersRef);
-          totalBarOrders += barOrdersSnap.size;
+          totalBarOrders += allOrdersDocs.filter(d => (d.data() as { source?: string }).source === 'qr').length + barOrdersSnap.size;
 
           // Événements
           const eventsRef = eventsColRef(db, profile.uid);
@@ -465,7 +466,7 @@ const AdminDashboard = () => {
     }
     setIsLoadingOrders(true);
     try {
-      const orders: Array<{ id: string; orderNumber: number; tableNumber: string; total: number; status: string; createdAt: number; userId: string; userName?: string; establishmentName?: string }> = [];
+      const orders: Array<{ id: string; orderNumber: number; tableNumber: string; total: number; status: string; createdAt: number; userId: string; userName?: string; establishmentName?: string; source?: string }> = [];
 
       for (const profile of allProfiles) {
         try {
@@ -478,17 +479,18 @@ const AdminDashboard = () => {
             orders.push({
               id: doc.id,
               orderNumber: data.orderNumber || 0,
-              tableNumber: data.tableNumber || '',
+              tableNumber: data.tableNumber || data.tableZone || '',
               total: Number(data.total || 0),
               status: data.status || 'pending',
               createdAt: data.createdAt || Date.now(),
               userId: profile.uid,
               userName: profile.ownerName,
               establishmentName: profile.establishmentName,
+              source: data.source || 'internal',
             });
           });
 
-          // Commandes Bar Connectée
+          // Commandes Bar Connectée / Menu Digital (orders source 'qr' + legacy barOrders)
           const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
           const barOrdersSnap = await getDocs(barOrdersRef);
 
@@ -497,13 +499,14 @@ const AdminDashboard = () => {
             orders.push({
               id: doc.id,
               orderNumber: data.orderNumber || 0,
-              tableNumber: data.tableNumber || data.tableName || '',
+              tableNumber: data.tableNumber || data.tableName || data.tableZone || '',
               total: Number(data.total || 0),
               status: data.status || 'pending',
               createdAt: data.createdAt || Date.now(),
               userId: profile.uid,
               userName: profile.ownerName,
               establishmentName: profile.establishmentName,
+              source: 'qr',
             });
           });
         } catch (error) {

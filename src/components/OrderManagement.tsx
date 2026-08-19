@@ -232,7 +232,7 @@ const OrderManagement = ({
         try {
           const prefill = order.items.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity }));
           localStorage.setItem('nack_prefill_cart', JSON.stringify(prefill));
-          localStorage.setItem('nack_prefill_order_meta', JSON.stringify({ orderId: order.id, ownerUid: uidToUse }));
+          localStorage.setItem('nack_prefill_order_meta', JSON.stringify({ orderId: order.id, tableNumber: order.tableNumber || '' }));
         } catch { /* ignore */ }
         onGoToSales();
         redirected = true;

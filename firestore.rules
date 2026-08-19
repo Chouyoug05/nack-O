@@ -18,6 +18,26 @@ service cloud.firestore {
 
     }
 
+    function agentFor(userId) {
+
+      return request.auth != null &&
+
+        exists(/databases/$(database)/documents/agentSessions/$(request.auth.uid)) &&
+
+        get(/databases/$(database)/documents/agentSessions/$(request.auth.uid)).data.ownerUid == userId;
+
+    }
+
+    function validAgentTokenFor(userId) {
+
+      return request.resource.data.agentToken != null &&
+
+        exists(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)) &&
+
+        get(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)).data.ownerUid == userId;
+
+    }
+
 
 
     function ownerOnlySubscriptionFieldsChanged() {
@@ -36,6 +56,24 @@ service cloud.firestore {
     function validBarOrderCreate() {
 
       return request.resource.data.keys().hasAll(['total', 'status', 'createdAt']) &&
+
+        request.resource.data.status == 'pending' &&
+
+        request.resource.data.total is number &&
+
+        request.resource.data.total >= 0 &&
+
+        request.resource.data.total <= 50000000 &&
+
+        request.resource.data.createdAt is int;
+
+    }
+
+    function validQrOrderCreate() {
+
+      return request.resource.data.keys().hasAll(['total', 'status', 'createdAt', 'source']) &&
+
+        request.resource.data.source == 'qr' &&
 
         request.resource.data.status == 'pending' &&
 
@@ -77,7 +115,19 @@ service cloud.firestore {
 
 
 
-    // Tokens agents : lecture publique (token = secret dans l'URL), écriture propriétaire/admin
+    // Sessions agents (authentification anonyme + lien vers le propriétaire)
+    // Permet aux agents de lire/écrire les commandes sans exposition publique.
+    // La création exige un agentToken valide mappé au propriétaire.
+    match /agentSessions/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null &&
+        request.auth.uid == uid &&
+        request.resource.data.ownerUid is string &&
+        request.resource.data.agentCode is string &&
+        exists(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentCode)) &&
+        get(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentCode)).data.ownerUid == request.resource.data.ownerUid;
+      allow delete: if false;
+    }
 
     match /agentTokens/{id} {
 
@@ -155,19 +205,17 @@ service cloud.firestore {
 
 
 
-    // Commandes internes : plus de lecture publique
-
+    // Commandes internes et menu digital : propriétaire, admin ou agent lié par session
+    // Création publique autorisée uniquement pour les commandes menu digital (source 'qr')
     match /profiles/{userId}/orders/{orderId} {
 
-      allow read: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || agentFor(userId);
 
-      allow write: if (isOwner(userId) || isAdmin()) || (
+      allow create: if validQrOrderCreate() || (isOwner(userId) || isAdmin()) || validAgentTokenFor(userId) || agentFor(userId);
 
-        exists(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)) &&
+      allow update: if (isOwner(userId) || isAdmin()) || validAgentTokenFor(userId) || agentFor(userId);
 
-        get(/databases/$(database)/documents/agentTokens/$(request.resource.data.agentToken)).data.ownerUid == userId
-
-      );
+      allow delete: if isOwner(userId) || isAdmin();
 
     }
 

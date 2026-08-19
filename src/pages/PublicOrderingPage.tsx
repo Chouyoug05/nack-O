@@ -15,7 +15,7 @@ import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 import { isFoodBusiness as isFoodBusinessFn } from "@/constants/establishmentTypes";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
 import { sendOrderNotificationViaServer } from "@/lib/securePayment";
-import { barOrdersColRef } from "@/lib/collections";
+import { ordersColRef } from "@/lib/collections";
 import { enqueuePendingOrder, flushPendingOrders } from "@/lib/localSyncQueue";
 import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 
@@ -46,6 +46,7 @@ interface CartItem {
   name: string;
   price: number;
   quantity: number;
+  category?: string;
 }
 
 interface Establishment {
@@ -393,7 +394,8 @@ const PublicOrderingPage = () => {
           productId: product.id,
           name: product.name,
           price: priceValue,
-          quantity: 1
+          quantity: 1,
+          category: product.category
         }];
       }
     });
@@ -419,11 +421,9 @@ const PublicOrderingPage = () => {
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    // Menu du jour : si au moins un produit est marqué "sur le menu digital", n'afficher que ceux-là
-    const hasMenuDuJour = products.some(p => p.showOnMenuDigital === true);
-    const menuProducts = hasMenuDuJour
-      ? products.filter(p => p.showOnMenuDigital === true)
-      : products;
+    // Menu du jour : n'afficher QUE les produits marqués "sur le menu digital".
+    // S'il n'y en a aucun, afficher un état vide (pas le catalogue complet).
+    const menuProducts = products.filter(p => p.showOnMenuDigital === true);
 
     return menuProducts.filter(product => {
       const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -492,6 +492,9 @@ const PublicOrderingPage = () => {
             items: cart,
             total,
             status: 'pending',
+            paymentStatus: 'unpaid',
+            kitchenStatus: 'en-attente',
+            source: 'qr',
             createdAt: Date.now(),
             isDelivery: isDelivery || false,
             deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
@@ -526,15 +529,18 @@ const PublicOrderingPage = () => {
         }
       }
 
-      // Si pas de paiement, créer la commande immédiatement dans barOrders
-      // IMPORTANT: Les commandes sur place doivent arriver dans les commandes clients
+      // Si pas de paiement, créer la commande immédiatement dans orders
+      // IMPORTANT: Les commandes sur place doivent arriver chez le gérant, le serveur et la cuisine
       const orderData: Record<string, unknown> = {
         orderNumber: orderNumberValue,
         receiptNumber,
         tableZone: isDelivery ? 'Livraison' : selectedTable,
         items: cart,
         total,
-        status: 'pending', // Statut pending pour apparaître dans les commandes clients
+        status: 'pending', // Statut pending pour apparaître dans les commandes
+        paymentStatus: 'unpaid',
+        kitchenStatus: 'en-attente',
+        source: 'qr',
         createdAt: Date.now(),
         isDelivery: isDelivery || false,
         deliveryPrice: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0,
@@ -549,15 +555,17 @@ const PublicOrderingPage = () => {
         orderData.deliveryAddress = deliveryAddress;
       }
 
-      // Créer la commande dans barOrders pour qu'elle arrive chez le gérant
+      // Créer la commande dans orders pour qu'elle arrive chez le gérant, le serveur et la cuisine
       let queuedOffline = false;
+      let orderDocId: string | null = null;
       if (establishmentId) {
         try {
-          await addDoc(barOrdersColRef(db, establishmentId), orderData);
+          const docRef = await addDoc(ordersColRef(db, establishmentId), orderData);
+          orderDocId = docRef.id;
         } catch {
           await enqueuePendingOrder({
             ownerUid: establishmentId,
-            channel: "barOrders",
+            channel: "orders",
             payload: orderData,
           });
           queuedOffline = true;
@@ -574,6 +582,7 @@ const PublicOrderingPage = () => {
       }
 
       const receiptData = {
+        orderId: orderDocId || orderNumberValue,
         orderNumber: orderNumberValue,
         receiptNumber,
         establishmentId,
@@ -938,7 +947,7 @@ const PublicOrderingPage = () => {
             <p className="text-gray-600">
               {searchTerm || activeCategoryTab !== "all"
                 ? "Aucun produit ne correspond à votre recherche."
-                : "Aucun produit disponible pour le moment."}
+                : "Menu du jour non configuré. Le gérant n'a pas encore sélectionné de produits pour le menu digital."}
             </p>
           </div>
         )}

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { ordersColRef, agentTokensTopColRef } from "@/lib/collections";
+import { ensureAgentSession } from "@/lib/agentSession";
 import { onSnapshot, query, orderBy, updateDoc, doc, getDoc, collectionGroup, where, limit, getDocs } from "firebase/firestore";
 
 interface FirestoreOrderItem {
@@ -110,6 +111,7 @@ const CuisineInterface = () => {
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string; role?: string };
           if (data.ownerUid && data.role === 'cuisinier') {
+            await ensureAgentSession(agentCode, data.ownerUid);
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Cuisinier';
             setAgentInfo({ name, code: agentCode });
@@ -135,6 +137,7 @@ const CuisineInterface = () => {
             const foundOwner = docSnap.ref.parent.parent ? docSnap.ref.parent.parent.id : null;
             const foundName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Cuisinier';
             if (foundOwner) {
+              await ensureAgentSession(agentCode, foundOwner);
               setOwnerUid(foundOwner);
               setAgentInfo({ name: foundName, code: agentCode });
               try {

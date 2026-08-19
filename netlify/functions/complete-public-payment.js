@@ -38,17 +38,19 @@ exports.handler = async (event) => {
 
     const subType = String(payment.subscriptionType || "");
 
-    // Menu digital : créer barOrder après paiement
+    // Menu digital : créer la commande après paiement
     if (subType === "menu-digital" && payment.orderData && establishmentId) {
-      const isDelivery = payment.orderData.isDelivery === true;
       const orderData = {
         ...payment.orderData,
-        status: isDelivery ? "paid" : "pending",
+        status: "pending",
+        paymentStatus: "paid",
+        kitchenStatus: "en-attente",
+        source: "qr",
         paidAt: now,
         paymentMethod: "airtel-money",
         paymentTransactionId: transactionId,
       };
-      const orderRef = await db.collection(`profiles/${establishmentId}/barOrders`).add(orderData);
+      const orderRef = await db.collection(`profiles/${establishmentId}/orders`).add(orderData);
 
       const profSnap = await db.doc(`profiles/${establishmentId}`).get();
       const fcmToken = profSnap.exists ? String(profSnap.data().fcmToken || "").trim() : "";

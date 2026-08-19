@@ -30,6 +30,7 @@ import { isFoodBusiness as _isFoodBusiness, isBoutique as _isBoutique, isService
 import { getDashboardCopy } from "@/lib/dashboardCopy";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/lib/firebase";
+import { omitUndefined } from "@/lib/omitUndefined";
 import { clipboardCopy } from "@/lib/clipboard";
 import { doc, setDoc, getDoc, getDocs, collection, addDoc, onSnapshot, query, orderBy, where, writeBatch, deleteDoc, updateDoc } from "firebase/firestore";
 import QRCode from "qrcode";
@@ -72,6 +73,8 @@ interface BarOrder {
   }>;
   total: number;
   status: 'pending' | 'confirmed' | 'served' | 'cancelled' | 'paid';
+  paymentStatus?: 'unpaid' | 'paid';
+  source?: 'qr' | 'barOrders';
   createdAt: number;
   receiptNumber?: string;
   isDelivery?: boolean;
@@ -153,28 +156,18 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         console.error('Erreur snapshot tables:', error);
       });
 
-      const ordersRef = collection(db, `profiles/${user.uid}/barOrders`);
-      const q = query(ordersRef, orderBy('createdAt', 'desc'));
+      // Commandes QR : source de vérité = orders (source 'qr'), fallback barOrders (legacy)
+      const ordersRef = collection(db, `profiles/${user.uid}/orders`);
+      const q = query(ordersRef, where('source', '==', 'qr'), orderBy('createdAt', 'desc'));
       const unsubscribeOrders = onSnapshot(q, (snapshot) => {
         try {
           // Gérer les changements (notifications et auto-correction)
           snapshot.docChanges().forEach((change) => {
             const data = change.doc.data();
-            
-            // Auto-correction : on le fait une seule fois quand le doc est ajouté ou modifié
-            if (
-              (change.type === 'added' || change.type === 'modified') &&
-              data.status === 'paid' && 
-              !data.isDelivery && 
-              data.tableZone && 
-              data.tableZone !== 'Livraison'
-            ) {
-              updateDoc(change.doc.ref, { status: 'pending' }).catch(err => console.error('Erreur correction statut commande:', err));
-            }
 
             // Notifications pour les nouvelles commandes uniquement
             if (change.type === 'added') {
-              const isPending = data.status === 'pending' || (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison');
+              const isPending = data.status === 'pending';
               if (isPending && data.createdAt > (Date.now() - 60000)) {
                 addDoc(notificationsColRef(db, user.uid), {
                   title: "Nouvelle commande Menu Digital",
@@ -192,11 +185,6 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
             .map(doc => {
               const data = doc.data();
               if (!doc.id) return null;
-              
-              if (data.status === 'paid' && !data.isDelivery && data.tableZone && data.tableZone !== 'Livraison') {
-                return { id: doc.id, ...data, status: 'pending' } as BarOrder;
-              }
-              
               return { id: doc.id, ...data } as BarOrder;
             })
             .filter((order): order is BarOrder => order !== null && !!order.id);
@@ -207,6 +195,33 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         }
       }, (error) => {
         console.error('Erreur snapshot commandes:', error);
+      });
+
+      // Fallback legacy : commandes déjà présentes dans barOrders (avant unification)
+      const legacyOrdersRef = collection(db, `profiles/${user.uid}/barOrders`);
+      const legacyQ = query(legacyOrdersRef, orderBy('createdAt', 'desc'));
+      const unsubscribeLegacyOrders = onSnapshot(legacyQ, (snapshot) => {
+        try {
+          const legacyOrders = snapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              if (!doc.id) return null;
+              return { id: doc.id, ...data, source: 'barOrders' } as BarOrder;
+            })
+            .filter((order): order is BarOrder => order !== null && !!order.id);
+
+          if (legacyOrders.length > 0) {
+            setOrders(prev => {
+              const ids = new Set(prev.map(o => o.id));
+              const merged = legacyOrders.filter(o => !ids.has(o.id));
+              return [...merged, ...prev];
+            });
+          }
+        } catch (error) {
+          console.error('Erreur traitement commandes legacy:', error);
+        }
+      }, (error) => {
+        console.error('Erreur snapshot commandes legacy:', error);
       });
 
       const productsRef = collection(db, `profiles/${user.uid}/products`);
@@ -225,9 +240,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               const parsed = parseFloat(product.price.trim());
               priceValue = isNaN(parsed) ? 0 : parsed;
             }
-            // Menu du jour : si au moins un produit est coché, n'afficher que ceux-là ; sinon tous
-            const hasMenuDuJour = allProducts.some(p => p.showOnMenuDigital === true);
-            if (hasMenuDuJour && product.showOnMenuDigital !== true) return false;
+            // Menu du jour strict : n'afficher QUE les produits cochés "showOnMenuDigital"
+            if (product.showOnMenuDigital !== true) return false;
             return priceValue > 0;
           });
           setProducts(productsInStock);
@@ -241,6 +255,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       return () => {
         unsubscribeTables();
         unsubscribeOrders();
+        unsubscribeLegacyOrders();
         unsubscribeProducts();
       };
     } catch (error) {
@@ -503,6 +518,13 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
   };
 
   // Confirmer une commande
+  // Résoudre le chemin Firestore d'une commande (orders pour source 'qr', barOrders sinon)
+  const orderDocRef = (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    const col = order?.source === 'barOrders' ? 'barOrders' : 'orders';
+    return doc(db, `profiles/${user.uid}/${col}`, orderId);
+  };
+
   const confirmOrder = async (orderId: string) => {
     if (!user || !orderId || !user.uid) {
       toast({
@@ -514,7 +536,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     }
 
     try {
-      await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
+      await setDoc(orderDocRef(orderId), {
         status: 'confirmed',
         confirmedAt: Date.now()
       }, { merge: true });
@@ -556,7 +578,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     }
 
     try {
-      await setDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId), {
+      await setDoc(orderDocRef(orderId), {
         status: 'cancelled',
         cancelledAt: Date.now()
       }, { merge: true });
@@ -601,7 +623,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       if (!user.uid || !orderId) {
         throw new Error('UID utilisateur ou ID commande manquant');
       }
-      await deleteDoc(doc(db, `profiles/${user.uid}/barOrders`, orderId));
+      await deleteDoc(orderDocRef(orderId));
 
       toast({
         title: "Commande supprimée",
@@ -666,11 +688,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       }
 
       // Marquer la commande comme servie
-      const orderRef = doc(db, `profiles/${user.uid}/barOrders`, orderId);
+      const orderRef = orderDocRef(orderId);
       batch.update(orderRef, {
         status: 'served',
         servedAt: Date.now(),
         paidAt: Date.now(),
+        paymentStatus: 'paid',
         paymentMethod: 'cash'
       });
 
@@ -694,7 +717,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       };
 
       const saleRef = doc(collection(db, `profiles/${user.uid}/sales`));
-      batch.set(saleRef, saleData);
+      batch.set(saleRef, omitUndefined(saleData));
 
       // Exécuter toutes les opérations en batch
       await batch.commit();

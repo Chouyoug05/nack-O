@@ -49,8 +49,8 @@ import { SupportSettingsPanel, TabletsSettingsPanel } from "@/components/setting
 import { getAssignedTabletImei } from "@/lib/tabletsSupport";
 import { receiptsColRef, paymentsColRef, productsColRef, salesColRef, lossesColRef, eventsColRef, teamColRef, ordersColRef, notificationsColRef } from "@/lib/collections";
 import { db } from "@/lib/firebase";
-import { getDocs, query, orderBy, deleteDoc, writeBatch, collection } from "firebase/firestore";
-import type { CollectionReference } from "firebase/firestore";
+import { getDocs, query, orderBy, deleteDoc, writeBatch, collection, where } from "firebase/firestore";
+import type { CollectionReference, Query, DocumentData } from "firebase/firestore";
 
 const DURATIONS = [
   { value: 'month', label: '1 Mois', discount: '' },
@@ -214,7 +214,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       const BATCH_LIMIT = 500; // Limite Firestore
 
       // Fonction pour supprimer une collection avec gestion des batches
-      const deleteCollection = async (colRef: CollectionReference, collectionName: string) => {
+      const deleteCollection = async (colRef: CollectionReference | Query<DocumentData>, collectionName: string) => {
         let deleted = 0;
         let hasMore = true;
 
@@ -283,9 +283,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       // Supprimer tous les reÃ§us
       await deleteCollection(receiptsColRef(db, user.uid), "reÃ§us");
 
-      // Supprimer toutes les commandes bar (barOrders)
+      // Supprimer toutes les commandes bar (barOrders legacy)
       const barOrdersRef = collection(db, "profiles", user.uid, "barOrders");
       await deleteCollection(barOrdersRef, "commandes bar");
+
+      // Supprimer les commandes Menu Digital (orders source 'qr')
+      const qrOrdersRef = collection(db, "profiles", user.uid, "orders");
+      await deleteCollection(query(qrOrdersRef, where("source", "==", "qr")), "commandes QR");
 
       toast({
         title: "âœ… DonnÃ©es rÃ©initialisÃ©es",

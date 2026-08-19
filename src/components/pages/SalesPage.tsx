@@ -48,6 +48,7 @@ import type { ProductDoc, PaymentMethod, SaleDoc, SaleItem } from "@/types/inven
 import type { UserProfile } from "@/types/profile";
 import type { Order } from "@/types/order";
 import { enqueuePendingOrder } from "@/lib/localSyncQueue";
+import { omitUndefined } from "@/lib/omitUndefined";
 
 interface Product {
   id: string;
@@ -474,16 +475,7 @@ const SalesPage = () => {
       }
 
       setIsSaving(true);
-      // 1) Déterminer le propriétaire pour l'écriture (meta > user)
-      let ownerUidForWrites: string | undefined = user?.uid;
-      try {
-        const metaRaw = localStorage.getItem('nack_prefill_order_meta');
-        if (metaRaw) {
-          const meta = JSON.parse(metaRaw) as { ownerUid?: string };
-          if (meta.ownerUid) ownerUidForWrites = meta.ownerUid;
-        }
-      } catch { /* ignore */ }
-      if (!ownerUidForWrites) throw new Error("Propriétaire introuvable pour l'écriture");
+      const ownerUidForWrites = user.uid;
       // 2) Batch atomique: décrémenter le stock + créer la vente
       const batch = writeBatch(db);
       for (const item of cart) {
@@ -504,17 +496,25 @@ const SalesPage = () => {
         if (currentQty < qtyToDecrement) throw new Error(`Stock insuffisant pour ${item.name}`);
         batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
       }
-        const saleItems: SaleItem[] = cart.map(ci => ({ id: ci.id, name: ci.name, price: ci.price, quantity: ci.quantity, isFormula: ci.isFormula }));
+        const saleItems: SaleItem[] = cart.map((ci) =>
+          omitUndefined({
+            id: ci.id,
+            name: ci.name,
+            price: Number(ci.price) || 0,
+            quantity: Number(ci.quantity) || 0,
+            ...(ci.isFormula ? { isFormula: true } : {}),
+          })
+        );
               const saleCol = salesColRef(db, ownerUidForWrites);
         // create new sale doc id
         const saleRef = fsDoc(saleCol);
-      const saleDoc: SaleDoc = {
+      const saleDoc: SaleDoc = omitUndefined({
         items: saleItems,
         total: cartTotal,
         paymentMethod: selectedPayment,
         createdAt: Date.now(),
         tableZone: tableNumber.trim() || 'Caisse',
-      };
+      });
       batch.set(saleRef, saleDoc);
       await batch.commit();
 
@@ -590,7 +590,13 @@ const SalesPage = () => {
       setSelectedPayment(null);
       setIsCheckoutOpen(false);
     } catch (e: unknown) {
-      const message = e instanceof Error ? e.message : "Erreur lors de l'enregistrement";
+      console.error("Erreur encaissement:", e);
+      const raw = e instanceof Error ? e.message : "Erreur lors de l'enregistrement";
+      const message = /unsupported field value|undefined/i.test(raw)
+        ? "Données de vente invalides. Réessayez ou rechargez le panier."
+        : /permission|insufficient/i.test(raw)
+          ? "Accès refusé à l'enregistrement. Reconnectez-vous puis réessayez."
+          : raw;
       toast({ title: "Erreur", description: message, variant: "destructive" });
     } finally {
       setIsSaving(false);

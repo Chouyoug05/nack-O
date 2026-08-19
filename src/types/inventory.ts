@@ -66,4 +66,5 @@ export interface SaleDoc {
   total: number;
   paymentMethod: PaymentMethod;
   createdAt: number;
+  tableZone?: string;
 } 

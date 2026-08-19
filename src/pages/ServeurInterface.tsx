@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
+import { ensureAgentSession } from "@/lib/agentSession";
 import { ordersColRef, productsColRef, teamColRef, notificationsColRef, agentTokensTopColRef, customersColRef } from "@/lib/collections";
 import { addDoc, getDocs, limit, onSnapshot, query, where, collectionGroup, doc, getDoc, updateDoc, runTransaction, orderBy } from "firebase/firestore";
 import { enqueuePendingOrder, flushPendingOrders } from "@/lib/localSyncQueue";
@@ -133,6 +134,7 @@ const ServeurInterface = () => {
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string };
           if (data.ownerUid) {
+            await ensureAgentSession(agentCode, data.ownerUid);
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent';
             setAgentInfo({ name, code: agentCode });
@@ -173,6 +175,7 @@ const ServeurInterface = () => {
           }
         }
         if (foundOwner) {
+          await ensureAgentSession(agentCode, foundOwner);
           setOwnerUid(foundOwner);
           setAgentInfo({ name: foundName || 'Agent', code: agentCode, memberId: foundMemberId });
           // Sauvegarder dans localStorage pour persistance

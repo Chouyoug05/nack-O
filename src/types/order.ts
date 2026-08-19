@@ -12,16 +12,19 @@ export interface CartItem extends Product {
   quantity: number;
 }
 
-export type OrderStatus = 'pending' | 'sent' | 'cancelled';
+export type OrderStatus = 'pending' | 'sent' | 'cancelled' | 'confirmed' | 'served';
 export type KitchenStatus = 'en-attente' | 'en-preparation' | 'pret' | 'termine';
+export type PaymentStatus = 'unpaid' | 'paid';
 
 export interface Order {
   id: string;
-  orderNumber: number;
+  orderNumber: number | string;
   tableNumber: string;
   items: CartItem[];
   total: number;
   status: OrderStatus;
+  paymentStatus?: PaymentStatus;
+  source?: 'qr' | 'internal';
   createdAt: Date;
   agentCode: string;
   agentName?: string;

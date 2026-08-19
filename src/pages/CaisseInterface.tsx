@@ -13,6 +13,7 @@ import {
 import { db } from "@/lib/firebase";
 import { collectionGroup, getDocs, limit, query, where, doc, getDoc } from "firebase/firestore";
 import { agentTokensTopColRef } from "@/lib/collections";
+import { ensureAgentSession } from "@/lib/agentSession";
 
 const getAuthStorageKey = (agentCode: string) => `nack_caisse_auth_${agentCode}`;
 
@@ -49,6 +50,7 @@ const CaisseInterfaceContent = () => {
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string; agentCode?: string };
           if (data.ownerUid) {
+            await ensureAgentSession(agentCode, data.ownerUid);
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent Caissier';
             setAgentInfo({ name, code: agentCode });
@@ -92,6 +94,7 @@ const CaisseInterfaceContent = () => {
         }
       }
       if (foundOwner) {
+        await ensureAgentSession(agentCode, foundOwner);
         setOwnerUid(foundOwner);
         setAgentInfo({ name: foundName || 'Agent Caissier', code: agentCode });
         if (foundAgentCode) setExpectedAgentCode(foundAgentCode);
@@ -157,6 +160,7 @@ const CaisseInterfaceContent = () => {
         const snap = sTok.docs[0];
         const data = snap.data() as { ownerUid?: string; firstName?: string; lastName?: string; agentCode?: string };
         if (data.ownerUid) {
+          await ensureAgentSession(agentCode, data.ownerUid);
           setOwnerUid(data.ownerUid);
           const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent Caissier';
           setAgentInfo({ name, code: agentCode });

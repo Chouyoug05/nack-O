@@ -19,6 +19,7 @@ import {
   X
 } from 'lucide-react';
 import { db } from '@/lib/firebase';
+import { omitUndefined } from '@/lib/omitUndefined';
 import { doc, getDoc, updateDoc, writeBatch, collection, addDoc } from 'firebase/firestore';
 
 interface ReceiptData {
@@ -29,6 +30,7 @@ interface ReceiptData {
 
 interface BarOrder {
   id: string;
+  establishmentId?: string;
   orderNumber: string;
   items: Array<{
     id: string;
@@ -39,6 +41,7 @@ interface BarOrder {
   total: number;
   tableZone: string;
   status: 'pending' | 'confirmed' | 'served';
+  source?: 'orders' | 'barOrders';
   createdAt: number;
   establishmentName?: string;
 }
@@ -225,9 +228,21 @@ const QRScanner: React.FC = () => {
         return;
       }
 
-      // Récupérer la commande depuis Firestore
-      const orderRef = doc(db, `profiles/${receiptData.establishmentId}/barOrders`, receiptData.orderId);
-      const orderSnap = await getDoc(orderRef);
+      // Récupérer la commande depuis Firestore (source de vérité : orders, fallback barOrders)
+      const estId = receiptData.establishmentId;
+      const orderRef = doc(db, `profiles/${estId}/orders`, receiptData.orderId);
+      let orderSnap = await getDoc(orderRef);
+
+      if (!orderSnap.exists()) {
+        const legacyRef = doc(db, `profiles/${estId}/barOrders`, receiptData.orderId);
+        const legacySnap = await getDoc(legacyRef);
+        if (legacySnap.exists()) {
+          const legacyData = { id: legacySnap.id, establishmentId: estId, ...legacySnap.data() } as BarOrder;
+          setScannedOrder({ ...legacyData, source: 'barOrders' });
+          setShowOrderDialog(true);
+          return;
+        }
+      }
 
       if (!orderSnap.exists()) {
         toast({
@@ -238,7 +253,7 @@ const QRScanner: React.FC = () => {
         return;
       }
 
-      const orderData = orderSnap.data() as BarOrder;
+      const orderData = { id: orderSnap.id, establishmentId: estId, ...orderSnap.data(), source: 'orders' } as BarOrder & { source?: 'orders' | 'barOrders' };
       console.log('Commande trouvée:', orderData);
 
       setScannedOrder(orderData);
@@ -289,11 +304,14 @@ const QRScanner: React.FC = () => {
       }
 
       // Mettre à jour le statut de la commande
-      const orderRef = doc(db, `profiles/${scannedOrder.id.split('/')[0]}/barOrders`, scannedOrder.id.split('/')[1] || scannedOrder.id);
+      const estId = scannedOrder.establishmentId || user.uid;
+      const col = scannedOrder.source === 'barOrders' ? 'barOrders' : 'orders';
+      const orderRef = doc(db, `profiles/${estId}/${col}`, scannedOrder.id);
       batch.update(orderRef, {
         status: 'served',
         servedAt: Date.now(),
         paidAt: Date.now(),
+        paymentStatus: 'paid',
         paymentMethod: 'cash'
       });
 
@@ -312,7 +330,7 @@ const QRScanner: React.FC = () => {
       };
 
       const salesRef = collection(db, `profiles/${user.uid}/sales`);
-      batch.set(doc(salesRef), saleData);
+      batch.set(doc(salesRef), omitUndefined(saleData));
 
       await batch.commit();
 

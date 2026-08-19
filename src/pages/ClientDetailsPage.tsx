@@ -126,14 +126,16 @@ const ClientDetailsPage = () => {
           return sum + (Number(data.total) || 0);
         }, 0);
 
-        // Commandes normales
+        // Commandes normales + QR (source de vérité : orders, source 'qr' = menu digital)
         const ordersSnap = await getDocs(query(ordersColRef(db, uid), orderBy("createdAt", "desc")));
-        const ordersCount = ordersSnap.size;
+        const allOrders = ordersSnap.docs;
+        const qrOrders = allOrders.filter(d => (d.data() as { source?: string }).source === 'qr');
+        const ordersCount = allOrders.length - qrOrders.length;
 
-        // Commandes Bar Connectée
+        // Commandes Bar Connectée / Menu Digital (orders source 'qr' + legacy barOrders)
         const barOrdersRef = collection(db, `profiles/${uid}/barOrders`);
         const barOrdersSnap = await getDocs(barOrdersRef);
-        const barOrdersCount = barOrdersSnap.size;
+        const barOrdersCount = qrOrders.length + barOrdersSnap.size;
 
         // Événements
         const eventsSnap = await getDocs(eventsColRef(db, uid));
