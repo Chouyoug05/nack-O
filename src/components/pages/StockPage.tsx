@@ -246,7 +246,8 @@ const StockPage = () => {
   // --- Manager authentication (password prompt) ---
   // Logique centralisée dans useManagerAuth : ouverture de la modale, fenêtre de
   // validité (sessionStorage partagé), soumission + hash SHA-256.
-  const { requireManagerAuth } = useManagerAuth(profile);
+  const managerAuth = useManagerAuth(profile);
+  const { requireManagerAuth } = managerAuth;
 
   // --- Security code management UI ---
   const [isSecurityDialogOpen, setIsSecurityDialogOpen] = useState(false);
@@ -2385,7 +2386,7 @@ const StockPage = () => {
       </Dialog>
 
       {/* Manager Auth Dialog (Optionnel) */}
-      <ManagerAuthDialog />
+      <ManagerAuthDialog auth={managerAuth} />
 
       {/* Security Code Dialog */}
       < Dialog open={isSecurityDialogOpen} onOpenChange={setIsSecurityDialogOpen} >

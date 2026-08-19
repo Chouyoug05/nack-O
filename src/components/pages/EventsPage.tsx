@@ -412,7 +412,8 @@ const EventsPage = () => {
   // --- Manager authentication (PIN) ---
   // Logique centralisée dans useManagerAuth : ouverture de la modale, fenêtre de
   // validité (sessionStorage partagé), soumission + hash SHA-256.
-  const { requireManagerAuth } = useManagerAuth(profile);
+  const managerAuth = useManagerAuth(profile);
+  const { requireManagerAuth } = managerAuth;
 
   const totalRevenue = events.reduce((total, event) => {
     return total + (event.ticketsSold * event.ticketPrice);
@@ -1065,6 +1066,7 @@ const EventsPage = () => {
 
       {/* Manager Auth Dialog */}
       <ManagerAuthDialog
+        auth={managerAuth}
         title="Code gérant requis"
         description="Veuillez saisir votre code de sécurité pour autoriser cette action."
         showToggle={true}

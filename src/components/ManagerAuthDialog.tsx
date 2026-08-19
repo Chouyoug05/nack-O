@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useManagerAuth } from "@/hooks/useManagerAuth";
-import { useAuth } from "@/contexts/AuthContext";
 import LegacyModal from "@/components/ui/LegacyModal";
 import DialogErrorBoundary from "@/components/DialogErrorBoundary";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -18,12 +17,19 @@ interface ManagerAuthDialogProps {
   showToggle?: boolean;
   /** Classes CSS supplémentaires sur le conteneur */
   className?: string;
+  /**
+   * État du hook useManagerAuth instancié PAR LA PAGE PARENTE.
+   * Obligatoire : sans lui, la modale utilise un état séparé et ne s'ouvre jamais
+   * quand la page appelle requireManagerAuth(action).
+   */
+  auth: ReturnType<typeof useManagerAuth>;
 }
 
 /**
  * Modale de vérification gérant, unifiée entre StockPage et EventsPage.
  *
- * - Logique (état, sessionStorage, submit) centralisée dans useManagerAuth.
+ * - Logique (état, sessionStorage, submit) centralisée dans useManagerAuth,
+ *   instancié UNE SEULE fois par la page parente et transmis via la prop `auth`.
  * - Sur navigateurs hérités (iPad 3 / iOS 9) : rendu via LegacyModal (div HTML pur)
  *   avec des éléments natifs <input> / <button> — sans Radix UI, sans animations,
  *   sans focus trap.
@@ -35,9 +41,9 @@ export default function ManagerAuthDialog({
   description = "Saisissez votre code gérant pour autoriser cette action.",
   showToggle = false,
   className,
+  auth,
 }: ManagerAuthDialogProps) {
-  const { profile } = useAuth();
-  const { isOpen, code, setCode, isChecking, submit, close } = useManagerAuth(profile);
+  const { isOpen, code, setCode, isChecking, submit, close } = auth;
   const [showPin, setShowPin] = useState(false);
 
   const isLegacy = typeof window !== "undefined" && (window as any).__NACK_LEGACY_BROWSER__ === true;
