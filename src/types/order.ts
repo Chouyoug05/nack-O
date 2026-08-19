@@ -24,6 +24,7 @@ export interface Order {
   total: number;
   status: OrderStatus;
   paymentStatus?: PaymentStatus;
+  kitchenStatus?: KitchenStatus;
   source?: 'qr' | 'internal';
   createdAt: Date;
   agentCode: string;

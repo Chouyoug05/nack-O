@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useOrders } from "@/contexts/OrderContext";
-import { Product, CartItem, OrderStatus } from "@/types/order";
+import { Product, CartItem, OrderStatus, Order, KitchenStatus, PaymentStatus } from "@/types/order";
 import OrderHistory from "@/components/OrderHistory";
 import { 
   LogOut,
@@ -125,6 +125,7 @@ const ServeurInterface = () => {
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [availableCustomers, setAvailableCustomers] = useState<Customer[]>([]);
+  const [liveOrders, setLiveOrders] = useState<Order[]>([]);
 
   useEffect(() => {
     const resolveOwner = async () => {
@@ -268,6 +269,36 @@ const ServeurInterface = () => {
     return () => unsub();
   }, [ownerUid]);
 
+  // Écouter les commandes Firestore en direct pour suivre le statut cuisine (prêt, terminé)
+  useEffect(() => {
+    if (!ownerUid) { setLiveOrders([]); return; }
+    const q = query(ordersColRef(db, ownerUid), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(q, (snap) => {
+      const list: Order[] = snap.docs.map((d) => {
+        const data = d.data() as Record<string, unknown>;
+        const createdAtMs = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
+        return {
+          id: d.id,
+          orderNumber: data.orderNumber ?? 0,
+          tableNumber: String(data.tableNumber ?? data.tableZone ?? ''),
+          items: (data.items ?? []) as CartItem[],
+          total: Number(data.total ?? 0),
+          status: (data.status ?? 'pending') as OrderStatus,
+          paymentStatus: (data.paymentStatus ?? 'unpaid') as PaymentStatus,
+          kitchenStatus: (data.kitchenStatus ?? 'en-attente') as KitchenStatus,
+          source: (data.source ?? 'internal') as 'qr' | 'internal',
+          createdAt: new Date(createdAtMs),
+          agentCode: String(data.agentCode ?? data.agentToken ?? data.agentMemberId ?? ''),
+          agentName: typeof data.agentName === 'string' ? data.agentName : undefined,
+        } as Order;
+      });
+      setLiveOrders(list);
+    }, (error) => {
+      console.error('Erreur lors du chargement des commandes en direct:', error);
+    });
+    return () => unsub();
+  }, [ownerUid]);
+
   useEffect(() => {
     const flush = async () => {
       if (!ownerUid) return;
@@ -305,7 +336,14 @@ const ServeurInterface = () => {
     return <Navigate to="/not-found" replace />;
   }
 
-  const agentOrders = getOrdersByAgent(agentCode);
+  const localOrders = getOrdersByAgent(agentCode);
+  const liveAgentOrders = liveOrders.filter(o =>
+    o.agentCode === agentCode || o.agentCode === (agentInfo?.code || agentCode)
+  );
+  const agentOrders = [
+    ...liveAgentOrders,
+    ...localOrders.filter(local => !liveAgentOrders.some(live => String(live.orderNumber) === String(local.orderNumber))),
+  ];
   const pendingOrders = agentOrders.filter(order => order.status === 'pending');
   const sentOrders = agentOrders.filter(order => order.status === 'sent');
 
@@ -651,6 +689,18 @@ const ServeurInterface = () => {
     }
     // Envoyer directement la commande avec le statut 'sent'
     createOrder('sent');
+  };
+
+  // Mettre à jour le statut d'une commande dans Firestore ET dans le contexte local
+  const handleUpdateOrderStatus = async (orderId: string, status: OrderStatus) => {
+    updateOrderStatus(orderId, status);
+    if (!ownerUid) return;
+    try {
+      const orderRef = doc(ordersColRef(db, ownerUid), orderId);
+      await updateDoc(orderRef, { status, updatedAt: Date.now() });
+    } catch (e) {
+      console.error('Erreur mise à jour statut commande:', e);
+    }
   };
 
   return (
@@ -1131,7 +1181,7 @@ const ServeurInterface = () => {
           <div className="max-w-7xl mx-auto w-full">
             <OrderHistory 
               orders={activeView === 'pending' ? pendingOrders : sentOrders}
-              onUpdateOrderStatus={updateOrderStatus}
+              onUpdateOrderStatus={handleUpdateOrderStatus}
             />
           </div>
         </main>

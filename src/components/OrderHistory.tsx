@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Order, OrderStatus } from "@/types/order";
-import { Clock, CheckCircle, XCircle, Send, Eye } from "lucide-react";
+import { Clock, CheckCircle, XCircle, Send, Eye, ChefHat } from "lucide-react";
 
 interface OrderHistoryProps {
   orders: Order[];
@@ -20,7 +20,9 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
     const icons = {
       pending: <Clock className="h-4 w-4" />,
       sent: <CheckCircle className="h-4 w-4" />,
-      cancelled: <XCircle className="h-4 w-4" />
+      cancelled: <XCircle className="h-4 w-4" />,
+      confirmed: <CheckCircle className="h-4 w-4" />,
+      served: <CheckCircle className="h-4 w-4" />
     };
     return icons[status];
   };
@@ -29,7 +31,9 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
     const colors = {
       pending: "bg-accent text-accent-foreground",
       sent: "bg-primary text-primary-foreground", 
-      cancelled: "bg-destructive text-destructive-foreground"
+      cancelled: "bg-destructive text-destructive-foreground",
+      confirmed: "bg-primary text-primary-foreground",
+      served: "bg-green-600 text-white"
     };
     return colors[status];
   };
@@ -38,9 +42,38 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
     const texts = {
       pending: "En attente",
       sent: "Envoyée",
-      cancelled: "Annulée"
+      cancelled: "Annulée",
+      confirmed: "Confirmée",
+      served: "Servie"
     };
     return texts[status];
+  };
+
+  const getKitchenBadge = (order: Order) => {
+    const ks = order.kitchenStatus;
+    if (!ks) return null;
+    const styles: Record<string, { className: string; text: string }> = {
+      'en-attente': { className: "bg-gray-100 text-gray-700 border-gray-200", text: "En attente cuisine" },
+      'en-preparation': { className: "bg-amber-100 text-amber-700 border-amber-300", text: "En préparation" },
+      'pret': { className: "bg-green-100 text-green-700 border-green-300", text: "✅ Prêt à servir" },
+      'termine': { className: "bg-blue-100 text-blue-700 border-blue-300", text: "Terminé" },
+    };
+    const style = styles[ks];
+    if (!style) return null;
+    return (
+      <Badge variant="outline" className={`${style.className} flex items-center gap-1`}>
+        <ChefHat className="h-3 w-3" />
+        {style.text}
+      </Badge>
+    );
+  };
+
+  const handleServeOrder = (order: Order) => {
+    onUpdateOrderStatus(order.id, 'served');
+    toast({
+      title: "Commande servie",
+      description: `Commande #${order.orderNumber} marquée comme servie`,
+    });
   };
 
   const handleSendOrder = (order: Order) => {
@@ -98,6 +131,7 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
                     {getStatusIcon(order.status)}
                     {getStatusText(order.status)}
                   </Badge>
+                  {getKitchenBadge(order)}
                 </div>
                 <div className="text-sm text-muted-foreground">
                   {new Date(order.createdAt).toLocaleTimeString()}
@@ -138,10 +172,19 @@ const OrderHistory = ({ orders, onUpdateOrderStatus, title, description }: Order
               )}
               {order.status === 'sent' && (
                 <div className="flex gap-2">
+                  {order.kitchenStatus === 'pret' && (
+                    <Button
+                      onClick={() => handleServeOrder(order)}
+                      className="flex-1 bg-green-600 text-white shadow-button"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Marquer comme servi
+                    </Button>
+                  )}
                   <Button
                     variant="destructive"
                     onClick={() => handleCancelOrder(order)}
-                    className="flex-1"
+                    className={order.kitchenStatus === 'pret' ? '' : 'flex-1'}
                   >
                     <XCircle className="h-4 w-4 mr-2" />
                     Annuler la commande
