@@ -189,9 +189,22 @@ const CuisineInterface = () => {
         if (foodItems.length === 0) return null;
 
         const createdAtMs = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
-        const rawStatus = (data.status ?? 'awaiting-validation') as OrderStatus;
-        // Compatibilité : les anciennes commandes 'pending' équivalent à 'awaiting-validation'
-        const status: OrderStatus = rawStatus === 'pending' ? 'awaiting-validation' : rawStatus;
+        // Compatibilité : normaliser tous les anciens statuts
+        const rawStatus = data.status ?? 'awaiting-validation';
+        const statusMap: Record<string, OrderStatus> = {
+          'pending': 'awaiting-validation',
+          'sent': 'validated',
+          'served': 'delivered',
+          'confirmed': 'validated',
+          'completed': 'closed',
+          'en-attente': 'awaiting-validation',
+          'en-preparation': 'in-preparation',
+          'pret': 'ready',
+          'prêt': 'ready',
+          'termine': 'closed',
+          'terminé': 'closed',
+        };
+        const status: OrderStatus = statusMap[rawStatus] ?? (rawStatus as OrderStatus);
         // La cuisine ne voit que les commandes validées par un serveur
         if (!KITCHEN_STATUSES.includes(status)) return null;
 

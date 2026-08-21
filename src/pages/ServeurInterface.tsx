@@ -281,13 +281,31 @@ const ServeurInterface = () => {
       const list: Order[] = snap.docs.map((d) => {
         const data = d.data() as Record<string, unknown>;
         const createdAtMs = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
+        // Compatibilité : normaliser les anciens statuts
+        const rawStatus = data.status ?? 'awaiting-validation';
+        const statusMap: Record<string, OrderStatus> = {
+          'pending': 'awaiting-validation',
+          'sent': 'validated',
+          'served': 'delivered',
+          'confirmed': 'validated',
+          'completed': 'closed',
+          'en-attente': 'awaiting-validation',
+          'en-preparation': 'in-preparation',
+          'pret': 'ready',
+          'prêt': 'ready',
+          'termine': 'closed',
+          'terminé': 'closed',
+        };
+        const normalizedStatus = statusMap[rawStatus] ?? rawStatus;
+        const validStatuses: OrderStatus[] = ['awaiting-validation', 'validated', 'in-preparation', 'ready', 'delivered', 'paid', 'closed', 'cancelled'];
+        const status: OrderStatus = validStatuses.includes(normalizedStatus as OrderStatus) ? normalizedStatus as OrderStatus : 'awaiting-validation';
         return {
           id: d.id,
           orderNumber: data.orderNumber ?? 0,
           tableNumber: String(data.tableNumber ?? data.tableZone ?? ''),
           items: (data.items ?? []) as CartItem[],
           total: Number(data.total ?? 0),
-          status: (data.status ?? 'awaiting-validation') as OrderStatus,
+          status,
           paymentStatus: (data.paymentStatus ?? 'unpaid') as PaymentStatus,
           source: (data.source ?? 'internal') as 'qr' | 'internal',
           createdAt: new Date(createdAtMs),

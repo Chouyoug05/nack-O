@@ -71,6 +71,7 @@ const normalizeOrdersFromCache = (input: unknown): Order[] => {
       : new Date(typeof createdAtRaw === 'number' ? createdAtRaw : String(createdAtRaw));
     return {
       ...(maybe as Order),
+      status: normalizeStatus(maybe.status),
       createdAt: dateObj,
     } as Order;
   });
@@ -82,7 +83,14 @@ const normalizeStatus = (status?: string): OrderStatus => {
   if (status === 'sent') return 'validated';
   if (status === 'served') return 'delivered';
   if (status === 'confirmed') return 'validated';
-  return (status ?? 'awaiting-validation') as OrderStatus;
+  if (status === 'completed') return 'closed';
+  if (status === 'en-attente') return 'awaiting-validation';
+  if (status === 'en-preparation') return 'in-preparation';
+  if (status === 'pret' || status === 'prêt') return 'ready';
+  if (status === 'termine' || status === 'terminé') return 'closed';
+  const validStatuses: OrderStatus[] = ['awaiting-validation', 'validated', 'in-preparation', 'ready', 'delivered', 'paid', 'closed', 'cancelled'];
+  const candidate = (status ?? 'awaiting-validation') as OrderStatus;
+  return validStatuses.includes(candidate) ? candidate : 'awaiting-validation';
 };
 
 const ORDER_STATUS_STYLES: Record<OrderStatus, { badge: string; text: string }> = {
@@ -95,6 +103,9 @@ const ORDER_STATUS_STYLES: Record<OrderStatus, { badge: string; text: string }> 
   'closed': { badge: "bg-gray-600 text-white", text: "Clôturée" },
   'cancelled': { badge: "bg-destructive text-destructive-foreground", text: "Annulée" },
 };
+
+const getStatusStyle = (status: OrderStatus) =>
+  ORDER_STATUS_STYLES[status] ?? { badge: "bg-gray-600 text-white", text: status };
 
 const OrderManagement = ({ 
   showActions = true, 
@@ -228,7 +239,7 @@ const OrderManagement = ({
       'closed': <CheckCircle className="h-4 w-4" />,
       'cancelled': <XCircle className="h-4 w-4" />,
     };
-    return icons[status];
+    return icons[status] ?? <Clock className="h-4 w-4" />;
   };
 
   const queueManagerUpdate = (id: string, status: OrderStatus) => {
@@ -534,9 +545,9 @@ const OrderManagement = ({
                     <Badge variant="outline" className="text-sm font-semibold">
                       Table {order.tableNumber}
                     </Badge>
-                    <Badge className={`${ORDER_STATUS_STYLES[order.status].badge} flex items-center gap-1`}>
+                    <Badge className={`${getStatusStyle(order.status).badge} flex items-center gap-1`}>
                       {getStatusIcon(order.status)}
-                      {ORDER_STATUS_STYLES[order.status].text}
+                      {getStatusStyle(order.status).text}
                     </Badge>
                     {order.status === 'paid' && order.paymentMethod && (
                       <Badge variant="outline" className="text-xs">

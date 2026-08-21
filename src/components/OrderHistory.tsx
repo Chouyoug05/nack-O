@@ -52,7 +52,7 @@ const OrderHistory = ({
       'closed': "bg-gray-600 text-white",
       'cancelled': "bg-destructive text-destructive-foreground",
     };
-    return colors[status];
+    return colors[status] ?? "bg-gray-600 text-white";
   };
 
   const getStatusText = (status: OrderStatus) => ORDER_STATUS_LABELS[status] || status;
