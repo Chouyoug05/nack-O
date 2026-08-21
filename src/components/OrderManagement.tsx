@@ -510,6 +510,178 @@ const OrderManagement = ({
   const canCancelOrderStatus = (s: OrderStatus) =>
     s === 'awaiting-validation' || s === 'validated' || s === 'in-preparation';
 
+  // Grouper les commandes par section
+  const ordersToCashIn = sortedOrders.filter(o => o.status === 'delivered' && o.paymentStatus !== 'paid');
+  const ordersInProgress = sortedOrders.filter(o => 
+    o.status === 'awaiting-validation' || o.status === 'validated' || 
+    o.status === 'in-preparation' || o.status === 'ready'
+  );
+  const ordersCashIn = sortedOrders.filter(o => o.status === 'paid' || o.status === 'closed');
+
+  const renderOrderCard = (order: Order) => (
+    <div key={order.id} className="bg-card border rounded-lg p-4 space-y-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="font-semibold text-lg">#{order.orderNumber}</div>
+            <Badge variant="outline" className="text-sm font-semibold">
+              Table {order.tableNumber}
+            </Badge>
+            <Badge className={`${getStatusStyle(order.status).badge} flex items-center gap-1`}>
+              {getStatusIcon(order.status)}
+              {getStatusStyle(order.status).text}
+            </Badge>
+            {order.status === 'paid' && order.paymentMethod && (
+              <Badge variant="outline" className="text-xs">
+                {order.paymentMethod === 'cash' ? 'Espèces' : order.paymentMethod === 'mobile' ? 'Mobile Money' : order.paymentMethod === 'card' ? 'Carte' : order.paymentMethod}
+              </Badge>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <span className="text-muted-foreground">
+              {new Date(order.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+            {order.serverName && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <Badge variant="secondary" className="text-xs font-medium flex items-center gap-1 w-fit">
+                  <User className="w-3 h-3" />
+                  Serveur: {order.serverName}
+                </Badge>
+              </>
+            )}
+            {order.cookName && order.status !== 'awaiting-validation' && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <Badge variant="secondary" className="text-xs font-medium flex items-center gap-1 w-fit">
+                  <ChefHat className="w-3 h-3" />
+                  Cuisinier: {order.cookName}
+                </Badge>
+              </>
+            )}
+            {order.paidBy === 'server' && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <Badge variant="secondary" className="text-xs font-medium text-blue-700 bg-blue-50">
+                  <Banknote className="w-3 h-3" />
+                  Encaissé par serveur — à reverser
+                </Badge>
+              </>
+            )}
+            {!order.serverName && !order.cookName && (
+              <span className="text-xs text-muted-foreground">
+                Code: {order.agentCode}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-sm font-medium">Articles:</div>
+        {order.items.map((item, index) => (
+          <div 
+            key={index} 
+            className="flex justify-between text-sm bg-muted p-2 rounded"
+          >
+            <span>{item.name} x{item.quantity}</span>
+            <span className="font-medium">{Number(item.price * item.quantity).toLocaleString()} XAF</span>
+          </div>
+        ))}
+        <div className="flex justify-between font-bold text-lg pt-2 border-t">
+          <span>Total:</span>
+          <span className="text-nack-red">{Number(order.total || 0).toLocaleString()} XAF</span>
+        </div>
+      </div>
+
+      {showActions && (
+        <div className="flex flex-wrap gap-2">
+          {order.status === 'awaiting-validation' && (
+            <>
+              <Button
+                onClick={() => handleValidateOrder(order)}
+                className="flex-1 bg-gradient-primary text-white shadow-button min-w-[140px]"
+                disabled={processingIds.has(order.id)}
+                type="button"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Valider et envoyer en cuisine
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleCancelOrderClick(order)}
+                disabled={processingIds.has(order.id) || isCancelling}
+                type="button"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Annuler
+              </Button>
+            </>
+          )}
+
+          {order.status === 'delivered' && order.paymentStatus !== 'paid' && (
+            <>
+              <select
+                className="border rounded px-2 text-sm h-9"
+                value={paymentMethodByOrder[order.id] || 'cash'}
+                onChange={(e) => setPaymentMethodFor(order.id, e.target.value as PaymentMethod)}
+              >
+                <option value="cash">Espèces</option>
+                <option value="mobile">Mobile Money</option>
+                <option value="card">Carte</option>
+              </select>
+              <Button
+                onClick={() => handleCashInOrder(order)}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-button min-w-[140px]"
+                disabled={processingIds.has(order.id)}
+                type="button"
+              >
+                <Banknote className="h-4 w-4 mr-2" />
+                Encaisser {Number(order.total || 0).toLocaleString()} XAF
+              </Button>
+            </>
+          )}
+
+          {order.status === 'paid' && (
+            <Button
+              onClick={() => handleCloseOrder(order)}
+              variant="outline"
+              className="flex-1"
+              type="button"
+            >
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Clôturer la commande
+            </Button>
+          )}
+
+          {canCancelOrderStatus(order.status) && (
+            <Button
+              variant="destructive"
+              onClick={() => handleCancelOrderClick(order)}
+              disabled={processingIds.has(order.id) || isCancelling}
+              type="button"
+              className={order.status === 'awaiting-validation' ? '' : 'flex-1'}
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              Annuler
+            </Button>
+          )}
+
+          {isOwnerAuthed && order.status === 'delivered' && order.paymentStatus !== 'paid' && onGoToSales && (
+            <Button
+              variant="secondary"
+              type="button"
+              onClick={() => loadOrderForSales(order, false)}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Modifier
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <Card className="shadow-card border-0">
       <CardHeader>
@@ -530,175 +702,58 @@ const OrderManagement = ({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 max-h-[500px] overflow-y-auto">
+      <CardContent className="space-y-6 max-h-[600px] overflow-y-auto">
         {sortedOrders.length === 0 ? (
           <p className="text-center text-muted-foreground py-8">
             Aucune commande pour le moment
           </p>
         ) : (
-          sortedOrders.map((order) => (
-            <div key={order.id} className="bg-card border rounded-lg p-4 space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 space-y-2">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="font-semibold text-lg">#{order.orderNumber}</div>
-                    <Badge variant="outline" className="text-sm font-semibold">
-                      Table {order.tableNumber}
-                    </Badge>
-                    <Badge className={`${getStatusStyle(order.status).badge} flex items-center gap-1`}>
-                      {getStatusIcon(order.status)}
-                      {getStatusStyle(order.status).text}
-                    </Badge>
-                    {order.status === 'paid' && order.paymentMethod && (
-                      <Badge variant="outline" className="text-xs">
-                        {order.paymentMethod === 'cash' ? 'Espèces' : order.paymentMethod === 'mobile' ? 'Mobile Money' : order.paymentMethod === 'card' ? 'Carte' : order.paymentMethod}
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap text-sm">
-                    <span className="text-muted-foreground">
-                      {new Date(order.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {order.serverName && (
-                      <>
-                        <span className="text-muted-foreground">•</span>
-                        <Badge variant="secondary" className="text-xs font-medium flex items-center gap-1 w-fit">
-                          <User className="w-3 h-3" />
-                          Serveur: {order.serverName}
-                        </Badge>
-                      </>
-                    )}
-                    {order.cookName && order.status !== 'awaiting-validation' && (
-                      <>
-                        <span className="text-muted-foreground">•</span>
-                        <Badge variant="secondary" className="text-xs font-medium flex items-center gap-1 w-fit">
-                          <ChefHat className="w-3 h-3" />
-                          Cuisinier: {order.cookName}
-                        </Badge>
-                      </>
-                    )}
-                    {order.paidBy === 'server' && (
-                      <>
-                        <span className="text-muted-foreground">•</span>
-                        <Badge variant="secondary" className="text-xs font-medium text-blue-700 bg-blue-50">
-                          <Banknote className="w-3 h-3" />
-                          Encaissé par serveur — à reverser
-                        </Badge>
-                      </>
-                    )}
-                    {!order.serverName && !order.cookName && (
-                      <span className="text-xs text-muted-foreground">
-                        Code: {order.agentCode}
-                      </span>
-                    )}
-                  </div>
+          <>
+            {/* Section À ENCAISSER */}
+            {ordersToCashIn.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-amber-500">
+                  <Banknote className="h-5 w-5 text-amber-600" />
+                  <h3 className="text-lg font-bold text-amber-700">
+                    À encaisser ({ordersToCashIn.length})
+                  </h3>
+                  <Badge className="bg-amber-100 text-amber-800 ml-auto">
+                    {ordersToCashIn.reduce((s, o) => s + Number(o.total || 0), 0).toLocaleString()} XAF
+                  </Badge>
                 </div>
+                {ordersToCashIn.map(renderOrderCard)}
               </div>
+            )}
 
-              <div className="space-y-2">
-                <div className="text-sm font-medium">Articles:</div>
-                {order.items.map((item, index) => (
-                  <div 
-                    key={index} 
-                    className="flex justify-between text-sm bg-muted p-2 rounded"
-                  >
-                    <span>{item.name} x{item.quantity}</span>
-                    <span className="font-medium">{Number(item.price * item.quantity).toLocaleString()} XAF</span>
-                  </div>
-                ))}
-                <div className="flex justify-between font-bold text-lg pt-2 border-t">
-                  <span>Total:</span>
-                  <span className="text-nack-red">{Number(order.total || 0).toLocaleString()} XAF</span>
+            {/* Section EN COURS */}
+            {ordersInProgress.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-blue-500">
+                  <Clock className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-bold text-blue-700">
+                    En cours ({ordersInProgress.length})
+                  </h3>
                 </div>
+                {ordersInProgress.map(renderOrderCard)}
               </div>
+            )}
 
-              {showActions && (
-                <div className="flex flex-wrap gap-2">
-                  {order.status === 'awaiting-validation' && (
-                    <>
-                      <Button
-                        onClick={() => handleValidateOrder(order)}
-                        className="flex-1 bg-gradient-primary text-white shadow-button min-w-[140px]"
-                        disabled={processingIds.has(order.id)}
-                        type="button"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Valider et envoyer en cuisine
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleCancelOrderClick(order)}
-                        disabled={processingIds.has(order.id) || isCancelling}
-                        type="button"
-                      >
-                        <XCircle className="h-4 w-4 mr-2" />
-                        Annuler
-                      </Button>
-                    </>
-                  )}
-
-                  {order.status === 'delivered' && order.paymentStatus !== 'paid' && (
-                    <>
-                      <select
-                        className="border rounded px-2 text-sm h-9"
-                        value={paymentMethodByOrder[order.id] || 'cash'}
-                        onChange={(e) => setPaymentMethodFor(order.id, e.target.value as PaymentMethod)}
-                      >
-                        <option value="cash">Espèces</option>
-                        <option value="mobile">Mobile Money</option>
-                        <option value="card">Carte</option>
-                      </select>
-                      <Button
-                        onClick={() => handleCashInOrder(order)}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-button min-w-[140px]"
-                        disabled={processingIds.has(order.id)}
-                        type="button"
-                      >
-                        <Banknote className="h-4 w-4 mr-2" />
-                        Encaisser {Number(order.total || 0).toLocaleString()} XAF
-                      </Button>
-                    </>
-                  )}
-
-                  {order.status === 'paid' && (
-                    <Button
-                      onClick={() => handleCloseOrder(order)}
-                      variant="outline"
-                      className="flex-1"
-                      type="button"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Clôturer la commande
-                    </Button>
-                  )}
-
-                  {canCancelOrderStatus(order.status) && (
-                    <Button
-                      variant="destructive"
-                      onClick={() => handleCancelOrderClick(order)}
-                      disabled={processingIds.has(order.id) || isCancelling}
-                      type="button"
-                      className={order.status === 'awaiting-validation' ? '' : 'flex-1'}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Annuler
-                    </Button>
-                  )}
-
-                  {isOwnerAuthed && order.status === 'delivered' && order.paymentStatus !== 'paid' && onGoToSales && (
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => loadOrderForSales(order, false)}
-                    >
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Modifier
-                    </Button>
-                  )}
+            {/* Section ENCAISSÉES */}
+            {ordersCashIn.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 pb-2 border-b-2 border-emerald-500">
+                  <CheckCircle className="h-5 w-5 text-emerald-600" />
+                  <h3 className="text-lg font-bold text-emerald-700">
+                    Encaissées ({ordersCashIn.length})
+                  </h3>
+                  <Badge className="bg-emerald-100 text-emerald-800 ml-auto">
+                    {ordersCashIn.reduce((s, o) => s + Number(o.total || 0), 0).toLocaleString()} XAF
+                  </Badge>
                 </div>
-              )}
-            </div>
-          ))
+                {ordersCashIn.map(renderOrderCard)}
+              </div>
+            )}
+          </>
         )}
       </CardContent>
 
