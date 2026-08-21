@@ -83,7 +83,7 @@ interface OutboxOrder {
 const ServeurInterface = () => {
   const { agentCode } = useParams();
   const { toast } = useToast();
-  const { addOrder, getOrdersByAgent, updateOrderStatus, orderCounter } = useOrders();
+  const { addOrder, getOrdersByAgent, updateOrderStatus, orderCounter, setOrderCounterFromFirestore } = useOrders();
   const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState("");
@@ -319,6 +319,11 @@ const ServeurInterface = () => {
         } as Order;
       });
       setLiveOrders(list);
+      // Synchroniser le compteur de commandes avec le max Firestore
+      const maxOrderNum = list.reduce((max, o) => Math.max(max, o.orderNumber || 0), 0);
+      if (maxOrderNum > 0) {
+        setOrderCounterFromFirestore(maxOrderNum);
+      }
     }, (error) => {
       console.error('Erreur lors du chargement des commandes en direct:', error);
     });

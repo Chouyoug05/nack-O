@@ -840,8 +840,13 @@ const AdminDashboard = () => {
 
       const profileSnap = await getDoc(doc(db, 'profiles', userId));
       if (profileSnap.exists()) {
-        const { syncPublicProfile } = await import('@/lib/publicProfile');
-        await syncPublicProfile(db, { uid: userId, ...(profileSnap.data() as UserProfile) });
+        try {
+          const { syncPublicProfile } = await import('@/lib/publicProfile');
+          await syncPublicProfile(db, { uid: userId, ...(profileSnap.data() as UserProfile) });
+          console.log('[Admin] Public profile synced for user:', userId);
+        } catch (syncError) {
+          console.error('[Admin] Failed to sync public profile:', syncError);
+        }
       }
 
       // Envoyer une notification à l'utilisateur

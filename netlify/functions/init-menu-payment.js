@@ -98,8 +98,12 @@ exports.handler = async (event) => {
       disbursement: disbursementId,
     });
 
-    if (!singpay.link) return json(502, { error: "Lien de paiement introuvable" });
+    if (!singpay.link) {
+      console.error('[SingPay] No link in response:', JSON.stringify(singpay).slice(0, 500));
+      return json(502, { error: "Lien de paiement introuvable" });
+    }
 
+    console.log('[SingPay] Payment link created:', singpay.link);
     await paymentRef.update({ paymentLink: singpay.link, updatedAt: Date.now() });
 
     return json(200, { link: singpay.link, exp: singpay.exp, paymentId: paymentRef.id });

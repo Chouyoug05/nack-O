@@ -527,7 +527,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await setDoc(ref, clean, { merge: true });
     const merged = { ...(profile || { uid: currentUser.uid, createdAt: now }), ...(clean as UserProfile) };
     setProfile(merged);
-    syncPublicProfile(db, merged).catch(() => undefined);
+    try {
+      await syncPublicProfile(db, merged);
+    } catch (syncError) {
+      console.error('[Auth] Failed to sync public profile:', syncError);
+    }
 
     // Sync avec l'Ã©tablissement actif
     const eid = payload.activeEstablishmentId || profile?.activeEstablishmentId;

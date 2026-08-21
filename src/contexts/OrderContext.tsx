@@ -8,6 +8,7 @@ interface OrderContextType {
   getOrdersByStatus: (status: OrderStatus) => Order[];
   getOrdersByAgent: (agentCode: string) => Order[];
   orderCounter: number;
+  setOrderCounterFromFirestore: (maxOrderNumber: number) => void;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -49,6 +50,10 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
     return orders.filter(order => order.agentCode === agentCode);
   };
 
+  const setOrderCounterFromFirestore = (maxOrderNumber: number) => {
+    setOrderCounter(prev => Math.max(prev, maxOrderNumber + 1));
+  };
+
   return (
     <OrderContext.Provider value={{
       orders,
@@ -56,7 +61,8 @@ export const OrderProvider = ({ children }: { children: ReactNode }) => {
       updateOrderStatus,
       getOrdersByStatus,
       getOrdersByAgent,
-      orderCounter
+      orderCounter,
+      setOrderCounterFromFirestore
     }}>
       {children}
     </OrderContext.Provider>

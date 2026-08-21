@@ -545,6 +545,7 @@ const PublicOrderingPage = () => {
             orderData,
           });
 
+          console.log('[Payment] Link created:', paymentLink);
           await openPaymentUrl(paymentLink);
           return;
         } catch (error) {
