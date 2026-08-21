@@ -478,22 +478,32 @@ const SalesPage = () => {
       const ownerUidForWrites = user.uid;
       // 2) Batch atomique: décrémenter le stock + créer la vente
       const batch = writeBatch(db);
+      const skippedItems: string[] = [];
       for (const item of cart) {
         const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
         let currentQty: number;
         if (!isOnline) {
           const p = products.find((x) => x.id === item.id);
-          if (!p) throw new Error(`Produit introuvable: ${item.name}`);
+          if (!p) {
+            skippedItems.push(item.name);
+            continue;
+          }
           currentQty = Number(p.stock ?? 0);
         } else {
           const snap = await getDoc(productRef);
-          if (!snap.exists()) throw new Error(`Produit introuvable: ${item.name}`);
+          if (!snap.exists()) {
+            skippedItems.push(item.name);
+            continue;
+          }
           const data = snap.data() as ProductDoc;
           currentQty = Number((data as { quantity?: number }).quantity ?? 0);
         }
         const qtyToDecrement = Number(item.quantity || 0);
         if (qtyToDecrement <= 0) continue;
-        if (currentQty < qtyToDecrement) throw new Error(`Stock insuffisant pour ${item.name}`);
+        if (currentQty < qtyToDecrement) {
+          skippedItems.push(`${item.name} (stock insuffisant: ${currentQty})`);
+          continue;
+        }
         batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
       }
         const saleItems: SaleItem[] = cart.map((ci) =>
@@ -542,10 +552,19 @@ const SalesPage = () => {
         localStorage.removeItem('nack_prefill_order_meta');
       } catch { /* ignore */ }
 
+      // Afficher un avertissement si des articles ont été ignorés
+      if (skippedItems.length > 0) {
+        toast({
+          title: "Stock non décrémenté",
+          description: `Les articles suivants n'ont pas été trouvés ou ont un stock insuffisant : ${skippedItems.join(', ')}`,
+          variant: "destructive",
+        });
+      }
+
       toast({
         title: "Vente enregistrée",
         description: !isOnline
-          ? `Vente de ${cartTotal.toLocaleString()} XAF — enregistrée sur l’appareil ; synchro automatique au retour du réseau.`
+          ? `Vente de ${cartTotal.toLocaleString()} XAF — enregistrée sur l'appareil ; synchro automatique au retour du réseau.`
           : `Vente de ${cartTotal.toLocaleString()} XAF`,
       });
       
