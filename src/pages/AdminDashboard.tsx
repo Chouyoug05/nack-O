@@ -2732,10 +2732,15 @@ const AdminDashboard = () => {
                         <TableCell>{order.tableNumber}</TableCell>
                         <TableCell className="font-semibold">{order.total.toLocaleString()} XAF</TableCell>
                         <TableCell>
-                          {order.status === 'pending' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">En attente</Badge>}
-                          {order.status === 'sent' && <Badge className="bg-green-100 text-green-700" variant="secondary">Envoyée</Badge>}
+                          {order.status === 'awaiting-validation' && <Badge className="bg-amber-100 text-amber-700" variant="secondary">En attente de validation</Badge>}
+                          {order.status === 'validated' && <Badge className="bg-green-100 text-green-700" variant="secondary">Validée</Badge>}
+                          {order.status === 'in-preparation' && <Badge className="bg-yellow-100 text-yellow-700" variant="secondary">En préparation</Badge>}
+                          {order.status === 'ready' && <Badge className="bg-green-600 text-white" variant="secondary">Prête</Badge>}
+                          {order.status === 'delivered' && <Badge className="bg-blue-100 text-blue-700" variant="secondary">Livrée</Badge>}
+                          {order.status === 'paid' && <Badge className="bg-emerald-100 text-emerald-700" variant="secondary">Payée</Badge>}
+                          {order.status === 'closed' && <Badge className="bg-gray-100 text-gray-700" variant="secondary">Clôturée</Badge>}
                           {order.status === 'cancelled' && <Badge className="bg-red-100 text-red-700" variant="secondary">Annulée</Badge>}
-                          {!['pending', 'sent', 'cancelled'].includes(order.status) && <Badge variant="secondary">{order.status}</Badge>}
+                          {!['awaiting-validation', 'validated', 'in-preparation', 'ready', 'delivered', 'paid', 'closed', 'cancelled'].includes(order.status) && <Badge variant="secondary">{order.status}</Badge>}
                         </TableCell>
                         <TableCell>{new Date(order.createdAt).toLocaleString('fr-FR')}</TableCell>
                         <TableCell>
@@ -2756,8 +2761,13 @@ const AdminDashboard = () => {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="pending">En attente</SelectItem>
-                                <SelectItem value="sent">Envoyée</SelectItem>
+                                <SelectItem value="awaiting-validation">En attente de validation</SelectItem>
+                                <SelectItem value="validated">Validée</SelectItem>
+                                <SelectItem value="in-preparation">En préparation</SelectItem>
+                                <SelectItem value="ready">Prête</SelectItem>
+                                <SelectItem value="delivered">Livrée</SelectItem>
+                                <SelectItem value="paid">Payée</SelectItem>
+                                <SelectItem value="closed">Clôturée</SelectItem>
                                 <SelectItem value="cancelled">Annulée</SelectItem>
                               </SelectContent>
                             </Select>
@@ -2796,10 +2806,15 @@ const AdminDashboard = () => {
                         </div>
                         <div className="text-right">
                           <p className="font-bold text-lg">{order.total.toLocaleString()} XAF</p>
-                          {order.status === 'pending' && <Badge className="bg-amber-100 text-amber-700 text-xs mt-1" variant="secondary">En attente</Badge>}
-                          {order.status === 'sent' && <Badge className="bg-green-100 text-green-700 text-xs mt-1" variant="secondary">Envoyée</Badge>}
+                          {order.status === 'awaiting-validation' && <Badge className="bg-amber-100 text-amber-700 text-xs mt-1" variant="secondary">En attente de validation</Badge>}
+                          {order.status === 'validated' && <Badge className="bg-green-100 text-green-700 text-xs mt-1" variant="secondary">Validée</Badge>}
+                          {order.status === 'in-preparation' && <Badge className="bg-yellow-100 text-yellow-700 text-xs mt-1" variant="secondary">En préparation</Badge>}
+                          {order.status === 'ready' && <Badge className="bg-green-600 text-white text-xs mt-1" variant="secondary">Prête</Badge>}
+                          {order.status === 'delivered' && <Badge className="bg-blue-100 text-blue-700 text-xs mt-1" variant="secondary">Livrée</Badge>}
+                          {order.status === 'paid' && <Badge className="bg-emerald-100 text-emerald-700 text-xs mt-1" variant="secondary">Payée</Badge>}
+                          {order.status === 'closed' && <Badge className="bg-gray-100 text-gray-700 text-xs mt-1" variant="secondary">Clôturée</Badge>}
                           {order.status === 'cancelled' && <Badge className="bg-red-100 text-red-700 text-xs mt-1" variant="secondary">Annulée</Badge>}
-                          {!['pending', 'sent', 'cancelled'].includes(order.status) && <Badge variant="secondary" className="text-xs mt-1">{order.status}</Badge>}
+                          {!['awaiting-validation', 'validated', 'in-preparation', 'ready', 'delivered', 'paid', 'closed', 'cancelled'].includes(order.status) && <Badge variant="secondary" className="text-xs mt-1">{order.status}</Badge>}
                         </div>
                       </div>
                       <div className="pt-2 border-t space-y-1">
@@ -2822,8 +2837,13 @@ const AdminDashboard = () => {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pending">En attente</SelectItem>
-                              <SelectItem value="sent">Envoyée</SelectItem>
+                              <SelectItem value="awaiting-validation">En attente de validation</SelectItem>
+                              <SelectItem value="validated">Validée</SelectItem>
+                              <SelectItem value="in-preparation">En préparation</SelectItem>
+                              <SelectItem value="ready">Prête</SelectItem>
+                              <SelectItem value="delivered">Livrée</SelectItem>
+                              <SelectItem value="paid">Payée</SelectItem>
+                              <SelectItem value="closed">Clôturée</SelectItem>
                               <SelectItem value="cancelled">Annulée</SelectItem>
                             </SelectContent>
                           </Select>

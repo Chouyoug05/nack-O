@@ -118,16 +118,6 @@ const Dashboard = () => {
   });
   const [barPendingCount, setBarPendingCount] = useState<number>(0);
   const [tablePendingCount, setTablePendingCount] = useState<number>(0);
-  const [foodProducts, setFoodProducts] = useState<Array<{
-    id: string;
-    name: string;
-    category: string;
-    price: number;
-    foodCost?: {
-      rawMaterials: Array<{ name: string; unitCost: number }>;
-      productionCosts: Array<{ type: string; amount: number }>;
-    };
-  }>>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -138,27 +128,6 @@ const Dashboard = () => {
       productsColRef(db, user.uid),
       (snap) => {
         setStatsValues((prev) => ({ ...prev, productsCount: snap.size }));
-        const profitableItems = snap.docs
-          .map(d => {
-            const data = d.data();
-            const category = data.category || "";
-            const isEligible = isFoodBusiness ? foodCategories.includes(category) : true;
-            if (isEligible && data.foodCost) {
-              return {
-                id: d.id,
-                name: data.name || "",
-                category,
-                price: Number(data.price || 0),
-                foodCost: data.foodCost as {
-                  rawMaterials: Array<{ name: string; unitCost: number }>;
-                  productionCosts: Array<{ type: string; amount: number }>;
-                }
-              };
-            }
-            return null;
-          })
-          .filter((item): item is NonNullable<typeof item> => item !== null);
-        setFoodProducts(profitableItems);
       }
     ));
 
@@ -192,7 +161,7 @@ const Dashboard = () => {
     // Menu Digital pending orders count (source de vérité : orders source 'qr')
     try {
       const barOrdersRef = collection(db, `profiles/${user.uid}/orders`);
-      const pendingQ = query(barOrdersRef, where('status', '==', 'pending'), where('source', '==', 'qr'));
+      const pendingQ = query(barOrdersRef, where('status', '==', 'awaiting-validation'), where('source', '==', 'qr'));
       unsubs.push(onSnapshot(pendingQ, (snap) => setBarPendingCount(snap.size)));
     } catch {
       setBarPendingCount(0);
@@ -200,7 +169,7 @@ const Dashboard = () => {
 
     // Commandes table / serveur en attente
     try {
-      const tablePendingQ = query(ordersColRef(db, user.uid), where('status', '==', 'pending'));
+      const tablePendingQ = query(ordersColRef(db, user.uid), where('status', '==', 'awaiting-validation'));
       unsubs.push(onSnapshot(tablePendingQ, (snap) => setTablePendingCount(snap.size)));
     } catch {
       setTablePendingCount(0);
@@ -390,7 +359,7 @@ const Dashboard = () => {
       )}
 
       {/* Rentabilité des plats */}
-      {activeAction === "menu" && foodProducts.length > 0 && (
+      {activeAction === "menu" && false && (
         <section className="p-4 md:p-6 lg:p-8 pt-2 md:pt-4 lg:pt-6">
           <div className="w-full max-w-7xl mx-auto">
             <Card className="shadow-card border-0">

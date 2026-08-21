@@ -42,9 +42,8 @@ exports.handler = async (event) => {
     if (subType === "menu-digital" && payment.orderData && establishmentId) {
       const orderData = {
         ...payment.orderData,
-        status: "pending",
+        status: "awaiting-validation",
         paymentStatus: "paid",
-        kitchenStatus: "en-attente",
         source: "qr",
         paidAt: now,
         paymentMethod: "airtel-money",

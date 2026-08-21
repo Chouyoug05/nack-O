@@ -196,7 +196,7 @@ const SalesPage = () => {
 
   useEffect(() => {
     if (!user) return;
-    const q = query(ordersColRef(db, user.uid), where('status', '==', 'pending'));
+    const q = query(ordersColRef(db, user.uid), where('status', '==', 'awaiting-validation'));
     const unsub = onSnapshot(q, (snap) => setPendingCount(snap.size));
     return () => unsub();
   }, [user]);
@@ -518,7 +518,7 @@ const SalesPage = () => {
       batch.set(saleRef, saleDoc);
       await batch.commit();
 
-      // Marquer la commande source comme "Validée" si meta ou édition en cours
+      // Marquer la commande source comme payée par le gérant après encaissement
       try {
         const orderIdToClose = editingOrderId || (() => {
           const metaRaw = localStorage.getItem('nack_prefill_order_meta');
@@ -528,7 +528,16 @@ const SalesPage = () => {
         })();
         if (orderIdToClose) {
           const owner = ownerUidForWrites;
-          await updateDoc(fsDoc(ordersColRef(db, owner), orderIdToClose), { status: 'sent' });
+          const paidAt = Date.now();
+          await updateDoc(fsDoc(ordersColRef(db, owner), orderIdToClose), {
+            status: 'paid',
+            paymentStatus: 'paid',
+            paymentMethod: selectedPayment,
+            paidBy: 'manager',
+            managerId: user?.uid,
+            paidAt,
+            updatedAt: paidAt,
+          });
         }
         localStorage.removeItem('nack_prefill_order_meta');
       } catch { /* ignore */ }

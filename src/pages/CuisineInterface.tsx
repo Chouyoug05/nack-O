@@ -5,19 +5,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Order, CartItem } from "@/types/order";
-import { KitchenStatus } from "@/types/order";
+import { OrderStatus, ORDER_STATUS_LABELS } from "@/types/order";
 import { 
   LogOut,
   User,
   Clock,
   CheckCircle,
   UtensilsCrossed,
-  AlertCircle
+  ChefHat,
+  Bell
 } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { ordersColRef, agentTokensTopColRef } from "@/lib/collections";
+import { ordersColRef, agentTokensTopColRef, notificationsColRef } from "@/lib/collections";
 import { ensureAgentSession } from "@/lib/agentSession";
-import { onSnapshot, query, orderBy, updateDoc, doc, getDoc, collectionGroup, where, limit, getDocs } from "firebase/firestore";
+import { onSnapshot, query, orderBy, updateDoc, doc, getDoc, collectionGroup, where, limit, getDocs, addDoc } from "firebase/firestore";
 
 interface FirestoreOrderItem {
   id?: string;
@@ -33,16 +34,18 @@ interface FirestoreOrderDoc {
   tableNumber?: string;
   items?: FirestoreOrderItem[];
   total?: number;
-  status?: string;
-  kitchenStatus?: KitchenStatus;
+  status?: OrderStatus;
   createdAt?: number;
   agentCode?: string;
   agentMemberId?: string;
   agentName?: string;
+  serverId?: string;
+  serverName?: string;
+  cookId?: string;
+  cookName?: string;
 }
 
 interface OrderWithKitchen extends Order {
-  kitchenStatus?: KitchenStatus;
   foodItems?: CartItem[];
 }
 
@@ -65,6 +68,9 @@ const isFoodCategory = (category?: string): boolean => {
 };
 
 const getServeurAuthKey = (agentCode: string) => `nack_serveur_auth_${agentCode}`;
+
+// Statuts que la cuisine est autorisée à voir : uniquement les commandes validées par un serveur
+const KITCHEN_STATUSES: OrderStatus[] = ['validated', 'in-preparation', 'ready'];
 
 const CuisineInterface = () => {
   const { agentCode } = useParams();
@@ -155,7 +161,7 @@ const CuisineInterface = () => {
     resolveOwner();
   }, [agentCode]);
 
-  // Charger les commandes avec produits alimentaires uniquement
+  // Charger uniquement les commandes validées par un serveur (jamais en attente de validation)
   useEffect(() => {
     if (!ownerUid) {
       setIsLoading(false);
@@ -183,6 +189,12 @@ const CuisineInterface = () => {
         if (foodItems.length === 0) return null;
 
         const createdAtMs = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
+        const rawStatus = (data.status ?? 'awaiting-validation') as OrderStatus;
+        // Compatibilité : les anciennes commandes 'pending' équivalent à 'awaiting-validation'
+        const status: OrderStatus = rawStatus === 'pending' ? 'awaiting-validation' : rawStatus;
+        // La cuisine ne voit que les commandes validées par un serveur
+        if (!KITCHEN_STATUSES.includes(status)) return null;
+
         return {
           id: d.id,
           orderNumber: data.orderNumber ?? 0,
@@ -190,11 +202,14 @@ const CuisineInterface = () => {
           items,
           foodItems,
           total: Number(data.total ?? 0),
-          status: (data.status ?? 'pending') as string,
-          kitchenStatus: (data.kitchenStatus ?? 'en-attente') as KitchenStatus,
+          status,
           createdAt: new Date(createdAtMs),
           agentCode: data.agentCode ?? data.agentMemberId ?? '—',
           agentName: data.agentName,
+          serverId: data.serverId,
+          serverName: data.serverName,
+          cookId: data.cookId,
+          cookName: data.cookName,
         } as OrderWithKitchen;
       }).filter((o): o is OrderWithKitchen => o !== null);
 
@@ -207,65 +222,102 @@ const CuisineInterface = () => {
     return () => unsub();
   }, [ownerUid]);
 
-  const updateKitchenStatus = async (orderId: string, status: KitchenStatus) => {
+  // Le cuisinier commence la préparation (validated → in-preparation)
+  const startPreparation = async (order: OrderWithKitchen) => {
     if (!ownerUid) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour le statut. Propriétaire non identifié.",
-        variant: "destructive"
-      });
+      toast({ title: "Erreur", description: "Propriétaire non identifié.", variant: "destructive" });
       return;
     }
-
     try {
-      const orderRef = doc(ordersColRef(db, ownerUid), orderId);
+      const orderRef = doc(ordersColRef(db, ownerUid), order.id);
       await updateDoc(orderRef, {
-        kitchenStatus: status,
+        status: 'in-preparation',
+        startedAt: Date.now(),
+        cookId: agentCode,
+        cookName: agentInfo?.name,
         updatedAt: Date.now(),
       });
+      toast({ title: "Préparation démarrée", description: `Commande #${order.orderNumber} en cours` });
+    } catch (error) {
+      console.error('Erreur lors du démarrage:', error);
+      toast({ title: "Erreur", description: "Impossible de démarrer la préparation.", variant: "destructive" });
+    }
+  };
 
-      const statusLabels: Record<KitchenStatus, string> = {
-        'en-attente': 'En attente',
-        'en-preparation': 'En préparation',
-        'pret': 'Prêt',
-        'termine': 'Terminé'
-      };
-
-      toast({
-        title: "Statut mis à jour",
-        description: `Commande marquée comme "${statusLabels[status]}"`,
+  // Le cuisinier termine la préparation (in-preparation → ready) + notifie le serveur
+  const completePreparation = async (order: OrderWithKitchen) => {
+    if (!ownerUid) {
+      toast({ title: "Erreur", description: "Propriétaire non identifié.", variant: "destructive" });
+      return;
+    }
+    try {
+      const orderRef = doc(ordersColRef(db, ownerUid), order.id);
+      const completedByCookAt = Date.now();
+      await updateDoc(orderRef, {
+        status: 'ready',
+        completedByCookAt,
+        cookId: agentCode,
+        cookName: agentInfo?.name,
+        updatedAt: completedByCookAt,
       });
+
+      // Notification ciblée au serveur qui a validé la commande (et au gérant)
+      if (order.serverId) {
+        try {
+          await addDoc(notificationsColRef(db, ownerUid), {
+            title: "Commande prête 🍽️",
+            message: `Commande #${order.orderNumber} — Table ${order.tableNumber} est prête à servir`,
+            type: "success",
+            targetAgentCode: order.serverId,
+            targetRole: "server",
+            orderId: order.id,
+            orderNumber: order.orderNumber,
+            read: false,
+            createdAt: completedByCookAt,
+          });
+        } catch { /* ignore notification errors */ }
+      }
+
+      toast({ title: "Préparation terminée", description: `Commande #${order.orderNumber} prête. Le serveur a été notifié.` });
     } catch (error) {
       console.error('Erreur lors de la mise à jour:', error);
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour le statut de la commande.",
-        variant: "destructive"
+      toast({ title: "Erreur", description: "Impossible de finaliser la préparation.", variant: "destructive" });
+    }
+  };
+
+  // Revenir à la liste (in-preparation → validated) si besoin
+  const revertToValidated = async (order: OrderWithKitchen) => {
+    if (!ownerUid) return;
+    try {
+      const orderRef = doc(ordersColRef(db, ownerUid), order.id);
+      await updateDoc(orderRef, {
+        status: 'validated',
+        updatedAt: Date.now(),
       });
+      toast({ title: "Retour", description: `Commande #${order.orderNumber} remise en attente de préparation` });
+    } catch (error) {
+      console.error('Erreur lors du retour:', error);
     }
   };
 
-  const getStatusBadge = (status: KitchenStatus) => {
+  const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
-      case 'en-attente':
-        return <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300"><Clock className="w-3 h-3 mr-1" />En attente</Badge>;
-      case 'en-preparation':
+      case 'validated':
+        return <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300"><Clock className="w-3 h-3 mr-1" />À préparer</Badge>;
+      case 'in-preparation':
         return <Badge variant="outline" className="bg-yellow-100 text-yellow-700 border-yellow-300"><Clock className="w-3 h-3 mr-1" />En préparation</Badge>;
-      case 'pret':
-        return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />Prêt</Badge>;
-      case 'termine':
-        return <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300"><CheckCircle className="w-3 h-3 mr-1" />Terminé</Badge>;
+      case 'ready':
+        return <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />Prête</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline">{ORDER_STATUS_LABELS[status] || status}</Badge>;
     }
   };
 
-  const getStatusColor = (status: KitchenStatus): string => {
+  const getStatusColor = (status: OrderStatus): string => {
     switch (status) {
-      case 'en-attente': return 'bg-gray-200 border-gray-300';
-      case 'en-preparation': return 'bg-yellow-200 border-yellow-400';
-      case 'pret': return 'bg-green-200 border-green-400';
-      case 'termine': return 'bg-blue-200 border-blue-400';
+      case 'validated': return 'bg-gray-200 border-gray-300';
+      case 'in-preparation': return 'bg-yellow-200 border-yellow-400';
+      case 'ready': return 'bg-green-200 border-green-400';
       default: return 'bg-gray-200 border-gray-300';
     }
   };
@@ -276,10 +328,9 @@ const CuisineInterface = () => {
 
   // Grouper les commandes par statut
   const ordersByStatus = {
-    'en-attente': orders.filter(o => o.kitchenStatus === 'en-attente'),
-    'en-preparation': orders.filter(o => o.kitchenStatus === 'en-preparation'),
-    'pret': orders.filter(o => o.kitchenStatus === 'pret'),
-    'termine': orders.filter(o => o.kitchenStatus === 'termine'),
+    'validated': orders.filter(o => o.status === 'validated'),
+    'in-preparation': orders.filter(o => o.status === 'in-preparation'),
+    'ready': orders.filter(o => o.status === 'ready'),
   };
 
   return (
@@ -295,7 +346,7 @@ const CuisineInterface = () => {
               {agentInfo?.name || 'Cuisine'}
             </h1>
             <p className="text-xs md:text-sm text-muted-foreground">
-              Interface Cuisine
+              Interface Cuisine — commandes validées par le serveur
             </p>
           </div>
         </div>
@@ -320,27 +371,29 @@ const CuisineInterface = () => {
             <Card className="border border-gray-200 bg-white shadow-sm">
               <CardContent className="text-center py-12">
                 <UtensilsCrossed className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">Aucune commande</h3>
+                <h3 className="text-lg font-semibold mb-2">Aucune commande à préparer</h3>
                 <p className="text-muted-foreground">
-                  Aucune commande contenant de la nourriture pour le moment.
+                  Les commandes validées par un serveur apparaîtront ici.
                 </p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-6">
-              {/* En attente */}
-              {ordersByStatus['en-attente'].length > 0 && (
+              {/* À préparer */}
+              {ordersByStatus['validated'].length > 0 && (
                 <div>
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Clock className="w-5 h-5 text-gray-600" />
-                    En attente ({ordersByStatus['en-attente'].length})
+                    À préparer ({ordersByStatus['validated'].length})
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {ordersByStatus['en-attente'].map((order) => (
+                    {ordersByStatus['validated'].map((order) => (
                       <OrderCard
                         key={order.id}
                         order={order}
-                        onStatusChange={updateKitchenStatus}
+                        onStart={startPreparation}
+                        onComplete={completePreparation}
+                        onRevert={revertToValidated}
                         getStatusBadge={getStatusBadge}
                         getStatusColor={getStatusColor}
                       />
@@ -350,18 +403,20 @@ const CuisineInterface = () => {
               )}
 
               {/* En préparation */}
-              {ordersByStatus['en-preparation'].length > 0 && (
+              {ordersByStatus['in-preparation'].length > 0 && (
                 <div>
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
                     <Clock className="w-5 h-5 text-yellow-600" />
-                    En préparation ({ordersByStatus['en-preparation'].length})
+                    En préparation ({ordersByStatus['in-preparation'].length})
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {ordersByStatus['en-preparation'].map((order) => (
+                    {ordersByStatus['in-preparation'].map((order) => (
                       <OrderCard
                         key={order.id}
                         order={order}
-                        onStatusChange={updateKitchenStatus}
+                        onStart={startPreparation}
+                        onComplete={completePreparation}
+                        onRevert={revertToValidated}
                         getStatusBadge={getStatusBadge}
                         getStatusColor={getStatusColor}
                       />
@@ -370,40 +425,21 @@ const CuisineInterface = () => {
                 </div>
               )}
 
-              {/* Prêt */}
-              {ordersByStatus['pret'].length > 0 && (
+              {/* Prêtes */}
+              {ordersByStatus['ready'].length > 0 && (
                 <div>
                   <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-green-600" />
-                    Prêt ({ordersByStatus['pret'].length})
+                    <Bell className="w-5 h-5 text-green-600" />
+                    Prêtes ({ordersByStatus['ready'].length})
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {ordersByStatus['pret'].map((order) => (
+                    {ordersByStatus['ready'].map((order) => (
                       <OrderCard
                         key={order.id}
                         order={order}
-                        onStatusChange={updateKitchenStatus}
-                        getStatusBadge={getStatusBadge}
-                        getStatusColor={getStatusColor}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Terminé */}
-              {ordersByStatus['termine'].length > 0 && (
-                <div>
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <CheckCircle className="w-5 h-5 text-blue-600" />
-                    Terminé ({ordersByStatus['termine'].length})
-                  </h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {ordersByStatus['termine'].map((order) => (
-                      <OrderCard
-                        key={order.id}
-                        order={order}
-                        onStatusChange={updateKitchenStatus}
+                        onStart={startPreparation}
+                        onComplete={completePreparation}
+                        onRevert={revertToValidated}
                         getStatusBadge={getStatusBadge}
                         getStatusColor={getStatusColor}
                       />
@@ -421,13 +457,15 @@ const CuisineInterface = () => {
 
 interface OrderCardProps {
   order: OrderWithKitchen;
-  onStatusChange: (orderId: string, status: KitchenStatus) => void;
-  getStatusBadge: (status: KitchenStatus) => JSX.Element;
-  getStatusColor: (status: KitchenStatus) => string;
+  onStart: (order: OrderWithKitchen) => void;
+  onComplete: (order: OrderWithKitchen) => void;
+  onRevert: (order: OrderWithKitchen) => void;
+  getStatusBadge: (status: OrderStatus) => JSX.Element;
+  getStatusColor: (status: OrderStatus) => string;
 }
 
-const OrderCard = ({ order, onStatusChange, getStatusBadge, getStatusColor }: OrderCardProps) => {
-  const currentStatus = order.kitchenStatus || 'en-attente';
+const OrderCard = ({ order, onStart, onComplete, onRevert, getStatusBadge, getStatusColor }: OrderCardProps) => {
+  const currentStatus = order.status || 'validated';
   const foodItems = order.foodItems || order.items.filter(item => isFoodCategory(item.category));
 
   return (
@@ -441,12 +479,21 @@ const OrderCard = ({ order, onStatusChange, getStatusBadge, getStatusColor }: Or
           <span>Table: {order.tableNumber}</span>
           <span>•</span>
           <span>{new Date(order.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-          {order.agentName && (
+          {order.serverName && (
             <>
               <span>•</span>
               <Badge variant="secondary" className="w-fit text-xs font-medium flex items-center gap-1">
                 <User className="w-3 h-3" />
-                Serveur: {order.agentName}
+                Serveur: {order.serverName}
+              </Badge>
+            </>
+          )}
+          {order.cookName && (
+            <>
+              <span>•</span>
+              <Badge variant="secondary" className="w-fit text-xs font-medium flex items-center gap-1">
+                <ChefHat className="w-3 h-3" />
+                {order.cookName}
               </Badge>
             </>
           )}
@@ -466,42 +513,42 @@ const OrderCard = ({ order, onStatusChange, getStatusBadge, getStatusColor }: Or
           </div>
         </div>
 
-        {/* Boutons d'actions - Gros boutons pour faciliter l'utilisation */}
+        {/* Boutons d'actions */}
         <div className="grid grid-cols-2 gap-2 pt-2">
-          {currentStatus === 'en-attente' && (
+          {currentStatus === 'validated' && (
             <Button
-              onClick={() => onStatusChange(order.id, 'en-preparation')}
-              className="w-full bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base font-bold"
+              onClick={() => onStart(order)}
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-white h-12 text-base font-bold col-span-2"
             >
               <Clock className="w-5 h-5 mr-2" />
-              En préparation
+              Commencer la préparation
             </Button>
           )}
-          {currentStatus === 'en-preparation' && (
-            <Button
-              onClick={() => onStatusChange(order.id, 'pret')}
-              className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-bold"
-            >
-              <CheckCircle className="w-5 h-5 mr-2" />
-              Prêt
-            </Button>
+          {currentStatus === 'in-preparation' && (
+            <>
+              <Button
+                onClick={() => onComplete(order)}
+                className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-bold"
+              >
+                <CheckCircle className="w-5 h-5 mr-2" />
+                Préparation terminée
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => onRevert(order)}
+                className="w-full h-12 text-base font-bold"
+              >
+                Retour
+              </Button>
+            </>
           )}
-          {currentStatus === 'pret' && (
+          {currentStatus === 'ready' && (
             <Button
-              onClick={() => onStatusChange(order.id, 'termine')}
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white h-12 text-base font-bold"
+              disabled
+              className="w-full bg-green-100 text-green-700 h-12 text-base font-bold col-span-2"
             >
-              <CheckCircle className="w-5 h-5 mr-2" />
-              Terminé
-            </Button>
-          )}
-          {(currentStatus === 'en-preparation' || currentStatus === 'pret') && (
-            <Button
-              variant="outline"
-              onClick={() => onStatusChange(order.id, 'en-attente')}
-              className="w-full h-12 text-base font-bold"
-            >
-              Retour
+              <Bell className="w-5 h-5 mr-2" />
+              Prête — le serveur a été notifié
             </Button>
           )}
         </div>
@@ -511,4 +558,3 @@ const OrderCard = ({ order, onStatusChange, getStatusBadge, getStatusColor }: Or
 };
 
 export default CuisineInterface;
-

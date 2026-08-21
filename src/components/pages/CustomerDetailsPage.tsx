@@ -170,10 +170,23 @@ const CustomerDetailsPage = () => {
 
   const getOrderStatusBadge = (status: string) => {
     switch (status) {
+      case "awaiting-validation":
       case "pending":
-        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300"><Clock className="w-3 h-3 mr-1" />En attente</Badge>;
+        return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-300"><Clock className="w-3 h-3 mr-1" />En attente de validation</Badge>;
+      case "validated":
       case "sent":
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />Envoyée</Badge>;
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />Validée</Badge>;
+      case "in-preparation":
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300"><Clock className="w-3 h-3 mr-1" />En préparation</Badge>;
+      case "ready":
+        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300"><CheckCircle className="w-3 h-3 mr-1" />Prête</Badge>;
+      case "delivered":
+      case "served":
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300"><CheckCircle className="w-3 h-3 mr-1" />Livrée</Badge>;
+      case "paid":
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300"><CheckCircle className="w-3 h-3 mr-1" />Payée</Badge>;
+      case "closed":
+        return <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300"><CheckCircle className="w-3 h-3 mr-1" />Clôturée</Badge>;
       case "cancelled":
         return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300"><XCircle className="w-3 h-3 mr-1" />Annulée</Badge>;
       default:

@@ -75,7 +75,7 @@ service cloud.firestore {
 
         request.resource.data.source == 'qr' &&
 
-        request.resource.data.status == 'pending' &&
+        (request.resource.data.status == 'awaiting-validation' || request.resource.data.status == 'pending') &&
 
         request.resource.data.total is number &&
 
@@ -85,6 +85,25 @@ service cloud.firestore {
 
         request.resource.data.createdAt is int;
 
+    }
+
+    // Machine d'état du circuit des commandes :
+    // Client → Serveur (awaiting-validation) → Cuisine (validated/in-preparation/ready) → Serveur (delivered) → Gérant (paid/closed)
+    function orderStatusTransitionAllowed() {
+      // Statut inchangé : modification d'autres champs (attribution, horodatage, paiement)
+      return resource.data.status == request.resource.data.status ||
+        // Compatibilité anciens statuts
+        (resource.data.status == 'pending' && (request.resource.data.status == 'awaiting-validation' || request.resource.data.status == 'validated' || request.resource.data.status == 'cancelled')) ||
+        (resource.data.status == 'sent' && (request.resource.data.status == 'validated' || request.resource.data.status == 'in-preparation' || request.resource.data.status == 'ready' || request.resource.data.status == 'cancelled')) ||
+        (resource.data.status == 'served' && (request.resource.data.status == 'delivered' || request.resource.data.status == 'paid' || request.resource.data.status == 'closed')) ||
+        (resource.data.status == 'completed' && (request.resource.data.status == 'delivered' || request.resource.data.status == 'paid' || request.resource.data.status == 'closed')) ||
+        // Nouvelle machine d'état
+        (resource.data.status == 'awaiting-validation' && (request.resource.data.status == 'validated' || request.resource.data.status == 'cancelled')) ||
+        (resource.data.status == 'validated' && (request.resource.data.status == 'in-preparation' || request.resource.data.status == 'ready' || request.resource.data.status == 'cancelled')) ||
+        (resource.data.status == 'in-preparation' && (request.resource.data.status == 'ready' || request.resource.data.status == 'validated' || request.resource.data.status == 'cancelled')) ||
+        (resource.data.status == 'ready' && request.resource.data.status == 'delivered') ||
+        (resource.data.status == 'delivered' && request.resource.data.status == 'paid') ||
+        (resource.data.status == 'paid' && request.resource.data.status == 'closed');
     }
 
 
@@ -213,7 +232,7 @@ service cloud.firestore {
 
       allow create: if validQrOrderCreate() || (isOwner(userId) || isAdmin()) || validAgentTokenFor(userId) || agentFor(userId);
 
-      allow update: if (isOwner(userId) || isAdmin()) || validAgentTokenFor(userId) || agentFor(userId);
+      allow update: if (isOwner(userId) || isAdmin()) || ((validAgentTokenFor(userId) || agentFor(userId)) && orderStatusTransitionAllowed());
 
       allow delete: if isOwner(userId) || isAdmin();
 
@@ -369,7 +388,23 @@ service cloud.firestore {
 
         );
 
-        allow write: if request.auth != null && (
+        allow create: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        );
+
+        allow update: if request.auth != null && (
+
+          get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
+
+          isAdmin()
+
+        ) && orderStatusTransitionAllowed();
+
+        allow delete: if request.auth != null && (
 
           get(/databases/$(database)/documents/establishments/$(estId)).data.ownerUid == request.auth.uid ||
 

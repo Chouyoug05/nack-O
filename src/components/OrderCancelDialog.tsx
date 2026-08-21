@@ -7,6 +7,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { AlertCircle } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+const ORDER_STATUS_TEXT: Record<string, string> = {
+  'in-preparation': 'En préparation',
+  'ready': 'Prête',
+  'delivered': 'Livrée',
+  'paid': 'Payée',
+  'closed': 'Clôturée',
+  'cancelled': 'Annulée',
+};
+
 interface OrderCancelDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -100,7 +109,7 @@ export const OrderCancelDialog = ({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {orderStatus === 'sent' && (
+          {['validated', 'in-preparation', 'sent'].includes(orderStatus) && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
@@ -159,7 +168,7 @@ export const OrderCancelDialog = ({
               <strong>Montant de la commande :</strong> {orderTotal.toLocaleString('fr-FR')} XAF
             </p>
             <p className="text-sm text-muted-foreground mt-1">
-              Statut actuel : {orderStatus === 'pending' ? 'En attente' : orderStatus === 'sent' ? 'Validée' : orderStatus}
+              Statut actuel : {orderStatus === 'awaiting-validation' || orderStatus === 'pending' ? 'En attente de validation' : orderStatus === 'validated' || orderStatus === 'sent' ? 'Validée' : ORDER_STATUS_TEXT[orderStatus] || orderStatus}
             </p>
           </div>
         </div>

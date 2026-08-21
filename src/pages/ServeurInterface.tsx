@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useOrders } from "@/contexts/OrderContext";
-import { Product, CartItem, OrderStatus, Order, KitchenStatus, PaymentStatus } from "@/types/order";
+import { Product, CartItem, OrderStatus, Order, PaymentStatus } from "@/types/order";
 import OrderHistory from "@/components/OrderHistory";
 import { 
   LogOut,
@@ -75,6 +75,9 @@ interface OutboxOrder {
   agentName?: string;
   agentToken?: string;
   customerId?: string; // ID du client favori associé
+  serverId?: string; // Code serveur ayant pris en charge la commande
+  serverName?: string;
+  validatedByServerAt?: number;
 }
 
 const ServeurInterface = () => {
@@ -84,7 +87,7 @@ const ServeurInterface = () => {
   const { user } = useAuth();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [tableNumber, setTableNumber] = useState("");
-  const [activeView, setActiveView] = useState<'products' | 'pending' | 'sent'>('products');
+  const [activeView, setActiveView] = useState<'products' | 'validate' | 'mine'>('products');
   const [agentInfo, setAgentInfo] = useState<{ name: string; code: string; memberId?: string } | null>(() => {
     // Restaurer depuis localStorage
     if (!agentCode) return null;
@@ -126,6 +129,7 @@ const ServeurInterface = () => {
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [availableCustomers, setAvailableCustomers] = useState<Customer[]>([]);
   const [liveOrders, setLiveOrders] = useState<Order[]>([]);
+  const notifiedReadyRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const resolveOwner = async () => {
@@ -283,13 +287,17 @@ const ServeurInterface = () => {
           tableNumber: String(data.tableNumber ?? data.tableZone ?? ''),
           items: (data.items ?? []) as CartItem[],
           total: Number(data.total ?? 0),
-          status: (data.status ?? 'pending') as OrderStatus,
+          status: (data.status ?? 'awaiting-validation') as OrderStatus,
           paymentStatus: (data.paymentStatus ?? 'unpaid') as PaymentStatus,
-          kitchenStatus: (data.kitchenStatus ?? 'en-attente') as KitchenStatus,
           source: (data.source ?? 'internal') as 'qr' | 'internal',
           createdAt: new Date(createdAtMs),
           agentCode: String(data.agentCode ?? data.agentToken ?? data.agentMemberId ?? ''),
           agentName: typeof data.agentName === 'string' ? data.agentName : undefined,
+          serverId: typeof data.serverId === 'string' ? data.serverId : undefined,
+          serverName: typeof data.serverName === 'string' ? data.serverName : undefined,
+          cookName: typeof data.cookName === 'string' ? data.cookName : undefined,
+          validatedByServerAt: typeof data.validatedByServerAt === 'number' ? data.validatedByServerAt : undefined,
+          deliveredAt: typeof data.deliveredAt === 'number' ? data.deliveredAt : undefined,
         } as Order;
       });
       setLiveOrders(list);
@@ -337,15 +345,28 @@ const ServeurInterface = () => {
   }
 
   const localOrders = getOrdersByAgent(agentCode);
-  const liveAgentOrders = liveOrders.filter(o =>
-    o.agentCode === agentCode || o.agentCode === (agentInfo?.code || agentCode)
+  const myAgentCodes = [agentCode, agentInfo?.code].filter(Boolean) as string[];
+
+  // Commandes en attente de validation serveur — visibles par tous les serveurs
+  const validateOrders = [
+    ...liveOrders.filter(o => o.status === 'awaiting-validation'),
+    ...localOrders.filter(o => o.status === 'awaiting-validation'),
+  ].filter((order, idx, arr) =>
+    arr.findIndex(o => String(o.orderNumber) === String(order.orderNumber)) === idx
   );
-  const agentOrders = [
-    ...liveAgentOrders,
-    ...localOrders.filter(local => !liveAgentOrders.some(live => String(live.orderNumber) === String(local.orderNumber))),
-  ];
-  const pendingOrders = agentOrders.filter(order => order.status === 'pending');
-  const sentOrders = agentOrders.filter(order => order.status === 'sent');
+
+  // Mes commandes prises en charge (serverId === moi)
+  const myOrders = [
+    ...liveOrders.filter(o =>
+      o.serverId && myAgentCodes.includes(o.serverId) && o.status !== 'cancelled'
+    ),
+    ...localOrders.filter(local =>
+      local.serverId && myAgentCodes.includes(local.serverId) && local.status !== 'cancelled' &&
+      !liveOrders.some(live => String(live.orderNumber) === String(local.orderNumber))
+    ),
+  ].filter((order, idx, arr) =>
+    arr.findIndex(o => String(o.orderNumber) === String(order.orderNumber)) === idx
+  );
 
   const getCategoryIcon = (category: string) => {
     const cat = category.toLowerCase();
@@ -527,7 +548,7 @@ const ServeurInterface = () => {
     }
   };
 
-  const createOrder = async (status: OrderStatus) => {
+  const createOrder = async () => {
     if (cart.length === 0 || !tableNumber.trim()) {
       toast({
         title: "Erreur",
@@ -537,6 +558,11 @@ const ServeurInterface = () => {
       return;
     }
 
+    const serverId = agentInfo?.code ?? agentCode!;
+    const serverName = agentInfo?.name;
+    const status: OrderStatus = 'validated';
+    const validatedByServerAt = Date.now();
+
     if (!ownerUid) {
       toast({
         title: "Erreur de connexion",
@@ -545,7 +571,7 @@ const ServeurInterface = () => {
       });
       // Même sans ownerUid, on peut quand même ajouter la commande au contexte local
       const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      addOrder({ orderNumber: orderCounter, tableNumber: tableNumber.trim(), items: [...cart], total, status, agentCode: agentCode! });
+      addOrder({ orderNumber: orderCounter, tableNumber: tableNumber.trim(), items: [...cart], total, status, agentCode: agentCode!, serverId, serverName, validatedByServerAt });
       setCart([]);
       setTableNumber("");
       return;
@@ -554,7 +580,7 @@ const ServeurInterface = () => {
     const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     
     // Ajouter la commande au contexte local immédiatement
-    addOrder({ orderNumber: orderCounter, tableNumber: tableNumber.trim(), items: [...cart], total, status, agentCode: agentCode! });
+    addOrder({ orderNumber: orderCounter, tableNumber: tableNumber.trim(), items: [...cart], total, status, agentCode: agentCode!, serverId, serverName, validatedByServerAt });
     
     const orderPayload: OutboxOrder = {
       orderNumber: orderCounter,
@@ -568,6 +594,9 @@ const ServeurInterface = () => {
       agentName: agentInfo?.name,
       agentToken: agentCode,
       customerId: selectedCustomer?.id,
+      serverId,
+      serverName,
+      validatedByServerAt,
     };
 
     let queued = false;
@@ -634,7 +663,7 @@ const ServeurInterface = () => {
     setTableNumber("");
     setSelectedCustomer(null);
 
-    const statusText = status === 'pending' ? 'mise en attente' : 'envoyée à la caisse';
+    const statusText = 'envoyée en cuisine';
     if (success) {
       let description = `Commande #${orderCounter} ${statusText} avec succès`;
       if (selectedCustomer) {
@@ -687,8 +716,8 @@ const ServeurInterface = () => {
       });
       return;
     }
-    // Envoyer directement la commande avec le statut 'sent'
-    createOrder('sent');
+    // Envoyer la commande en cuisine (statut 'validated', serveur pris en charge)
+    createOrder();
   };
 
   // Mettre à jour le statut d'une commande dans Firestore ET dans le contexte local
@@ -702,6 +731,98 @@ const ServeurInterface = () => {
       console.error('Erreur mise à jour statut commande:', e);
     }
   };
+
+  // Le serveur prend en charge et valide une commande en attente (QR ou interne)
+  const handleValidateOrder = async (order: Order) => {
+    if (!ownerUid) {
+      toast({
+        title: "Erreur de connexion",
+        description: "Impossible de déterminer l'établissement. Veuillez réessayer.",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const serverId = agentInfo?.code ?? agentCode!;
+      const orderRef = doc(ordersColRef(db, ownerUid), order.id);
+      await updateDoc(orderRef, {
+        status: 'validated',
+        serverId,
+        serverName: agentInfo?.name,
+        validatedByServerAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      updateOrderStatus(order.id, 'validated');
+      toast({
+        title: "Commande validée",
+        description: `Commande #${order.orderNumber} envoyée en cuisine`,
+      });
+    } catch (e) {
+      console.error('Erreur validation commande:', e);
+      toast({
+        title: "Erreur",
+        description: "Impossible de valider la commande.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Le serveur marque la commande comme livrée au client
+  const handleDeliverOrder = async (order: Order) => {
+    if (!ownerUid) return;
+    try {
+      const orderRef = doc(ordersColRef(db, ownerUid), order.id);
+      await updateDoc(orderRef, {
+        status: 'delivered',
+        deliveredAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      updateOrderStatus(order.id, 'delivered');
+    } catch (e) {
+      console.error('Erreur livraison commande:', e);
+      toast({
+        title: "Erreur",
+        description: "Impossible de marquer la commande comme livrée.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Le serveur signale au gérant une commande livrée à encaisser (le gérant encaisse)
+  const handleSendToManager = async (order: Order) => {
+    if (!ownerUid) return;
+    try {
+      await addDoc(notificationsColRef(db, ownerUid), {
+        title: "Commande à encaisser",
+        message: `Table ${order.tableNumber} • Commande #${order.orderNumber} • ${Number(order.total || 0).toLocaleString()} XAF • Livrée par ${agentInfo?.name || order.serverName || 'le serveur'}`,
+        type: "info",
+        targetRole: "manager",
+        orderId: order.id,
+        orderNumber: order.orderNumber,
+        read: false,
+        createdAt: Date.now(),
+      });
+    } catch (e) {
+      console.error('Erreur notification gérant:', e);
+    }
+  };
+
+  // Notification au serveur quand une de ses commandes devient prête (cuisine terminée)
+  useEffect(() => {
+    if (myOrders.length === 0) return;
+    const readyOrders = myOrders.filter(o => o.status === 'ready');
+    if (readyOrders.length === 0) return;
+    readyOrders.forEach((o) => {
+      if (!notifiedReadyRef.current.has(String(o.id))) {
+        notifiedReadyRef.current.add(String(o.id));
+        toast({
+          title: "Commande prête 🍽️",
+          description: `Commande #${o.orderNumber} — table ${o.tableNumber} est prête à servir`,
+        });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myOrders]);
 
   return (
     <div className="relative flex h-full min-h-screen w-full flex-col bg-[#f6f8f6]">
@@ -733,22 +854,22 @@ const ServeurInterface = () => {
               Produits
             </Button>
             <Button 
-              variant={activeView === 'pending' ? 'default' : 'outline'}
+              variant={activeView === 'validate' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveView('pending')}
-              className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
+              onClick={() => setActiveView('validate')}
+              className={activeView === 'validate' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
             >
               <Clock className="mr-2 h-4 w-4" />
-              En attente ({pendingOrders.length})
+              À valider ({validateOrders.length})
             </Button>
             <Button 
-              variant={activeView === 'sent' ? 'default' : 'outline'}
+              variant={activeView === 'mine' ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setActiveView('sent')}
-              className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
+              onClick={() => setActiveView('mine')}
+              className={activeView === 'mine' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
             >
               <Send className="mr-2 h-4 w-4" />
-              Envoyées ({sentOrders.length})
+              Mes commandes ({myOrders.length})
             </Button>
           </div>
           <Button 
@@ -774,22 +895,22 @@ const ServeurInterface = () => {
             Produits
           </Button>
           <Button 
-            variant={activeView === 'pending' ? 'default' : 'outline'}
+            variant={activeView === 'validate' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setActiveView('pending')}
-            className={activeView === 'pending' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
+            onClick={() => setActiveView('validate')}
+            className={activeView === 'validate' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
           >
             <Clock className="mr-2 h-4 w-4" />
-            En attente ({pendingOrders.length})
+            À valider ({validateOrders.length})
           </Button>
           <Button 
-            variant={activeView === 'sent' ? 'default' : 'outline'}
+            variant={activeView === 'mine' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setActiveView('sent')}
-            className={activeView === 'sent' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
+            onClick={() => setActiveView('mine')}
+            className={activeView === 'mine' ? 'bg-gradient-primary text-white shadow-button' : 'border-gray-200'}
           >
             <Send className="mr-2 h-4 w-4" />
-            Envoyées ({sentOrders.length})
+            Mes commandes ({myOrders.length})
           </Button>
         </div>
       </div>
@@ -1116,20 +1237,10 @@ const ServeurInterface = () => {
                             disabled={!tableNumber.trim()}
                           >
                             <Send className="mr-2 h-4 w-4" />
-                            Envoyer à la caisse
+                            Envoyer en cuisine
                           </Button>
                           
                           <div className="grid grid-cols-2 gap-2">
-                            <Button 
-                              variant="outline"
-                              onClick={() => createOrder('pending')}
-                              className="h-10"
-                              disabled={!tableNumber.trim()}
-                            >
-                              <Clock className="mr-2 h-4 w-4" />
-                              En attente
-                            </Button>
-                            
                             <Button 
                               variant="destructive"
                               onClick={clearCart}
@@ -1180,8 +1291,15 @@ const ServeurInterface = () => {
         <main className="flex-1 p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto w-full">
             <OrderHistory 
-              orders={activeView === 'pending' ? pendingOrders : sentOrders}
+              orders={activeView === 'validate' ? validateOrders : myOrders}
               onUpdateOrderStatus={handleUpdateOrderStatus}
+              onValidateOrder={handleValidateOrder}
+              onDeliverOrder={handleDeliverOrder}
+              onSendToManager={handleSendToManager}
+              title={activeView === 'validate' ? 'Commandes à valider' : 'Mes commandes'}
+              description={activeView === 'validate'
+                ? 'Validez les commandes client pour les envoyer en cuisine'
+                : 'Commandes que vous avez prises en charge'}
             />
           </div>
         </main>

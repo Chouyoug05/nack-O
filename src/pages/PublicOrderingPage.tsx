@@ -518,9 +518,8 @@ const PublicOrderingPage = () => {
             tableZone: isDelivery ? 'Livraison' : selectedTable,
             items: cart,
             total,
-            status: 'pending',
+            status: 'awaiting-validation',
             paymentStatus: 'unpaid',
-            kitchenStatus: 'en-attente',
             source: 'qr',
             createdAt: Date.now(),
             isDelivery: isDelivery || false,
@@ -564,9 +563,8 @@ const PublicOrderingPage = () => {
         tableZone: isDelivery ? 'Livraison' : selectedTable,
         items: cart,
         total,
-        status: 'pending', // Statut pending pour apparaître dans les commandes
+        status: 'awaiting-validation', // En attente de validation serveur avant d'aller en cuisine
         paymentStatus: 'unpaid',
-        kitchenStatus: 'en-attente',
         source: 'qr',
         createdAt: Date.now(),
         isDelivery: isDelivery || false,

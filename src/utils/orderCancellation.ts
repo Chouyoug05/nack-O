@@ -22,16 +22,16 @@ export async function canCancelOrder(
   orderStatus: OrderStatus,
   orderCreatedAt: number | Date
 ): Promise<{ canCancel: boolean; reason?: string }> {
-  // Ne pas permettre l'annulation si la commande est déjà servie ou terminée
-  if (orderStatus === 'served' || orderStatus === 'completed' || orderStatus === 'termine') {
+  // Ne pas permettre l'annulation si la commande est déjà livrée, payée ou clôturée
+  if (orderStatus === 'ready' || orderStatus === 'delivered' || orderStatus === 'paid' || orderStatus === 'closed') {
     return {
       canCancel: false,
-      reason: "Impossible d'annuler : la commande est déjà servie ou terminée."
+      reason: "Impossible d'annuler : la commande est déjà livrée ou clôturée."
     };
   }
 
-  // Pour les commandes validées ('sent'), vérifier le délai
-  if (orderStatus === 'sent') {
+  // Pour les commandes validées, vérifier le délai
+  if (orderStatus === 'validated' || orderStatus === 'in-preparation') {
     const createdAt = orderCreatedAt instanceof Date 
       ? orderCreatedAt.getTime() 
       : (typeof orderCreatedAt === 'number' ? orderCreatedAt : Date.now());
