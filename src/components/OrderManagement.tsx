@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
-import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc, getDocs } from "firebase/firestore";
+import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc, getDocs, where } from "firebase/firestore";
 import type { SaleDoc, SaleItem, PaymentMethod } from "@/types/inventory";
 import type { UserProfile } from "@/types/profile";
 import { OrderCancelDialog } from "@/components/OrderCancelDialog";
@@ -259,10 +259,41 @@ const OrderManagement = ({
     setProcessingIds(prev => new Set(prev).add(order.id));
     if (!uidToUse) {
       setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+      toast({ title: 'Erreur', description: 'Établissement non identifié.', variant: 'destructive' });
       return;
     }
     try {
-      await updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), {
+      // Vérifier si la commande existe dans Firestore
+      const orderRef = fsDoc(ordersColRef(db, uidToUse), order.id);
+      const orderSnap = await getDoc(orderRef);
+      
+      if (!orderSnap.exists()) {
+        // La commande n'existe pas dans Firestore (ID local)
+        // Chercher par orderNumber
+        const q = query(ordersColRef(db, uidToUse), where('orderNumber', '==', order.orderNumber));
+        const querySnap = await getDocs(q);
+        
+        if (querySnap.empty) {
+          toast({ title: 'Erreur', description: `Commande #${order.orderNumber} introuvable dans la base de données.`, variant: 'destructive' });
+          return;
+        }
+        
+        // Utiliser le premier document trouvé
+        const foundDoc = querySnap.docs[0];
+        await updateDoc(foundDoc.ref, {
+          status: 'validated',
+          serverId: order.serverId || (agentToken || undefined),
+          serverName: order.serverName || profile?.ownerName || user?.email || undefined,
+          validatedByServerAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+        setFsOrders(prev => prev.map(o => o.id === foundDoc.id ? { ...o, status: 'validated' } : o));
+        updateOrderStatus(order.id, 'validated');
+        toast({ title: "Commande validée", description: `Commande #${order.orderNumber} envoyée en cuisine` });
+        return;
+      }
+      
+      await updateDoc(orderRef, {
         status: 'validated',
         serverId: order.serverId || (agentToken || undefined),
         serverName: order.serverName || profile?.ownerName || user?.email || undefined,
@@ -273,7 +304,9 @@ const OrderManagement = ({
       updateOrderStatus(order.id, 'validated');
       toast({ title: "Commande validée", description: `Commande #${order.orderNumber} envoyée en cuisine` });
     } catch (e) {
-      toast({ title: 'Erreur', description: 'Impossible de valider la commande.', variant: 'destructive' });
+      console.error('Erreur validation commande:', e);
+      const errorMsg = e instanceof Error ? e.message : 'Erreur inconnue';
+      toast({ title: 'Erreur', description: `Impossible de valider la commande: ${errorMsg}`, variant: 'destructive' });
     } finally {
       setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
     }

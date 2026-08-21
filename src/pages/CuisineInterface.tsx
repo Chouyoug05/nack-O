@@ -168,9 +168,11 @@ const CuisineInterface = () => {
       return;
     }
 
+    console.log('[CuisineInterface] Écoute des commandes sur profiles/' + ownerUid + '/orders');
     setIsLoading(true);
     const q = query(ordersColRef(db, ownerUid), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
+      console.log('[CuisineInterface] Snapshot reçu:', snap.size, 'commandes');
       const allOrders: OrderWithKitchen[] = snap.docs.map((d) => {
         const data = d.data() as FirestoreOrderDoc;
         const items = (data.items ?? []).map((it) => ({

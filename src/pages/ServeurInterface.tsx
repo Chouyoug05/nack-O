@@ -276,8 +276,10 @@ const ServeurInterface = () => {
   // Écouter les commandes Firestore en direct pour suivre le statut cuisine (prêt, terminé)
   useEffect(() => {
     if (!ownerUid) { setLiveOrders([]); return; }
+    console.log('[ServeurInterface] Écoute des commandes sur profiles/' + ownerUid + '/orders');
     const q = query(ordersColRef(db, ownerUid), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
+      console.log('[ServeurInterface] Snapshot reçu:', snap.size, 'commandes');
       const list: Order[] = snap.docs.map((d) => {
         const data = d.data() as Record<string, unknown>;
         const createdAtMs = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
@@ -371,25 +373,28 @@ const ServeurInterface = () => {
   const myAgentCodes = [agentCode, agentInfo?.code].filter(Boolean) as string[];
 
   // Commandes en attente de validation serveur — visibles par tous les serveurs
-  const validateOrders = [
-    ...liveOrders.filter(o => o.status === 'awaiting-validation'),
-    ...localOrders.filter(o => o.status === 'awaiting-validation'),
-  ].filter((order, idx, arr) =>
-    arr.findIndex(o => String(o.orderNumber) === String(order.orderNumber)) === idx
-  );
+  // Priorité aux commandes Firestore (liveOrders), puis commandes locales si absentes
+  const validateOrders = (() => {
+    const fsValidate = liveOrders.filter(o => o.status === 'awaiting-validation');
+    const fsOrderNumbers = new Set(fsValidate.map(o => String(o.orderNumber)));
+    const localOnlyValidate = localOrders.filter(o => 
+      o.status === 'awaiting-validation' && !fsOrderNumbers.has(String(o.orderNumber))
+    );
+    return [...fsValidate, ...localOnlyValidate];
+  })();
 
   // Mes commandes prises en charge (serverId === moi)
-  const myOrders = [
-    ...liveOrders.filter(o =>
+  const myOrders = (() => {
+    const fsMy = liveOrders.filter(o =>
       o.serverId && myAgentCodes.includes(o.serverId) && o.status !== 'cancelled'
-    ),
-    ...localOrders.filter(local =>
+    );
+    const fsOrderNumbers = new Set(fsMy.map(o => String(o.orderNumber)));
+    const localOnlyMy = localOrders.filter(local =>
       local.serverId && myAgentCodes.includes(local.serverId) && local.status !== 'cancelled' &&
-      !liveOrders.some(live => String(live.orderNumber) === String(local.orderNumber))
-    ),
-  ].filter((order, idx, arr) =>
-    arr.findIndex(o => String(o.orderNumber) === String(order.orderNumber)) === idx
-  );
+      !fsOrderNumbers.has(String(local.orderNumber))
+    );
+    return [...fsMy, ...localOnlyMy];
+  })();
 
   const getCategoryIcon = (category: string) => {
     const cat = category.toLowerCase();

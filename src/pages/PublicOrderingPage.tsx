@@ -585,9 +585,11 @@ const PublicOrderingPage = () => {
       let queuedOffline = false;
       let orderDocId: string | null = null;
       if (establishmentId) {
+        console.log('[PublicOrderingPage] Création commande sur profiles/' + establishmentId + '/orders');
         try {
           const docRef = await addDoc(ordersColRef(db, establishmentId), orderData);
           orderDocId = docRef.id;
+          console.log('[PublicOrderingPage] Commande créée avec ID:', docRef.id);
         } catch {
           await enqueuePendingOrder({
             ownerUid: establishmentId,
