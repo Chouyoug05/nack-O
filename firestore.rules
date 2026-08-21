@@ -19,13 +19,11 @@ service cloud.firestore {
     }
 
     function agentFor(userId) {
-
+      // Vérifie si l'utilisateur est un agent authentifié pour ce propriétaire
+      // via une session agent valide
       return request.auth != null &&
-
         exists(/databases/$(database)/documents/agentSessions/$(request.auth.uid)) &&
-
         get(/databases/$(database)/documents/agentSessions/$(request.auth.uid)).data.ownerUid == userId;
-
     }
 
     function validAgentTokenFor(userId) {
@@ -227,15 +225,10 @@ service cloud.firestore {
     // Commandes internes et menu digital : propriétaire, admin ou agent lié par session
     // Création publique autorisée uniquement pour les commandes menu digital (source 'qr')
     match /profiles/{userId}/orders/{orderId} {
-
       allow read: if isOwner(userId) || isAdmin() || agentFor(userId);
-
       allow create: if validQrOrderCreate() || (isOwner(userId) || isAdmin()) || validAgentTokenFor(userId) || agentFor(userId);
-
-      allow update: if (isOwner(userId) || isAdmin()) || ((validAgentTokenFor(userId) || agentFor(userId)) && orderStatusTransitionAllowed());
-
+      allow update: if (isOwner(userId) || isAdmin() || agentFor(userId)) && orderStatusTransitionAllowed();
       allow delete: if isOwner(userId) || isAdmin();
-
     }
 
 
@@ -283,9 +276,8 @@ service cloud.firestore {
 
 
     match /profiles/{userId}/team/{memberId} {
-
-      allow read, write: if isOwner(userId) || isAdmin();
-
+      allow read: if isOwner(userId) || isAdmin() || agentFor(userId);
+      allow write: if isOwner(userId) || isAdmin();
     }
 
 
@@ -299,7 +291,8 @@ service cloud.firestore {
     }
 
     match /profiles/{userId}/notifications/{notificationId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read: if isOwner(userId) || isAdmin() || agentFor(userId);
+      allow write: if isOwner(userId) || isAdmin() || agentFor(userId);
     }
     match /profiles/{userId}/sales/{saleId} {
       allow read, write: if isOwner(userId) || isAdmin();
