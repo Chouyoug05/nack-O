@@ -13,6 +13,12 @@ export async function ensureAgentSession(agentCode: string, ownerUid: string): P
     console.log('[ensureAgentSession] Début pour agentCode:', agentCode, 'ownerUid:', ownerUid);
     let uid = auth.currentUser?.uid;
     console.log('[ensureAgentSession] UID actuel:', uid);
+    
+    if (uid === ownerUid) {
+      console.log('[ensureAgentSession] L\'utilisateur est déjà le propriétaire, pas besoin de session agent');
+      return;
+    }
+    
     if (!uid) {
       console.log('[ensureAgentSession] Connexion anonyme...');
       const cred = await signInAnonymously(auth);
@@ -38,8 +44,6 @@ export async function ensureAgentSession(agentCode: string, ownerUid: string): P
       console.log('[ensureAgentSession] Session déjà valide, pas de mise à jour nécessaire');
     }
   } catch (error) {
-    // En mode hors-ligne ou sans réseau, on ne peut pas créer la session.
-    // La lecture des commandes échouera, mais la commande locale reste possible.
     console.error("[ensureAgentSession] Erreur:", error);
   }
 }
