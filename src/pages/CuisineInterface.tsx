@@ -112,12 +112,17 @@ const CuisineInterface = () => {
   useEffect(() => {
     const resolveOwner = async () => {
       if (!agentCode) return;
+      console.log('[CuisineInterface] Résolution du propriétaire pour agent:', agentCode);
       try {
         const tokenDoc = await getDoc(doc(agentTokensTopColRef(db), agentCode));
+        console.log('[CuisineInterface] Token doc exists:', tokenDoc.exists());
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string; role?: string };
+          console.log('[CuisineInterface] Token data:', { ownerUid: data.ownerUid, role: data.role });
           if (data.ownerUid && data.role === 'cuisinier') {
+            console.log('[CuisineInterface] Création session agent pour ownerUid:', data.ownerUid);
             await ensureAgentSession(agentCode, data.ownerUid);
+            console.log('[CuisineInterface] Session agent créée avec succès');
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Cuisinier';
             setAgentInfo({ name, code: agentCode });
@@ -129,9 +134,13 @@ const CuisineInterface = () => {
               }));
             } catch { /* ignore */ }
             return;
+          } else {
+            console.log('[CuisineInterface] Rôle incorrect ou ownerUid manquant. Role:', data.role, 'OwnerUid:', data.ownerUid);
           }
         }
-      } catch { /* ignore */ }
+      } catch (e) {
+        console.error('[CuisineInterface] Erreur lecture agentTokens:', e);
+      }
       try {
         const cg = collectionGroup(db, 'team');
         const byToken = query(cg, where('agentToken', '==', agentCode), limit(1));
@@ -139,11 +148,14 @@ const CuisineInterface = () => {
         if (!s1.empty) {
           const docSnap = s1.docs[0];
           const data = docSnap.data() as { firstName?: string; lastName?: string; role?: string };
+          console.log('[CuisineInterface] Team member found:', { role: data.role });
           if (data.role === 'cuisinier') {
             const foundOwner = docSnap.ref.parent.parent ? docSnap.ref.parent.parent.id : null;
             const foundName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Cuisinier';
             if (foundOwner) {
+              console.log('[CuisineInterface] Création session agent (via team) pour ownerUid:', foundOwner);
               await ensureAgentSession(agentCode, foundOwner);
+              console.log('[CuisineInterface] Session agent (via team) créée avec succès');
               setOwnerUid(foundOwner);
               setAgentInfo({ name: foundName, code: agentCode });
               try {
@@ -154,9 +166,15 @@ const CuisineInterface = () => {
                 }));
               } catch { /* ignore */ }
             }
+          } else {
+            console.log('[CuisineInterface] Rôle team incorrect:', data.role);
           }
+        } else {
+          console.log('[CuisineInterface] Aucun team member trouvé pour agentCode:', agentCode);
         }
-      } catch { /* ignore permissions */ }
+      } catch (e) {
+        console.error('[CuisineInterface] Erreur lecture team:', e);
+      }
     };
     resolveOwner();
   }, [agentCode]);
