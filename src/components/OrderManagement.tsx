@@ -263,6 +263,25 @@ const OrderManagement = ({
       return;
     }
     try {
+      // Construire l'objet de mise à jour sans valeurs undefined
+      const updateData: Record<string, unknown> = {
+        status: 'validated',
+        validatedByServerAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      
+      // Ajouter serverId seulement s'il est défini
+      const serverIdValue = order.serverId || agentToken;
+      if (serverIdValue) {
+        updateData.serverId = serverIdValue;
+      }
+      
+      // Ajouter serverName seulement s'il est défini
+      const serverNameValue = order.serverName || profile?.ownerName || user?.email;
+      if (serverNameValue) {
+        updateData.serverName = serverNameValue;
+      }
+      
       // Vérifier si la commande existe dans Firestore
       const orderRef = fsDoc(ordersColRef(db, uidToUse), order.id);
       const orderSnap = await getDoc(orderRef);
@@ -280,26 +299,14 @@ const OrderManagement = ({
         
         // Utiliser le premier document trouvé
         const foundDoc = querySnap.docs[0];
-        await updateDoc(foundDoc.ref, {
-          status: 'validated',
-          serverId: order.serverId || (agentToken || undefined),
-          serverName: order.serverName || profile?.ownerName || user?.email || undefined,
-          validatedByServerAt: Date.now(),
-          updatedAt: Date.now(),
-        });
+        await updateDoc(foundDoc.ref, updateData);
         setFsOrders(prev => prev.map(o => o.id === foundDoc.id ? { ...o, status: 'validated' } : o));
         updateOrderStatus(order.id, 'validated');
         toast({ title: "Commande validée", description: `Commande #${order.orderNumber} envoyée en cuisine` });
         return;
       }
       
-      await updateDoc(orderRef, {
-        status: 'validated',
-        serverId: order.serverId || (agentToken || undefined),
-        serverName: order.serverName || profile?.ownerName || user?.email || undefined,
-        validatedByServerAt: Date.now(),
-        updatedAt: Date.now(),
-      });
+      await updateDoc(orderRef, updateData);
       setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'validated' } : o));
       updateOrderStatus(order.id, 'validated');
       toast({ title: "Commande validée", description: `Commande #${order.orderNumber} envoyée en cuisine` });

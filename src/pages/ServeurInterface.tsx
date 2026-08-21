@@ -773,13 +773,21 @@ const ServeurInterface = () => {
     try {
       const serverId = agentInfo?.code ?? agentCode!;
       const orderRef = doc(ordersColRef(db, ownerUid), order.id);
-      await updateDoc(orderRef, {
+      
+      // Construire l'objet de mise à jour sans valeurs undefined
+      const updateData: Record<string, unknown> = {
         status: 'validated',
         serverId,
-        serverName: agentInfo?.name,
         validatedByServerAt: Date.now(),
         updatedAt: Date.now(),
-      });
+      };
+      
+      // Ajouter serverName seulement s'il est défini
+      if (agentInfo?.name) {
+        updateData.serverName = agentInfo.name;
+      }
+      
+      await updateDoc(orderRef, updateData);
       updateOrderStatus(order.id, 'validated');
       toast({
         title: "Commande validée",
