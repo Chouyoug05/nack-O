@@ -137,6 +137,11 @@ const PublicOrderingPage = () => {
 
     const loadTheme = async () => {
       try {
+        // Charger d'abord depuis publicProfiles pour avoir le designId
+        const publicDoc = await getDoc(doc(db, 'publicProfiles', establishmentId));
+        const publicData = publicDoc.exists() ? publicDoc.data() : {};
+        
+        // Ensuite charger le thème complet depuis menuDigital
         let themeDoc = await getDoc(doc(db, `profiles/${establishmentId}/menuDigital`, 'theme'));
         if (!themeDoc.exists()) {
           try {
@@ -146,7 +151,20 @@ const PublicOrderingPage = () => {
           }
         }
         if (themeDoc.exists()) {
-          setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
+          const themeData = themeDoc.data();
+          // Utiliser le designId de publicProfiles si disponible, sinon celui du thème
+          const designId = publicData.menuDesignId || themeData.designId;
+          setMenuTheme({ 
+            ...defaultMenuTheme, 
+            ...themeData,
+            designId: designId 
+          } as MenuThemeConfig);
+        } else if (publicData.menuDesignId) {
+          // Si pas de thème mais un designId dans publicProfiles, utiliser le design par défaut
+          setMenuTheme({ 
+            ...defaultMenuTheme, 
+            designId: publicData.menuDesignId 
+          } as MenuThemeConfig);
         }
       } catch (error) {
         console.error('Erreur chargement thème:', error);
@@ -214,6 +232,12 @@ const PublicOrderingPage = () => {
       // Toujours profiles : c'est là que Stock / Menu Digital écrivent les produits
       const base: 'establishments' | 'profiles' = 'profiles';
       setCollectionBase(base);
+      
+      // S'assurer que deliveryPrice est un nombre
+      const deliveryPrice = typeof data.deliveryPrice === 'number' 
+        ? data.deliveryPrice 
+        : (typeof data.deliveryPrice === 'string' ? parseInt(data.deliveryPrice) || 0 : 0);
+      
       setEstablishment({
         establishmentName: data.name || data.establishmentName || 'Établissement',
         establishmentType: data.type || data.establishmentType,
@@ -231,8 +255,8 @@ const PublicOrderingPage = () => {
         cssPercentage: data.cssPercentage,
         ticketFooterMessage: data.ticketFooterMessage,
         paymentsEnabled: data.paymentsEnabled === true,
-        deliveryEnabled: data.deliveryEnabled,
-        deliveryPrice: data.deliveryPrice,
+        deliveryEnabled: data.deliveryEnabled === true,
+        deliveryPrice: deliveryPrice,
       } as Establishment);
 
       if (!isMountedRef.current) return;
@@ -470,6 +494,13 @@ const PublicOrderingPage = () => {
       placeOrder(false);
       return;
     }
+    
+    // Vérifier que le montant est valide
+    if (total <= 0) {
+      alert('Le montant de la commande doit être supérieur à 0.');
+      return;
+    }
+    
     void placeOrder(true);
   };
 

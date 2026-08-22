@@ -27,6 +27,8 @@ export interface PublicProfile {
   deliveryPrice?: number;
   /** true si disbursement approuvé — sans exposer l'ID */
   paymentsEnabled?: boolean;
+  /** ID du design de menu sélectionné */
+  menuDesignId?: string;
   updatedAt: number;
 }
 
@@ -58,6 +60,7 @@ export function buildPublicProfile(profile: Partial<UserProfile> & { uid: string
     deliveryEnabled: profile.deliveryEnabled,
     deliveryPrice: profile.deliveryPrice,
     paymentsEnabled,
+    menuDesignId: profile.menuDesignId,
     updatedAt: profile.updatedAt ?? Date.now(),
   };
 }

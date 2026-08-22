@@ -300,14 +300,27 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       try {
         const themeDoc = await getDoc(doc(db, `profiles/${user.uid}/menuDigital`, 'theme'));
         if (themeDoc.exists()) {
-          setMenuTheme({ ...defaultMenuTheme, ...themeDoc.data() } as MenuThemeConfig);
+          const themeData = themeDoc.data();
+          // Utiliser le designId du profil si disponible, sinon celui du thème
+          const designId = profile?.menuDesignId || themeData.designId;
+          setMenuTheme({ 
+            ...defaultMenuTheme, 
+            ...themeData,
+            designId: designId 
+          } as MenuThemeConfig);
+        } else if (profile?.menuDesignId) {
+          // Si pas de thème mais un designId dans le profil, utiliser le design par défaut
+          setMenuTheme({ 
+            ...defaultMenuTheme, 
+            designId: profile.menuDesignId 
+          } as MenuThemeConfig);
         }
       } catch (error) {
         console.error('Erreur chargement thème:', error);
       }
     };
     loadTheme();
-  }, [user]);
+  }, [user, profile?.menuDesignId]);
 
   // Vérifier que l'utilisateur est connecté
   if (!user) {
@@ -366,10 +379,27 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
 
     setIsSavingTheme(true);
     try {
+      // Sauvegarder le thème dans menuDigital
       await setDoc(doc(db, `profiles/${user.uid}/menuDigital`, 'theme'), {
         ...menuTheme,
         updatedAt: Date.now()
       });
+      
+      // Synchroniser le designId avec le profil utilisateur
+      if (profile && menuTheme.designId) {
+        await setDoc(doc(db, 'profiles', user.uid), {
+          menuDesignId: menuTheme.designId,
+          updatedAt: Date.now()
+        }, { merge: true });
+        
+        // Synchroniser avec publicProfiles pour que le menu QR ait les bonnes données
+        await syncPublicProfile(db, { 
+          uid: user.uid, 
+          ...profile, 
+          menuDesignId: menuTheme.designId 
+        });
+      }
+      
       toast({
         title: "Thème sauvegardé",
         description: "Les paramètres du menu digital ont été mis à jour."
@@ -1698,14 +1728,26 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                       checked={profile?.deliveryEnabled || false}
                       onChange={async (e) => {
                         if (!user) return;
+                        const enabled = e.target.checked;
                         try {
+                          // Sauvegarder dans le profil
                           await setDoc(doc(db, 'profiles', user.uid), {
-                            deliveryEnabled: e.target.checked,
+                            deliveryEnabled: enabled,
                             updatedAt: Date.now(),
                           }, { merge: true });
+                          
+                          // Synchroniser avec publicProfiles pour le menu QR
+                          if (profile) {
+                            await syncPublicProfile(db, { 
+                              uid: user.uid, 
+                              ...profile, 
+                              deliveryEnabled: enabled 
+                            });
+                          }
+                          
                           toast({
                             title: "Paramètre enregistré",
-                            description: e.target.checked ? "Livraison activée" : "Livraison désactivée",
+                            description: enabled ? "Livraison activée" : "Livraison désactivée",
                           });
                         } catch (error) {
                           console.error('Erreur sauvegarde livraison:', error);
@@ -1730,10 +1772,25 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                           if (!user) return;
                           const price = parseInt(e.target.value) || 0;
                           try {
+                            // Sauvegarder dans le profil
                             await setDoc(doc(db, 'profiles', user.uid), {
                               deliveryPrice: price,
                               updatedAt: Date.now(),
                             }, { merge: true });
+                            
+                            // Synchroniser avec publicProfiles pour le menu QR
+                            if (profile) {
+                              await syncPublicProfile(db, { 
+                                uid: user.uid, 
+                                ...profile, 
+                                deliveryPrice: price 
+                              });
+                            }
+                            
+                            toast({
+                              title: "Prix enregistré",
+                              description: `Le prix de livraison a été défini à ${price} XAF.`
+                            });
                           } catch (error) {
                             console.error('Erreur sauvegarde prix livraison:', error);
                           }

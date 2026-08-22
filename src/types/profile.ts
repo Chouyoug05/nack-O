@@ -41,6 +41,8 @@ export interface UserProfile {
   deliveryEnabled?: boolean;
   deliveryPrice?: number;
   fcmToken?: string;
+  /** ID du design de menu sélectionné */
+  menuDesignId?: string;
   /** IMEI assigné par l'admin — active le mode tablette restreint */
   assignedTabletImei?: string | null;
   assignedTabletLabel?: string | null;
