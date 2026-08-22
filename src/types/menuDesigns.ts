@@ -1,17 +1,19 @@
 import { MenuThemeConfig } from './menuTheme';
 
 export type MenuDesignId = 
-  | 'classic-elegant'
-  | 'modern-minimal'
-  | 'warm-rustic'
-  | 'luxury-dark'
-  | 'mediterranean-fresh';
+  | 'restaurant-classic'
+  | 'restaurant-modern'
+  | 'bar-lounge'
+  | 'cafe-cozy'
+  | 'boutique-minimal'
+  | 'boutique-grid'
+  | 'boutique-luxury';
 
 export interface MenuDesign {
   id: MenuDesignId;
   name: string;
   description: string;
-  category: string;
+  category: 'restaurant' | 'bar' | 'cafe' | 'boutique';
   preview: {
     primaryColor: string;
     backgroundColor: string;
@@ -21,11 +23,12 @@ export interface MenuDesign {
 }
 
 export const MENU_DESIGNS: MenuDesign[] = [
+  // === RESTAURANTS ===
   {
-    id: 'classic-elegant',
-    name: 'Classique Élégant',
-    description: 'Design raffiné pour restaurants haut de gamme. Tons bordeaux et dorés, typographie serif élégante.',
-    category: 'Restaurant',
+    id: 'restaurant-classic',
+    name: 'Restaurant Classique',
+    description: 'Design élégant avec header imposant, sections par catégorie, cartes produits avec image large. Idéal pour restaurants traditionnels.',
+    category: 'restaurant',
     preview: {
       primaryColor: '#8B2635',
       backgroundColor: '#F5F1EB',
@@ -39,95 +42,147 @@ export const MENU_DESIGNS: MenuDesign[] = [
       cardStyle: 'shadow',
       borderRadius: 'large',
       titleFont: 'Georgia, serif',
-      designId: 'classic-elegant',
+      designId: 'restaurant-classic',
     },
   },
   {
-    id: 'modern-minimal',
-    name: 'Moderne Minimaliste',
-    description: 'Design épuré et contemporain pour bars et lounges. Lignes nettes, couleurs vives.',
-    category: 'Bar / Lounge',
+    id: 'restaurant-modern',
+    name: 'Restaurant Moderne',
+    description: 'Design épuré avec navigation horizontale, cartes produits compactes, mise en page aérée. Parfait pour restaurants contemporains.',
+    category: 'restaurant',
     preview: {
-      primaryColor: '#1A1A2E',
-      backgroundColor: '#F8F9FA',
-      accentColor: '#E94560',
+      primaryColor: '#2C3E50',
+      backgroundColor: '#FFFFFF',
+      accentColor: '#E74C3C',
     },
     theme: {
-      primaryColor: '#1A1A2E',
-      secondaryColor: '#E94560',
-      backgroundColor: '#F8F9FA',
+      primaryColor: '#2C3E50',
+      secondaryColor: '#E74C3C',
+      backgroundColor: '#FFFFFF',
       backgroundType: 'color',
       cardStyle: 'minimalist',
       borderRadius: 'medium',
       titleFont: 'system-ui, sans-serif',
-      designId: 'modern-minimal',
+      designId: 'restaurant-modern',
     },
   },
+
+  // === BARS & LOUNGES ===
   {
-    id: 'warm-rustic',
-    name: 'Chaleureux Rustique',
-    description: 'Ambiance cozy pour cafés et brasseries. Tons chauds, texture bois et cuir.',
-    category: 'Café / Brasserie',
+    id: 'bar-lounge',
+    name: 'Bar & Lounge',
+    description: 'Design sombre et atmosphérique avec accents néon, cartes produits avec effets hover. Idéal pour bars, clubs et lounges.',
+    category: 'bar',
     preview: {
-      primaryColor: '#5D4037',
-      backgroundColor: '#EFEBE9',
-      accentColor: '#FF8F00',
+      primaryColor: '#9B59B6',
+      backgroundColor: '#1A1A2E',
+      accentColor: '#E94560',
     },
     theme: {
-      primaryColor: '#5D4037',
-      secondaryColor: '#FF8F00',
-      backgroundColor: '#EFEBE9',
+      primaryColor: '#9B59B6',
+      secondaryColor: '#E94560',
+      backgroundColor: '#1A1A2E',
+      backgroundType: 'color',
+      cardStyle: 'shadow',
+      borderRadius: 'large',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'bar-lounge',
+    },
+  },
+
+  // === CAFÉS ===
+  {
+    id: 'cafe-cozy',
+    name: 'Café Cosy',
+    description: 'Design chaleureux avec tons bois et crème, typographie manuscrite pour les titres. Parfait pour cafés et salons de thé.',
+    category: 'cafe',
+    preview: {
+      primaryColor: '#6F4E37',
+      backgroundColor: '#FDF6E3',
+      accentColor: '#C19A6B',
+    },
+    theme: {
+      primaryColor: '#6F4E37',
+      secondaryColor: '#C19A6B',
+      backgroundColor: '#FDF6E3',
       backgroundType: 'color',
       cardStyle: 'border',
       borderRadius: 'medium',
       titleFont: 'Georgia, serif',
-      designId: 'warm-rustic',
+      designId: 'cafe-cozy',
+    },
+  },
+
+  // === BOUTIQUES EN LIGNE ===
+  {
+    id: 'boutique-minimal',
+    name: 'Boutique Minimaliste',
+    description: 'Design épuré style e-commerce moderne avec grille 3 colonnes, filtres latéraux, panier flottant. Idéal pour boutiques de mode.',
+    category: 'boutique',
+    preview: {
+      primaryColor: '#000000',
+      backgroundColor: '#FAFAFA',
+      accentColor: '#FF6B6B',
+    },
+    theme: {
+      primaryColor: '#000000',
+      secondaryColor: '#FF6B6B',
+      backgroundColor: '#FAFAFA',
+      backgroundType: 'color',
+      cardStyle: 'minimalist',
+      borderRadius: 'medium',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'boutique-minimal',
     },
   },
   {
-    id: 'luxury-dark',
-    name: 'Luxe Noir & Or',
-    description: 'Design premium pour restaurants gastronomiques. Fond sombre, accents dorés luxueux.',
-    category: 'Gastronomie',
+    id: 'boutique-grid',
+    name: 'Boutique Grid Pro',
+    description: 'Design grille dense avec informations produit complètes, badges de promo, navigation par catégories. Parfait pour multi-produits.',
+    category: 'boutique',
+    preview: {
+      primaryColor: '#2980B9',
+      backgroundColor: '#ECF0F1',
+      accentColor: '#27AE60',
+    },
+    theme: {
+      primaryColor: '#2980B9',
+      secondaryColor: '#27AE60',
+      backgroundColor: '#ECF0F1',
+      backgroundType: 'color',
+      cardStyle: 'border',
+      borderRadius: 'small',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'boutique-grid',
+    },
+  },
+  {
+    id: 'boutique-luxury',
+    name: 'Boutique Luxe',
+    description: 'Design premium avec fond sombre, accents dorés, typographie élégante. Idéal pour bijouteries, parfumeries, produits haut de gamme.',
+    category: 'boutique',
     preview: {
       primaryColor: '#D4AF37',
-      backgroundColor: '#1A1A1A',
+      backgroundColor: '#0D0D0D',
       accentColor: '#FFFFFF',
     },
     theme: {
       primaryColor: '#D4AF37',
       secondaryColor: '#FFFFFF',
-      backgroundColor: '#1A1A1A',
+      backgroundColor: '#0D0D0D',
       backgroundType: 'color',
       cardStyle: 'shadow',
       borderRadius: 'large',
       titleFont: 'Georgia, serif',
-      designId: 'luxury-dark',
-    },
-  },
-  {
-    id: 'mediterranean-fresh',
-    name: 'Fraîcheur Méditerranéenne',
-    description: 'Style frais et léger pour restaurants méditerranéens. Bleus et verts, ambiance estivale.',
-    category: 'Méditerranéen',
-    preview: {
-      primaryColor: '#006994',
-      backgroundColor: '#F0F8FF',
-      accentColor: '#2E8B57',
-    },
-    theme: {
-      primaryColor: '#006994',
-      secondaryColor: '#2E8B57',
-      backgroundColor: '#F0F8FF',
-      backgroundType: 'color',
-      cardStyle: 'shadow',
-      borderRadius: 'large',
-      titleFont: 'system-ui, sans-serif',
-      designId: 'mediterranean-fresh',
+      designId: 'boutique-luxury',
     },
   },
 ];
 
 export const getMenuDesignById = (id: MenuDesignId | string | undefined): MenuDesign => {
   return MENU_DESIGNS.find(d => d.id === id) || MENU_DESIGNS[0];
+};
+
+export const getDesignsByCategory = (category: 'restaurant' | 'bar' | 'cafe' | 'boutique'): MenuDesign[] => {
+  return MENU_DESIGNS.filter(d => d.category === category);
 };
