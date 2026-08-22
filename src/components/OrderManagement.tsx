@@ -771,7 +771,7 @@ const OrderManagement = ({
         <CardDescription>{description}</CardDescription>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
           <Badge variant="outline" className="text-accent-foreground justify-center">
-            À valider: {orders.filter(o => o.status === 'awaiting-validation').length}
+            À valider: {orders.filter(o => o.status === 'awaiting-validation' || o.status === 'pending').length}
           </Badge>
           <Badge variant="outline" className="text-amber-700 justify-center">
             À encaisser: {summary.toCashInCount} ({summary.toCashInTotal.toLocaleString()} XAF)

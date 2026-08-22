@@ -373,43 +373,53 @@ const ServeurInterface = () => {
   const myAgentCodes = [agentCode, agentInfo?.code].filter(Boolean) as string[];
 
   // Commandes en attente de validation serveur — visibles par tous les serveurs
-  // Priorité aux commandes Firestore (liveOrders), puis commandes locales si absentes
+  // Inclut les statuts 'awaiting-validation' et 'pending' (legacy)
   const validateOrders = (() => {
-    const fsValidate = liveOrders.filter(o => o.status === 'awaiting-validation');
+    const fsValidate = liveOrders.filter(o => 
+      o.status === 'awaiting-validation' || o.status === 'pending'
+    );
     const fsOrderNumbers = new Set(fsValidate.map(o => String(o.orderNumber)));
     const localOnlyValidate = localOrders.filter(o => 
-      o.status === 'awaiting-validation' && !fsOrderNumbers.has(String(o.orderNumber))
+      (o.status === 'awaiting-validation' || o.status === 'pending') && 
+      !fsOrderNumbers.has(String(o.orderNumber))
     );
     return [...fsValidate, ...localOnlyValidate];
   })();
 
-  // Mes commandes prises en charge (serverId === moi)
-  // Inclut aussi les commandes prêtes qui ont été validées par ce serveur
+  // Mes commandes prises en charge
+  // Inclut toutes les commandes actives (pas encore terminées/payées)
+  // Plus les commandes assignées à ce serveur spécifiquement
   const myOrders = (() => {
-    console.log('[ServeurInterface] myAgentCodes:', myAgentCodes);
-    console.log('[ServeurInterface] liveOrders count:', liveOrders.length);
+    // Statuts actifs : commandes en cours de traitement
+    const activeStatuses: OrderStatus[] = ['validated', 'in-preparation', 'ready', 'delivered'];
     
     const fsMy = liveOrders.filter(o => {
-      // Inclure si serverId correspond à ce serveur
-      const serverIdMatch = o.serverId && myAgentCodes.includes(o.serverId);
-      // Inclure si la commande est prête et a été validée (peut être la nôtre)
-      const isReadyAndValidated = o.status === 'ready' && o.validatedByServerAt;
-      // Exclure les annulées
-      const notCancelled = o.status !== 'cancelled';
-      
-      const matches = (serverIdMatch || isReadyAndValidated) && notCancelled;
-      if (o.serverId || o.status === 'ready') {
-        console.log('[ServeurInterface] Commande', o.orderNumber, 'status:', o.status, 'serverId:', o.serverId, 'matches:', matches);
+      // Exclure les commandes terminées, payées, fermées ou annulées
+      if (['closed', 'paid', 'cancelled'].includes(o.status)) {
+        return false;
       }
-      return matches;
+      
+      // Inclure si la commande est dans un statut actif
+      if (activeStatuses.includes(o.status)) {
+        return true;
+      }
+      
+      // Inclure si serverId correspond à ce serveur (même si en attente)
+      if (o.serverId && myAgentCodes.includes(o.serverId)) {
+        return true;
+      }
+      
+      return false;
     });
     
-    console.log('[ServeurInterface] myOrders count:', fsMy.length);
     const fsOrderNumbers = new Set(fsMy.map(o => String(o.orderNumber)));
     const localOnlyMy = localOrders.filter(local =>
-      local.serverId && myAgentCodes.includes(local.serverId) && local.status !== 'cancelled' &&
-      !fsOrderNumbers.has(String(local.orderNumber))
+      !fsOrderNumbers.has(String(local.orderNumber)) &&
+      !['closed', 'paid', 'cancelled'].includes(local.status) &&
+      (activeStatuses.includes(local.status) || 
+       (local.serverId && myAgentCodes.includes(local.serverId)))
     );
+    
     return [...fsMy, ...localOnlyMy];
   })();
 
