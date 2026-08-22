@@ -432,79 +432,96 @@ const SalesPage = () => {
     }
     if (isSaving) return;
 
-    try {
-      // Pré-contrôle des stocks (hors ligne : cache Firestore / liste produits déjà chargée)
-      const adjusted: CartItem[] = [];
-      const changes: string[] = [];
-      for (const item of cart) {
-        let currentQty: number;
-        if (!isOnline) {
-          const p = products.find((x) => x.id === item.id);
-          if (!p) {
-            changes.push(`${item.name}: supprimé (produit introuvable en local)`);
-            continue;
-          }
-          currentQty = Number(p.stock ?? 0);
-        } else {
-          const ref = fsDoc(productsColRef(db, user.uid), item.id);
-          const snap = await getDoc(ref);
-          if (!snap.exists()) {
-            changes.push(`${item.name}: supprimé (produit introuvable)`);
-            continue;
-          }
-          const data = snap.data() as ProductDoc;
-          currentQty = Number((data as { quantity?: number }).quantity ?? 0);
-        }
-        if (currentQty <= 0) {
-          changes.push(`${item.name}: supprimé (stock épuisé)`);
-          continue;
-        }
-        const desired = Number(item.quantity || 0);
-        if (desired > currentQty) {
-          adjusted.push({ ...item, quantity: currentQty });
-          changes.push(`${item.name}: limité à ${currentQty}`);
-        } else {
-          adjusted.push(item);
-        }
+    // Détecter si c'est un encaissement de commande existante
+    const isOrderCashIn = !!editingOrderId || (() => {
+      try {
+        const metaRaw = localStorage.getItem('nack_prefill_order_meta');
+        return !!metaRaw;
+      } catch {
+        return false;
       }
-      if (changes.length > 0) {
-        setCart(adjusted);
-        setIsCheckoutOpen(true);
-        toast({ title: "Stock ajusté", description: changes.join(" • "), variant: "destructive" });
-        return;
+    })();
+
+    try {
+      // Pré-contrôle des stocks uniquement pour les nouvelles ventes (pas pour l'encaissement de commandes)
+      if (!isOrderCashIn) {
+        const adjusted: CartItem[] = [];
+        const changes: string[] = [];
+        for (const item of cart) {
+          let currentQty: number;
+          if (!isOnline) {
+            const p = products.find((x) => x.id === item.id);
+            if (!p) {
+              changes.push(`${item.name}: supprimé (produit introuvable en local)`);
+              continue;
+            }
+            currentQty = Number(p.stock ?? 0);
+          } else {
+            const ref = fsDoc(productsColRef(db, user.uid), item.id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) {
+              changes.push(`${item.name}: supprimé (produit introuvable)`);
+              continue;
+            }
+            const data = snap.data() as ProductDoc;
+            currentQty = Number((data as { quantity?: number }).quantity ?? 0);
+          }
+          if (currentQty <= 0) {
+            changes.push(`${item.name}: supprimé (stock épuisé)`);
+            continue;
+          }
+          const desired = Number(item.quantity || 0);
+          if (desired > currentQty) {
+            adjusted.push({ ...item, quantity: currentQty });
+            changes.push(`${item.name}: limité à ${currentQty}`);
+          } else {
+            adjusted.push(item);
+          }
+        }
+        if (changes.length > 0) {
+          setCart(adjusted);
+          setIsCheckoutOpen(true);
+          toast({ title: "Stock ajusté", description: changes.join(" • "), variant: "destructive" });
+          return;
+        }
       }
 
       setIsSaving(true);
       const ownerUidForWrites = user.uid;
-      // 2) Batch atomique: décrémenter le stock + créer la vente
+      
+      // Batch atomique: créer la vente et éventuellement décrémenter le stock
       const batch = writeBatch(db);
       const skippedItems: string[] = [];
-      for (const item of cart) {
-        const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
-        let currentQty: number;
-        if (!isOnline) {
-          const p = products.find((x) => x.id === item.id);
-          if (!p) {
-            skippedItems.push(item.name);
+      
+      // Décrémenter le stock uniquement pour les nouvelles ventes (pas pour l'encaissement de commandes)
+      if (!isOrderCashIn) {
+        for (const item of cart) {
+          const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
+          let currentQty: number;
+          if (!isOnline) {
+            const p = products.find((x) => x.id === item.id);
+            if (!p) {
+              skippedItems.push(item.name);
+              continue;
+            }
+            currentQty = Number(p.stock ?? 0);
+          } else {
+            const snap = await getDoc(productRef);
+            if (!snap.exists()) {
+              skippedItems.push(item.name);
+              continue;
+            }
+            const data = snap.data() as ProductDoc;
+            currentQty = Number((data as { quantity?: number }).quantity ?? 0);
+          }
+          const qtyToDecrement = Number(item.quantity || 0);
+          if (qtyToDecrement <= 0) continue;
+          if (currentQty < qtyToDecrement) {
+            skippedItems.push(`${item.name} (stock insuffisant: ${currentQty})`);
             continue;
           }
-          currentQty = Number(p.stock ?? 0);
-        } else {
-          const snap = await getDoc(productRef);
-          if (!snap.exists()) {
-            skippedItems.push(item.name);
-            continue;
-          }
-          const data = snap.data() as ProductDoc;
-          currentQty = Number((data as { quantity?: number }).quantity ?? 0);
+          batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
         }
-        const qtyToDecrement = Number(item.quantity || 0);
-        if (qtyToDecrement <= 0) continue;
-        if (currentQty < qtyToDecrement) {
-          skippedItems.push(`${item.name} (stock insuffisant: ${currentQty})`);
-          continue;
-        }
-        batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
       }
         const saleItems: SaleItem[] = cart.map((ci) =>
           omitUndefined({
@@ -552,8 +569,8 @@ const SalesPage = () => {
         localStorage.removeItem('nack_prefill_order_meta');
       } catch { /* ignore */ }
 
-      // Afficher un avertissement si des articles ont été ignorés
-      if (skippedItems.length > 0) {
+      // Afficher un avertissement si des articles ont été ignorés (uniquement pour les nouvelles ventes)
+      if (!isOrderCashIn && skippedItems.length > 0) {
         toast({
           title: "Stock non décrémenté",
           description: `Les articles suivants n'ont pas été trouvés ou ont un stock insuffisant : ${skippedItems.join(', ')}`,
@@ -562,10 +579,12 @@ const SalesPage = () => {
       }
 
       toast({
-        title: "Vente enregistrée",
-        description: !isOnline
-          ? `Vente de ${cartTotal.toLocaleString()} XAF — enregistrée sur l'appareil ; synchro automatique au retour du réseau.`
-          : `Vente de ${cartTotal.toLocaleString()} XAF`,
+        title: isOrderCashIn ? "Encaissement enregistré" : "Vente enregistrée",
+        description: isOrderCashIn
+          ? `Commande encaissée avec succès (${cartTotal.toLocaleString()} XAF)`
+          : !isOnline
+            ? `Vente de ${cartTotal.toLocaleString()} XAF — enregistrée sur l'appareil ; synchro automatique au retour du réseau.`
+            : `Vente de ${cartTotal.toLocaleString()} XAF`,
       });
       
       // Proposer d'imprimer le reçu pour le client
