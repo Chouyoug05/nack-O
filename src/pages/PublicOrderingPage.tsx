@@ -12,6 +12,7 @@ import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
+import { getMenuDesignById, MenuDesignId } from "@/types/menuDesigns";
 import { isFoodBusiness as isFoodBusinessFn } from "@/constants/establishmentTypes";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
 import { sendOrderNotificationViaServer } from "@/lib/securePayment";
@@ -716,28 +717,101 @@ const PublicOrderingPage = () => {
     }
   };
 
-  // Styles dynamiques basés sur le thème
-  const getCardStyle = () => {
-    const baseStyle = "bg-white transition-all duration-200 hover:scale-[1.02]";
-    const borderRadius = {
-      small: "rounded-md",
-      medium: "rounded-lg",
-      large: "rounded-xl"
-    }[menuTheme.borderRadius];
+  // Styles dynamiques basés sur le thème et le design
+  const currentDesign = getMenuDesignById(menuTheme.designId);
+  const isDarkMode = currentDesign.id === 'luxury-dark';
 
-    switch (menuTheme.cardStyle) {
-      case 'minimalist':
-        return `${baseStyle} ${borderRadius} border border-gray-200`;
-      case 'shadow':
-        return `${baseStyle} ${borderRadius} shadow-md hover:shadow-lg`;
-      case 'border':
-        return `${baseStyle} ${borderRadius} border-2 border-gray-300`;
+  const getCardStyle = () => {
+    const designId = currentDesign.id;
+    
+    switch (designId) {
+      case 'classic-elegant':
+        return "bg-white rounded-xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 border border-amber-100 overflow-hidden";
+      case 'modern-minimal':
+        return "bg-white rounded-lg border-2 border-gray-100 hover:border-current transition-all duration-200 overflow-hidden group";
+      case 'warm-rustic':
+        return "bg-amber-50 rounded-lg border-2 border-amber-200 shadow-md hover:shadow-xl transition-all duration-200 overflow-hidden";
+      case 'luxury-dark':
+        return "bg-gradient-to-br from-gray-900 to-gray-800 rounded-xl shadow-2xl border border-yellow-600/30 hover:border-yellow-500/60 transition-all duration-300 overflow-hidden";
+      case 'mediterranean-fresh':
+        return "bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 border-l-4 overflow-hidden";
       default:
-        return `${baseStyle} ${borderRadius} shadow-md`;
+        const borderRadius = {
+          small: "rounded-md",
+          medium: "rounded-lg",
+          large: "rounded-xl"
+        }[menuTheme.borderRadius];
+        return `bg-white ${borderRadius} shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden`;
+    }
+  };
+
+  const getCardImageStyle = () => {
+    const designId = currentDesign.id;
+    switch (designId) {
+      case 'classic-elegant':
+        return "w-full h-44 object-cover";
+      case 'modern-minimal':
+        return "w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300";
+      case 'warm-rustic':
+        return "w-full h-40 object-cover rounded-t-lg";
+      case 'luxury-dark':
+        return "w-full h-44 object-cover opacity-90";
+      case 'mediterranean-fresh':
+        return "w-full h-40 object-cover";
+      default:
+        return "w-full h-40 object-cover";
+    }
+  };
+
+  const getCardPlaceholderStyle = () => {
+    const designId = currentDesign.id;
+    switch (designId) {
+      case 'luxury-dark':
+        return "w-full h-44 bg-gradient-to-br from-gray-800 to-gray-700 flex items-center justify-center";
+      default:
+        return "w-full h-40 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center";
+    }
+  };
+
+  const getCardTextStyle = () => {
+    const designId = currentDesign.id;
+    switch (designId) {
+      case 'luxury-dark':
+        return { color: '#D4AF37' };
+      default:
+        return { color: menuTheme.primaryColor };
+    }
+  };
+
+  const getCardPriceStyle = () => {
+    const designId = currentDesign.id;
+    switch (designId) {
+      case 'luxury-dark':
+        return "text-xl font-bold text-yellow-400";
+      case 'mediterranean-fresh':
+        return "text-xl font-bold text-teal-600";
+      default:
+        return "text-xl font-bold";
+    }
+  };
+
+  const getAddButtonStyle = () => {
+    const designId = currentDesign.id;
+    switch (designId) {
+      case 'modern-minimal':
+        return "rounded-full w-9 h-9 flex items-center justify-center bg-current text-white shadow-lg hover:scale-110 transition-transform";
+      case 'luxury-dark':
+        return "rounded-full w-9 h-9 flex items-center justify-center bg-yellow-500 text-black shadow-lg hover:bg-yellow-400 transition-colors";
+      case 'mediterranean-fresh':
+        return "rounded-full w-9 h-9 flex items-center justify-center bg-teal-500 text-white shadow-md hover:bg-teal-600 transition-colors";
+      default:
+        return "rounded-full w-9 h-9 flex items-center justify-center text-white shadow-md";
     }
   };
 
   const getBackgroundStyle = () => {
+    const designId = currentDesign.id;
+    
     if (menuTheme.backgroundType === 'image' && menuTheme.backgroundColor.startsWith('http')) {
       return {
         backgroundImage: `url(${menuTheme.backgroundColor})`,
@@ -746,15 +820,57 @@ const PublicOrderingPage = () => {
         backgroundRepeat: 'no-repeat'
       };
     }
-    // Fond texturé façon papier avec pattern CSS
-    return {
-      backgroundColor: menuTheme.backgroundColor,
-      backgroundImage: `
-        repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px),
-        repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px)
-      `,
-      backgroundSize: '100% 100%'
-    };
+    
+    switch (designId) {
+      case 'classic-elegant':
+        return {
+          backgroundColor: menuTheme.backgroundColor,
+          backgroundImage: `
+            radial-gradient(circle at 20% 80%, rgba(212, 165, 116, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(139, 38, 53, 0.05) 0%, transparent 50%)
+          `
+        };
+      case 'modern-minimal':
+        return {
+          backgroundColor: menuTheme.backgroundColor,
+          backgroundImage: `
+            linear-gradient(135deg, rgba(26, 26, 46, 0.02) 0%, transparent 50%),
+            linear-gradient(225deg, rgba(233, 69, 96, 0.02) 0%, transparent 50%)
+          `
+        };
+      case 'warm-rustic':
+        return {
+          backgroundColor: menuTheme.backgroundColor,
+          backgroundImage: `
+            repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(93, 64, 55, 0.02) 10px, rgba(93, 64, 55, 0.02) 20px)
+          `
+        };
+      case 'luxury-dark':
+        return {
+          backgroundColor: menuTheme.backgroundColor,
+          backgroundImage: `
+            radial-gradient(circle at 30% 30%, rgba(212, 175, 55, 0.08) 0%, transparent 50%),
+            radial-gradient(circle at 70% 70%, rgba(212, 175, 55, 0.05) 0%, transparent 50%)
+          `
+        };
+      case 'mediterranean-fresh':
+        return {
+          backgroundColor: menuTheme.backgroundColor,
+          backgroundImage: `
+            radial-gradient(circle at 10% 90%, rgba(0, 105, 148, 0.05) 0%, transparent 40%),
+            radial-gradient(circle at 90% 10%, rgba(46, 139, 87, 0.05) 0%, transparent 40%)
+          `
+        };
+      default:
+        return {
+          backgroundColor: menuTheme.backgroundColor,
+          backgroundImage: `
+            repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px),
+            repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px)
+          `,
+          backgroundSize: '100% 100%'
+        };
+    }
   };
 
   if (isLoading) {
@@ -839,27 +955,42 @@ const PublicOrderingPage = () => {
       )}
 
       {/* Header avec logo */}
-      <header className="sticky top-0 z-10 bg-white/98 backdrop-blur-sm shadow-md border-b-2" style={{ borderColor: menuTheme.primaryColor + '40' }}>
+      <header 
+        className={`sticky top-0 z-10 backdrop-blur-sm shadow-md border-b-2 ${
+          isDarkMode ? 'bg-gray-900/98 border-yellow-600/30' : 'bg-white/98'
+        }`}
+        style={{ borderColor: isDarkMode ? undefined : menuTheme.primaryColor + '40' }}
+      >
         <div className="container mx-auto px-4 py-3 sm:py-5 flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-4 flex-1 min-w-0">
             {establishment?.logoUrl && (
               <img
                 src={establishment.logoUrl}
                 alt={establishment.establishmentName}
-                className="w-10 h-10 sm:w-14 sm:h-14 rounded-full object-cover border-2 shadow-sm flex-shrink-0"
-                style={{ borderColor: menuTheme.primaryColor }}
+                className={`w-10 h-10 sm:w-14 sm:h-14 rounded-full object-cover border-2 shadow-sm flex-shrink-0 ${
+                  isDarkMode ? 'border-yellow-500/50' : ''
+                }`}
+                style={!isDarkMode ? { borderColor: menuTheme.primaryColor } : {}}
               />
             )}
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-wide truncate" style={{ color: menuTheme.primaryColor, fontFamily: menuTheme.titleFont || 'Georgia, serif' }}>
+            <h1 
+              className="text-xl sm:text-2xl md:text-3xl font-bold tracking-wide truncate" 
+              style={{ 
+                color: isDarkMode ? '#D4AF37' : menuTheme.primaryColor, 
+                fontFamily: menuTheme.titleFont || 'Georgia, serif' 
+              }}
+            >
               {establishment?.establishmentName || "Menu"}
             </h1>
           </div>
           <div className="relative cursor-pointer flex-shrink-0 ml-2">
-            <ShoppingBag className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: menuTheme.primaryColor }} />
+            <ShoppingBag className="w-6 h-6 sm:w-7 sm:h-7" style={{ color: isDarkMode ? '#D4AF37' : menuTheme.primaryColor }} />
             {cart.length > 0 && (
               <span
-                className="absolute -top-2 -right-2 text-white text-xs rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center font-bold shadow-lg"
-                style={{ backgroundColor: menuTheme.primaryColor }}
+                className={`absolute -top-2 -right-2 text-xs rounded-full w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center font-bold shadow-lg ${
+                  isDarkMode ? 'bg-yellow-500 text-black' : 'text-white'
+                }`}
+                style={!isDarkMode ? { backgroundColor: menuTheme.primaryColor } : {}}
               >
                 {cart.reduce((sum, item) => sum + item.quantity, 0)}
               </span>
@@ -918,50 +1049,59 @@ const PublicOrderingPage = () => {
                 onClick={() => setSelectedProduct(product)}
                 role="button"
                 tabIndex={0}
+                style={currentDesign.id === 'mediterranean-fresh' ? { borderLeftColor: menuTheme.secondaryColor } : {}}
               >
                 {product.imageUrl ? (
-                  <div className="w-full h-40 bg-gray-100 overflow-hidden">
+                  <div className="w-full overflow-hidden">
                     <img
                       src={product.imageUrl}
                       alt={product.name}
-                      className="w-full h-full object-cover"
+                      className={getCardImageStyle()}
                       loading="lazy"
                       onError={(e) => {
                         const target = e.currentTarget;
                         target.style.display = 'none';
                         const parent = target.parentElement;
                         if (parent && !parent.querySelector('svg')) {
-                          parent.className = 'w-full h-40 bg-gray-100 flex items-center justify-center';
+                          parent.className = getCardPlaceholderStyle();
                           parent.innerHTML = '<svg class="w-16 h-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>';
                         }
                       }}
                     />
                   </div>
                 ) : (
-                  <div className="w-full h-40 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-                    <Package className="w-16 h-16 text-gray-300" />
+                  <div className={getCardPlaceholderStyle()}>
+                    <Package className={isDarkMode ? "w-16 h-16 text-yellow-600/50" : "w-16 h-16 text-gray-300"} />
                   </div>
                 )}
-                <div className="p-5">
-                  <h3 className="font-semibold text-lg mb-3 line-clamp-2 leading-tight" style={{ color: menuTheme.primaryColor, fontFamily: 'Georgia, serif' }}>
+                <div className={isDarkMode ? "p-4" : "p-4"}>
+                  <h3 
+                    className="font-semibold text-lg mb-2 line-clamp-2 leading-tight" 
+                    style={{ 
+                      color: getCardTextStyle().color, 
+                      fontFamily: menuTheme.titleFont || 'Georgia, serif' 
+                    }}
+                  >
                     {product.name}
                   </h3>
-                  <div className="flex items-center justify-between pt-2 border-t" style={{ borderColor: menuTheme.primaryColor + '20' }}>
-                    <span className="text-xl font-bold tracking-wide" style={{ color: menuTheme.primaryColor }}>
+                  {product.description && currentDesign.id === 'mediterranean-fresh' && (
+                    <p className="text-sm text-gray-500 mb-2 line-clamp-2">{product.description}</p>
+                  )}
+                  <div className="flex items-center justify-between pt-2" style={{ borderColor: menuTheme.primaryColor + '20' }}>
+                    <span className={getCardPriceStyle()} style={currentDesign.id !== 'luxury-dark' && currentDesign.id !== 'mediterranean-fresh' ? { color: menuTheme.primaryColor } : {}}>
                       {priceValue.toLocaleString('fr-FR')} XAF
                     </span>
                     {isFoodBusiness && (
-                    <Button
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        addToCart(product);
-                      }}
-                      className="text-white shadow-md hover:shadow-lg transition-shadow"
-                      style={{ backgroundColor: menuTheme.primaryColor }}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addToCart(product);
+                        }}
+                        className={getAddButtonStyle()}
+                        style={currentDesign.id !== 'modern-minimal' && currentDesign.id !== 'luxury-dark' && currentDesign.id !== 'mediterranean-fresh' ? { backgroundColor: menuTheme.primaryColor } : {}}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
                     )}
                   </div>
                 </div>
@@ -972,7 +1112,7 @@ const PublicOrderingPage = () => {
 
         {filteredProducts.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-600">
+            <p className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
               {searchTerm || activeCategoryTab !== "all"
                 ? "Aucun produit ne correspond à votre recherche."
                 : "Menu du jour non configuré. Le gérant n'a pas encore sélectionné de produits pour le menu digital."}
@@ -983,11 +1123,13 @@ const PublicOrderingPage = () => {
 
       {/* Panier fixe en bas */}
       {cart.length > 0 && (
-        <footer className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg p-2 sm:p-4 z-20">
+        <footer className={`fixed bottom-0 left-0 right-0 border-t shadow-lg p-2 sm:p-4 z-20 ${
+          isDarkMode ? 'bg-gray-900 border-yellow-600/30' : 'bg-white'
+        }`}>
           <div className="container mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-0">
             <div className="flex-1">
-              <p className="text-xs sm:text-sm text-gray-600">Total</p>
-              <p className="text-lg sm:text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>
+              <p className={`text-xs sm:text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total</p>
+              <p className="text-lg sm:text-2xl font-bold" style={{ color: isDarkMode ? '#D4AF37' : menuTheme.primaryColor }}>
                 {total.toLocaleString('fr-FR')} XAF
               </p>
             </div>
@@ -1001,8 +1143,10 @@ const PublicOrderingPage = () => {
                   }
                 }}
                 variant="outline"
-                className="px-4 sm:px-6 text-sm sm:text-base flex-1 sm:flex-none"
-                style={{ borderColor: menuTheme.primaryColor, color: menuTheme.primaryColor }}
+                className={`px-4 sm:px-6 text-sm sm:text-base flex-1 sm:flex-none ${
+                  isDarkMode ? 'border-yellow-500 text-yellow-400 hover:bg-yellow-500/10' : ''
+                }`}
+                style={!isDarkMode ? { borderColor: menuTheme.primaryColor, color: menuTheme.primaryColor } : {}}
               >
                 Commander
               </Button>

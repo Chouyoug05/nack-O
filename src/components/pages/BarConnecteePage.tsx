@@ -39,6 +39,7 @@ import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collectio
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
+import { MENU_DESIGNS } from "@/types/menuDesigns";
 
 interface Product {
   id: string;
@@ -1302,6 +1303,56 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Sélecteur de Design */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg">Modèles de design</h3>
+                <p className="text-sm text-muted-foreground">Choisissez un modèle de design pour votre menu digital</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {MENU_DESIGNS.map((design) => (
+                    <button
+                      key={design.id}
+                      type="button"
+                      onClick={() => setMenuTheme({ ...design.theme, updatedAt: Date.now() })}
+                      className={`relative p-4 rounded-xl border-2 transition-all text-left ${
+                        menuTheme.designId === design.id
+                          ? 'border-nack-red bg-nack-red/5 shadow-lg'
+                          : 'border-gray-200 hover:border-gray-300 hover:shadow-md'
+                      }`}
+                    >
+                      {menuTheme.designId === design.id && (
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-nack-red rounded-full flex items-center justify-center">
+                          <CheckCircle className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      <div className="flex gap-2 mb-3">
+                        <div 
+                          className="w-8 h-8 rounded-full border-2 border-white shadow"
+                          style={{ backgroundColor: design.preview.primaryColor }}
+                        />
+                        <div 
+                          className="w-8 h-8 rounded-full border-2 border-white shadow"
+                          style={{ backgroundColor: design.preview.accentColor }}
+                        />
+                        <div 
+                          className="w-8 h-8 rounded-full border-2 border-white shadow"
+                          style={{ backgroundColor: design.preview.backgroundColor }}
+                        />
+                      </div>
+                      <h4 className="font-semibold text-sm mb-1">{design.name}</h4>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{design.description}</p>
+                      <span className="inline-block mt-2 text-xs px-2 py-0.5 bg-gray-100 rounded-full text-gray-600">
+                        {design.category}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="font-semibold text-lg mb-4">Personnalisation avancée</h3>
+                <p className="text-sm text-muted-foreground mb-4">Ajustez les couleurs et styles pour personnaliser votre design</p>
+              </div>
+
               {/* Couleurs */}
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg">Couleurs</h3>

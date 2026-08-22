@@ -15,6 +15,9 @@ export interface MenuThemeConfig {
   // Typographie
   titleFont?: string; // Police pour les titres (optionnel)
   
+  // Design template
+  designId?: string; // ID du template de design sélectionné
+  
   // Autres
   updatedAt?: number; // Date de dernière mise à jour
 }
