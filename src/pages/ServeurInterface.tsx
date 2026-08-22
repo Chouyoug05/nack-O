@@ -384,17 +384,27 @@ const ServeurInterface = () => {
   })();
 
   // Mes commandes prises en charge (serverId === moi)
+  // Inclut aussi les commandes prêtes qui ont été validées par ce serveur
   const myOrders = (() => {
     console.log('[ServeurInterface] myAgentCodes:', myAgentCodes);
-    console.log('[ServeurInterface] liveOrders:', liveOrders.map(o => ({ id: o.id, status: o.status, serverId: o.serverId })));
+    console.log('[ServeurInterface] liveOrders count:', liveOrders.length);
+    
     const fsMy = liveOrders.filter(o => {
-      const matches = o.serverId && myAgentCodes.includes(o.serverId) && o.status !== 'cancelled';
-      if (o.serverId) {
-        console.log('[ServeurInterface] Commande', o.id, 'serverId:', o.serverId, 'matches:', matches);
+      // Inclure si serverId correspond à ce serveur
+      const serverIdMatch = o.serverId && myAgentCodes.includes(o.serverId);
+      // Inclure si la commande est prête et a été validée (peut être la nôtre)
+      const isReadyAndValidated = o.status === 'ready' && o.validatedByServerAt;
+      // Exclure les annulées
+      const notCancelled = o.status !== 'cancelled';
+      
+      const matches = (serverIdMatch || isReadyAndValidated) && notCancelled;
+      if (o.serverId || o.status === 'ready') {
+        console.log('[ServeurInterface] Commande', o.orderNumber, 'status:', o.status, 'serverId:', o.serverId, 'matches:', matches);
       }
       return matches;
     });
-    console.log('[ServeurInterface] fsMy (commandes Firestore matchées):', fsMy.length);
+    
+    console.log('[ServeurInterface] myOrders count:', fsMy.length);
     const fsOrderNumbers = new Set(fsMy.map(o => String(o.orderNumber)));
     const localOnlyMy = localOrders.filter(local =>
       local.serverId && myAgentCodes.includes(local.serverId) && local.status !== 'cancelled' &&

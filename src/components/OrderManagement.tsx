@@ -145,6 +145,7 @@ const OrderManagement = ({
 
     const q = query(ordersColRef(db, uidToUse), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(q, (snap) => {
+      console.log('[OrderManagement] Snapshot reçu:', snap.size, 'commandes pour uid:', uidToUse);
       const list: Order[] = snap.docs.map((d, idx) => {
         const data = d.data() as FirestoreOrderDoc;
         const items = (data.items ?? []).map((it) => ({
@@ -179,7 +180,8 @@ const OrderManagement = ({
       });
       setFsOrders(list);
       try { localStorage.setItem(getManagerOrdersCacheKey(uidToUse), JSON.stringify(list)); } catch (e) { /* ignore */ }
-    }, () => {
+    }, (error) => {
+      console.error('[OrderManagement] Erreur listener:', error, 'uidToUse:', uidToUse);
       // Snapshot error → fallback to cache
       try {
         const cached = localStorage.getItem(getManagerOrdersCacheKey(uidToUse));
@@ -326,6 +328,7 @@ const OrderManagement = ({
 
     if (!uidToUse) {
       setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+      toast({ title: 'Erreur', description: 'Établissement non identifié.', variant: 'destructive' });
       return;
     }
 
@@ -349,16 +352,53 @@ const OrderManagement = ({
     const paymentMethod = paymentMethodByOrder[order.id] || 'cash';
     const managerId = user?.uid;
     const paidAt = Date.now();
+    
+    // Construire l'objet de mise à jour
+    const updateData: Record<string, unknown> = {
+      status: 'paid',
+      paymentStatus: 'paid',
+      paymentMethod,
+      paidBy: 'manager',
+      managerId,
+      paidAt,
+      updatedAt: paidAt,
+    };
+    
     try {
-      await updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), {
-        status: 'paid',
-        paymentStatus: 'paid',
-        paymentMethod,
-        paidBy: 'manager',
-        managerId,
-        paidAt,
-        updatedAt: paidAt,
-      });
+      // Vérifier si la commande existe dans Firestore
+      const orderRef = fsDoc(ordersColRef(db, uidToUse), order.id);
+      const orderSnap = await getDoc(orderRef);
+      
+      if (!orderSnap.exists()) {
+        // Chercher par orderNumber
+        const q = query(ordersColRef(db, uidToUse), where('orderNumber', '==', order.orderNumber));
+        const querySnap = await getDocs(q);
+        
+        if (querySnap.empty) {
+          toast({ title: 'Erreur', description: `Commande #${order.orderNumber} introuvable.`, variant: 'destructive' });
+          return;
+        }
+        
+        const foundDoc = querySnap.docs[0];
+        await updateDoc(foundDoc.ref, updateData);
+        setFsOrders(prev => prev.map(o => o.id === foundDoc.id ? {
+          ...o,
+          status: 'paid',
+          paymentStatus: 'paid',
+          paymentMethod: paymentMethod as OrderPaymentMethod,
+          paidBy: 'manager' as const,
+          managerId,
+          paidAt,
+        } : o));
+        updateOrderStatus(order.id, 'paid');
+        toast({
+          title: "Encaissement enregistré",
+          description: `Commande #${order.orderNumber} encaissée (${paymentMethod === 'cash' ? 'espèces' : paymentMethod === 'mobile' ? 'mobile money' : 'carte'})`,
+        });
+        return;
+      }
+      
+      await updateDoc(orderRef, updateData);
       setFsOrders(prev => prev.map(o => o.id === order.id ? {
         ...o,
         status: 'paid',
@@ -374,13 +414,15 @@ const OrderManagement = ({
         description: `Commande #${order.orderNumber} encaissée (${paymentMethod === 'cash' ? 'espèces' : paymentMethod === 'mobile' ? 'mobile money' : 'carte'})`,
       });
     } catch (e) {
+      console.error('Erreur encaissement:', e);
       if (agentToken && uidToUse) {
         queueManagerUpdate(order.id, 'paid');
         setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'paid', paymentStatus: 'paid' } : o));
         updateOrderStatus(order.id, 'paid');
         toast({ title: "Encaissement en file", description: "Sera synchronisé dès que possible." });
       } else {
-        toast({ title: 'Erreur', description: 'Impossible de procéder à l\'encaissement.', variant: 'destructive' });
+        const errorMsg = e instanceof Error ? e.message : 'Erreur inconnue';
+        toast({ title: 'Erreur', description: `Impossible d'encaisser: ${errorMsg}`, variant: 'destructive' });
       }
     } finally {
       setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
