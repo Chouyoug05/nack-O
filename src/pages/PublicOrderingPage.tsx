@@ -118,6 +118,7 @@ const PublicOrderingPage = () => {
   const [showCartDetails, setShowCartDetails] = useState(false);
   const [productQuantity, setProductQuantity] = useState(1);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [loadError, setLoadError] = useState<string | null>(null);
   // Livraison
   const [isDelivery, setIsDelivery] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -249,12 +250,27 @@ const PublicOrderingPage = () => {
     const loadEstablishmentData = async () => {
       // Métadonnées publiques (sans secrets) + shell établissement éventuel.
       // Les produits restent sous profiles/{uid}/products (lecture publique).
-      const [publicDoc, estDoc] = await Promise.all([
-        getDoc(doc(db, 'publicProfiles', establishmentId)).catch(() => null),
-        getDoc(doc(db, 'establishments', establishmentId)).catch(() => null),
-      ]);
+      let publicDoc, estDoc;
+      try {
+        [publicDoc, estDoc] = await Promise.all([
+          getDoc(doc(db, 'publicProfiles', establishmentId)),
+          getDoc(doc(db, 'establishments', establishmentId)),
+        ]);
+      } catch (e: any) {
+        console.error('[PublicOrderingPage] load public data permission error', e);
+        if (e?.code === 'permission-denied') setLoadError('permission-denied');
+        else setLoadError('network-error');
+        setIsLoading(false);
+        return;
+      }
 
       if (!isMountedRef.current) return;
+
+      if (!publicDoc?.exists() && !estDoc?.exists()) {
+        setLoadError('not-found');
+        setIsLoading(false);
+        return;
+      }
 
       const data = {
         ...(estDoc?.exists() ? estDoc.data() : {}),
@@ -295,12 +311,12 @@ const PublicOrderingPage = () => {
 
       setupProductsAndTables(base);
     };
-    loadEstablishmentData().catch(() => {
+    loadEstablishmentData().catch((e) => {
       if (!isMountedRef.current) return;
-      // Même sans publicProfiles, tenter le chargement des produits publics
-      setCollectionBase('profiles');
-      setEstablishment({ establishmentName: 'Établissement' } as Establishment);
-      setupProductsAndTables('profiles');
+      console.error('[PublicOrderingPage] loadEstablishmentData catch', e);
+      if ((e as any)?.code === 'permission-denied') setLoadError('permission-denied');
+      else setLoadError('network-error');
+      setIsLoading(false);
     });
 
     function setupProductsAndTables(base: 'establishments' | 'profiles') {
@@ -984,6 +1000,22 @@ const PublicOrderingPage = () => {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+        <div className="max-w-md w-full text-center bg-white rounded-2xl shadow p-8">
+          <h2 className="text-xl font-bold mb-2">
+            {loadError === 'not-found' ? 'Établissement introuvable' : loadError === 'permission-denied' ? 'Accès refusé' : 'Erreur réseau'}
+          </h2>
+          <p className="text-gray-600 text-sm mb-4">
+            {loadError === 'not-found' ? 'Ce lien de commande n\'existe pas ou a été supprimé.' : loadError === 'permission-denied' ? 'Permissions Firestore insuffisantes pour afficher ce menu. Vérifiez les règles publicProfiles.' : 'Impossible de charger le menu. Vérifiez votre connexion.'}
+          </p>
+          <Button onClick={() => window.location.reload()}>Recharger</Button>
+        </div>
+      </div>
+    );
+  }
+
   if (orderComplete) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -1039,9 +1071,9 @@ const PublicOrderingPage = () => {
     availableCategories,
     menuTheme,
     isFoodBusiness,
-    onSearchChange: setSearchTerm,
-    onCategoryChange: setActiveCategoryTab,
-    onAddToCart: (p: any) => addToCart(p),
+    onSearchChange: (v: string) => setSearchTerm(v),
+    onCategoryChange: (v: string) => setActiveCategoryTab(v),
+    onAddToCart: (p: any) => { try { addToCart(p); } catch(e){ console.error(e);} },
     onSelectProduct: (p: any) => setSelectedProduct(p),
     onCheckout: () => {
       if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
@@ -1055,6 +1087,7 @@ const PublicOrderingPage = () => {
   };
 
   const renderTemplate = () => {
+    try {
     // Déterminer la catégorie de l'établissement
     const isRestaurant = isFoodBusiness(establishmentType);
     const isShop = isBoutique(establishmentType);
@@ -1126,6 +1159,10 @@ const PublicOrderingPage = () => {
     
     // Par défaut pour restauration : NACK Modern
     return <NackModernTemplate {...templateProps} establishmentType={establishmentType} />;
+    } catch(e) {
+      console.error('[PublicOrderingPage] renderTemplate error', e);
+      return <div className="p-8 text-center text-red-600">Erreur affichage menu. Rechargez la page.</div>;
+    }
   };
 
   return (

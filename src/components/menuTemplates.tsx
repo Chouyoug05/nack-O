@@ -888,23 +888,20 @@ export const NackModernTemplate = (props: NackModernTemplateProps) => {
   const isDark = bg.startsWith('#1') || bg.startsWith('#0') || bg.startsWith('#2');
 
   const handleShare = async () => {
-    const shareData = {
-      title: establishment?.establishmentName || 'Menu',
-      text: `Découvrez le menu de ${establishment?.establishmentName || 'cet établissement'} !`,
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        // Fallback: copier le lien
-        navigator.clipboard.writeText(window.location.href);
+    try {
+      const shareData = {
+        title: establishment?.establishmentName || 'Menu',
+        text: `Découvrez le menu de ${establishment?.establishmentName || 'cet établissement'} !`,
+        url: window.location.href,
+      };
+      if ((navigator as any).share) {
+        await (navigator as any).share(shareData);
+        return;
       }
-    } else {
-      // Fallback: copier le lien
-      navigator.clipboard.writeText(window.location.href);
-    }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(window.location.href);
+      }
+    } catch { /* ignore CSP/sandbox */ }
   };
 
   return (
@@ -1343,21 +1340,20 @@ export const NackShopTemplate = (props: NackShopTemplateProps) => {
   const shopLabel = getShopTypeLabel(establishmentType);
 
   const handleShare = async () => {
-    const shareData = {
-      title: establishment?.establishmentName || 'Boutique',
-      text: `Découvrez ${establishment?.establishmentName || 'cette boutique'} !`,
-      url: window.location.href,
-    };
-
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData);
-      } catch {
-        navigator.clipboard.writeText(window.location.href);
+    try {
+      const shareData = {
+        title: establishment?.establishmentName || 'Boutique',
+        text: `Découvrez ${establishment?.establishmentName || 'cette boutique'} !`,
+        url: window.location.href,
+      };
+      if ((navigator as any).share) {
+        await (navigator as any).share(shareData);
+        return;
       }
-    } else {
-      navigator.clipboard.writeText(window.location.href);
-    }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(window.location.href);
+      }
+    } catch { /* ignore */ }
   };
 
   return (
