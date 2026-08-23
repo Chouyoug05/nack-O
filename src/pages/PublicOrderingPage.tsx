@@ -2,12 +2,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { db } from "@/lib/firebase";
 import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData, updateDoc, getDocs } from "firebase/firestore";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Grid3x3, Search, CreditCard, AlertCircle, Heart, X, Share2 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
@@ -483,6 +479,20 @@ const PublicOrderingPage = () => {
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
   }, [establishmentId]);
+
+  // ESC key closes any open dialog
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showTableDialog) { setShowTableDialog(false); return; }
+      if (showPaymentChoiceDialog) { setShowPaymentChoiceDialog(false); return; }
+      if (selectedProduct) { setSelectedProduct(null); setProductQuantity(1); return; }
+      if (showAirtelNumberDialog) { setShowAirtelNumberDialog(false); return; }
+      if (showCartDetails) { setShowCartDetails(false); return; }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [showTableDialog, showPaymentChoiceDialog, selectedProduct, showAirtelNumberDialog, showCartDetails]);
 
   // Fonctions
   const addToCart = (product: Product) => {
@@ -1079,7 +1089,7 @@ const PublicOrderingPage = () => {
           <p className="text-gray-600 text-sm mb-4">
             {loadError === 'not-found' ? 'Ce lien de commande n\'existe pas ou a été supprimé.' : loadError === 'permission-denied' ? 'Permissions Firestore insuffisantes pour afficher ce menu. Vérifiez les règles publicProfiles.' : 'Impossible de charger le menu. Vérifiez votre connexion.'}
           </p>
-          <Button onClick={() => window.location.reload()}>Recharger</Button>
+          <button onClick={() => window.location.reload()} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 shadow-button hover:shadow-elegant h-10 px-4 py-2">Recharger</button>
         </div>
       </div>
     );
@@ -1105,26 +1115,25 @@ const PublicOrderingPage = () => {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 w-full">
-            <Button onClick={printReceipt} className="w-full text-white" style={{ backgroundColor: menuTheme.primaryColor }}>
+            <button onClick={printReceipt} className="w-full inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-white h-10 px-4 py-2" style={{ backgroundColor: menuTheme.primaryColor }}>
               <Printer className="w-4 h-4 mr-2" />
               Imprimer
-            </Button>
-            <Button onClick={downloadReceipt} variant="outline" className="w-full">
+            </button>
+            <button onClick={downloadReceipt} className="w-full inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
               <Download className="w-4 h-4 mr-2" />
               Télécharger
-            </Button>
+            </button>
           </div>
-          <Button
-            variant="outline"
+          <button
             onClick={() => {
               setOrderComplete(false);
               setCart([]);
               setSelectedTable("");
             }}
-            className="w-full"
+            className="w-full inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2"
           >
             Nouvelle commande
-          </Button>
+          </button>
         </div>
       </div>
     );
@@ -1247,240 +1256,256 @@ const PublicOrderingPage = () => {
       {renderTemplate()}
 
       {/* Dialog selection table ou livraison */}
-      <Dialog open={showTableDialog} onOpenChange={setShowTableDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2" style={{ color: menuTheme.primaryColor }}>
-              <MapPin className="w-5 h-5" />
-              Votre position
-            </DialogTitle>
-            <DialogDescription>
-              Sélectionnez votre table, zone ou activez la livraison
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Option livraison */}
-            {establishment?.deliveryEnabled && (
-              <div className="space-y-2 p-4 border rounded-lg bg-gray-50">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="deliveryCheckbox"
-                    checked={isDelivery}
-                    onChange={(e) => {
-                      setIsDelivery(e.target.checked);
-                      if (e.target.checked) {
-                        setSelectedTable("");
+      {showTableDialog && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setShowTableDialog(false)} />
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg">
+            <button
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              onClick={() => setShowTableDialog(false)}
+              aria-label="Fermer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex flex-col space-y-1.5 text-center sm:text-left">
+              <h2 className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2" style={{ color: menuTheme.primaryColor }}>
+                <MapPin className="w-5 h-5" />
+                Votre position
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Sélectionnez votre table, zone ou activez la livraison
+              </p>
+            </div>
+            <div className="space-y-4">
+              {/* Option livraison */}
+              {establishment?.deliveryEnabled && (
+                <div className="space-y-2 p-4 border rounded-lg bg-gray-50">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="deliveryCheckbox"
+                      checked={isDelivery}
+                      onChange={(e) => {
+                        setIsDelivery(e.target.checked);
+                        if (e.target.checked) {
+                          setSelectedTable("");
+                        }
+                      }}
+                      className="w-4 h-4"
+                    />
+                    <label htmlFor="deliveryCheckbox" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer">
+                      Livraison à domicile
+                      {establishment.deliveryPrice && (
+                        <span className="text-sm font-normal text-gray-600 ml-2">
+                          (+{establishment.deliveryPrice.toLocaleString('fr-FR')} XAF)
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                  {isDelivery && (
+                    <div className="mt-2 space-y-3">
+                      <div>
+                        <label htmlFor="deliveryName" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Nom du destinataire *</label>
+                        <Input
+                          id="deliveryName"
+                          placeholder="Ex: Jean Koumba"
+                          value={deliveryName}
+                          onChange={(e) => setDeliveryName(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="deliveryPhone" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Téléphone *</label>
+                        <Input
+                          id="deliveryPhone"
+                          type="tel"
+                          placeholder="Ex: 06 12 34 56 78"
+                          value={deliveryPhone}
+                          onChange={(e) => setDeliveryPhone(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="deliveryAddress" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Adresse de livraison *</label>
+                        <Input
+                          id="deliveryAddress"
+                          placeholder="Ex: Quartier Nzeng-Ayong, Rue 123..."
+                          value={deliveryAddress}
+                          onChange={(e) => setDeliveryAddress(e.target.value)}
+                          className="mt-1"
+                        />
+                      </div>
+                      {establishment.deliveryPrice && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-900">
+                            <strong>Frais de livraison :</strong> {establishment.deliveryPrice.toLocaleString('fr-FR')} FCFA
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sélection table/zone (si livraison désactivée) */}
+              {!isDelivery && (
+                <>
+                  {tables.length === 0 ? (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Table ou zone</label>
+                      <Input
+                        placeholder="Ex: Table 3, Comptoir..."
+                        value={selectedTable}
+                        onChange={(e) => setSelectedTable(e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Table ou zone</label>
+                      <select
+                        value={selectedTable}
+                        onChange={(e) => setSelectedTable(e.target.value)}
+                        className="w-full px-3 py-2 border rounded-md"
+                      >
+                        <option value="">Sélectionnez votre table/zone</option>
+                        {tables.map((table) => (
+                          <option key={table.id} value={table.name}>
+                            {table.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                <button
+                  onClick={() => {
+                    setShowTableDialog(false);
+                    setIsDelivery(false);
+                    setDeliveryAddress("");
+                  }}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 flex-1"
+                >
+                  Annuler
+                </button>
+                <div className="flex gap-2 w-full">
+                  <button
+                    onClick={() => {
+                      if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
+                        setShowTableDialog(false);
+                        proceedToCheckout();
                       }
                     }}
-                    className="w-4 h-4"
-                  />
-                  <Label htmlFor="deliveryCheckbox" className="font-semibold cursor-pointer">
-                    Livraison à domicile
-                    {establishment.deliveryPrice && (
-                      <span className="text-sm font-normal text-gray-600 ml-2">
-                        (+{establishment.deliveryPrice.toLocaleString('fr-FR')} XAF)
-                      </span>
-                    )}
-                  </Label>
+                    disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable)}
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 flex-1 text-white h-10 px-4 py-2"
+                    style={{ backgroundColor: menuTheme.primaryColor }}
+                  >
+                    Continuer
+                  </button>
                 </div>
-                {isDelivery && (
-                  <div className="mt-2 space-y-3">
-                    <div>
-                      <Label htmlFor="deliveryName">Nom du destinataire *</Label>
-                      <Input
-                        id="deliveryName"
-                        placeholder="Ex: Jean Koumba"
-                        value={deliveryName}
-                        onChange={(e) => setDeliveryName(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="deliveryPhone">Téléphone *</Label>
-                      <Input
-                        id="deliveryPhone"
-                        type="tel"
-                        placeholder="Ex: 06 12 34 56 78"
-                        value={deliveryPhone}
-                        onChange={(e) => setDeliveryPhone(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="deliveryAddress">Adresse de livraison *</Label>
-                      <Input
-                        id="deliveryAddress"
-                        placeholder="Ex: Quartier Nzeng-Ayong, Rue 123..."
-                        value={deliveryAddress}
-                        onChange={(e) => setDeliveryAddress(e.target.value)}
-                        className="mt-1"
-                      />
-                    </div>
-                    {establishment.deliveryPrice && (
-                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <p className="text-sm text-blue-900">
-                          <strong>Frais de livraison :</strong> {establishment.deliveryPrice.toLocaleString('fr-FR')} FCFA
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Sélection table/zone (si livraison désactivée) */}
-            {!isDelivery && (
-              <>
-                {tables.length === 0 ? (
-                  <div className="space-y-2">
-                    <Label>Table ou zone</Label>
-                    <Input
-                      placeholder="Ex: Table 3, Comptoir..."
-                      value={selectedTable}
-                      onChange={(e) => setSelectedTable(e.target.value)}
-                    />
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Label>Table ou zone</Label>
-                    <select
-                      value={selectedTable}
-                      onChange={(e) => setSelectedTable(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-md"
-                    >
-                      <option value="">Sélectionnez votre table/zone</option>
-                      {tables.map((table) => (
-                        <option key={table.id} value={table.name}>
-                          {table.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="flex gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowTableDialog(false);
-                  setIsDelivery(false);
-                  setDeliveryAddress("");
-                }}
-                className="flex-1"
-              >
-                Annuler
-              </Button>
-              <div className="flex gap-2 w-full">
-                <Button
-                  onClick={() => {
-                    if ((isDelivery && deliveryAddress.trim()) || (!isDelivery && selectedTable)) {
-                      setShowTableDialog(false);
-                      proceedToCheckout();
-                    }
-                  }}
-                  disabled={(isDelivery && !deliveryAddress.trim()) || (!isDelivery && !selectedTable)}
-                  className="flex-1 text-white"
-                  style={{ backgroundColor: menuTheme.primaryColor }}
-                >
-                  Continuer
-                </Button>
               </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* Dialog choix de paiement : en ligne (SingPay) ou sur place */}
-      <Dialog open={showPaymentChoiceDialog} onOpenChange={setShowPaymentChoiceDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2" style={{ color: menuTheme.primaryColor }}>
-              <CreditCard className="w-5 h-5" />
-              Comment souhaitez-vous payer ?
-            </DialogTitle>
-            <DialogDescription>
-              {isDelivery ? 'Choisissez le mode de paiement pour votre livraison.' : 'Choisissez le mode de paiement pour votre commande.'}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={payOnline}
-              onKeyDown={(e) => { if (e.key === 'Enter') payOnline(); }}
-              className="flex items-start gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all hover:shadow-md"
-              style={{ borderColor: menuTheme.primaryColor }}
+      {showPaymentChoiceDialog && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setShowPaymentChoiceDialog(false)} />
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg">
+            <button
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              onClick={() => setShowPaymentChoiceDialog(false)}
+              aria-label="Fermer"
             >
-              <div className="mt-1">
-                <CreditCard className="w-5 h-5" style={{ color: menuTheme.primaryColor }} />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold">Payer en ligne à la commande</p>
-                <p className="text-sm text-gray-600">
-                  {isDelivery
-                    ? 'Réglez maintenant en ligne via SingPay, la livraison est déjà payée.'
-                    : 'Réglez immédiatement en ligne via SingPay.'}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">💳 Airtel Money, Moov Money, etc.</p>
-              </div>
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex flex-col space-y-1.5 text-center sm:text-left">
+              <h2 className="text-lg font-semibold leading-none tracking-tight flex items-center gap-2" style={{ color: menuTheme.primaryColor }}>
+                <CreditCard className="w-5 h-5" />
+                Comment souhaitez-vous payer ?
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {isDelivery ? 'Choisissez le mode de paiement pour votre livraison.' : 'Choisissez le mode de paiement pour votre commande.'}
+              </p>
             </div>
-
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => {
-                setShowPaymentChoiceDialog(false);
-                void placeOrder(false);
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter') { setShowPaymentChoiceDialog(false); void placeOrder(false); } }}
-              className="flex items-start gap-3 rounded-xl border-2 border-gray-200 p-4 cursor-pointer transition-all hover:shadow-md"
-            >
-              <div className="mt-1">
-                <ShoppingBag className="w-5 h-5 text-gray-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold">Payer sur place</p>
-                <p className="text-sm text-gray-600">
-                  {isDelivery
-                    ? 'Réglez à la réception de votre commande.'
-                    : 'Réglez directement à votre table, au comptoir ou à la caisse.'}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                onClick={() => setShowPaymentChoiceDialog(false)}
-                className="flex-1"
+            <div className="space-y-3">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={payOnline}
+                onKeyDown={(e) => { if (e.key === 'Enter') payOnline(); }}
+                className="flex items-start gap-3 rounded-xl border-2 p-4 cursor-pointer transition-all hover:shadow-md"
+                style={{ borderColor: menuTheme.primaryColor }}
               >
-                Retour
-              </Button>
-              <Button
+                <div className="mt-1">
+                  <CreditCard className="w-5 h-5" style={{ color: menuTheme.primaryColor }} />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">Payer en ligne à la commande</p>
+                  <p className="text-sm text-gray-600">
+                    {isDelivery
+                      ? 'Réglez maintenant en ligne via SingPay, la livraison est déjà payée.'
+                      : 'Réglez immédiatement en ligne via SingPay.'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">💳 Airtel Money, Moov Money, etc.</p>
+                </div>
+              </div>
+
+              <div
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setShowPaymentChoiceDialog(false);
                   void placeOrder(false);
                 }}
-                className="flex-1 text-white"
-                style={{ backgroundColor: menuTheme.primaryColor }}
+                onKeyDown={(e) => { if (e.key === 'Enter') { setShowPaymentChoiceDialog(false); void placeOrder(false); } }}
+                className="flex items-start gap-3 rounded-xl border-2 border-gray-200 p-4 cursor-pointer transition-all hover:shadow-md"
               >
-                Commander sur place
-              </Button>
+                <div className="mt-1">
+                  <ShoppingBag className="w-5 h-5 text-gray-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">Payer sur place</p>
+                  <p className="text-sm text-gray-600">
+                    {isDelivery
+                      ? 'Réglez à la réception de votre commande.'
+                      : 'Réglez directement à votre table, au comptoir ou à la caisse.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={() => setShowPaymentChoiceDialog(false)}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2 flex-1"
+                >
+                  Retour
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPaymentChoiceDialog(false);
+                    void placeOrder(false);
+                  }}
+                  className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 flex-1 text-white h-10 px-4 py-2"
+                  style={{ backgroundColor: menuTheme.primaryColor }}
+                >
+                  Commander sur place
+                </button>
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* Fiche produit améliorée */}
-      <Dialog open={!!selectedProduct} onOpenChange={(open) => { 
-        setSelectedProduct(null); 
-        setProductQuantity(1);
-      }}>
-        <DialogContent className="max-w-md p-0 overflow-hidden">
-          {selectedProduct && (
+      {!!selectedProduct && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/80" onClick={() => { setSelectedProduct(null); setProductQuantity(1); }} />
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-md translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background shadow-lg sm:rounded-lg p-0 overflow-hidden">
             <div className="flex flex-col max-h-[90vh]">
               {/* Image du produit */}
               <div className="relative w-full h-64 bg-gray-100">
@@ -1571,23 +1596,23 @@ const PublicOrderingPage = () => {
 
               {/* Bouton d'action */}
               <div className="p-4 border-t">
-                <Button
+                <button
                   onClick={() => {
                     addToCartWithQuantity(selectedProduct, productQuantity);
                     setSelectedProduct(null);
                     setProductQuantity(1);
                   }}
-                  className="w-full h-12 text-white font-bold text-base"
+                  className="w-full h-12 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-white font-bold text-base"
                   style={{ backgroundColor: menuTheme.primaryColor }}
                 >
                   <ShoppingBag className="w-5 h-5 mr-2" />
                   Ajouter au panier
-                </Button>
+                </button>
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </div>
+        </div>
+      )}
 
       {/* Vue panier détaillée (Bottom Sheet) */}
       {showCartDetails && (
@@ -1714,53 +1739,63 @@ const PublicOrderingPage = () => {
       )}
 
       {/* Dialogue pour demander le numéro Airtel Money */}
-      <Dialog open={showAirtelNumberDialog} onOpenChange={setShowAirtelNumberDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Recevoir les paiements sur Airtel Money</DialogTitle>
-            <DialogDescription>
-              Pour recevoir les paiements des commandes directement sur votre compte Airtel Money,
-              veuillez entrer votre numéro Airtel Money. Votre demande sera envoyée à l'administration
-              pour configuration du Disbursement ID.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="airtelNumber">Numéro Airtel Money</Label>
-              <Input
-                id="airtelNumber"
-                type="tel"
-                placeholder="Ex: 0612345678"
-                value={airtelNumberInput}
-                onChange={(e) => setAirtelNumberInput(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">
-                Format: 10 chiffres (ex: 0612345678)
+      {showAirtelNumberDialog && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setShowAirtelNumberDialog(false)} />
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg">
+            <button
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              onClick={() => setShowAirtelNumberDialog(false)}
+              aria-label="Fermer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex flex-col space-y-1.5 text-center sm:text-left">
+              <h2 className="text-lg font-semibold leading-none tracking-tight">Recevoir les paiements sur Airtel Money</h2>
+              <p className="text-sm text-muted-foreground">
+                Pour recevoir les paiements des commandes directement sur votre compte Airtel Money,
+                veuillez entrer votre numéro Airtel Money. Votre demande sera envoyée à l'administration
+                pour configuration du Disbursement ID.
               </p>
             </div>
-            <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
-                <p className="text-sm text-yellow-800">
-                  Une fois votre demande approuvée par l'administration, vous recevrez un message de confirmation
-                  et pourrez commencer à recevoir les paiements automatiquement.
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label htmlFor="airtelNumber" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">Numéro Airtel Money</label>
+                <Input
+                  id="airtelNumber"
+                  type="tel"
+                  placeholder="Ex: 0612345678"
+                  value={airtelNumberInput}
+                  onChange={(e) => setAirtelNumberInput(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Format: 10 chiffres (ex: 0612345678)
                 </p>
               </div>
+              <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-yellow-600 mt-0.5" />
+                  <p className="text-sm text-yellow-800">
+                    Une fois votre demande approuvée par l'administration, vous recevrez un message de confirmation
+                    et pourrez commencer à recevoir les paiements automatiquement.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+              <button onClick={() => {
+                setShowAirtelNumberDialog(false);
+                setAirtelNumberInput("");
+              }} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-4 py-2">
+                Annuler
+              </button>
+              <button onClick={requestAirtelNumber} disabled={!airtelNumberInput.trim()} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 shadow-button hover:shadow-elegant h-10 px-4 py-2">
+                Envoyer la demande
+              </button>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setShowAirtelNumberDialog(false);
-              setAirtelNumberInput("");
-            }}>
-              Annuler
-            </Button>
-            <Button onClick={requestAirtelNumber} disabled={!airtelNumberInput.trim()}>
-              Envoyer la demande
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </>
   );
 };

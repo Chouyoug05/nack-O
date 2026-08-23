@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Package, Plus, Search, ShoppingBag, X, Minus, Star, Flame, Sparkles, Tag, Clock, MapPin, ChevronRight, Utensils, Wine, Coffee, Pizza, Music, Store, Briefcase, Heart, Shirt, Footprints, Gem, Smartphone, Home, Droplet, Watch, ShoppingBasket, Gift, Glasses, Share2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MenuThemeConfig } from "@/types/menuTheme";
 
@@ -64,9 +63,9 @@ const CartBar = ({ cart, total, pc, onCheckout }: { cart: TemplateCartItem[]; to
           <p className="text-xs text-gray-500">{count} article(s)</p>
           <p className="text-xl sm:text-2xl font-bold" style={{ color: pc }}>{total.toLocaleString("fr-FR")} FCFA</p>
         </div>
-        <Button onClick={onCheckout} className="text-white px-6 sm:px-8 h-12 rounded-full font-bold shadow-lg" style={{ backgroundColor: pc }}>
+        <button onClick={onCheckout} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 text-white px-6 sm:px-8 h-12 rounded-full font-bold shadow-lg" style={{ backgroundColor: pc }}>
           <ShoppingBag className="w-4 h-4 mr-2" /> Commander
-        </Button>
+        </button>
       </div>
     </div>
   );
@@ -241,9 +240,9 @@ export const BarLoungeTemplate = (props: TemplateProps) => {
               <p className="text-xs text-gray-400">{cart.reduce((s, i) => s + i.quantity, 0)} article(s)</p>
               <p className="text-xl font-bold" style={{ color: sc }}>{total.toLocaleString("fr-FR")} FCFA</p>
             </div>
-            <Button onClick={onCheckout} className="px-6 h-12 rounded-full font-bold text-black" style={{ backgroundColor: sc }}>
+            <button onClick={onCheckout} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 px-6 h-12 rounded-full font-bold text-black" style={{ backgroundColor: sc }}>
               <ShoppingBag className="w-4 h-4 mr-2" /> Commander
-            </Button>
+            </button>
           </div>
         </div>
       )}
@@ -386,9 +385,9 @@ export const BoutiqueMinimalTemplate = (props: TemplateProps) => {
               <p className="text-xs text-gray-500">{cart.reduce((s, i) => s + i.quantity, 0)} article(s)</p>
               <p className="text-lg font-bold" style={{ color: pc }}>{total.toLocaleString("fr-FR")} FCFA</p>
             </div>
-            <Button onClick={onCheckout} className="text-white px-6 h-10 rounded-lg font-medium text-sm" style={{ backgroundColor: pc }}>
+            <button onClick={onCheckout} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 text-white px-6 h-10 rounded-lg font-medium text-sm" style={{ backgroundColor: pc }}>
               <ShoppingBag className="w-4 h-4 mr-2" /> Panier
-            </Button>
+            </button>
           </div>
         </div>
       )}
@@ -464,9 +463,9 @@ export const BoutiqueLuxuryTemplate = (props: TemplateProps) => {
               <p className="text-xs text-gray-500">{cart.reduce((s, i) => s + i.quantity, 0)} article(s)</p>
               <p className="text-xl font-bold" style={{ color: pc }}>{total.toLocaleString("fr-FR")} FCFA</p>
             </div>
-            <Button onClick={onCheckout} className="px-8 h-12 font-medium tracking-wider text-black border-0" style={{ backgroundColor: pc }}>
+            <button onClick={onCheckout} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 px-8 h-12 font-medium tracking-wider text-black border-0" style={{ backgroundColor: pc }}>
               COMMANDER
-            </Button>
+            </button>
           </div>
         </div>
       )}
@@ -633,9 +632,9 @@ export const BoutiqueGridTemplate = (props: TemplateProps) => {
               <p className="text-xs text-gray-500">{cart.reduce((s, i) => s + i.quantity, 0)} article(s)</p>
               <p className="text-lg font-bold" style={{ color: pc }}>{total.toLocaleString("fr-FR")} FCFA</p>
             </div>
-            <Button onClick={onCheckout} className="text-white px-6 h-10 rounded-md font-medium text-sm" style={{ backgroundColor: pc }}>
+            <button onClick={onCheckout} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 text-white px-6 h-10 rounded-md font-medium text-sm" style={{ backgroundColor: pc }}>
               <ShoppingBag className="w-4 h-4 mr-2" /> Commander
-            </Button>
+            </button>
           </div>
         </div>
       )}
@@ -812,9 +811,9 @@ export const ServiceTemplate = (props: TemplateProps) => {
               <p className="text-xs text-gray-500">{cart.reduce((s, i) => s + i.quantity, 0)} prestation(s)</p>
               <p className="text-xl font-bold" style={{ color: pc }}>{total.toLocaleString("fr-FR")} FCFA</p>
             </div>
-            <Button onClick={onCheckout} className="text-white px-6 h-12 rounded-full font-bold shadow-lg" style={{ backgroundColor: pc }}>
+            <button onClick={onCheckout} className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all duration-300 disabled:pointer-events-none disabled:opacity-50 text-white px-6 h-12 rounded-full font-bold shadow-lg" style={{ backgroundColor: pc }}>
               Réserver
-            </Button>
+            </button>
           </div>
         </div>
       )}
