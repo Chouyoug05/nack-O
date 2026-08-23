@@ -700,29 +700,34 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
         return;
       }
 
-      // Diminuer le stock pour chaque produit
+      // Vérifier si la commande est déjà payée (paiement en ligne)
+      const isAlreadyPaid = order.paymentStatus === 'paid';
+
+      // Diminuer le stock pour chaque produit (seulement si pas déjà payé)
       const batch = writeBatch(db);
 
-      for (const item of order.items) {
-        // Trouver le produit dans la liste des produits
-        const product = products.find(p => p.name === item.name);
-        if (product && product.id) {
-          const newStock = (product.quantity || product.stock || 0) - item.quantity;
-          if (newStock < 0) {
-            toast({
-              title: "Stock insuffisant",
-              description: `Stock insuffisant pour ${item.name}. Stock actuel: ${product.quantity || product.stock || 0}`,
-              variant: "destructive"
-            });
-            return;
-          }
+      if (!isAlreadyPaid) {
+        for (const item of order.items) {
+          // Trouver le produit dans la liste des produits
+          const product = products.find(p => p.name === item.name);
+          if (product && product.id) {
+            const newStock = (product.quantity || product.stock || 0) - item.quantity;
+            if (newStock < 0) {
+              toast({
+                title: "Stock insuffisant",
+                description: `Stock insuffisant pour ${item.name}. Stock actuel: ${product.quantity || product.stock || 0}`,
+                variant: "destructive"
+              });
+              return;
+            }
 
-          // Mettre à jour le stock
-          const productRef = doc(db, `profiles/${user.uid}/products`, product.id);
-          batch.update(productRef, {
-            quantity: newStock,
-            lastStockUpdate: Date.now()
-          });
+            // Mettre à jour le stock
+            const productRef = doc(db, `profiles/${user.uid}/products`, product.id);
+            batch.update(productRef, {
+              quantity: newStock,
+              lastStockUpdate: Date.now()
+            });
+          }
         }
       }
 
@@ -731,9 +736,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       batch.update(orderRef, {
         status: 'served',
         servedAt: Date.now(),
-        paidAt: Date.now(),
-        paymentStatus: 'paid',
-        paymentMethod: 'cash'
+        // Ne pas écraser paidAt et paymentStatus si déjà payé
+        ...(!isAlreadyPaid && {
+          paidAt: Date.now(),
+          paymentStatus: 'paid',
+          paymentMethod: 'cash'
+        })
       });
 
       // Créer une vente dans la collection sales
@@ -749,10 +757,11 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
           total: item.price * item.quantity
         })),
         total: order.total,
-        paymentMethod: 'cash',
+        paymentMethod: isAlreadyPaid ? (order.paymentMethod || 'airtel-money') : 'cash',
         createdAt: Date.now(),
         servedAt: Date.now(),
-        source: 'Menu Digital'
+        source: 'Menu Digital',
+        alreadyPaid: isAlreadyPaid
       };
 
       const saleRef = doc(collection(db, `profiles/${user.uid}/sales`));
@@ -762,7 +771,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
       await batch.commit();
 
       toast({
-        title: "Commande servie et payée !",
+        title: isAlreadyPaid ? "Commande servie !" : "Commande servie et payée !",
         description: `Commande #${order.orderNumber} finalisée (${order.total.toLocaleString('fr-FR', { useGrouping: false })} XAF)`
       });
     } catch (error) {
@@ -779,10 +788,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
     switch (status) {
       case 'pending':
         return <Badge variant="outline" className="text-orange-600 border-orange-600"><Clock className="w-3 h-3 mr-1" />En attente</Badge>;
+      case 'awaiting-validation':
+        return <Badge variant="outline" className="text-orange-600 border-orange-600"><Clock className="w-3 h-3 mr-1" />À valider</Badge>;
       case 'confirmed':
         return <Badge variant="outline" className="text-blue-600 border-blue-600"><CheckCircle className="w-3 h-3 mr-1" />Confirmée</Badge>;
       case 'served':
-        return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" />Servie & Payée</Badge>;
+        return <Badge variant="outline" className="text-green-600 border-green-600"><CheckCircle className="w-3 h-3 mr-1" />Servie</Badge>;
       case 'paid':
         return <Badge variant="outline" className="text-purple-600 border-purple-600"><CreditCard className="w-3 h-3 mr-1" />Payée</Badge>;
       case 'cancelled':
@@ -1240,7 +1251,8 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                       </div>
 
                       <div className="flex flex-wrap gap-2 w-full">
-                        {order.status === 'pending' && order.id && (
+                        {/* Commandes en attente de validation (non payées) */}
+                        {(order.status === 'pending' || order.status === 'awaiting-validation') && order.paymentStatus !== 'paid' && order.id && (
                           <>
                             <Button size="sm" onClick={() => order.id && confirmOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
                               <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
@@ -1253,11 +1265,12 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                             </Button>
                           </>
                         )}
-                        {order.status === 'confirmed' && order.id && (
+                        {/* Commandes confirmées ou payées en ligne (prêtes à servir) */}
+                        {(order.status === 'confirmed' || (order.status === 'awaiting-validation' && order.paymentStatus === 'paid')) && order.id && (
                           <>
                             <Button size="sm" onClick={() => order.id && markAsServed(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[120px] text-xs sm:text-sm">
                               <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 flex-shrink-0" />
-                              <span className="hidden sm:inline">Servir & Payer</span>
+                              <span className="hidden sm:inline">{order.paymentStatus === 'paid' ? 'Marquer servie' : 'Servir & Payer'}</span>
                               <span className="sm:hidden">Servir</span>
                             </Button>
                             <Button size="sm" variant="destructive" onClick={() => order.id && cancelOrder(order.id)} className="flex-1 sm:flex-initial min-w-0 sm:min-w-[100px] text-xs sm:text-sm">
@@ -1265,6 +1278,13 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                               <span className="truncate">Annuler</span>
                             </Button>
                           </>
+                        )}
+                        {/* Commandes servies - affichage en lecture seule */}
+                        {order.status === 'served' && (
+                          <div className="text-sm text-muted-foreground">
+                            Commande servie
+                            {order.paymentStatus === 'paid' && order.paymentMethod && ` - Payée (${order.paymentMethod === 'airtel-money' ? 'Airtel Money' : order.paymentMethod})`}
+                          </div>
                         )}
                         {/* Commandes payées (livraisons) - affichage en lecture seule */}
                         {order.status === 'paid' && (

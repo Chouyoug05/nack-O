@@ -42,7 +42,7 @@ exports.handler = async (event) => {
     if (subType === "menu-digital" && payment.orderData && establishmentId) {
       const orderData = {
         ...payment.orderData,
-        status: "awaiting-validation",
+        status: "confirmed",
         paymentStatus: "paid",
         paymentPending: false,
         source: "qr",
@@ -60,6 +60,7 @@ exports.handler = async (event) => {
         // Mettre à jour la commande existante (créée avant le paiement)
         orderRef = db.doc(`profiles/${establishmentId}/orders/${existingOrderId}`);
         await orderRef.update({
+          status: "confirmed",
           paymentStatus: "paid",
           paymentPending: false,
           paidAt: now,
@@ -72,6 +73,34 @@ exports.handler = async (event) => {
         // Créer une nouvelle commande (fallback)
         orderRef = await db.collection(`profiles/${establishmentId}/orders`).add(orderData);
         console.log('[Payment] Created new order:', orderRef.id);
+      }
+
+      // Diminuer le stock automatiquement après paiement
+      try {
+        const items = payment.orderData.items || [];
+        const productsRef = db.collection(`profiles/${establishmentId}/products`);
+        
+        for (const item of items) {
+          // Trouver le produit par nom
+          const productsSnap = await productsRef.where('name', '==', item.name).limit(1).get();
+          if (!productsSnap.empty) {
+            const productDoc = productsSnap.docs[0];
+            const product = productDoc.data();
+            const currentStock = Number(product.quantity || product.stock || 0);
+            const itemQuantity = Number(item.quantity || 0);
+            const newStock = Math.max(0, currentStock - itemQuantity);
+            
+            await productDoc.ref.update({
+              quantity: newStock,
+              stock: newStock,
+              lastStockUpdate: now
+            });
+            console.log(`[Payment] Stock updated for ${item.name}: ${currentStock} -> ${newStock}`);
+          }
+        }
+      } catch (stockError) {
+        console.error('[Payment] Error updating stock:', stockError);
+        // Ne pas bloquer le paiement si le stock échoue
       }
 
       const profSnap = await db.doc(`profiles/${establishmentId}`).get();
