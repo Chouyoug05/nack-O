@@ -21,6 +21,24 @@ export interface SubscriptionFeatures {
 }
 
 export const SUBSCRIPTION_PLANS = {
+  expired: {
+    name: 'Expiré',
+    price: 0,
+    features: {
+      products: true,
+      productLimit: 0,
+      sales: false,
+      stock: false,
+      reports: false,
+      team: false,
+      barConnectee: false,
+      menuDigital: false,
+      disbursementRequest: false,
+      events: false,
+      eventsLimit: 0,
+      eventsExtraPrice: 1000,
+    } as SubscriptionFeatures,
+  },
   free: {
     name: 'Gratuit',
     price: 0,
@@ -88,21 +106,33 @@ export function getCurrentPlan(profile: UserProfile | null | undefined): Subscri
   
   const now = Date.now();
   
-  // En mode freemium, trial ou expired reviennent au plan Gratuit (free)
-  if (profile.plan === 'trial' || profile.plan === 'expired' || profile.plan === 'free') {
+  // Essai gratuit (trial)
+  if (profile.plan === 'trial') {
+    if (profile.trialEndsAt && profile.trialEndsAt > now) {
+      return 'free';
+    }
+    return 'expired';
+  }
+  
+  // Plan gratuit explicite
+  if (profile.plan === 'free') {
     return 'free';
   }
   
-  // Vérifier l'abonnement actif
-  // Si plan est 'active' OU si subscriptionType est défini (pour assurer la compatibilité)
-  if ((profile.plan === 'active' || profile.subscriptionType) && profile.subscriptionEndsAt) {
-    if (profile.subscriptionEndsAt > now) {
-      // Retourner le type d'abonnement ou 'transition' par défaut
-      return profile.subscriptionType || 'transition';
-    }
+  // Déjà expiré
+  if (profile.plan === 'expired') {
+    return 'expired';
   }
   
-  return 'free';
+  // Vérifier l'abonnement actif
+  if ((profile.plan === 'active' || profile.subscriptionType) && profile.subscriptionEndsAt) {
+    if (profile.subscriptionEndsAt > now) {
+      return profile.subscriptionType || 'transition';
+    }
+    return 'expired';
+  }
+  
+  return 'expired';
 }
 
 /**
@@ -141,8 +171,11 @@ export async function hasFeatureAccess(
 ): Promise<boolean> {
   const plan = getCurrentPlan(profile);
   
-  // Gratuit, tout passe par le feature set de 'free'
-  if (plan === 'free' || plan === 'trial' || plan === 'expired') {
+  if (plan === 'expired') {
+    return SUBSCRIPTION_PLANS.expired.features[feature] === true;
+  }
+  
+  if (plan === 'free' || plan === 'trial') {
     return SUBSCRIPTION_PLANS.free.features[feature] === true;
   }
   
@@ -169,7 +202,11 @@ export function hasFeatureAccessSync(
 ): boolean {
   const plan = getCurrentPlan(profile);
   
-  if (plan === 'free' || plan === 'trial' || plan === 'expired') {
+  if (plan === 'expired') {
+    return SUBSCRIPTION_PLANS.expired.features[feature] === true;
+  }
+  
+  if (plan === 'free' || plan === 'trial') {
     return SUBSCRIPTION_PLANS.free.features[feature] === true;
   }
   
@@ -199,34 +236,30 @@ export function canCreateEvent(profile: UserProfile | null | undefined): {
   let eventsLimit = 0;
   let extraPrice = 1000;
   
-  if (plan === 'free' || plan === 'trial' || plan === 'expired') {
+  if (plan === 'expired') {
+    return { allowed: false, reason: 'Votre abonnement a expiré. Veuillez le renouveler pour créer des événements.' };
+  }
+  
+  if (plan === 'free' || plan === 'trial') {
     eventsLimit = SUBSCRIPTION_PLANS.free.features.eventsLimit ?? 0;
     extraPrice = SUBSCRIPTION_PLANS.free.features.eventsExtraPrice ?? 1000;
   } else if (plan === 'transition') {
     eventsLimit = SUBSCRIPTION_PLANS.transition.features.eventsLimit ?? 5;
     extraPrice = SUBSCRIPTION_PLANS.transition.features.eventsExtraPrice ?? 1000;
   } else if (plan === 'transition-pro-max') {
-    // Pro max: eventsLimit is Infinity implicitly if undefined, but let's handle it
     const limit = SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsLimit;
     eventsLimit = limit !== undefined ? limit : Infinity;
     extraPrice = SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsExtraPrice ?? 1000;
   }
 
-  // Vérifier le compteur d'événements
   const eventsCount = profile.eventsCount ?? 0;
   const eventsResetAt = profile.eventsResetAt ?? profile.subscriptionEndsAt ?? Date.now();
   const now = Date.now();
-  
-  // Si on est dans une nouvelle période (pour les abonnements), le compteur est reset
-  // Pour le plan gratuit, eventsResetAt ne sera probablement jamais dans le futur, donc ça s'accumule ?
-  // En fait, peu importe, s'ils ont payé, on utilise le compteur pour voir s'ils ont épuisé le quota.
-  // Pour les gratuits, limit = 0, donc ça demandera toujours un paiement.
   
   if (eventsLimit === Infinity) {
     return { allowed: true };
   }
 
-  // Reset count if period is over
   if (eventsResetAt && now > eventsResetAt && plan !== 'free') {
     return { allowed: true };
   }

@@ -138,6 +138,43 @@
           .catch(function (e) { ui.toast(e.message, "error"); });
       };
     }
+    var approveButtons = state.root.querySelectorAll("[data-approve-disbursement]");
+    for (var k = 0; k < approveButtons.length; k++) {
+      approveButtons[k].onclick = function () {
+        var requestId = this.getAttribute("data-approve-disbursement");
+        var userId = this.getAttribute("data-user-id");
+        var disbursementId = this.getAttribute("data-disbursement-id");
+        approveDisbursement(requestId, userId, disbursementId);
+      };
+    }
+  }
+
+  function approveDisbursement(requestId, userId, disbursementId) {
+    if (!requestId || !userId || !disbursementId) {
+      ui.toast("Données manquantes", "error");
+      return;
+    }
+    api.patchDoc("disbursementRequests/" + requestId, {
+      status: "approved",
+      approvedAt: Date.now(),
+      approvedBy: "admin"
+    }, ["status", "approvedAt", "approvedBy"]).then(function () {
+      return api.patchProfile(userId, {
+        disbursementId: disbursementId,
+        disbursementStatus: "approved",
+        updatedAt: Date.now()
+      }, ["disbursementId", "disbursementStatus", "updatedAt"]);
+    }).then(function () {
+      return api.patchDoc("publicProfiles/" + userId, {
+        paymentsEnabled: true,
+        updatedAt: Date.now()
+      }, ["paymentsEnabled", "updatedAt"]);
+    }).then(function () {
+      ui.toast("Disbursement approuvé", "ok");
+      loadTab(state.tab);
+    }).catch(function (e) {
+      ui.toast(e.message || "Erreur", "error");
+    });
   }
 
   function loadTablets() {
@@ -317,7 +354,12 @@
         return {
           _id: d.id, _title: d.userId || d.id, _meta: (d.status || "pending") + " • " + (d.disbursementId || "—"),
           _path: "disbursementRequests/" + d.id,
-          _actions: '<button type="button" class="lg-btn lg-btn-nack lg-btn-sm" data-adm-patch data-adm-path="disbursementRequests/' + ui.escapeHtml(d.id) + '" data-adm-field="status" data-adm-val="approved">Approuver</button>'
+          userId: d.userId,
+          disbursementId: d.disbursementId,
+          status: d.status,
+          _actions: d.status === "pending"
+            ? '<button type="button" class="lg-btn lg-btn-nack lg-btn-sm" data-approve-disbursement="' + ui.escapeHtml(d.id) + '" data-user-id="' + ui.escapeHtml(d.userId || "") + '" data-disbursement-id="' + ui.escapeHtml(d.disbursementId || "") + '">Approuver</button>'
+            : ""
         };
       });
       paintPanel();

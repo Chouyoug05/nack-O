@@ -86,13 +86,35 @@ const SubscriptionGate = ({ children }: Props) => {
   }, [user, profile]);
 
   const state = useMemo(() => {
-    if (!profile) return { status: 'loading' as const };
+    if (!profile) return { status: 'loading' as const, remaining: 0 };
     
-    // Le nouveau système est freemium, on ne bloque plus l'utilisateur.
-    // Il a toujours accès, les fonctionnalités sont limitées par le FeatureGate
-    // et les limites (10 produits max en gratuit).
+    const nowMs = now;
     
-    return { status: 'active' as const, remaining: 0 };
+    // Essai gratuit
+    if (profile.plan === 'trial') {
+      const trialEndsAt = profile.trialEndsAt || (profile.createdAt + sevenDays);
+      if (trialEndsAt > nowMs) {
+        return { status: 'trial' as const, remaining: trialEndsAt - nowMs };
+      }
+      return { status: 'expired' as const, remaining: 0 };
+    }
+    
+    // Plan gratuit
+    if (profile.plan === 'free') {
+      return { status: 'active' as const, remaining: 0 };
+    }
+    
+    // Déjà expiré
+    if (profile.plan === 'expired') {
+      return { status: 'expired' as const, remaining: 0 };
+    }
+    
+    // Abonnement actif
+    if (profile.subscriptionEndsAt && profile.subscriptionEndsAt > nowMs) {
+      return { status: 'active' as const, remaining: profile.subscriptionEndsAt - nowMs };
+    }
+    
+    return { status: 'expired' as const, remaining: 0 };
   }, [profile, now]);
 
   const calculatePrice = (plan: 'transition' | 'transition-pro-max', duration: DurationType) => {

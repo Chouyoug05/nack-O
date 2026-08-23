@@ -26,12 +26,13 @@ export interface MenuThemeConfig {
  * Valeurs par défaut du thème
  */
 export const defaultMenuTheme: MenuThemeConfig = {
-  primaryColor: '#8B2635', // Rouge bordeaux
-  secondaryColor: '#D4A574', // Beige doré
-  backgroundColor: '#F5F1EB', // Beige clair texturé
+  primaryColor: '#E63946', // Rouge NACK
+  secondaryColor: '#F4A261', // Orange doré
+  backgroundColor: '#FFFFFF', // Blanc pur
   backgroundType: 'color',
   cardStyle: 'shadow',
-  borderRadius: 'medium',
+  borderRadius: 'large',
+  designId: 'nack-modern',
   updatedAt: Date.now()
 };
 

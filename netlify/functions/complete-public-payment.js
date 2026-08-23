@@ -38,18 +38,41 @@ exports.handler = async (event) => {
 
     const subType = String(payment.subscriptionType || "");
 
-    // Menu digital : créer la commande après paiement
+    // Menu digital : mettre à jour la commande existante ou la créer
     if (subType === "menu-digital" && payment.orderData && establishmentId) {
       const orderData = {
         ...payment.orderData,
         status: "awaiting-validation",
         paymentStatus: "paid",
+        paymentPending: false,
         source: "qr",
         paidAt: now,
         paymentMethod: "airtel-money",
         paymentTransactionId: transactionId,
       };
-      const orderRef = await db.collection(`profiles/${establishmentId}/orders`).add(orderData);
+
+      // Supprimer orderId des données pour ne pas écraser l'ID du document
+      const existingOrderId = orderData.orderId;
+      delete orderData.orderId;
+
+      let orderRef;
+      if (existingOrderId) {
+        // Mettre à jour la commande existante (créée avant le paiement)
+        orderRef = db.doc(`profiles/${establishmentId}/orders/${existingOrderId}`);
+        await orderRef.update({
+          paymentStatus: "paid",
+          paymentPending: false,
+          paidAt: now,
+          paymentMethod: "airtel-money",
+          paymentTransactionId: transactionId,
+          updatedAt: now,
+        });
+        console.log('[Payment] Updated existing order:', existingOrderId);
+      } else {
+        // Créer une nouvelle commande (fallback)
+        orderRef = await db.collection(`profiles/${establishmentId}/orders`).add(orderData);
+        console.log('[Payment] Created new order:', orderRef.id);
+      }
 
       const profSnap = await db.doc(`profiles/${establishmentId}`).get();
       const fcmToken = profSnap.exists ? String(profSnap.data().fcmToken || "").trim() : "";
@@ -70,7 +93,7 @@ exports.handler = async (event) => {
       return json(200, {
         success: true,
         establishmentId,
-        orderId: orderRef.id,
+        orderId: existingOrderId || orderRef.id,
         type: "menu-digital",
       });
     }

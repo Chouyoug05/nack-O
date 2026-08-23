@@ -1,19 +1,25 @@
 import { MenuThemeConfig } from './menuTheme';
 
 export type MenuDesignId = 
+  | 'nack-modern'
+  | 'nack-shop'
+  | 'nack-shop-fashion'
+  | 'nack-shop-premium'
   | 'restaurant-classic'
   | 'restaurant-modern'
   | 'bar-lounge'
   | 'cafe-cozy'
   | 'boutique-minimal'
   | 'boutique-grid'
-  | 'boutique-luxury';
+  | 'boutique-luxury'
+  | 'service-professional'
+  | 'service-creative';
 
 export interface MenuDesign {
   id: MenuDesignId;
   name: string;
   description: string;
-  category: 'restaurant' | 'bar' | 'cafe' | 'boutique';
+  category: 'restaurant' | 'bar' | 'cafe' | 'boutique' | 'service';
   preview: {
     primaryColor: string;
     backgroundColor: string;
@@ -23,6 +29,94 @@ export interface MenuDesign {
 }
 
 export const MENU_DESIGNS: MenuDesign[] = [
+  // === NACK MODERN (Default - Restaurant/Bar) ===
+  {
+    id: 'nack-modern',
+    name: 'NACK Modern',
+    description: 'Design moderne et adaptatif par défaut. Interface épurée, mobile-first, avec cartes produits élégantes. S\'adapte automatiquement au type d\'établissement.',
+    category: 'restaurant',
+    preview: {
+      primaryColor: '#E63946',
+      backgroundColor: '#FFFFFF',
+      accentColor: '#F4A261',
+    },
+    theme: {
+      primaryColor: '#E63946',
+      secondaryColor: '#F4A261',
+      backgroundColor: '#FFFFFF',
+      backgroundType: 'color',
+      cardStyle: 'shadow',
+      borderRadius: 'large',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'nack-modern',
+    },
+  },
+
+  // === NACK SHOP (Boutique / Catalogue) ===
+  {
+    id: 'nack-shop',
+    name: 'NACK Shop',
+    description: 'Design catalogue moderne pour boutiques. Grille 2 colonnes, grandes images, favoris, navigation par catégories. Idéal pour friperies, boutiques de vêtements, accessoires.',
+    category: 'boutique',
+    preview: {
+      primaryColor: '#1a1a1a',
+      backgroundColor: '#FAFAFA',
+      accentColor: '#E63946',
+    },
+    theme: {
+      primaryColor: '#1a1a1a',
+      secondaryColor: '#E63946',
+      backgroundColor: '#FAFAFA',
+      backgroundType: 'color',
+      cardStyle: 'shadow',
+      borderRadius: 'large',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'nack-shop',
+    },
+  },
+  {
+    id: 'nack-shop-fashion',
+    name: 'NACK Fashion',
+    description: 'Design élégant orienté mode. Interface minimaliste avec emphasis sur les visuels. Parfait pour boutiques de vêtements, chaussures, accessoires de mode.',
+    category: 'boutique',
+    preview: {
+      primaryColor: '#2C3E50',
+      backgroundColor: '#FFFFFF',
+      accentColor: '#E74C3C',
+    },
+    theme: {
+      primaryColor: '#2C3E50',
+      secondaryColor: '#E74C3C',
+      backgroundColor: '#FFFFFF',
+      backgroundType: 'color',
+      cardStyle: 'minimalist',
+      borderRadius: 'medium',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'nack-shop-fashion',
+    },
+  },
+  {
+    id: 'nack-shop-premium',
+    name: 'NACK Premium',
+    description: 'Design haut de gamme pour boutiques premium. Interface sombre et élégante avec accents dorés. Idéal pour bijouteries, parfumeries, produits de luxe.',
+    category: 'boutique',
+    preview: {
+      primaryColor: '#D4AF37',
+      backgroundColor: '#0D0D0D',
+      accentColor: '#FFFFFF',
+    },
+    theme: {
+      primaryColor: '#D4AF37',
+      secondaryColor: '#FFFFFF',
+      backgroundColor: '#0D0D0D',
+      backgroundType: 'color',
+      cardStyle: 'shadow',
+      borderRadius: 'large',
+      titleFont: 'Georgia, serif',
+      designId: 'nack-shop-premium',
+    },
+  },
+
   // === RESTAURANTS ===
   {
     id: 'restaurant-classic',
@@ -177,12 +271,56 @@ export const MENU_DESIGNS: MenuDesign[] = [
       designId: 'boutique-luxury',
     },
   },
+
+  // === SERVICES ===
+  {
+    id: 'service-professional',
+    name: 'Service Professionnel',
+    description: 'Design sobre et professionnel avec cartes prestations, sections claires, bouton de réservation. Idéal pour consultants, avocats, comptables.',
+    category: 'service',
+    preview: {
+      primaryColor: '#1E40AF',
+      backgroundColor: '#F8FAFC',
+      accentColor: '#3B82F6',
+    },
+    theme: {
+      primaryColor: '#1E40AF',
+      secondaryColor: '#3B82F6',
+      backgroundColor: '#F8FAFC',
+      backgroundType: 'color',
+      cardStyle: 'border',
+      borderRadius: 'medium',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'service-professional',
+    },
+  },
+  {
+    id: 'service-creative',
+    name: 'Service Créatif',
+    description: 'Design moderne et dynamique avec dégradés, animations subtiles, mise en page créative. Parfait pour agences, designers, freelances.',
+    category: 'service',
+    preview: {
+      primaryColor: '#7C3AED',
+      backgroundColor: '#FAF5FF',
+      accentColor: '#EC4899',
+    },
+    theme: {
+      primaryColor: '#7C3AED',
+      secondaryColor: '#EC4899',
+      backgroundColor: '#FAF5FF',
+      backgroundType: 'color',
+      cardStyle: 'shadow',
+      borderRadius: 'large',
+      titleFont: 'system-ui, sans-serif',
+      designId: 'service-creative',
+    },
+  },
 ];
 
 export const getMenuDesignById = (id: MenuDesignId | string | undefined): MenuDesign => {
   return MENU_DESIGNS.find(d => d.id === id) || MENU_DESIGNS[0];
 };
 
-export const getDesignsByCategory = (category: 'restaurant' | 'bar' | 'cafe' | 'boutique'): MenuDesign[] => {
+export const getDesignsByCategory = (category: 'restaurant' | 'bar' | 'cafe' | 'boutique' | 'service'): MenuDesign[] => {
   return MENU_DESIGNS.filter(d => d.category === category);
 };

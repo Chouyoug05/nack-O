@@ -1,5 +1,6 @@
-﻿import { Wine, ShoppingBag, Store, Building2, GlassWater, Utensils, Pizza, Music, UtensilsCrossed, Hotel, Briefcase, HelpCircle } from "lucide-react";
+﻿import { Wine, ShoppingBag, Store, Building2, GlassWater, Utensils, Pizza, Music, UtensilsCrossed, Hotel, Briefcase, HelpCircle, Wallet, ChefHat, UserCheck, Package, ClipboardList, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { TeamRole } from "@/types/team";
 
 export interface MainCategoryConfig {
   id: string;
@@ -64,7 +65,9 @@ export function isFoodBusiness(value: string | undefined | null): boolean {
 }
 
 export function isServiceBusiness(value: string | undefined | null): boolean {
-  return value === "services";
+  if (!value) return false;
+  const main = getMainCategory(value);
+  return main?.id === "services";
 }
 
 export function isBoutique(value: string | undefined | null): boolean {
@@ -96,6 +99,18 @@ export function getCategoriesForEstablishment(value: string | undefined | null):
       "Autre",
     ];
   }
+  if (isServiceBusiness(value)) {
+    return [
+      "Conseil",
+      "Formation",
+      "Maintenance",
+      "Prestation de service",
+      "Location",
+      "Forfait",
+      "Horaire",
+      "Autre",
+    ];
+  }
   if (isBoutique(value)) {
     return [
       "Vêtements",
@@ -110,20 +125,139 @@ export function getCategoriesForEstablishment(value: string | undefined | null):
     ];
   }
   return [
-    "Boisson alcoolisée",
-    "Boisson non alcoolisée",
-    "Plat / Repas",
-    "Snack",
-    "Dessert",
-    "Entrée",
-    "Vêtements",
-    "Accessoires",
-    "Chaussures",
-    "Maison & Déco",
-    "Cosmétiques",
-    "Électronique",
-    "Jeux & Jouets",
-    "Alimentation",
+    "Produit",
+    "Service",
+    "Forfait",
     "Autre",
   ];
+}
+
+export interface RoleConfig {
+  value: TeamRole;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+}
+
+export const ROLES_BY_CATEGORY: Record<string, RoleConfig[]> = {
+  restauration: [
+    { value: 'serveur', label: 'Serveur', description: 'Prendre des commandes et servir les clients', icon: UtensilsCrossed },
+    { value: 'caissier', label: 'Caissier', description: 'Enregistrer les paiements à la caisse', icon: Wallet },
+    { value: 'cuisinier', label: 'Cuisinier', description: 'Préparer les plats et gérer la cuisine', icon: ChefHat },
+    { value: 'barman', label: 'Barman', description: 'Préparer les boissons et gérer le bar', icon: GlassWater },
+  ],
+  boutique: [
+    { value: 'vendeur', label: 'Vendeur', description: 'Accueillir les clients et gérer les ventes', icon: Users },
+    { value: 'caissier', label: 'Caissier', description: 'Enregistrer les paiements à la caisse', icon: Wallet },
+    { value: 'gestionnaire-stock', label: 'Gestionnaire de stock', description: 'Gérer les inventaires et réapprovisionnements', icon: Package },
+  ],
+  commerce: [
+    { value: 'vendeur', label: 'Vendeur', description: 'Accueillir les clients et gérer les ventes', icon: Users },
+    { value: 'caissier', label: 'Caissier', description: 'Enregistrer les paiements à la caisse', icon: Wallet },
+    { value: 'magasinier', label: 'Magasinier', description: 'Gérer le stock et les livraisons', icon: Package },
+  ],
+  services: [
+    { value: 'consultant', label: 'Consultant', description: 'Accompagner les clients dans leurs demandes', icon: ClipboardList },
+    { value: 'caissier', label: 'Caissier', description: 'Enregistrer les paiements', icon: Wallet },
+    { value: 'assistant', label: 'Assistant', description: 'Assister dans les tâches administratives', icon: UserCheck },
+  ],
+};
+
+export function getRolesForEstablishment(value: string | undefined | null): RoleConfig[] {
+  const mainCategory = getMainCategory(value);
+  if (!mainCategory) {
+    return ROLES_BY_CATEGORY.services;
+  }
+  return ROLES_BY_CATEGORY[mainCategory.id] || ROLES_BY_CATEGORY.services;
+}
+
+export function getRoleLabel(role: TeamRole): string {
+  for (const roles of Object.values(ROLES_BY_CATEGORY)) {
+    const found = roles.find(r => r.value === role);
+    if (found) return found.label;
+  }
+  return role;
+}
+
+export function getRoleIcon(role: TeamRole): LucideIcon {
+  for (const roles of Object.values(ROLES_BY_CATEGORY)) {
+    const found = roles.find(r => r.value === role);
+    if (found) return found.icon;
+  }
+  return HelpCircle;
+}
+
+export interface EstablishmentLabels {
+  product: string;
+  products: string;
+  addProduct: string;
+  order: string;
+  orders: string;
+  table: string;
+  command: string;
+  menu: string;
+  cook: string;
+  kitchen: string;
+  server: string;
+}
+
+export function getEstablishmentLabels(value: string | undefined | null): EstablishmentLabels {
+  if (isFoodBusiness(value)) {
+    return {
+      product: "plat",
+      products: "plats",
+      addProduct: "Ajouter un plat",
+      order: "commande",
+      orders: "commandes",
+      table: "table",
+      command: "Commander",
+      menu: "Menu",
+      cook: "Cuisinier",
+      kitchen: "Cuisine",
+      server: "Serveur",
+    };
+  }
+  if (isServiceBusiness(value)) {
+    return {
+      product: "prestation",
+      products: "prestations",
+      addProduct: "Ajouter une prestation",
+      order: "réservation",
+      orders: "réservations",
+      table: "créneau",
+      command: "Réserver",
+      menu: "Prestations",
+      cook: "Prestataire",
+      kitchen: "Équipe",
+      server: "Conseiller",
+    };
+  }
+  if (isBoutique(value)) {
+    return {
+      product: "produit",
+      products: "produits",
+      addProduct: "Ajouter un produit",
+      order: "commande",
+      orders: "commandes",
+      table: "zone",
+      command: "Commander",
+      menu: "Catalogue",
+      cook: "Préparateur",
+      kitchen: "Stock",
+      server: "Vendeur",
+    };
+  }
+  return {
+    product: "produit",
+    products: "produits",
+    addProduct: "Ajouter un produit",
+    order: "commande",
+    orders: "commandes",
+    table: "zone",
+    command: "Commander",
+    menu: "Catalogue",
+    cook: "Préparateur",
+    kitchen: "Stock",
+    server: "Vendeur",
+  };
 }

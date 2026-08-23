@@ -119,7 +119,7 @@ const CuisineInterface = () => {
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string; role?: string };
           console.log('[CuisineInterface] Token data:', { ownerUid: data.ownerUid, role: data.role });
-          if (data.ownerUid && data.role === 'cuisinier') {
+          if (data.ownerUid && (data.role === 'cuisinier' || data.role === 'barman')) {
             console.log('[CuisineInterface] Création session agent pour ownerUid:', data.ownerUid);
             await ensureAgentSession(agentCode, data.ownerUid);
             console.log('[CuisineInterface] Session agent créée avec succès');
@@ -149,7 +149,7 @@ const CuisineInterface = () => {
           const docSnap = s1.docs[0];
           const data = docSnap.data() as { firstName?: string; lastName?: string; role?: string };
           console.log('[CuisineInterface] Team member found:', { role: data.role });
-          if (data.role === 'cuisinier') {
+          if (data.role === 'cuisinier' || data.role === 'barman') {
             const foundOwner = docSnap.ref.parent.parent ? docSnap.ref.parent.parent.id : null;
             const foundName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Cuisinier';
             if (foundOwner) {

@@ -42,6 +42,7 @@ import type { Customer, CustomerDoc, Reward } from "@/types/customer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Heart, X, Star, Crown } from "lucide-react";
+import { getEstablishmentLabels } from "@/constants/establishmentTypes";
 
 interface FirestoreTeamMemberDoc {
   firstName: string;
@@ -130,6 +131,8 @@ const ServeurInterface = () => {
   const [availableCustomers, setAvailableCustomers] = useState<Customer[]>([]);
   const [liveOrders, setLiveOrders] = useState<Order[]>([]);
   const notifiedReadyRef = useRef<Set<string>>(new Set());
+  const [establishmentType, setEstablishmentType] = useState<string | null>(null);
+  const labels = getEstablishmentLabels(establishmentType);
 
   useEffect(() => {
     const resolveOwner = async () => {
@@ -143,6 +146,14 @@ const ServeurInterface = () => {
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent';
             setAgentInfo({ name, code: agentCode });
+            // Récupérer le type d'établissement
+            try {
+              const profileDoc = await getDoc(doc(db, 'profiles', data.ownerUid));
+              if (profileDoc.exists()) {
+                const profileData = profileDoc.data() as { establishmentType?: string };
+                setEstablishmentType(profileData.establishmentType || null);
+              }
+            } catch { /* ignore */ }
             // Sauvegarder dans localStorage pour persistance
             try {
               localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
@@ -183,6 +194,14 @@ const ServeurInterface = () => {
           await ensureAgentSession(agentCode, foundOwner);
           setOwnerUid(foundOwner);
           setAgentInfo({ name: foundName || 'Agent', code: agentCode, memberId: foundMemberId });
+          // Récupérer le type d'établissement
+          try {
+            const profileDoc = await getDoc(doc(db, 'profiles', foundOwner));
+            if (profileDoc.exists()) {
+              const profileData = profileDoc.data() as { establishmentType?: string };
+              setEstablishmentType(profileData.establishmentType || null);
+            }
+          } catch { /* ignore */ }
           // Sauvegarder dans localStorage pour persistance
           try {
             localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
@@ -1190,11 +1209,11 @@ const ServeurInterface = () => {
                   {/* Table Number Input */}
                   <div className="space-y-2">
                     <Label htmlFor="table-number" className="text-sm font-medium">
-                      Numéro de table *
+                      {labels.table === 'créneau' ? 'Créneau *' : labels.table === 'zone' ? 'Zone *' : 'Numéro de table *'}
                     </Label>
                     <Input
                       id="table-number"
-                      placeholder="Ex: T01, 15, VIP-A..."
+                      placeholder={labels.table === 'créneau' ? 'Ex: 14h-16h, Matin...' : labels.table === 'zone' ? 'Ex: A1, B2, VIP...' : 'Ex: T01, 15, VIP-A...'}
                       value={tableNumber}
                       onChange={(e) => setTableNumber(e.target.value)}
                     />
@@ -1300,7 +1319,7 @@ const ServeurInterface = () => {
                             disabled={!tableNumber.trim()}
                           >
                             <Send className="mr-2 h-4 w-4" />
-                            Envoyer en cuisine
+                            {labels.kitchen === 'Équipe' ? 'Envoyer la demande' : labels.kitchen === 'Stock' ? 'Préparer' : 'Envoyer en cuisine'}
                           </Button>
                           
                           <div className="grid grid-cols-2 gap-2">
@@ -1359,10 +1378,10 @@ const ServeurInterface = () => {
               onValidateOrder={handleValidateOrder}
               onDeliverOrder={handleDeliverOrder}
               onSendToManager={handleSendToManager}
-              title={activeView === 'validate' ? 'Commandes à valider' : 'Mes commandes'}
+              title={activeView === 'validate' ? `${labels.orders.charAt(0).toUpperCase() + labels.orders.slice(1)} à valider` : `Mes ${labels.orders}`}
               description={activeView === 'validate'
-                ? 'Validez les commandes client pour les envoyer en cuisine'
-                : 'Commandes que vous avez prises en charge'}
+                ? `Validez les ${labels.orders} client pour les envoyer ${labels.kitchen === 'Équipe' ? 'à l\'équipe' : labels.kitchen === 'Stock' ? 'au stock' : 'en cuisine'}`
+                : `${labels.orders.charAt(0).toUpperCase() + labels.orders.slice(1)} que vous avez prises en charge`}
             />
           </div>
         </main>

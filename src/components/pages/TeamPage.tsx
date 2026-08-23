@@ -19,8 +19,6 @@ import {
   ChevronLeft,
   LogOut,
   Calendar,
-  UtensilsCrossed,
-  Wallet,
   QrCode
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -30,6 +28,7 @@ import { addDoc, deleteDoc, doc as fsDoc, onSnapshot, updateDoc, setDoc, doc, ge
 import type { TeamMemberDoc, TeamRole } from "@/types/team";
 import { clipboardCopy } from "@/lib/clipboard";
 import { useNavigate } from "react-router-dom";
+import { getRolesForEstablishment, getRoleLabel, getRoleIcon } from "@/constants/establishmentTypes";
 
 interface TeamMember {
   id: string;
@@ -37,7 +36,7 @@ interface TeamMember {
   lastName: string;
   email: string;
   phone: string;
-  role: 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
+  role: TeamRole;
   status: 'active' | 'inactive';
   agentCode?: string;
   dashboardLink?: string;
@@ -47,11 +46,11 @@ interface TeamMember {
 
 const TeamPage = () => {
   const { toast } = useToast();
-  const { user, logout } = useAuth();
+  const { user, logout, profile } = useAuth();
   const navigate = useNavigate();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isRoleSelectionOpen, setIsRoleSelectionOpen] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier' | null>(null);
+  const [selectedRole, setSelectedRole] = useState<TeamRole | null>(null);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [isBottomSheetOpen, setIsBottomSheetOpen] = useState(false);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
@@ -65,6 +64,8 @@ const TeamPage = () => {
 
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [isAddingMember, setIsAddingMember] = useState(false);
+
+  const availableRoles = getRolesForEstablishment(profile?.establishmentType);
 
   useEffect(() => {
     if (!user || !user.uid) return;
@@ -156,30 +157,20 @@ const TeamPage = () => {
   };
 
   const generateDashboardLink = (role: TeamRole, token: string) => {
-    if (role === 'serveur') return `/serveur/${token}`;
+    if (role === 'serveur' || role === 'vendeur' || role === 'consultant') return `/serveur/${token}`;
     if (role === 'caissier') return `/caisse/${token}`;
-    if (role === 'cuisinier') return `/cuisine/${token}`;
+    if (role === 'cuisinier' || role === 'barman') return `/cuisine/${token}`;
+    if (role === 'gestionnaire-stock' || role === 'magasinier' || role === 'assistant') return `/serveur/${token}`;
     return `/agent-evenement/${token}`;
   };
 
-  const getRoleIcon = (role: TeamMember['role']) => {
-    switch (role) {
-      case 'serveur': return UtensilsCrossed;
-      case 'caissier': return Wallet;
-      case 'agent-evenement': return QrCode;
-      case 'cuisinier': return UtensilsCrossed;
-      default: return UserCheck;
-    }
+  const memberRoleIcon = (role: TeamMember['role']) => {
+    const Icon = getRoleIcon(role);
+    return Icon;
   };
 
-  const getRoleLabel = (role: TeamMember['role']) => {
-    switch (role) {
-      case 'serveur': return 'Serveur';
-      case 'caissier': return 'Caissier';
-      case 'agent-evenement': return 'Agent Événement';
-      case 'cuisinier': return 'Cuisinier';
-      default: return role;
-    }
+  const memberRoleLabel = (role: TeamMember['role']) => {
+    return getRoleLabel(role);
   };
 
   const handleAddMember = async () => {
@@ -503,8 +494,7 @@ const TeamPage = () => {
     }
   };
 
-  const openAddModal = (role: 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier') => {
-    // Fonctionnalités débloquées : tous les rôles sont disponibles
+  const openAddModal = (role: TeamRole) => {
     setSelectedRole(role);
     setIsAddModalOpen(true);
     setIsRoleSelectionOpen(false);
@@ -690,45 +680,25 @@ const TeamPage = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 py-4 overflow-y-auto flex-1 min-h-0">
-            <Button
-              variant="outline"
-              onClick={() => openAddModal('serveur')}
-              className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
-            >
-              <div className="flex items-center gap-2">
-                <UtensilsCrossed className="w-6 h-6" />
-                <span className="font-semibold text-lg">Serveur</span>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                Prendre des commandes et gérer les produits
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => openAddModal('caissier')}
-              className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
-            >
-              <div className="flex items-center gap-2">
-                <Wallet className="w-6 h-6" />
-                <span className="font-semibold text-lg">Caissier</span>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                Enregistrer les paiements à la caisse
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => openAddModal('cuisinier')}
-              className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
-            >
-              <div className="flex items-center gap-2">
-                <UtensilsCrossed className="w-6 h-6" />
-                <span className="font-semibold text-lg">Cuisinier</span>
-              </div>
-              <span className="text-sm text-muted-foreground">
-                Gérer les commandes de nourriture et leur préparation
-              </span>
-            </Button>
+            {availableRoles.map((roleConfig) => {
+              const Icon = roleConfig.icon;
+              return (
+                <Button
+                  key={roleConfig.value}
+                  variant="outline"
+                  onClick={() => openAddModal(roleConfig.value)}
+                  className="h-20 flex flex-col gap-2 border-2 hover:border-primary"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon className="w-6 h-6" />
+                    <span className="font-semibold text-lg">{roleConfig.label}</span>
+                  </div>
+                  <span className="text-sm text-muted-foreground">
+                    {roleConfig.description}
+                  </span>
+                </Button>
+              );
+            })}
             <Button
               variant="outline"
               onClick={() => openAddModal('agent-evenement')}
@@ -848,12 +818,12 @@ const TeamPage = () => {
         <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Ajouter un {selectedRole === 'serveur' ? 'Serveur' : selectedRole === 'caissier' ? 'Caissier' : selectedRole === 'cuisinier' ? 'Cuisinier' : 'Agent Événement'}
+              Ajouter un {selectedRole ? getRoleLabel(selectedRole) : 'Agent'}
             </DialogTitle>
             <DialogDescription>
               Remplissez les informations du nouvel agent. Un code d'agent et un lien d'accès personnalisé seront générés automatiquement.
               {selectedRole === 'agent-evenement' && ' Cet agent aura accès uniquement au scanner QR pour valider les billets d\'événements.'}
-              {selectedRole === 'cuisinier' && ' Cet agent aura accès uniquement aux commandes contenant de la nourriture pour gérer leur préparation.'}
+              {(selectedRole === 'cuisinier' || selectedRole === 'barman') && ' Cet agent aura accès uniquement aux commandes contenant de la nourriture/boissons pour gérer leur préparation.'}
             </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4">
@@ -918,14 +888,13 @@ const TeamPage = () => {
                         '📱 Interface Agent Événement'}
                 </p>
                 <p className="text-xs text-blue-700">
-                  {selectedRole === 'serveur'
-                    ? 'L\'agent aura accès aux produits et pourra prendre les commandes'
-                    : selectedRole === 'caissier'
-                      ? 'L\'agent aura accès à la feuille de caisse pour enregistrer les paiements'
-                      : selectedRole === 'cuisinier'
-                        ? 'L\'agent aura accès uniquement aux commandes contenant de la nourriture pour gérer leur préparation'
-                        : 'L\'agent aura accès uniquement au scanner QR pour valider les billets d\'événements'
-                  }
+                  {(() => {
+                    if (!selectedRole) return '';
+                    const roleConfig = availableRoles.find(r => r.value === selectedRole);
+                    if (roleConfig) return roleConfig.description;
+                    if (selectedRole === 'agent-evenement') return 'L\'agent aura accès uniquement au scanner QR pour valider les billets d\'événements';
+                    return 'L\'agent aura accès à l\'interface dédiée';
+                  })()}
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">

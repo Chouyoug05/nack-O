@@ -1,4 +1,22 @@
-export type TeamRole = 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
+export type TeamRole = 
+  | 'serveur' 
+  | 'caissier' 
+  | 'agent-evenement' 
+  | 'cuisinier'
+  | 'barman'
+  | 'vendeur'
+  | 'gestionnaire-stock'
+  | 'magasinier'
+  | 'consultant'
+  | 'assistant';
+
+export interface TeamRoleConfig {
+  value: TeamRole;
+  label: string;
+  description: string;
+  icon: string;
+  applicableTo: string[]; // main categories where this role applies
+}
 export type TeamStatus = 'active' | 'inactive';
 
 export interface TeamMemberDoc {

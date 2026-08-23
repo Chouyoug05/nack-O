@@ -6,14 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Grid3x3, Search, CreditCard, AlertCircle } from "lucide-react";
+import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Grid3x3, Search, CreditCard, AlertCircle, Heart, X, Share2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 import { getMenuDesignById, MenuDesignId } from "@/types/menuDesigns";
-import { isFoodBusiness as isFoodBusinessFn } from "@/constants/establishmentTypes";
+import { isFoodBusiness as isFoodBusinessFn, isServiceBusiness, isBoutique } from "@/constants/establishmentTypes";
+import { useToast } from "@/hooks/use-toast";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
 import { sendOrderNotificationViaServer } from "@/lib/securePayment";
 import { ordersColRef } from "@/lib/collections";
@@ -27,6 +28,10 @@ import {
   BoutiqueMinimalTemplate,
   BoutiqueGridTemplate,
   BoutiqueLuxuryTemplate,
+  BoutiqueTemplate,
+  ServiceTemplate,
+  NackModernTemplate,
+  NackShopTemplate,
   type TemplateProps,
 } from "@/components/menuTemplates";
 
@@ -85,6 +90,7 @@ const PublicOrderingPage = () => {
   // Hooks de routing
   const params = useParams<{ establishmentId: string }>();
   const location = useLocation();
+  const { toast } = useToast();
   const establishmentId = useMemo(() => params?.establishmentId ?? null, [params?.establishmentId]);
 
   // State
@@ -109,6 +115,14 @@ const PublicOrderingPage = () => {
   const [airtelNumberInput, setAirtelNumberInput] = useState("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [showCartDetails, setShowCartDetails] = useState(false);
+  const [productQuantity, setProductQuantity] = useState(1);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem(`nack_favorites_${establishmentId || 'default'}`);
+      return stored ? JSON.parse(stored) : [];
+    } catch { return []; }
+  });
   // Livraison
   const [isDelivery, setIsDelivery] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -452,16 +466,99 @@ const PublicOrderingPage = () => {
     });
   };
 
+  const updateCartItemQuantity = (productId: string, quantity: number) => {
+    if (quantity <= 0) {
+      setCart(prev => prev.filter(item => item.productId !== productId));
+    } else {
+      setCart(prev => prev.map(item =>
+        item.productId === productId ? { ...item, quantity } : item
+      ));
+    }
+  };
+
+  const clearCart = () => {
+    setCart([]);
+  };
+
+  const toggleFavorite = (productId: string) => {
+    setFavorites(prev => {
+      const newFavs = prev.includes(productId) 
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId];
+      try {
+        localStorage.setItem(`nack_favorites_${establishmentId || 'default'}`, JSON.stringify(newFavs));
+      } catch { /* ignore */ }
+      return newFavs;
+    });
+  };
+
+  const isFavorite = (productId: string) => favorites.includes(productId);
+
+  const addToCartWithQuantity = (product: Product, quantity: number) => {
+    const priceValue = typeof product.price === 'number'
+      ? product.price
+      : parseFloat(String(product.price)) || 0;
+
+    setCart(prev => {
+      const existingItem = prev.find(item => item.productId === product.id);
+      if (existingItem) {
+        return prev.map(item =>
+          item.productId === product.id
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      } else {
+        return [...prev, {
+          productId: product.id,
+          name: product.name,
+          price: priceValue,
+          quantity: quantity,
+          category: product.category
+        }];
+      }
+    });
+
+    // Feedback visuel
+    toast({
+      title: "Ajouté au panier",
+      description: `${product.name} x${quantity}`,
+      duration: 1500,
+    });
+  };
+
   const availableCategories = useMemo(() => {
-    return [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+    const categories = [...new Set(products.map(p => p.category).filter(Boolean))];
+    
+    // Ordre logique des catégories pour la restauration
+    const foodOrder = ['Entrée', 'Plat / Repas', 'Plat', 'Grillades', 'Accompagnements', 'Dessert', 'Snack', 'Boisson alcoolisée', 'Boisson non alcoolisée', 'Boissons'];
+    
+    // Ordre logique pour les boutiques
+    const shopOrder = ['Nouveau', 'Populaire', 'Promo', 'T-shirts', 'Chemises', 'Jeans', 'Pantalons', 'Robes', 'Vestes', 'Chaussures', 'Sacs', 'Accessoires'];
+    
+    // Trier selon l'ordre défini
+    return categories.sort((a, b) => {
+      const aIndex = foodOrder.findIndex(c => a.toLowerCase().includes(c.toLowerCase()));
+      const bIndex = foodOrder.findIndex(c => b.toLowerCase().includes(c.toLowerCase()));
+      
+      // Si les deux catégories sont dans l'ordre, trier par position
+      if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+      // Si seulement a est dans l'ordre, a vient en premier
+      if (aIndex !== -1) return -1;
+      // Si seulement b est dans l'ordre, b vient en premier
+      if (bIndex !== -1) return 1;
+      // Sinon, trier alphabétiquement
+      return a.localeCompare(b);
+    });
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    // Menu du jour : n'afficher QUE les produits marqués "sur le menu digital".
-    // S'il n'y en a aucun, afficher un état vide (pas le catalogue complet).
+    // Vérifier si des produits sont marqués pour le menu digital
     const menuProducts = products.filter(p => p.showOnMenuDigital === true);
+    
+    // Fallback : si aucun produit n'est marqué, afficher tous les produits
+    const productsToDisplay = menuProducts.length > 0 ? menuProducts : products;
 
-    return menuProducts.filter(product => {
+    return productsToDisplay.filter(product => {
       const matchesSearch = !searchTerm || product.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = activeCategoryTab === "all" || product.category === activeCategoryTab;
       return matchesSearch && matchesCategory;
@@ -562,6 +659,8 @@ const PublicOrderingPage = () => {
             total,
             status: 'awaiting-validation',
             paymentStatus: 'unpaid',
+            paymentPending: true,
+            paymentTransactionId: transactionId,
             source: 'qr',
             createdAt: Date.now(),
             isDelivery: isDelivery || false,
@@ -576,6 +675,22 @@ const PublicOrderingPage = () => {
             orderData.deliveryAddress = deliveryAddress;
           }
 
+          let createdOrderId: string | null = null;
+          try {
+            const docRef = await addDoc(ordersColRef(db, establishmentId), orderData);
+            createdOrderId = docRef.id;
+            console.log('[Payment] Order created before payment:', createdOrderId);
+
+            void sendOrderNotificationViaServer({
+              establishmentId,
+              title: "Commande en attente de paiement",
+              body: `Commande #${orderNumberValue} - ${isDelivery ? 'Livraison' : selectedTable} - ${total.toLocaleString('fr-FR')} XAF (paiement en cours)`,
+              data: { orderNumber: orderNumberValue, type: "PENDING_PAYMENT" },
+            });
+          } catch (createError) {
+            console.error('[Payment] Error creating order before payment:', createError);
+          }
+
           const paymentLink = await createMenuDigitalPaymentLink({
             amount: total,
             reference,
@@ -584,7 +699,7 @@ const PublicOrderingPage = () => {
             logoURL,
             establishmentId: establishmentId!,
             transactionId,
-            orderData,
+            orderData: { ...orderData, orderId: createdOrderId },
           });
 
           console.log('[Payment] Link created:', paymentLink);
@@ -784,10 +899,54 @@ const PublicOrderingPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={getBackgroundStyle()}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: menuTheme.primaryColor }}></div>
-          <p className="text-gray-700" style={{ color: menuTheme.primaryColor }}>Chargement du menu...</p>
+      <div className="min-h-screen" style={getBackgroundStyle()}>
+        {/* Skeleton Header */}
+        <div className="sticky top-0 z-40 backdrop-blur-lg border-b" style={{ 
+          backgroundColor: 'rgba(255,255,255,0.95)',
+          borderColor: 'rgba(0,0,0,0.08)'
+        }}>
+          <div className="container mx-auto px-4 py-3">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gray-200 animate-pulse" />
+              <div className="flex-1">
+                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-1" />
+                <div className="h-3 w-20 bg-gray-100 rounded animate-pulse" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Skeleton Search */}
+        <div className="px-4 py-3">
+          <div className="h-11 bg-gray-100 rounded-xl animate-pulse" />
+        </div>
+
+        {/* Skeleton Categories */}
+        <div className="px-4 py-3">
+          <div className="flex gap-2 overflow-hidden">
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-9 w-20 bg-gray-100 rounded-xl animate-pulse flex-shrink-0" />
+            ))}
+          </div>
+        </div>
+
+        {/* Skeleton Products Grid */}
+        <div className="container mx-auto px-3 py-4">
+          <div className="grid grid-cols-2 gap-3">
+            {[1,2,3,4,5,6].map(i => (
+              <div key={i} className="rounded-2xl overflow-hidden bg-white shadow-sm">
+                <div className="aspect-square bg-gray-100 animate-pulse" />
+                <div className="p-3">
+                  <div className="h-4 bg-gray-100 rounded animate-pulse mb-2" />
+                  <div className="h-3 w-16 bg-gray-50 rounded animate-pulse mb-2" />
+                  <div className="flex justify-between items-center">
+                    <div className="h-4 w-16 bg-gray-100 rounded animate-pulse" />
+                    <div className="w-8 h-8 rounded-full bg-gray-100 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -859,28 +1018,49 @@ const PublicOrderingPage = () => {
         proceedToCheckout();
       }
     },
+    onShowCart: () => setShowCartDetails(true),
     backgroundStyle: getBackgroundStyle(),
   };
 
   const renderTemplate = () => {
-    switch (currentDesign.id) {
-      case "restaurant-classic":
-        return <RestaurantClassicTemplate {...templateProps} />;
-      case "restaurant-modern":
-        return <RestaurantModernTemplate {...templateProps} />;
-      case "bar-lounge":
-        return <BarLoungeTemplate {...templateProps} />;
-      case "cafe-cozy":
-        return <CafeCozyTemplate {...templateProps} />;
-      case "boutique-minimal":
-        return <BoutiqueMinimalTemplate {...templateProps} />;
-      case "boutique-grid":
-        return <BoutiqueGridTemplate {...templateProps} />;
-      case "boutique-luxury":
-        return <BoutiqueLuxuryTemplate {...templateProps} />;
-      default:
-        return <RestaurantClassicTemplate {...templateProps} />;
+    // Si un design spécifique est choisi, l'utiliser
+    if (currentDesign.id !== "default") {
+      switch (currentDesign.id) {
+        case "nack-modern":
+          return <NackModernTemplate {...templateProps} establishmentType={establishmentType} />;
+        case "nack-shop":
+        case "nack-shop-fashion":
+        case "nack-shop-premium":
+          return <NackShopTemplate {...templateProps} establishmentType={establishmentType} fullAddress={establishment?.fullAddress} />;
+        case "restaurant-classic":
+          return <RestaurantClassicTemplate {...templateProps} />;
+        case "restaurant-modern":
+          return <RestaurantModernTemplate {...templateProps} />;
+        case "bar-lounge":
+          return <BarLoungeTemplate {...templateProps} />;
+        case "cafe-cozy":
+          return <CafeCozyTemplate {...templateProps} />;
+        case "boutique-minimal":
+          return <BoutiqueMinimalTemplate {...templateProps} />;
+        case "boutique-grid":
+          return <BoutiqueGridTemplate {...templateProps} />;
+        case "boutique-luxury":
+          return <BoutiqueLuxuryTemplate {...templateProps} />;
+        default:
+          break;
+      }
     }
+    
+    // Sélection automatique selon le type d'établissement
+    if (isServiceBusiness(establishmentType)) {
+      return <ServiceTemplate {...templateProps} />;
+    }
+    if (isBoutique(establishmentType)) {
+      return <NackShopTemplate {...templateProps} establishmentType={establishmentType} fullAddress={establishment?.fullAddress} />;
+    }
+    
+    // Par défaut pour restauration : NACK Modern
+    return <NackModernTemplate {...templateProps} establishmentType={establishmentType} />;
   };
 
   return (
@@ -1104,56 +1284,244 @@ const PublicOrderingPage = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Popup produit */}
-      <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
-        <DialogContent className="max-w-md">
+      {/* Fiche produit améliorée */}
+      <Dialog open={!!selectedProduct} onOpenChange={(open) => { 
+        setSelectedProduct(null); 
+        setProductQuantity(1);
+      }}>
+        <DialogContent className="max-w-md p-0 overflow-hidden">
           {selectedProduct && (
-            <>
-              <DialogHeader>
-                <DialogTitle style={{ color: menuTheme.primaryColor }}>{selectedProduct.name}</DialogTitle>
-                <DialogDescription>
-                  {selectedProduct.description || "Détails du produit"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                {selectedProduct.imageUrl && (
-                  <div className="w-full h-64 bg-gray-100 rounded-lg overflow-hidden">
-                    <img
-                      src={selectedProduct.imageUrl}
-                      alt={selectedProduct.name}
-                      className="w-full h-full object-cover"
-                    />
+            <div className="flex flex-col max-h-[90vh]">
+              {/* Image du produit */}
+              <div className="relative w-full h-64 bg-gray-100">
+                {selectedProduct.imageUrl ? (
+                  <img
+                    src={selectedProduct.imageUrl}
+                    alt={selectedProduct.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                    <Package className="w-16 h-16 text-gray-300" />
                   </div>
                 )}
-                {selectedProduct.description && (
-                  <p className="text-gray-600">{selectedProduct.description}</p>
+                {/* Bouton favori */}
+                <button
+                  onClick={() => toggleFavorite(selectedProduct.id)}
+                  className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-md transition-transform active:scale-90"
+                >
+                  <Heart 
+                    className="w-5 h-5" 
+                    style={{ 
+                      color: isFavorite(selectedProduct.id) ? '#ef4444' : '#666',
+                      fill: isFavorite(selectedProduct.id) ? '#ef4444' : 'transparent'
+                    }} 
+                  />
+                </button>
+                {/* Badge catégorie */}
+                {selectedProduct.category && (
+                  <div className="absolute bottom-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur-sm text-white text-xs font-medium">
+                    {selectedProduct.category}
+                  </div>
                 )}
-                <div className="flex items-center justify-between pt-4 border-t">
+              </div>
+
+              {/* Contenu */}
+              <div className="flex-1 overflow-y-auto p-5">
+                <h2 className="text-xl font-bold mb-2" style={{ color: menuTheme.primaryColor }}>
+                  {selectedProduct.name}
+                </h2>
+                {selectedProduct.description && (
+                  <p className="text-gray-600 text-sm mb-4 leading-relaxed">
+                    {selectedProduct.description}
+                  </p>
+                )}
+                
+                {/* Prix */}
+                <div className="flex items-center justify-between mb-4">
                   <span className="text-2xl font-bold" style={{ color: menuTheme.primaryColor }}>
                     {(typeof selectedProduct.price === 'number'
                       ? selectedProduct.price
                       : parseFloat(String(selectedProduct.price)) || 0
-                    ).toLocaleString('fr-FR')} XAF
+                    ).toLocaleString('fr-FR')} FCFA
                   </span>
-                  {!isSimpleBusiness && (
-                  <Button
-                    onClick={() => {
-                      addToCart(selectedProduct);
-                      setSelectedProduct(null);
-                    }}
-                    className="text-white"
-                    style={{ backgroundColor: menuTheme.primaryColor }}
-                  >
-                    <ShoppingBag className="w-4 h-4 mr-2" />
-                    Commander
-                  </Button>
-                  )}
+                </div>
+
+                {/* Sélecteur de quantité */}
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl mb-4">
+                  <span className="text-sm font-medium text-gray-700">Quantité</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setProductQuantity(Math.max(1, productQuantity - 1))}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border hover:bg-gray-100 transition-colors"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-8 text-center font-bold">{productQuantity}</span>
+                    <button
+                      onClick={() => setProductQuantity(productQuantity + 1)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center border hover:bg-gray-100 transition-colors"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Total */}
+                <div className="flex items-center justify-between p-3 rounded-xl" style={{ backgroundColor: menuTheme.primaryColor + '10' }}>
+                  <span className="text-sm font-medium">Total</span>
+                  <span className="text-lg font-bold" style={{ color: menuTheme.primaryColor }}>
+                    {((typeof selectedProduct.price === 'number'
+                      ? selectedProduct.price
+                      : parseFloat(String(selectedProduct.price)) || 0
+                    ) * productQuantity).toLocaleString('fr-FR')} FCFA
+                  </span>
                 </div>
               </div>
-            </>
+
+              {/* Bouton d'action */}
+              <div className="p-4 border-t">
+                <Button
+                  onClick={() => {
+                    addToCartWithQuantity(selectedProduct, productQuantity);
+                    setSelectedProduct(null);
+                    setProductQuantity(1);
+                  }}
+                  className="w-full h-12 text-white font-bold text-base"
+                  style={{ backgroundColor: menuTheme.primaryColor }}
+                >
+                  <ShoppingBag className="w-5 h-5 mr-2" />
+                  Ajouter au panier
+                </Button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Vue panier détaillée (Bottom Sheet) */}
+      {showCartDetails && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCartDetails(false)} />
+          <div className="relative w-full max-w-lg bg-white rounded-t-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <h2 className="text-lg font-bold" style={{ color: menuTheme.primaryColor }}>
+                Votre panier
+              </h2>
+              <button
+                onClick={() => setShowCartDetails(false)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Liste des articles */}
+            <div className="flex-1 overflow-y-auto p-4">
+              {cart.length === 0 ? (
+                <div className="text-center py-12">
+                  <ShoppingBag className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">Votre panier est vide</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {cart.map((item) => (
+                    <div key={item.productId} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{item.name}</p>
+                        <p className="text-xs text-gray-500">{item.price.toLocaleString('fr-FR')} FCFA / unité</p>
+                      </div>
+                      
+                      {/* Contrôles quantité */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateCartItemQuantity(item.productId, item.quantity - 1)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center bg-white border hover:bg-gray-100"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="w-6 text-center font-medium text-sm">{item.quantity}</span>
+                        <button
+                          onClick={() => updateCartItemQuantity(item.productId, item.quantity + 1)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center bg-white border hover:bg-gray-100"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                      
+                      {/* Prix total de l'article */}
+                      <div className="text-right min-w-[70px]">
+                        <p className="font-bold text-sm" style={{ color: menuTheme.primaryColor }}>
+                          {(item.price * item.quantity).toLocaleString('fr-FR')} F
+                        </p>
+                      </div>
+                      
+                      {/* Bouton supprimer */}
+                      <button
+                        onClick={() => updateCartItemQuantity(item.productId, 0)}
+                        className="w-7 h-7 rounded-full flex items-center justify-center text-red-500 hover:bg-red-50"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Footer avec total et boutons */}
+            {cart.length > 0 && (
+              <div className="border-t p-4 space-y-3">
+                {/* Détails des prix */}
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Sous-total</span>
+                    <span>{cart.reduce((sum, item) => sum + (item.price * item.quantity), 0).toLocaleString('fr-FR')} FCFA</span>
+                  </div>
+                  {isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice && (
+                    <div className="flex justify-between text-gray-600">
+                      <span>Livraison</span>
+                      <span>{establishment.deliveryPrice.toLocaleString('fr-FR')} FCFA</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-bold text-base pt-2 border-t">
+                    <span>Total</span>
+                    <span style={{ color: menuTheme.primaryColor }}>{total.toLocaleString('fr-FR')} FCFA</span>
+                  </div>
+                </div>
+
+                {/* Boutons d'action */}
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      clearCart();
+                      setShowCartDetails(false);
+                    }}
+                    className="flex-1 py-3 rounded-xl border border-red-200 text-red-500 font-medium hover:bg-red-50"
+                  >
+                    Vider
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCartDetails(false);
+                      if ((!isDelivery && !selectedTable) || (isDelivery && !deliveryAddress.trim())) {
+                        setShowTableDialog(true);
+                      } else {
+                        proceedToCheckout();
+                      }
+                    }}
+                    className="flex-[2] py-3 rounded-xl text-white font-bold shadow-lg"
+                    style={{ backgroundColor: menuTheme.primaryColor }}
+                  >
+                    Commander • {total.toLocaleString('fr-FR')} FCFA
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Dialogue pour demander le numéro Airtel Money */}
       <Dialog open={showAirtelNumberDialog} onOpenChange={setShowAirtelNumberDialog}>

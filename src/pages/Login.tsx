@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Eye, EyeOff, Smartphone, Loader2, Users, Shield, Clock, UtensilsCrossed, Wallet, QrCode, User, Gift } from "lucide-react";
+import { Eye, EyeOff, Smartphone, Loader2, Users, Shield, Clock, UtensilsCrossed, Wallet, QrCode, User, Gift, Package, ClipboardList, UserCheck } from "lucide-react";
 import NackLogo from "@/components/NackLogo";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,9 +14,9 @@ import { agentTokensTopColRef } from "@/lib/collections";
 import { getDoc, doc, collectionGroup, query, where, limit, getDocs } from "firebase/firestore";
 import { getFriendlyErrorMessage } from "@/utils/authErrors";
 import { isProfileComplete } from "@/utils/profileComplete";
+import type { TeamRole } from "@/types/team";
 
 type LoginType = 'manager' | 'team' | 'affiliate';
-type TeamRole = 'serveur' | 'caissier' | 'agent-evenement' | 'cuisinier';
 
 const Login = () => {
   const [loginType, setLoginType] = useState<LoginType>('manager');
@@ -149,11 +149,11 @@ const Login = () => {
       }
 
       // Rediriger vers l'interface appropriée
-      if (teamFormData.role === 'serveur') {
+      if (teamFormData.role === 'serveur' || teamFormData.role === 'vendeur' || teamFormData.role === 'consultant' || teamFormData.role === 'gestionnaire-stock' || teamFormData.role === 'magasinier' || teamFormData.role === 'assistant') {
         navigate(`/serveur/${foundToken}`);
       } else if (teamFormData.role === 'caissier') {
         navigate(`/caisse/${foundToken}`);
-      } else if (teamFormData.role === 'cuisinier') {
+      } else if (teamFormData.role === 'cuisinier' || teamFormData.role === 'barman') {
         navigate(`/cuisine/${foundToken}`);
       } else if (teamFormData.role === 'agent-evenement') {
         navigate(`/agent-evenement/${foundToken}`);
@@ -344,6 +344,42 @@ const Login = () => {
                         <div className="flex items-center gap-2">
                           <UtensilsCrossed size={16} />
                           <span>Cuisinier</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="barman">
+                        <div className="flex items-center gap-2">
+                          <UtensilsCrossed size={16} />
+                          <span>Barman</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="vendeur">
+                        <div className="flex items-center gap-2">
+                          <Users size={16} />
+                          <span>Vendeur</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="gestionnaire-stock">
+                        <div className="flex items-center gap-2">
+                          <Package size={16} />
+                          <span>Gestionnaire de stock</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="magasinier">
+                        <div className="flex items-center gap-2">
+                          <Package size={16} />
+                          <span>Magasinier</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="consultant">
+                        <div className="flex items-center gap-2">
+                          <ClipboardList size={16} />
+                          <span>Consultant</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="assistant">
+                        <div className="flex items-center gap-2">
+                          <UserCheck size={16} />
+                          <span>Assistant</span>
                         </div>
                       </SelectItem>
                       <SelectItem value="agent-evenement">
