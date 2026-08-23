@@ -117,12 +117,7 @@ const PublicOrderingPage = () => {
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
   const [showCartDetails, setShowCartDetails] = useState(false);
   const [productQuantity, setProductQuantity] = useState(1);
-  const [favorites, setFavorites] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(`nack_favorites_${establishmentId || 'default'}`);
-      return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
-  });
+  const [favorites, setFavorites] = useState<string[]>([]);
   // Livraison
   const [isDelivery, setIsDelivery] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState("");
@@ -494,15 +489,7 @@ const PublicOrderingPage = () => {
   };
 
   const toggleFavorite = (productId: string) => {
-    setFavorites(prev => {
-      const newFavs = prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId];
-      try {
-        localStorage.setItem(`nack_favorites_${establishmentId || 'default'}`, JSON.stringify(newFavs));
-      } catch { /* ignore */ }
-      return newFavs;
-    });
+    setFavorites(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
   };
 
   const isFavorite = (productId: string) => favorites.includes(productId);
