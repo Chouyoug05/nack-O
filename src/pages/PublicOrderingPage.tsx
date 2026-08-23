@@ -199,8 +199,12 @@ const PublicOrderingPage = () => {
             updatedAt: Date.now()
           } as MenuThemeConfig);
         }
-      } catch (error) {
-        console.error('Erreur chargement thème:', error);
+      } catch (error: any) {
+        console.error('[NACK FIREBASE ERROR]', {
+          code: error?.code,
+          message: error?.message,
+          path: `publicProfiles/${establishmentId} | profiles/${establishmentId}/menuDigital/theme | establishments/${establishmentId}/menuDigital/theme`
+        });
       }
     };
 
@@ -257,7 +261,11 @@ const PublicOrderingPage = () => {
           getDoc(doc(db, 'establishments', establishmentId)),
         ]);
       } catch (e: any) {
-        console.error('[PublicOrderingPage] load public data permission error', e);
+        console.error('[NACK FIREBASE ERROR]', {
+          code: e?.code,
+          message: e?.message,
+          path: `publicProfiles/${establishmentId} | establishments/${establishmentId}`
+        });
         if (e?.code === 'permission-denied') setLoadError('permission-denied');
         else setLoadError('network-error');
         setIsLoading(false);
@@ -267,6 +275,11 @@ const PublicOrderingPage = () => {
       if (!isMountedRef.current) return;
 
       if (!publicDoc?.exists() && !estDoc?.exists()) {
+        console.warn('[NACK DEBUG] Document not found', {
+          publicProfilesExists: publicDoc?.exists(),
+          establishmentsExists: estDoc?.exists(),
+          establishmentId
+        });
         setLoadError('not-found');
         setIsLoading(false);
         return;
@@ -371,7 +384,12 @@ const PublicOrderingPage = () => {
       unsubscribeProducts = onSnapshot(
         productsQuery,
         handleProductsSnapshot,
-        (error) => {
+        (error: any) => {
+          console.error('[NACK FIREBASE ERROR]', {
+            code: error?.code,
+            message: error?.message,
+            path: `${base}/${establishmentId}/products (with orderBy)`
+          });
           // Erreur avec orderBy, charger sans tri
           if (unsubscribeProducts) {
             unsubscribeProducts();
@@ -381,9 +399,13 @@ const PublicOrderingPage = () => {
           unsubscribeProducts = onSnapshot(
             simpleQuery,
             handleProductsSnapshot,
-            (err) => {
+            (err: any) => {
               if (!isMountedRef.current) return;
-              console.error('❌ Erreur produits:', err);
+              console.error('[NACK FIREBASE ERROR]', {
+                code: err?.code,
+                message: err?.message,
+                path: `${base}/${establishmentId}/products (simple)`
+              });
               setIsLoading(false);
             }
           );
@@ -391,14 +413,23 @@ const PublicOrderingPage = () => {
         }
       );
       unsubscribeProductsRef.current = unsubscribeProducts;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[NACK FIREBASE ERROR]', {
+        code: error?.code,
+        message: error?.message,
+        path: `${base}/${establishmentId}/products (query creation)`
+      });
       // Erreur création query, charger directement
       unsubscribeProducts = onSnapshot(
         productsRef,
         handleProductsSnapshot,
-        (err) => {
+        (err: any) => {
           if (!isMountedRef.current) return;
-          console.error('❌ Erreur produits:', err);
+          console.error('[NACK FIREBASE ERROR]', {
+            code: err?.code,
+            message: err?.message,
+            path: `${base}/${establishmentId}/products (fallback)`
+          });
           setIsLoading(false);
         }
       );
@@ -420,9 +451,13 @@ const PublicOrderingPage = () => {
         setTables(filteredTables);
         setIsLoading(false);
       },
-      (error) => {
+      (error: any) => {
         if (!isMountedRef.current) return;
-        console.error('Erreur tables:', error);
+        console.error('[NACK FIREBASE ERROR]', {
+          code: error?.code,
+          message: error?.message,
+          path: `${base}/${establishmentId}/tables`
+        });
         setIsLoading(false);
       }
     );
@@ -671,6 +706,29 @@ const PublicOrderingPage = () => {
       return;
     }
 
+    // DEBUG: Log template resolution
+    console.log('[NACK DEBUG TEMPLATE]', {
+      establishmentId,
+      establishmentType,
+      menuTheme,
+      designId: menuTheme.designId,
+      currentDesignId: currentDesign?.id,
+      requestedTemplate: TEMPLATE_MAP[currentDesign?.id || ''],
+      templateType: typeof TEMPLATE_MAP[currentDesign?.id || '']
+    });
+
+    // DEBUG: Validate total before order creation
+    if (typeof total !== 'number' || !Number.isFinite(total) || Number.isNaN(total)) {
+      console.error('[NACK DEBUG TOTAL INVALID]', { total, cart, establishment, deliveryFee: (isDelivery && establishment?.deliveryEnabled && establishment?.deliveryPrice) ? establishment.deliveryPrice : 0 });
+      alert('Erreur calcul total. Veuillez réessayer.');
+      return;
+    }
+
+    console.log('[NACK DEBUG COMPONENT]', {
+      TemplateComponent: currentDesign?.id ? TEMPLATE_MAP[currentDesign.id] : 'fallback',
+      type: typeof (currentDesign?.id ? TEMPLATE_MAP[currentDesign.id] : NackModernTemplate)
+    });
+
     try {
       const orderNumberValue = `CMD${Date.now().toString().slice(-6)}`;
       const receiptNumber = `RCP${Date.now().toString().slice(-6)}`;
@@ -730,8 +788,13 @@ const PublicOrderingPage = () => {
               body: `Commande #${orderNumberValue} - ${isDelivery ? 'Livraison' : selectedTable} - ${total.toLocaleString('fr-FR')} XAF (paiement en cours)`,
               data: { orderNumber: orderNumberValue, type: "PENDING_PAYMENT" },
             });
-          } catch (createError) {
-            console.error('[Payment] Error creating order before payment:', createError);
+          } catch (createError: any) {
+            console.error('[NACK FIREBASE ERROR]', {
+              code: createError?.code,
+              message: createError?.message,
+              path: `profiles/${establishmentId}/orders (pre-payment)`,
+              orderData
+            });
           }
 
           const paymentLink = await createMenuDigitalPaymentLink({
@@ -795,7 +858,13 @@ const PublicOrderingPage = () => {
           const docRef = await addDoc(ordersColRef(db, establishmentId), orderData);
           orderDocId = docRef.id;
           console.log('[PublicOrderingPage] Commande créée avec ID:', docRef.id);
-        } catch {
+        } catch (error: any) {
+          console.error('[NACK FIREBASE ERROR]', {
+            code: error?.code,
+            message: error?.message,
+            path: `profiles/${establishmentId}/orders`,
+            orderData
+          });
           await enqueuePendingOrder({
             ownerUid: establishmentId,
             channel: "orders",
