@@ -4,7 +4,6 @@ import { db } from "@/lib/firebase";
 import { doc, getDoc, addDoc, collection, onSnapshot, query, orderBy, QuerySnapshot, DocumentData, updateDoc, getDocs } from "firebase/firestore";
 import { Input } from "@/components/ui/input";
 import { Plus, Minus, ShoppingBag, MapPin, CheckCircle, Package, Printer, Download, Grid3x3, Search, CreditCard, AlertCircle, Heart, X, Share2 } from "lucide-react";
-import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
@@ -100,7 +99,6 @@ const PublicOrderingPage = () => {
   const [showPaymentChoiceDialog, setShowPaymentChoiceDialog] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderNumber, setOrderNumber] = useState<string>("");
-  const [receiptQR, setReceiptQR] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeCategoryTab, setActiveCategoryTab] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
@@ -904,13 +902,7 @@ const PublicOrderingPage = () => {
         createdAt: Date.now()
       };
 
-      const receiptQRDataUrl = await QRCodeLib.toDataURL(JSON.stringify(receiptData), {
-        width: 200,
-        margin: 2
-      });
-
       setOrderNumber(orderNumberValue);
-      setReceiptQR(receiptQRDataUrl);
       setOrderComplete(true);
       if (queuedOffline) {
         alert("Commande enregistrée. Elle sera envoyée automatiquement dès le retour d'internet.");
@@ -1107,11 +1099,8 @@ const PublicOrderingPage = () => {
             <p className="text-gray-600">
               Merci pour votre commande. Elle est en cours de préparation.
             </p>
-          </div>
-          <div className="p-4 bg-gray-50 rounded-xl w-full">
-            <img src={receiptQR} alt="QR Code reçu" className="w-32 h-32 mx-auto mb-2" />
-            <p className="text-sm text-gray-600">
-              Montrez ce QR Code au serveur
+            <p className="text-sm text-gray-500">
+              N° {orderNumber}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 w-full">
