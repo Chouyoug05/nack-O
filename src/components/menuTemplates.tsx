@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Package, Plus, Search, ShoppingBag, X, Minus, Star, Flame, Sparkles, Tag, Clock, MapPin, ChevronRight, Utensils, Wine, Coffee, Pizza, Music, Store, Briefcase, Heart, Shirt, Shoe, Gem, Smartphone, Home, Sprays, Watch, ShoppingBasket, Gift, Glasses, Share2 } from "lucide-react";
+import { Package, Plus, Search, ShoppingBag, X, Minus, Star, Flame, Sparkles, Tag, Clock, MapPin, ChevronRight, Utensils, Wine, Coffee, Pizza, Music, Store, Briefcase, Heart, Shirt, Footprints, Gem, Smartphone, Home, Droplet, Watch, ShoppingBasket, Gift, Glasses, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { MenuThemeConfig } from "@/types/menuTheme";
@@ -1283,7 +1283,7 @@ const getShopCategoryIcon = (category: string, type?: string) => {
   if (cat.includes('vêtement')) return Shirt;
   
   // Chaussures
-  if (cat.includes('chaussure') || cat.includes('basket') || cat.includes('sneaker') || cat.includes('botte')) return Shoe;
+  if (cat.includes('chaussure') || cat.includes('basket') || cat.includes('sneaker') || cat.includes('botte')) return Footprints;
   
   // Accessoires
   if (cat.includes('sac') || cat.includes('accessoire')) return ShoppingBag;
@@ -1292,7 +1292,7 @@ const getShopCategoryIcon = (category: string, type?: string) => {
   if (cat.includes('ceinture')) return Shirt;
   
   // Beauté / Parfums
-  if (cat.includes('parfum') || cat.includes('cosmétique') || cat.includes('beauté')) return Sprays;
+  if (cat.includes('parfum') || cat.includes('cosmétique') || cat.includes('beauté')) return Droplet;
   
   // Électronique
   if (cat.includes('téléphone') || cat.includes('ordinateur') || cat.includes('audio') || cat.includes('gaming') || cat.includes('électronique')) return Smartphone;
@@ -1308,7 +1308,7 @@ const getShopCategoryIcon = (category: string, type?: string) => {
   
   // Par défaut selon le type
   if (type === 'friperie' || type === 'boutique-vetements') return Shirt;
-  if (type === 'boutique-chaussures') return Shoe;
+  if (type === 'boutique-chaussures') return Footprints;
   if (type === 'boutique-electronique') return Smartphone;
   if (type === 'boutique-accessoires') return ShoppingBag;
   if (type === 'boutique-maison') return Home;
