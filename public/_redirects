@@ -1,5 +1,0 @@
-﻿# Ne pas renvoyer index.html pour les chunks JS manquants (évite MIME text/html)
-/assets/*  /404.html  404
-
-# SPA fallback (/.netlify/functions/* est géré avant les redirects par Netlify)
-/*    /index.html   200
