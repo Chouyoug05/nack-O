@@ -1086,83 +1086,72 @@ const PublicOrderingPage = () => {
     backgroundStyle: getBackgroundStyle(),
   };
 
+  // Map sûre des templates — vérifie typeof avant rendu (cause racine de "Je is not a function")
+  const TEMPLATE_MAP: Record<string, React.FC<any>> = {
+    'nack-modern': NackModernTemplate,
+    'nack-shop': NackShopTemplate,
+    'nack-shop-fashion': NackShopTemplate,
+    'nack-shop-premium': NackShopTemplate,
+    'restaurant-classic': RestaurantClassicTemplate,
+    'restaurant-modern': RestaurantModernTemplate,
+    'bar-lounge': BarLoungeTemplate,
+    'cafe-cozy': CafeCozyTemplate,
+    'boutique-minimal': BoutiqueMinimalTemplate,
+    'boutique-grid': BoutiqueGridTemplate,
+    'boutique-luxury': BoutiqueLuxuryTemplate,
+    'service-professional': ServiceTemplate,
+    'service-creative': ServiceTemplate,
+  };
+
   const renderTemplate = () => {
-    try {
-    // Déterminer la catégorie de l'établissement
-    const isRestaurant = isFoodBusiness(establishmentType);
-    const isShop = isBoutique(establishmentType);
-    const isService = isServiceBusiness(establishmentType);
-    
-    // Si un design spécifique est choisi, vérifier qu'il est approprié
-    if (currentDesign.id !== "default") {
-      // Designs pour restauration
-      if (isRestaurant) {
-        if (currentDesign.id === "nack-modern" || 
-            currentDesign.id === "restaurant-classic" || 
-            currentDesign.id === "restaurant-modern" ||
-            currentDesign.id === "bar-lounge" ||
-            currentDesign.id === "cafe-cozy") {
-          switch (currentDesign.id) {
-            case "nack-modern":
-              return <NackModernTemplate {...templateProps} establishmentType={establishmentType} />;
-            case "restaurant-classic":
-              return <RestaurantClassicTemplate {...templateProps} />;
-            case "restaurant-modern":
-              return <RestaurantModernTemplate {...templateProps} />;
-            case "bar-lounge":
-              return <BarLoungeTemplate {...templateProps} />;
-            case "cafe-cozy":
-              return <CafeCozyTemplate {...templateProps} />;
-          }
-        }
+    // Guards : données non encore chargées → skeleton déjà géré, mais éviter crash si establishment null
+    const safeEstablishment = establishment ?? { establishmentName: 'Menu' } as Establishment;
+    const safeProducts = Array.isArray(filteredProducts) ? filteredProducts : [];
+    const safeCart = Array.isArray(cart) ? cart : [];
+    const safeTheme = menuTheme ?? defaultMenuTheme;
+
+    const props = {
+      ...templateProps,
+      establishment: safeEstablishment,
+      filteredProducts: safeProducts as any,
+      cart: safeCart as any,
+      menuTheme: safeTheme,
+      backgroundStyle: safeTheme ? getBackgroundStyle() : {},
+    };
+
+    // 1. Si un designId explicite est stocké, tenter de l'utiliser
+    const requestedId = (currentDesign?.id ?? '') as string;
+    const RequestedComp = requestedId ? TEMPLATE_MAP[requestedId] : null;
+
+    if (requestedId && RequestedComp && typeof RequestedComp === 'function') {
+      // Vérifier cohérence avec le type d'établissement : si incohérent, fallback au défaut
+      const isRestaurant = isFoodBusiness(establishmentType);
+      const isShop = isBoutique(establishmentType);
+      const isService = isServiceBusiness(establishmentType);
+      const isBoutiqueDesign = ['nack-shop','nack-shop-fashion','nack-shop-premium','boutique-minimal','boutique-grid','boutique-luxury'].includes(requestedId);
+      const isRestoDesign = ['nack-modern','restaurant-classic','restaurant-modern','bar-lounge','cafe-cozy'].includes(requestedId);
+      const isServiceDesign = ['service-professional','service-creative'].includes(requestedId);
+      const coherent = (isRestaurant && isRestoDesign) || (isShop && isBoutiqueDesign) || (isService && isServiceDesign) || (!establishmentType);
+      if (coherent) {
+        return <RequestedComp {...props} establishmentType={establishmentType} fullAddress={safeEstablishment.fullAddress} />;
       }
-      
-      // Designs pour boutique
-      if (isShop) {
-        if (currentDesign.id === "nack-shop" || 
-            currentDesign.id === "nack-shop-fashion" || 
-            currentDesign.id === "nack-shop-premium" ||
-            currentDesign.id === "boutique-minimal" ||
-            currentDesign.id === "boutique-grid" ||
-            currentDesign.id === "boutique-luxury") {
-          switch (currentDesign.id) {
-            case "nack-shop":
-            case "nack-shop-fashion":
-            case "nack-shop-premium":
-              return <NackShopTemplate {...templateProps} establishmentType={establishmentType} fullAddress={establishment?.fullAddress} />;
-            case "boutique-minimal":
-              return <BoutiqueMinimalTemplate {...templateProps} />;
-            case "boutique-grid":
-              return <BoutiqueGridTemplate {...templateProps} />;
-            case "boutique-luxury":
-              return <BoutiqueLuxuryTemplate {...templateProps} />;
-          }
-        }
-      }
-      
-      // Designs pour services
-      if (isService) {
-        if (currentDesign.id === "service-professional" || 
-            currentDesign.id === "service-creative") {
-          return <ServiceTemplate {...templateProps} />;
-        }
-      }
+    } else if (requestedId && !RequestedComp) {
+      console.warn(`[PublicOrderingPage] design inconnu "${requestedId}" → fallback`);
     }
-    
-    // Sélection automatique par défaut selon le type d'établissement
-    if (isService) {
-      return <ServiceTemplate {...templateProps} />;
+
+    // 2. Fallback automatique selon le type d'établissement (toujours sûr)
+    if (isServiceBusiness(establishmentType)) {
+      const Comp = ServiceTemplate;
+      if (Comp && typeof Comp === 'function') return <Comp {...props} />;
     }
-    if (isShop) {
-      return <NackShopTemplate {...templateProps} establishmentType={establishmentType} fullAddress={establishment?.fullAddress} />;
+    if (isBoutique(establishmentType)) {
+      const Comp = NackShopTemplate;
+      if (Comp && typeof Comp === 'function') return <Comp {...props} establishmentType={establishmentType} fullAddress={safeEstablishment.fullAddress} />;
     }
-    
-    // Par défaut pour restauration : NACK Modern
-    return <NackModernTemplate {...templateProps} establishmentType={establishmentType} />;
-    } catch(e) {
-      console.error('[PublicOrderingPage] renderTemplate error', e);
-      return <div className="p-8 text-center text-red-600">Erreur affichage menu. Rechargez la page.</div>;
-    }
+    // Défaut ultime sûr
+    const Fallback = NackModernTemplate;
+    if (Fallback && typeof Fallback === 'function') return <Fallback {...props} establishmentType={establishmentType} />;
+    return <div className="p-8 text-center">Menu indisponible</div>;
   };
 
   return (
