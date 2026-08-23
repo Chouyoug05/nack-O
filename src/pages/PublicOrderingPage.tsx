@@ -13,7 +13,7 @@ import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
 import { getMenuDesignById, MenuDesignId, getDefaultDesignForEstablishment } from "@/types/menuDesigns";
-import { isFoodBusiness as isFoodBusinessFn, isServiceBusiness, isBoutique, getEstablishmentLabel } from "@/constants/establishmentTypes";
+import { isFoodBusiness as isFoodBusinessFn, isServiceBusiness, isBoutique } from "@/constants/establishmentTypes";
 import { useToast } from "@/hooks/use-toast";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
 import { sendOrderNotificationViaServer } from "@/lib/securePayment";
