@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Package, Plus, Search, ShoppingBag, X, Minus, Star, Flame, Sparkles, Tag, Clock, MapPin, ChevronRight, Utensils, Wine, Coffee, Pizza, Music, Store, Briefcase, Heart, Shirt, Footprints, Gem, Smartphone, Home, Droplet, Watch, ShoppingBasket, Gift, Glasses, Share2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1238,37 +1238,14 @@ interface NackShopTemplateProps extends TemplateProps {
   fullAddress?: string;
 }
 
-// Hook pour gérer les favoris avec localStorage
-const useFavorites = (establishmentId?: string | null) => {
+// Favoris simple en mémoire (pas de localStorage pour éviter les erreurs SSR/hydratation)
+const useFavorites = () => {
   const [favorites, setFavorites] = useState<string[]>([]);
-  
-  const storageKey = establishmentId ? `nack_favorites_${establishmentId}` : 'nack_favorites';
-  
-  // Charger les favoris au montage
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        setFavorites(JSON.parse(stored));
-      }
-    } catch { /* ignore */ }
-  }, [storageKey]);
-  
   const toggleFavorite = (productId: string) => {
-    setFavorites(prev => {
-      const newFavs = prev.includes(productId) 
-        ? prev.filter(id => id !== productId)
-        : [...prev, productId];
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(newFavs));
-      } catch { /* ignore */ }
-      return newFavs;
-    });
+    setFavorites(prev => prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]);
   };
-  
   const isFavorite = (productId: string) => favorites.includes(productId);
-  
-  return { favorites, toggleFavorite, isFavorite };
+  return { toggleFavorite, isFavorite };
 };
 
 // Icônes pour les catégories boutique
@@ -1361,8 +1338,7 @@ export const NackShopTemplate = (props: NackShopTemplateProps) => {
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const isDark = bg.startsWith('#1') || bg.startsWith('#0') || bg.startsWith('#2');
   
-  // Extraire establishmentId du backgroundStyle ou utiliser une valeur par défaut
-  const { toggleFavorite, isFavorite } = useFavorites(null);
+  const { toggleFavorite, isFavorite } = useFavorites();
   
   const shopLabel = getShopTypeLabel(establishmentType);
 
