@@ -69,6 +69,9 @@ export async function syncPublicProfile(
   db: Firestore,
   profile: Partial<UserProfile> & { uid: string }
 ): Promise<void> {
-  const payload = buildPublicProfile(profile);
+  const raw = buildPublicProfile(profile);
+  const payload = Object.fromEntries(
+    Object.entries(raw).filter(([, v]) => v !== undefined)
+  );
   await setDoc(doc(db, "publicProfiles", profile.uid), payload, { merge: true });
 }
