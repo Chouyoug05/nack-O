@@ -126,6 +126,8 @@ const PublicOrderingPage = () => {
   // Livraison
   const [isDelivery, setIsDelivery] = useState(false);
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryName, setDeliveryName] = useState("");
+  const [deliveryPhone, setDeliveryPhone] = useState("");
 
   // useRef
   const isMountedRef = useRef<boolean>(true);
@@ -596,10 +598,22 @@ const PublicOrderingPage = () => {
       setShowTableDialog(true);
       return;
     }
-    if (isDelivery && !deliveryAddress.trim()) {
-      alert('Veuillez saisir votre adresse de livraison.');
-      setShowTableDialog(true);
-      return;
+    if (isDelivery) {
+      if (!deliveryName.trim()) {
+        alert('Veuillez saisir le nom du destinataire.');
+        setShowTableDialog(true);
+        return;
+      }
+      if (!deliveryPhone.trim()) {
+        alert('Veuillez saisir le numéro de téléphone du destinataire.');
+        setShowTableDialog(true);
+        return;
+      }
+      if (!deliveryAddress.trim()) {
+        alert('Veuillez saisir l\'adresse de livraison.');
+        setShowTableDialog(true);
+        return;
+      }
     }
     setShowPaymentChoiceDialog(true);
   };
@@ -634,9 +648,19 @@ const PublicOrderingPage = () => {
       return;
     }
 
-    if (isDelivery && !deliveryAddress.trim()) {
-      alert('Veuillez saisir votre adresse de livraison.');
-      return;
+    if (isDelivery) {
+      if (!deliveryName.trim()) {
+        alert('Veuillez saisir le nom du destinataire.');
+        return;
+      }
+      if (!deliveryPhone.trim()) {
+        alert('Veuillez saisir le numéro de téléphone du destinataire.');
+        return;
+      }
+      if (!deliveryAddress.trim()) {
+        alert('Veuillez saisir l\'adresse de livraison.');
+        return;
+      }
     }
 
     if (withPayment && !establishment?.paymentsEnabled) {
@@ -682,7 +706,12 @@ const PublicOrderingPage = () => {
             }
           };
 
-          if (isDelivery && deliveryAddress) {
+          if (isDelivery) {
+            orderData.deliveryInfo = {
+              name: deliveryName,
+              phone: deliveryPhone,
+              address: deliveryAddress
+            };
             orderData.deliveryAddress = deliveryAddress;
           }
 
@@ -744,8 +773,13 @@ const PublicOrderingPage = () => {
         }
       };
 
-      // Ajouter deliveryAddress seulement si c'est une livraison (éviter undefined)
-      if (isDelivery && deliveryAddress) {
+      // Ajouter les informations de livraison complètes
+      if (isDelivery) {
+        orderData.deliveryInfo = {
+          name: deliveryName,
+          phone: deliveryPhone,
+          address: deliveryAddress
+        };
         orderData.deliveryAddress = deliveryAddress;
       }
 
@@ -1169,15 +1203,45 @@ const PublicOrderingPage = () => {
                   </Label>
                 </div>
                 {isDelivery && (
-                  <div className="mt-2">
-                    <Label htmlFor="deliveryAddress">Adresse de livraison *</Label>
-                    <Input
-                      id="deliveryAddress"
-                      placeholder="Ex: Quartier Nzeng-Ayong, Rue 123..."
-                      value={deliveryAddress}
-                      onChange={(e) => setDeliveryAddress(e.target.value)}
-                      className="mt-1"
-                    />
+                  <div className="mt-2 space-y-3">
+                    <div>
+                      <Label htmlFor="deliveryName">Nom du destinataire *</Label>
+                      <Input
+                        id="deliveryName"
+                        placeholder="Ex: Jean Koumba"
+                        value={deliveryName}
+                        onChange={(e) => setDeliveryName(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="deliveryPhone">Téléphone *</Label>
+                      <Input
+                        id="deliveryPhone"
+                        type="tel"
+                        placeholder="Ex: 06 12 34 56 78"
+                        value={deliveryPhone}
+                        onChange={(e) => setDeliveryPhone(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="deliveryAddress">Adresse de livraison *</Label>
+                      <Input
+                        id="deliveryAddress"
+                        placeholder="Ex: Quartier Nzeng-Ayong, Rue 123..."
+                        value={deliveryAddress}
+                        onChange={(e) => setDeliveryAddress(e.target.value)}
+                        className="mt-1"
+                      />
+                    </div>
+                    {establishment.deliveryPrice && (
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-900">
+                          <strong>Frais de livraison :</strong> {establishment.deliveryPrice.toLocaleString('fr-FR')} FCFA
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
