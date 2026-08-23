@@ -12,8 +12,8 @@ import QRCodeLib from "qrcode";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { printThermalTicket } from "@/utils/ticketThermal";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
-import { getMenuDesignById, MenuDesignId } from "@/types/menuDesigns";
-import { isFoodBusiness as isFoodBusinessFn, isServiceBusiness, isBoutique } from "@/constants/establishmentTypes";
+import { getMenuDesignById, MenuDesignId, getDefaultDesignForEstablishment } from "@/types/menuDesigns";
+import { isFoodBusiness as isFoodBusinessFn, isServiceBusiness, isBoutique, getEstablishmentLabel } from "@/constants/establishmentTypes";
 import { useToast } from "@/hooks/use-toast";
 import { createMenuDigitalPaymentLink } from "@/lib/payments/menuDigitalPayment";
 import { sendOrderNotificationViaServer } from "@/lib/securePayment";
@@ -161,7 +161,7 @@ const PublicOrderingPage = () => {
 
     const loadTheme = async () => {
       try {
-        // Charger d'abord depuis publicProfiles pour avoir le designId
+        // Charger d'abord depuis publicProfiles pour avoir le designId et le type
         const publicDoc = await getDoc(doc(db, 'publicProfiles', establishmentId));
         const publicData = publicDoc.exists() ? publicDoc.data() : {};
         
@@ -174,6 +174,9 @@ const PublicOrderingPage = () => {
             /* rules establishments/menuDigital peuvent refuser le public */
           }
         }
+        
+        const establishmentType = publicData.establishmentType || publicData.type;
+        
         if (themeDoc.exists()) {
           const themeData = themeDoc.data();
           // Utiliser le designId de publicProfiles si disponible, sinon celui du thème
@@ -188,6 +191,14 @@ const PublicOrderingPage = () => {
           setMenuTheme({ 
             ...defaultMenuTheme, 
             designId: publicData.menuDesignId 
+          } as MenuThemeConfig);
+        } else {
+          // Aucun design défini, utiliser le design par défaut selon le type d'établissement
+          const defaultDesign = getDefaultDesignForEstablishment(establishmentType);
+          setMenuTheme({ 
+            ...defaultDesign.theme,
+            designId: defaultDesign.id,
+            updatedAt: Date.now()
           } as MenuThemeConfig);
         }
       } catch (error) {
@@ -1023,39 +1034,72 @@ const PublicOrderingPage = () => {
   };
 
   const renderTemplate = () => {
-    // Si un design spécifique est choisi, l'utiliser
+    // Déterminer la catégorie de l'établissement
+    const isRestaurant = isFoodBusiness(establishmentType);
+    const isShop = isBoutique(establishmentType);
+    const isService = isServiceBusiness(establishmentType);
+    
+    // Si un design spécifique est choisi, vérifier qu'il est approprié
     if (currentDesign.id !== "default") {
-      switch (currentDesign.id) {
-        case "nack-modern":
-          return <NackModernTemplate {...templateProps} establishmentType={establishmentType} />;
-        case "nack-shop":
-        case "nack-shop-fashion":
-        case "nack-shop-premium":
-          return <NackShopTemplate {...templateProps} establishmentType={establishmentType} fullAddress={establishment?.fullAddress} />;
-        case "restaurant-classic":
-          return <RestaurantClassicTemplate {...templateProps} />;
-        case "restaurant-modern":
-          return <RestaurantModernTemplate {...templateProps} />;
-        case "bar-lounge":
-          return <BarLoungeTemplate {...templateProps} />;
-        case "cafe-cozy":
-          return <CafeCozyTemplate {...templateProps} />;
-        case "boutique-minimal":
-          return <BoutiqueMinimalTemplate {...templateProps} />;
-        case "boutique-grid":
-          return <BoutiqueGridTemplate {...templateProps} />;
-        case "boutique-luxury":
-          return <BoutiqueLuxuryTemplate {...templateProps} />;
-        default:
-          break;
+      // Designs pour restauration
+      if (isRestaurant) {
+        if (currentDesign.id === "nack-modern" || 
+            currentDesign.id === "restaurant-classic" || 
+            currentDesign.id === "restaurant-modern" ||
+            currentDesign.id === "bar-lounge" ||
+            currentDesign.id === "cafe-cozy") {
+          switch (currentDesign.id) {
+            case "nack-modern":
+              return <NackModernTemplate {...templateProps} establishmentType={establishmentType} />;
+            case "restaurant-classic":
+              return <RestaurantClassicTemplate {...templateProps} />;
+            case "restaurant-modern":
+              return <RestaurantModernTemplate {...templateProps} />;
+            case "bar-lounge":
+              return <BarLoungeTemplate {...templateProps} />;
+            case "cafe-cozy":
+              return <CafeCozyTemplate {...templateProps} />;
+          }
+        }
+      }
+      
+      // Designs pour boutique
+      if (isShop) {
+        if (currentDesign.id === "nack-shop" || 
+            currentDesign.id === "nack-shop-fashion" || 
+            currentDesign.id === "nack-shop-premium" ||
+            currentDesign.id === "boutique-minimal" ||
+            currentDesign.id === "boutique-grid" ||
+            currentDesign.id === "boutique-luxury") {
+          switch (currentDesign.id) {
+            case "nack-shop":
+            case "nack-shop-fashion":
+            case "nack-shop-premium":
+              return <NackShopTemplate {...templateProps} establishmentType={establishmentType} fullAddress={establishment?.fullAddress} />;
+            case "boutique-minimal":
+              return <BoutiqueMinimalTemplate {...templateProps} />;
+            case "boutique-grid":
+              return <BoutiqueGridTemplate {...templateProps} />;
+            case "boutique-luxury":
+              return <BoutiqueLuxuryTemplate {...templateProps} />;
+          }
+        }
+      }
+      
+      // Designs pour services
+      if (isService) {
+        if (currentDesign.id === "service-professional" || 
+            currentDesign.id === "service-creative") {
+          return <ServiceTemplate {...templateProps} />;
+        }
       }
     }
     
-    // Sélection automatique selon le type d'établissement
-    if (isServiceBusiness(establishmentType)) {
+    // Sélection automatique par défaut selon le type d'établissement
+    if (isService) {
       return <ServiceTemplate {...templateProps} />;
     }
-    if (isBoutique(establishmentType)) {
+    if (isShop) {
       return <NackShopTemplate {...templateProps} establishmentType={establishmentType} fullAddress={establishment?.fullAddress} />;
     }
     

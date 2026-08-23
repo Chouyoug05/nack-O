@@ -39,7 +39,7 @@ import { notificationsColRef, disbursementRequestsColRef } from "@/lib/collectio
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { generateTicketPDF } from "@/utils/ticketPDF";
 import { MenuThemeConfig, defaultMenuTheme } from "@/types/menuTheme";
-import { MENU_DESIGNS } from "@/types/menuDesigns";
+import { MENU_DESIGNS, getDesignsForEstablishment, getDefaultDesignForEstablishment } from "@/types/menuDesigns";
 
 interface Product {
   id: string;
@@ -314,13 +314,21 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
             ...defaultMenuTheme, 
             designId: profile.menuDesignId 
           } as MenuThemeConfig);
+        } else {
+          // Aucun design défini, utiliser le design par défaut selon le type d'établissement
+          const defaultDesign = getDefaultDesignForEstablishment(profile?.establishmentType);
+          setMenuTheme({ 
+            ...defaultDesign.theme,
+            designId: defaultDesign.id,
+            updatedAt: Date.now()
+          } as MenuThemeConfig);
         }
       } catch (error) {
         console.error('Erreur chargement thème:', error);
       }
     };
     loadTheme();
-  }, [user, profile?.menuDesignId]);
+  }, [user, profile?.menuDesignId, profile?.establishmentType]);
 
   // Vérifier que l'utilisateur est connecté
   if (!user) {
@@ -1338,7 +1346,7 @@ const BarConnecteePage: React.FC<BarConnecteePageProps> = ({ activeTab: external
                 <h3 className="font-semibold text-lg">Modèles de design</h3>
                 <p className="text-sm text-muted-foreground">Choisissez un modèle de design pour votre menu digital</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {MENU_DESIGNS.map((design) => (
+                  {getDesignsForEstablishment(profile?.establishmentType).map((design) => (
                     <button
                       key={design.id}
                       type="button"

@@ -324,3 +324,67 @@ export const getMenuDesignById = (id: MenuDesignId | string | undefined): MenuDe
 export const getDesignsByCategory = (category: 'restaurant' | 'bar' | 'cafe' | 'boutique' | 'service'): MenuDesign[] => {
   return MENU_DESIGNS.filter(d => d.category === category);
 };
+
+/**
+ * Retourne les designs disponibles selon le type d'établissement
+ */
+export const getDesignsForEstablishment = (establishmentType: string | undefined | null): MenuDesign[] => {
+  if (!establishmentType) return MENU_DESIGNS;
+  
+  const type = establishmentType.toLowerCase();
+  
+  // Restauration & Bar
+  if (type === 'restaurant' || type === 'bar' || type === 'snack' || type === 'nightclub' || 
+      type === 'restaurant-bar' || type === 'hotel-bar' || type === 'cafe') {
+    return MENU_DESIGNS.filter(d => 
+      d.category === 'restaurant' || d.category === 'bar' || d.category === 'cafe'
+    );
+  }
+  
+  // Boutique & Commerce
+  if (type === 'boutique' || type === 'friperie' || type === 'boutique-vetements' || 
+      type === 'boutique-chaussures' || type === 'boutique-electronique' || 
+      type === 'boutique-accessoires' || type === 'boutique-maison' || 
+      type === 'commerce' || type === 'commerce-alimentation' || 
+      type === 'commerce-cosmetique' || type === 'commerce-marche') {
+    return MENU_DESIGNS.filter(d => d.category === 'boutique');
+  }
+  
+  // Services
+  if (type === 'services' || type === 'other') {
+    return MENU_DESIGNS.filter(d => d.category === 'service');
+  }
+  
+  return MENU_DESIGNS;
+};
+
+/**
+ * Retourne le design par défaut approprié selon le type d'établissement
+ */
+export const getDefaultDesignForEstablishment = (establishmentType: string | undefined | null): MenuDesign => {
+  if (!establishmentType) return MENU_DESIGNS[0]; // nack-modern
+  
+  const type = establishmentType.toLowerCase();
+  
+  // Restauration & Bar -> NACK Modern
+  if (type === 'restaurant' || type === 'bar' || type === 'snack' || type === 'nightclub' || 
+      type === 'restaurant-bar' || type === 'hotel-bar' || type === 'cafe') {
+    return MENU_DESIGNS.find(d => d.id === 'nack-modern') || MENU_DESIGNS[0];
+  }
+  
+  // Boutique & Commerce -> NACK Shop
+  if (type === 'boutique' || type === 'friperie' || type === 'boutique-vetements' || 
+      type === 'boutique-chaussures' || type === 'boutique-electronique' || 
+      type === 'boutique-accessoires' || type === 'boutique-maison' || 
+      type === 'commerce' || type === 'commerce-alimentation' || 
+      type === 'commerce-cosmetique' || type === 'commerce-marche') {
+    return MENU_DESIGNS.find(d => d.id === 'nack-shop') || MENU_DESIGNS[0];
+  }
+  
+  // Services -> Service Professional
+  if (type === 'services' || type === 'other') {
+    return MENU_DESIGNS.find(d => d.id === 'service-professional') || MENU_DESIGNS[0];
+  }
+  
+  return MENU_DESIGNS[0];
+};
