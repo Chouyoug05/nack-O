@@ -433,6 +433,9 @@ const OrderManagement = ({
   const handleCloseOrder = async (order: Order) => {
     if (!uidToUse) return;
     try {
+      let stockUpdated = false;
+      let missingProducts: string[] = [];
+
       // Décrémenter le stock pour chaque article de la commande
       if (order.items && order.items.length > 0) {
         const productsSnapshot = await getDocs(productsColRef(db, uidToUse));
@@ -447,23 +450,22 @@ const OrderManagement = ({
           const productId = item.id || productsMap.get(item.name);
           if (productId) {
             stockUpdates.push({ id: productId, qty: item.quantity });
+          } else {
+            missingProducts.push(item.name);
           }
         }
 
         if (stockUpdates.length > 0) {
-          try {
-            await runTransaction(db, async (transaction) => {
-              for (const update of stockUpdates) {
-                const productRef = fsDoc(productsColRef(db, uidToUse), update.id);
-                transaction.update(productRef, {
-                  quantity: increment(-update.qty),
-                  updatedAt: Date.now(),
-                });
-              }
-            });
-          } catch (stockErr) {
-            console.error('Erreur décrémentation stock:', stockErr);
-          }
+          await runTransaction(db, async (transaction) => {
+            for (const update of stockUpdates) {
+              const productRef = fsDoc(productsColRef(db, uidToUse), update.id);
+              transaction.update(productRef, {
+                quantity: increment(-update.qty),
+                updatedAt: Date.now(),
+              });
+            }
+          });
+          stockUpdated = true;
         }
       }
 
@@ -474,8 +476,16 @@ const OrderManagement = ({
       });
       setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'closed' } : o));
       updateOrderStatus(order.id, 'closed');
-      toast({ title: "Commande clôturée", description: `Commande #${order.orderNumber} clôturée — stock mis à jour` });
+
+      if (stockUpdated && missingProducts.length === 0) {
+        toast({ title: "Commande clôturée", description: `Commande #${order.orderNumber} clôturée — stock mis à jour` });
+      } else if (stockUpdated && missingProducts.length > 0) {
+        toast({ title: "Commande clôturée (partiel)", description: `Stock mis à jour mais ${missingProducts.length} produit(s) introuvable(s) : ${missingProducts.join(', ')}`, variant: "default" });
+      } else {
+        toast({ title: "Commande clôturée", description: `Commande #${order.orderNumber} clôturée — stock non modifié (aucun produit trouvé)` });
+      }
     } catch (e) {
+      console.error('Erreur clôture commande:', e);
       toast({ title: 'Erreur', description: 'Impossible de clôturer la commande.', variant: 'destructive' });
     }
   };

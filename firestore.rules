@@ -206,7 +206,7 @@ service cloud.firestore {
 
       allow read: if true;
 
-      allow write: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) || isAdmin() || agentFor(userId);
 
     }
 
