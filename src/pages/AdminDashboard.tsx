@@ -85,7 +85,6 @@ const AdminDashboard = () => {
   const [globalStats, setGlobalStats] = useState({
     totalProducts: 0,
     totalOrders: 0,
-    totalBarOrders: 0,
     totalEvents: 0,
     totalTeamMembers: 0,
     totalRatings: 0,
@@ -155,7 +154,6 @@ const AdminDashboard = () => {
     globalStats: {
       totalProducts: 0,
       totalOrders: 0,
-      totalBarOrders: 0,
       totalEvents: 0,
       totalTeamMembers: 0,
       totalRatings: 0,
@@ -190,13 +188,15 @@ const AdminDashboard = () => {
     stock: true,
     reports: true,
     team: false,
-    barConnectee: false,
     events: false,
   });
   const [isLoadingPlans, setIsLoadingPlans] = useState(false);
   const [planPrice, setPlanPrice] = useState<number>(5000);
   const [planEventsLimit, setPlanEventsLimit] = useState<number>(5);
   const [planEventsExtraPrice, setPlanEventsExtraPrice] = useState<number>(1500);
+  const [managePaymentsUser, setManagePaymentsUser] = useState<UserProfile | null>(null);
+  const [managePaymentsNis, setManagePaymentsNis] = useState("");
+  const [managePaymentsAction, setManagePaymentsAction] = useState<"activate" | "deactivate">("activate");
 
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
@@ -331,7 +331,6 @@ const AdminDashboard = () => {
     try {
       let totalProducts = 0;
       let totalOrders = 0;
-      let totalBarOrders = 0;
       let totalEvents = 0;
       let totalTeamMembers = 0;
       let totalRatings = 0;
@@ -356,16 +355,11 @@ const AdminDashboard = () => {
             }
           });
 
-          // Commandes normales (orders hors source 'qr')
+          // Commandes normales
           const ordersRef = ordersColRef(db, profile.uid);
           const ordersSnap = await getDocs(ordersRef);
           const allOrdersDocs = ordersSnap.docs;
-          totalOrders += allOrdersDocs.filter(d => (d.data() as { source?: string }).source !== 'qr').length;
-
-          // Commandes Bar Connectée / Menu Digital (orders source 'qr' + legacy barOrders)
-          const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
-          const barOrdersSnap = await getDocs(barOrdersRef);
-          totalBarOrders += allOrdersDocs.filter(d => (d.data() as { source?: string }).source === 'qr').length + barOrdersSnap.size;
+          totalOrders += allOrdersDocs.length;
 
           // Événements
           const eventsRef = eventsColRef(db, profile.uid);
@@ -384,7 +378,6 @@ const AdminDashboard = () => {
       const stats = {
         totalProducts,
         totalOrders,
-        totalBarOrders,
         totalEvents,
         totalTeamMembers,
         totalRatings,
@@ -490,25 +483,6 @@ const AdminDashboard = () => {
             });
           });
 
-          // Commandes Bar Connectée / Menu Digital (orders source 'qr' + legacy barOrders)
-          const barOrdersRef = collection(db, `profiles/${profile.uid}/barOrders`);
-          const barOrdersSnap = await getDocs(barOrdersRef);
-
-          barOrdersSnap.forEach(doc => {
-            const data = doc.data();
-            orders.push({
-              id: doc.id,
-              orderNumber: data.orderNumber || 0,
-              tableNumber: data.tableNumber || data.tableName || data.tableZone || '',
-              total: Number(data.total || 0),
-              status: data.status || 'pending',
-              createdAt: data.createdAt || Date.now(),
-              userId: profile.uid,
-              userName: profile.ownerName,
-              establishmentName: profile.establishmentName,
-              source: 'qr',
-            });
-          });
         } catch (error) {
           console.error(`Erreur chargement commandes pour ${profile.uid}:`, error);
         }
@@ -900,6 +874,41 @@ const AdminDashboard = () => {
     } catch (error) {
       console.error('Erreur rejet Disbursement:', error);
       toast({ title: "Erreur", description: "Impossible de rejeter la demande", variant: "destructive" });
+    }
+  };
+
+  const openManagePaymentsDialog = (user: UserProfile) => {
+    setManagePaymentsUser(user);
+    setManagePaymentsNis(user.disbursementId || "");
+    setManagePaymentsAction(user.disbursementStatus === 'approved' ? "deactivate" : "activate");
+  };
+
+  const handleManagePayments = async () => {
+    if (!managePaymentsUser) return;
+    try {
+      if (managePaymentsAction === "activate") {
+        if (!managePaymentsNis.trim()) {
+          toast({ title: "Erreur", description: "Le NIS est requis pour activer les paiements", variant: "destructive" });
+          return;
+        }
+        await updateDoc(doc(db, 'profiles', managePaymentsUser.uid), {
+          disbursementId: managePaymentsNis.trim(),
+          disbursementStatus: 'approved',
+          updatedAt: Date.now(),
+        });
+        toast({ title: "Paiements activés", description: `Les paiements en ligne ont été activés pour ${managePaymentsUser.establishmentName}` });
+      } else {
+        await updateDoc(doc(db, 'profiles', managePaymentsUser.uid), {
+          disbursementStatus: 'rejected',
+          updatedAt: Date.now(),
+        });
+        toast({ title: "Paiements désactivés", description: `Les paiements en ligne ont été désactivés pour ${managePaymentsUser.establishmentName}` });
+      }
+      setManagePaymentsUser(null);
+      // allProfiles se met à jour automatiquement via onSnapshot
+    } catch (error) {
+      console.error('Erreur gestion paiements:', error);
+      toast({ title: "Erreur", description: "Impossible de modifier les paiements", variant: "destructive" });
     }
   };
 
@@ -1713,15 +1722,8 @@ const AdminDashboard = () => {
   // Fonctions de gestion des commandes
   const handleUpdateOrderStatus = async (orderId: string, userId: string, newStatus: string) => {
     try {
-      // Essayer d'abord dans orders, puis dans barOrders
       const orderRef = doc(db, `profiles/${userId}/orders`, orderId);
-      const barOrderRef = doc(db, `profiles/${userId}/barOrders`, orderId);
-
-      try {
-        await updateDoc(orderRef, { status: newStatus, updatedAt: Date.now() });
-      } catch {
-        await updateDoc(barOrderRef, { status: newStatus, updatedAt: Date.now() });
-      }
+      await updateDoc(orderRef, { status: newStatus, updatedAt: Date.now() });
 
       toast({ title: "Commande modifiée", description: `Le statut a été changé en "${newStatus}"` });
       setEditingOrder(null);
@@ -1738,13 +1740,7 @@ const AdminDashboard = () => {
     setDeletingOrderId(orderId);
     try {
       const orderRef = doc(db, `profiles/${userId}/orders`, orderId);
-      const barOrderRef = doc(db, `profiles/${userId}/barOrders`, orderId);
-
-      try {
-        await deleteDoc(orderRef);
-      } catch {
-        await deleteDoc(barOrderRef);
-      }
+      await deleteDoc(orderRef);
 
       toast({ title: "Commande supprimée", description: "La commande a été supprimée avec succès" });
       loadAllOrders();
@@ -1894,10 +1890,10 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              {isLoadingGlobalStats ? "..." : (globalStats.totalOrders + globalStats.totalBarOrders).toLocaleString()}
+              {isLoadingGlobalStats ? "..." : globalStats.totalOrders.toLocaleString()}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              {globalStats.totalOrders} normales • {globalStats.totalBarOrders} bar connectée
+              {globalStats.totalOrders} commandes
             </div>
           </CardContent>
         </Card>
@@ -2031,7 +2027,7 @@ const AdminDashboard = () => {
         >
           <ShoppingCart size={48} className="text-green-600 transition-transform group-hover:scale-110" />
           <h2 className="text-lg font-semibold text-gray-900">Commandes</h2>
-          <p className="text-sm text-muted-foreground">{(globalStats.totalOrders + globalStats.totalBarOrders).toLocaleString()} total</p>
+          <p className="text-sm text-muted-foreground">{globalStats.totalOrders.toLocaleString()} total</p>
         </button>
         <button
           onClick={() => navigate('/admin?view=events')}
@@ -2269,6 +2265,7 @@ const AdminDashboard = () => {
                   <TableHead>Plan</TableHead>
                   <TableHead>Fin d'abonnement</TableHead>
                   <TableHead>Tickets</TableHead>
+                  <TableHead>Paiements</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -2325,6 +2322,21 @@ const AdminDashboard = () => {
                           </Badge>
                         )}
                       </TableCell>
+                      <TableCell>
+                        {p.disbursementStatus === 'approved' ? (
+                          <Badge className="bg-green-100 text-green-700" variant="secondary">
+                            ✓ Activé
+                          </Badge>
+                        ) : p.disbursementStatus === 'pending' ? (
+                          <Badge className="bg-amber-100 text-amber-700" variant="secondary">
+                            ⏳ En attente
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-gray-100 text-gray-700" variant="secondary">
+                            ✗ Non activé
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end flex-wrap">
                           {status === 'active' && p.subscriptionType && (
@@ -2364,6 +2376,14 @@ const AdminDashboard = () => {
                             title="Voir les détails du client"
                           >
                             <Eye size={14} className="mr-2" /> Voir
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openManagePaymentsDialog(p)}
+                            title="Gérer les paiements en ligne"
+                          >
+                            <CreditCard size={14} className="mr-2" /> Paiements
                           </Button>
                           <Button
                             size="sm"
@@ -3613,7 +3633,7 @@ const AdminDashboard = () => {
                       setPlanFeatures({ ...planFeatures, [feature]: checked as boolean })
                     }
                   />
-                  <Label className="capitalize">{feature === 'barConnectee' ? 'Bar Connectée' : feature}</Label>
+                  <Label className="capitalize">{feature}</Label>
                 </div>
               ))}
             </div>
@@ -4044,6 +4064,102 @@ const AdminDashboard = () => {
               disabled={!editingDisbursement?.disbursementId.trim()}
             >
               Approuver et configurer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de gestion des paiements */}
+      <Dialog open={!!managePaymentsUser} onOpenChange={(open) => !open && setManagePaymentsUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Gérer les paiements en ligne</DialogTitle>
+            <DialogDescription>
+              Activer ou désactiver les paiements mobiles (Airtel Money, Moov Money) pour cet établissement.
+            </DialogDescription>
+          </DialogHeader>
+          {managePaymentsUser && (
+            <div className="space-y-4 py-4">
+              <div className="bg-muted p-3 rounded-lg">
+                <p className="text-sm font-medium mb-1">Établissement</p>
+                <p className="text-sm">{managePaymentsUser.establishmentName}</p>
+                <p className="text-xs text-muted-foreground mt-1">{managePaymentsUser.email}</p>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="space-y-0.5">
+                    <p className="font-medium text-sm">Statut actuel</p>
+                    <p className="text-xs text-muted-foreground">
+                      {managePaymentsUser.disbursementStatus === 'approved' ? "Paiements activés" :
+                       managePaymentsUser.disbursementStatus === 'pending' ? "En attente d'approbation" :
+                       "Paiements désactivés"}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className={
+                    managePaymentsUser.disbursementStatus === 'approved' ? "bg-green-50 text-green-700 border-green-200" :
+                    managePaymentsUser.disbursementStatus === 'pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                    "bg-gray-50 text-gray-600"
+                  }>
+                    {managePaymentsUser.disbursementStatus === 'approved' ? "✓ Activé" :
+                     managePaymentsUser.disbursementStatus === 'pending' ? "⏳ En attente" :
+                     "✗ Désactivé"}
+                  </Badge>
+                </div>
+
+                {managePaymentsUser.disbursementId && (
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">NIS actuel</Label>
+                    <div className="flex items-center gap-2">
+                      <Input value={managePaymentsUser.disbursementId} readOnly className="flex-1 font-mono text-sm bg-gray-50" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 border-t pt-4">
+                <div className="flex gap-2">
+                  <Button
+                    variant={managePaymentsAction === "activate" ? "default" : "outline"}
+                    onClick={() => setManagePaymentsAction("activate")}
+                    className="flex-1"
+                  >
+                    <CheckCircle size={16} className="mr-2" />
+                    Activer
+                  </Button>
+                  <Button
+                    variant={managePaymentsAction === "deactivate" ? "destructive" : "outline"}
+                    onClick={() => setManagePaymentsAction("deactivate")}
+                    className="flex-1"
+                  >
+                    <X size={16} className="mr-2" />
+                    Désactiver
+                  </Button>
+                </div>
+
+                {managePaymentsAction === "activate" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="manage-payments-nis">NIS Distributeur</Label>
+                    <Input
+                      id="manage-payments-nis"
+                      placeholder="Entrez le NIS SingPay"
+                      value={managePaymentsNis}
+                      onChange={(e) => setManagePaymentsNis(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Le NIS permet de recevoir les paiements sur le compte de l'établissement.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManagePaymentsUser(null)}>
+              Annuler
+            </Button>
+            <Button onClick={handleManagePayments}>
+              {managePaymentsAction === "activate" ? "Activer les paiements" : "Désactiver les paiements"}
             </Button>
           </DialogFooter>
         </DialogContent>

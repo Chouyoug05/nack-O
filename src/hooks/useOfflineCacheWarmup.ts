@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { getDocs, query, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { productsColRef, barOrdersColRef, ordersColRef } from "@/lib/collections";
+import { productsColRef, ordersColRef } from "@/lib/collections";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { flushPendingOrders } from "@/lib/localSyncQueue";
@@ -26,7 +26,6 @@ export function useOfflineCacheWarmup() {
     const run = () => {
       Promise.all([
         getDocs(query(productsColRef(db, uid), limit(PRELOAD_LIMIT))),
-        getDocs(query(barOrdersColRef(db, uid), limit(PRELOAD_LIMIT))),
         getDocs(query(ordersColRef(db, uid), limit(PRELOAD_LIMIT))),
       ]).catch(() => {
         warmedRef.current = false;

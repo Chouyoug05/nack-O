@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { orderCancellationsColRef, ordersColRef, barOrdersColRef, salesColRef } from "@/lib/collections";
+import { orderCancellationsColRef, ordersColRef, salesColRef } from "@/lib/collections";
 import { addDoc, doc, getDoc, query, where, getDocs, orderBy, updateDoc, Timestamp } from "firebase/firestore";
 import type { OrderCancellationDoc } from "@/types/orderCancellation";
 import type { OrderStatus } from "@/types/order";
@@ -141,7 +141,6 @@ export async function cancelOrderWithLogging(
   await addDoc(orderCancellationsColRef(db, ownerUid), cancellationDoc);
 
   // Mettre à jour le statut de la commande
-  // Essayer d'abord dans orders, puis dans barOrders
   try {
     const orderRef = doc(ordersColRef(db, ownerUid), orderId);
     const orderSnap = await getDoc(orderRef);
@@ -155,21 +154,6 @@ export async function cancelOrderWithLogging(
     }
   } catch (error) {
     // Ignorer si la commande n'est pas dans orders
-  }
-
-  try {
-    const barOrderRef = doc(barOrdersColRef(db, ownerUid), orderId);
-    const barOrderSnap = await getDoc(barOrderRef);
-    if (barOrderSnap.exists()) {
-      await updateDoc(barOrderRef, { 
-        status: 'cancelled',
-        cancelledAt: Date.now(),
-        cancellationReason: reason
-      });
-      return;
-    }
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour de la commande bar:', error);
   }
 
   throw new Error("Commande introuvable pour annulation");

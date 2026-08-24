@@ -30,7 +30,7 @@
 
   var FEATURE_MAP = {
     sales: "sales", stock: "stock", reports: "reports", team: "team",
-    menu: "menuDigital", events: "events", customers: "products"
+    events: "events", customers: "products"
   };
 
   function checkFeatureGate(view) {
@@ -99,8 +99,14 @@
       interfaces.agentEvent.render(root, { token: parts[1] });
       return true;
     }
-    if (name === "commande" && parts[1] && pub.ordering) {
-      pub.ordering.render(root, { uid: parts[1] });
+    if ((name === "menu" || name === "commande") && parts[1] && pub.ordering) {
+      var tableParam = (route.query.match(/(?:^|&)table=([^&]*)/) || [])[1];
+      var themeParam = (route.query.match(/(?:^|&)theme=([^&]*)/) || [])[1];
+      pub.ordering.render(root, {
+        uid: parts[1],
+        table: tableParam ? decodeURIComponent(tableParam) : null,
+        theme: themeParam ? decodeURIComponent(themeParam) : null
+      });
       return true;
     }
     if (name === "event" && parts[1] && pub.eventPublic) {
@@ -391,9 +397,6 @@
       case "stock-add-save":
         if (views.stock && views.stock.addSave) views.stock.addSave();
         break;
-      case "stock-menu-toggle":
-        if (views.stock && views.stock.toggleMenuDigital) views.stock.toggleMenuDigital(arg);
-        break;
       case "stock-entry-save":
         if (views.stock && views.stock.saveEntry) views.stock.saveEntry();
         break;
@@ -423,27 +426,6 @@
         break;
       case "reports-cal-next":
         if (views.reports && views.reports.calNext) views.reports.calNext();
-        break;
-      case "menu-tab":
-        if (views.menu && views.menu.setTab) views.menu.setTab(arg);
-        break;
-      case "menu-add-table":
-        if (views.menu && views.menu.addTable) views.menu.addTable();
-        break;
-      case "menu-del-table":
-        if (views.menu && views.menu.delTable) views.menu.delTable(arg);
-        break;
-      case "menu-order-done":
-        if (views.menu && views.menu.orderDone) views.menu.orderDone(arg);
-        break;
-      case "menu-order-cancel":
-        if (views.menu && views.menu.orderCancel) views.menu.orderCancel(arg);
-        break;
-      case "menu-scan-submit":
-        if (views.menu && views.menu.scanSubmit) views.menu.scanSubmit();
-        break;
-      case "menu-save-theme":
-        if (views.menu && views.menu.saveTheme) views.menu.saveTheme();
         break;
       case "event-edit":
         if (views.events && views.events.openEdit) views.events.openEdit(arg);

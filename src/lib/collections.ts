@@ -57,9 +57,6 @@ export const estLoyaltyConfigDocRef = (db: Firestore, eid: string) =>
 export const estOrderCancellationsColRef = (db: Firestore, eid: string): CollectionReference =>
   collection(db, "establishments", eid, "orderCancellations") as CollectionReference;
 
-export const estBarOrdersColRef = (db: Firestore, eid: string): CollectionReference =>
-  collection(db, "establishments", eid, "barOrders") as CollectionReference;
-
 // --- Legacy helpers (profil utilisateur comme racine) ---
 export const productsColRef = (db: Firestore, uid: string): CollectionReference =>
   collection(db, "profiles", uid, "products") as CollectionReference;
@@ -110,9 +107,6 @@ export const subscriptionPlanDocRef = (db: Firestore, planKey: string) =>
 
 export const orderCancellationsColRef = (db: Firestore, uid: string): CollectionReference =>
   collection(db, "profiles", uid, "orderCancellations") as CollectionReference;
-
-export const barOrdersColRef = (db: Firestore, uid: string): CollectionReference =>
-  collection(db, "profiles", uid, "barOrders") as CollectionReference;
 
 export const disbursementRequestsColRef = (db: Firestore): CollectionReference =>
   collection(db, "disbursementRequests") as CollectionReference;

@@ -28,6 +28,8 @@ export interface Order {
   id: string;
   orderNumber: number | string;
   tableNumber: string;
+  /** ID structuré de la table (menu digital) — optionnel, rétrocompatible. */
+  tableId?: string;
   items: CartItem[];
   total: number;
   status: OrderStatus;

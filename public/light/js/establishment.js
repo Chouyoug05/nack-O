@@ -62,7 +62,6 @@
         products: "Articles",
         stock: "Stock articles",
         sales: "Ventes",
-        menu: "Boutique en ligne",
         team: "Équipe",
         welcome: "Bonjour"
       };
@@ -73,7 +72,6 @@
       products: "Produits",
       stock: "Stock",
       sales: "Vente",
-      menu: "Menu Digital",
       team: "Équipe",
       welcome: "Bonjour"
     };

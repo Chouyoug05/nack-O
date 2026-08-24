@@ -1,4 +1,5 @@
 import type { Handler } from "@netlify/functions";
+import { admin } from "./_firebaseAdmin";
 
 const SINGPAY_ENDPOINT = "https://gateway.singpay.ga/v1/ext";
 
@@ -23,6 +24,31 @@ const CORS_HEADERS = {
 
 function json(statusCode: number, body: Record<string, unknown>) {
   return { statusCode, headers: CORS_HEADERS, body: JSON.stringify(body) };
+}
+
+interface EstablishmentPayInfo {
+  disbursementId: string;
+  establishmentName: string;
+}
+
+/**
+ * Résout le NIS distributeur de l'établissement CÔTÉ SERVEUR.
+ * Le client n'a JAMAIS le droit de choisir le bénéficiaire : on ignore
+ * tout `disbursement`/`portefeuille` envoyé par le front.
+ */
+async function resolveEstablishmentPayInfo(establishmentId: string): Promise<EstablishmentPayInfo | null> {
+  if (!establishmentId) return null;
+  try {
+    const snap = await admin.firestore().doc(`profiles/${establishmentId}`).get();
+    if (!snap.exists) return null;
+    const p = snap.data() || {};
+    const approved = p.disbursementStatus === "approved";
+    const nis = String(p.disbursementId || "").trim();
+    if (!approved || !nis) return null;
+    return { disbursementId: nis, establishmentName: String(p.establishmentName || "") };
+  } catch {
+    return null;
+  }
 }
 
 export const handler: Handler = async (event) => {
@@ -59,6 +85,16 @@ export const handler: Handler = async (event) => {
       return json(400, { error: "Montant invalide", amount: input.amount });
     }
 
+    // Routage vers le NIS de l'établissement (source de vérité : Firestore)
+    const establishmentId = typeof input.establishmentId === "string" ? input.establishmentId.trim() : "";
+    const payInfo = await resolveEstablishmentPayInfo(establishmentId);
+    if (establishmentId && !payInfo) {
+      return json(403, {
+        error: "Paiement en ligne indisponible pour cet établissement",
+        hint: "Aucun NIS distributeur approuvé n'est associé à cet établissement.",
+      });
+    }
+
     const payload: Record<string, unknown> = {
       reference: input.reference || `nack-${Date.now()}`,
       redirect_success: input.redirect_success || input.redirectSuccess || "",
@@ -66,13 +102,10 @@ export const handler: Handler = async (event) => {
       amount,
       logoURL: input.logoURL || "",
       isTransfer: Boolean(input.isTransfer),
-      portefeuille:
-        (typeof input.portefeuille === "string" && input.portefeuille.trim()) ||
-        SINGPAY_WALLET,
+      portefeuille: SINGPAY_WALLET,
     };
-    const disbursement =
-      (typeof input.disbursement === "string" && input.disbursement.trim()) || "";
-    if (disbursement) payload.disbursement = disbursement;
+    // Le NIS vient UNIQUEMENT du profil établissement (jamais du client)
+    if (payInfo) payload.disbursement = payInfo.disbursementId;
 
     const res = await fetch(SINGPAY_ENDPOINT, {
       method: "POST",

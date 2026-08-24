@@ -283,14 +283,6 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       // Supprimer tous les reÃ§us
       await deleteCollection(receiptsColRef(db, user.uid), "reÃ§us");
 
-      // Supprimer toutes les commandes bar (barOrders legacy)
-      const barOrdersRef = collection(db, "profiles", user.uid, "barOrders");
-      await deleteCollection(barOrdersRef, "commandes bar");
-
-      // Supprimer les commandes Menu Digital (orders source 'qr')
-      const qrOrdersRef = collection(db, "profiles", user.uid, "orders");
-      await deleteCollection(query(qrOrdersRef, where("source", "==", "qr")), "commandes QR");
-
       toast({
         title: "âœ… DonnÃ©es rÃ©initialisÃ©es",
         description: `${totalDeleted} Ã©lÃ©ment(s) supprimÃ©(s) avec succÃ¨s. Vos paramÃ¨tres de base ont Ã©tÃ© conservÃ©s.`,
@@ -1316,6 +1308,15 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         onCheckedChange={(checked) => setTicketCustomization({ ...ticketCustomization, showDeliveryMention: checked })}
                       />
                     </div>
+                    {ticketCustomization.showDeliveryMention && (
+                      <div className="space-y-2 pl-4 border-l-2 border-gray-200 mt-2">
+                        <p className="text-xs text-muted-foreground">
+                          Affiche la mention "LIVRAISON A DOMICILE" sur les tickets. 
+                          Pour configurer les options de livraison (activation, prix), 
+                          allez dans <strong>Menu numérique → Livraison</strong>.
+                        </p>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="space-y-0.5">
                         <Label htmlFor="show-css">Afficher "C.S.S. X%"</Label>

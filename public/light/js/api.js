@@ -186,7 +186,7 @@
 
   var EST_MIGRATE_COLS = [
     "products", "sales", "orders", "losses", "events", "team",
-    "customers", "notifications", "barOrders", "tables"
+    "customers", "notifications", "tables"
   ];
 
   function copyDocFields(d) {

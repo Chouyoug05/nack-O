@@ -12,12 +12,11 @@ export interface SubscriptionFeatures {
   stock: boolean; // Voir le stock
   reports: boolean; // Voir les rapports
   team: boolean; // Gérer les équipiers
-  barConnectee: boolean; // Bar connectée
-  menuDigital: boolean; // Accès au Menu Digital
   disbursementRequest: boolean; // Possibilité de demander un Disbursement ID
   events: boolean; // Créer des événements
   eventsLimit?: number; // Nombre d'événements inclus (pour Pro Max)
   eventsExtraPrice?: number; // Prix par événement supplémentaire
+  menuDigital: boolean; // Menu digital / Boutique en ligne
 }
 
 export const SUBSCRIPTION_PLANS = {
@@ -31,12 +30,11 @@ export const SUBSCRIPTION_PLANS = {
       stock: false,
       reports: false,
       team: false,
-      barConnectee: false,
-      menuDigital: false,
       disbursementRequest: false,
       events: false,
       eventsLimit: 0,
       eventsExtraPrice: 1000,
+      menuDigital: false,
     } as SubscriptionFeatures,
   },
   free: {
@@ -49,12 +47,11 @@ export const SUBSCRIPTION_PLANS = {
       stock: true,
       reports: true,
       team: false,
-      barConnectee: false,
-      menuDigital: false,
       disbursementRequest: false,
       events: true,
       eventsLimit: 0,
       eventsExtraPrice: 1000,
+      menuDigital: true,
     } as SubscriptionFeatures,
   },
   transition: {
@@ -66,12 +63,11 @@ export const SUBSCRIPTION_PLANS = {
       stock: true,
       reports: true,
       team: false,
-      barConnectee: true,
-      menuDigital: true,
       disbursementRequest: false,
       events: true,
       eventsLimit: 5,
       eventsExtraPrice: 1000,
+      menuDigital: true,
     } as SubscriptionFeatures,
   },
   'transition-pro-max': {
@@ -83,11 +79,10 @@ export const SUBSCRIPTION_PLANS = {
       stock: true,
       reports: true,
       team: true,
-      barConnectee: true,
-      menuDigital: true,
       disbursementRequest: true,
       events: true,
       eventsExtraPrice: 1000,
+      menuDigital: true,
     } as SubscriptionFeatures,
   },
 } as const;

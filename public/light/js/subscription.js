@@ -3,15 +3,15 @@
   var PLANS = {
     free: {
       name: "Gratuit", price: 0,
-      features: { products: true, productLimit: 10, sales: true, stock: true, reports: true, team: false, barConnectee: false, menuDigital: false, disbursementRequest: false, events: true, eventsLimit: 0, eventsExtraPrice: 1000 }
+      features: { products: true, productLimit: 10, sales: true, stock: true, reports: true, team: false, disbursementRequest: false, events: true, eventsLimit: 0, eventsExtraPrice: 1000 }
     },
     transition: {
       name: "Standard", price: 3000,
-      features: { products: true, sales: true, stock: true, reports: true, team: false, barConnectee: true, menuDigital: true, disbursementRequest: false, events: true, eventsLimit: 5, eventsExtraPrice: 1000 }
+      features: { products: true, sales: true, stock: true, reports: true, team: false, disbursementRequest: false, events: true, eventsLimit: 5, eventsExtraPrice: 1000 }
     },
     "transition-pro-max": {
       name: "Premium", price: 7500,
-      features: { products: true, sales: true, stock: true, reports: true, team: true, barConnectee: true, menuDigital: true, disbursementRequest: true, events: true, eventsExtraPrice: 1000 }
+      features: { products: true, sales: true, stock: true, reports: true, team: true, disbursementRequest: true, events: true, eventsExtraPrice: 1000 }
     }
   };
 

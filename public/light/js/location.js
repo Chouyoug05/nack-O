@@ -26,7 +26,7 @@
     modal.setAttribute("role", "dialog");
     modal.innerHTML =
       '<h2>Complétez votre adresse</h2>' +
-      '<p class="lg-modal-desc">Indiquez votre adresse ou utilisez la géolocalisation pour le menu digital et la carte.</p>' +
+      '<p class="lg-modal-desc">Indiquez votre adresse ou utilisez la géolocalisation pour la carte.</p>' +
       '<div class="lg-field"><label class="lg-label">Adresse</label><input class="lg-input" id="loc-address"></div>' +
       '<div class="lg-modal-actions">' +
         '<button type="button" class="lg-btn lg-btn-secondary" data-action="loc-skip">Plus tard</button>' +

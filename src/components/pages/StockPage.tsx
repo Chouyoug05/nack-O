@@ -51,7 +51,10 @@ import {
   Home,
   Smartphone,
   Gamepad2,
-  ShoppingBasket
+  ShoppingBasket,
+  Star,
+  Tag,
+  Sun
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -85,13 +88,12 @@ interface Product {
     rawMaterials: Array<{ name: string; unitCost: number }>;
     productionCosts: Array<{ type: string; amount: number }>;
   };
-  /** Si true, le produit apparaît sur le menu digital (menu du jour) */
-  showOnMenuDigital?: boolean;
   sku?: string;
   subCategory?: string;
   brand?: string;
   isPromotional?: boolean;
   isFeatured?: boolean;
+  isDailySpecial?: boolean;
 }
 
 const StockPage = () => {
@@ -155,12 +157,12 @@ const StockPage = () => {
             rawMaterials: foodCost.rawMaterials || [],
             productionCosts: foodCost.productionCosts || []
           } : undefined,
-          showOnMenuDigital: raw.showOnMenuDigital === true,
           sku: (raw.sku as string) || undefined,
           subCategory: (raw.subCategory as string) || undefined,
           brand: (raw.brand as string) || undefined,
           isPromotional: raw.isPromotional === true,
           isFeatured: raw.isFeatured === true,
+          isDailySpecial: raw.isDailySpecial === true,
         } as Product;
       });
 
@@ -220,9 +222,12 @@ const StockPage = () => {
     formulaPrice: "",
     rawMaterials: [] as Array<{ name: string; unitCost: string }>,
     productionCosts: [] as Array<{ type: string; amount: string }>,
-    showOnMenuDigital: false,
     sku: "",
     subCategory: "",
+    brand: "",
+    isPromotional: false,
+    isFeatured: false,
+    isDailySpecial: false,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -503,7 +508,10 @@ const StockPage = () => {
         ...(foodCostData ? { foodCost: foodCostData } : {}),
         ...(newProduct.sku ? { sku: newProduct.sku } : {}),
         ...(newProduct.subCategory ? { subCategory: newProduct.subCategory } : {}),
-        ...(newProduct.showOnMenuDigital ? { showOnMenuDigital: true } : {}),
+        ...(newProduct.brand ? { brand: newProduct.brand } : {}),
+        ...(newProduct.isPromotional ? { isPromotional: newProduct.isPromotional } : {}),
+        ...(newProduct.isFeatured ? { isFeatured: newProduct.isFeatured } : {}),
+        ...(newProduct.isDailySpecial ? { isDailySpecial: newProduct.isDailySpecial } : {}),
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -523,9 +531,12 @@ const StockPage = () => {
         formulaPrice: "",
         rawMaterials: [],
         productionCosts: [],
-        showOnMenuDigital: false,
         sku: "",
         subCategory: "",
+        brand: "",
+        isPromotional: false,
+        isFeatured: false,
+        isDailySpecial: false,
       });
       setImageFile(null);
       setIsAddModalOpen(false);
@@ -556,29 +567,18 @@ const StockPage = () => {
       formulaPrice: product.formula?.price ? String(product.formula.price) : "",
       rawMaterials: product.foodCost?.rawMaterials.map(m => ({ name: m.name, unitCost: String(m.unitCost) })) || [],
       productionCosts: product.foodCost?.productionCosts.map(c => ({ type: c.type, amount: String(c.amount) })) || [],
-      showOnMenuDigital: product.showOnMenuDigital === true,
       sku: product.sku || "",
       subCategory: product.subCategory || "",
+      brand: product.brand || "",
+      isPromotional: product.isPromotional || false,
+      isFeatured: product.isFeatured || false,
+      isDailySpecial: product.isDailySpecial || false,
     });
     setIsAddModalOpen(true);
   };
 
   const handleEditProduct = (product: Product) => {
     requireManagerAuth(() => openEditProductUnsafe(product));
-  };
-
-  const handleToggleMenuDigital = async (productId: string, currentValue: boolean) => {
-    if (!user) return;
-    try {
-      const ref = fsDoc(productsColRef(db, user.uid), productId);
-      await updateDoc(ref, { showOnMenuDigital: !currentValue, updatedAt: Date.now() });
-      toast({
-        title: !currentValue ? "Ajouté au menu digital" : "Retiré du menu digital",
-        description: !currentValue ? "Le produit sera visible sur le menu digital (menu du jour)" : "Le produit ne sera plus affiché sur le menu digital",
-      });
-    } catch (e: unknown) {
-      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible de mettre à jour", variant: "destructive" });
-    }
   };
 
   const handleDeleteProduct = async (id: string) => {
@@ -634,7 +634,6 @@ const StockPage = () => {
           ...(product.sku ? { sku: product.sku } : {}),
           ...(product.subCategory ? { subCategory: product.subCategory } : {}),
           ...(product.brand ? { brand: product.brand } : {}),
-          showOnMenuDigital: false,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
@@ -795,9 +794,12 @@ const StockPage = () => {
           }
         } : {}),
         ...(foodCostData ? { foodCost: foodCostData } : {}),
-        showOnMenuDigital: newProduct.showOnMenuDigital === true,
         ...(newProduct.sku ? { sku: newProduct.sku } : {}),
         ...(newProduct.subCategory ? { subCategory: newProduct.subCategory } : {}),
+        ...(newProduct.brand ? { brand: newProduct.brand } : {}),
+        ...(newProduct.isPromotional !== undefined ? { isPromotional: newProduct.isPromotional } : {}),
+        ...(newProduct.isFeatured !== undefined ? { isFeatured: newProduct.isFeatured } : {}),
+        ...(newProduct.isDailySpecial !== undefined ? { isDailySpecial: newProduct.isDailySpecial } : {}),
         updatedAt: Date.now(),
       };
       await updateDoc(productRef, payload);
@@ -818,9 +820,12 @@ const StockPage = () => {
         formulaPrice: "",
         rawMaterials: [],
         productionCosts: [],
-        showOnMenuDigital: false,
         sku: "",
         subCategory: "",
+        brand: "",
+        isPromotional: false,
+        isFeatured: false,
+        isDailySpecial: false,
       });
       toast({ title: "Produit modifié", description: "Le produit a été mis à jour" });
     } catch (e: unknown) {
@@ -1522,13 +1527,14 @@ const StockPage = () => {
           <DialogHeader className="pb-4">
             <DialogTitle className="text-2xl font-bold text-center">{editingProduct ? "Modifier le produit" : "Ajouter un produit"}</DialogTitle>
             <DialogDescription className="text-base text-center">
-              Étape {formStep} sur 3
+              Étape {formStep} sur 4
             </DialogDescription>
             {/* Barre de progression */}
             <div className="flex gap-2 mt-4">
               <div className={`h-2 flex-1 rounded-full ${formStep >= 1 ? 'bg-green-500' : 'bg-gray-200'}`} />
               <div className={`h-2 flex-1 rounded-full ${formStep >= 2 ? 'bg-green-500' : 'bg-gray-200'}`} />
               <div className={`h-2 flex-1 rounded-full ${formStep >= 3 ? 'bg-green-500' : 'bg-gray-200'}`} />
+              <div className={`h-2 flex-1 rounded-full ${formStep >= 4 ? 'bg-green-500' : 'bg-gray-200'}`} />
             </div>
           </DialogHeader>
           <div className="space-y-6 py-4 min-h-[400px]">
@@ -1749,17 +1755,6 @@ const StockPage = () => {
                   <p className="text-center text-sm text-muted-foreground mt-2">Laisser vide si non vendu.</p>
                 </div>
 
-                <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/30">
-                  <div>
-                    <Label className="text-base font-semibold">Menu digital (menu du jour)</Label>
-                    <p className="text-sm text-muted-foreground">Afficher ce produit sur le menu digital pour les clients</p>
-                  </div>
-                  <Switch
-                    checked={newProduct.showOnMenuDigital === true}
-                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, showOnMenuDigital: !!checked })}
-                  />
-                </div>
-
                 {!isFoodCategory(newProduct.category) && (
                   <div>
                     <Label htmlFor="cost" className="text-lg font-medium mb-3 block text-center">Coût d'achat (optionnel)</Label>
@@ -1963,6 +1958,64 @@ const StockPage = () => {
               </div>
             )}
           </div>
+
+          {/* ÉTAPE 4: Visibilité & Options */}
+          {formStep === 4 && (
+            <div className="space-y-6">
+              <h3 className="text-2xl font-bold text-center">Visibilité et Options</h3>
+              <p className="text-center text-muted-foreground">
+                Configurez comment ce produit apparaît dans votre {isFoodBusiness ? "menu digital" : "boutique en ligne"}.
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Star className="h-6 w-6 text-yellow-500" />
+                    <div>
+                      <p className="font-medium text-gray-900">Produit vedette</p>
+                      <p className="text-sm text-muted-foreground">Mis en avant sur la page d'accueil du menu</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="isFeatured"
+                    checked={newProduct.isFeatured}
+                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, isFeatured: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Tag className="h-6 w-6 text-orange-500" />
+                    <div>
+                      <p className="font-medium text-gray-900">Promotion</p>
+                      <p className="text-sm text-muted-foreground">Affiché avec un badge promotionnel</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="isPromotional"
+                    checked={newProduct.isPromotional}
+                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, isPromotional: checked })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-l-4 border-nack-red">
+                  <div className="flex items-center gap-3">
+                    <Sun className="h-6 w-6 text-nack-red" />
+                    <div>
+                      <p className="font-medium text-gray-900">Plat du jour / Article du jour</p>
+                      <p className="text-sm text-muted-foreground">Affiché en priorité dans la section "Aujourd'hui" du menu</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="isDailySpecial"
+                    checked={newProduct.isDailySpecial}
+                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, isDailySpecial: checked })}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row justify-between gap-3 pt-4 border-t">
             {formStep > 1 ? (
               <Button
@@ -1982,7 +2035,7 @@ const StockPage = () => {
               </Button>
             )}
 
-            {formStep < 3 ? (
+            {formStep < 4 ? (
               <Button
                 onClick={() => setFormStep(formStep + 1)}
                 disabled={formStep === 1 && !newProduct.category}
@@ -2094,8 +2147,20 @@ const StockPage = () => {
                         <p className="text-lg font-medium leading-normal text-[#181411]">
                           {product.name}
                         </p>
-                        {product.showOnMenuDigital && (
-                          <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">Menu digital</Badge>
+                        {product.isFeatured && (
+                          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200" variant="outline">
+                            <Star className="mr-1 h-3 w-3" /> Vedette
+                          </Badge>
+                        )}
+                        {product.isPromotional && (
+                          <Badge className="bg-orange-100 text-orange-700 border-orange-200" variant="outline">
+                            <Tag className="mr-1 h-3 w-3" /> Promo
+                          </Badge>
+                        )}
+                        {product.isDailySpecial && (
+                          <Badge className="bg-nack-red/10 text-nack-red border-nack-red/20" variant="outline">
+                            <Sun className="mr-1 h-3 w-3" /> Aujourd'hui
+                          </Badge>
                         )}
                         <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 w-7 p-0" title="Modifier">
                           <Edit size={14} />
@@ -2118,12 +2183,6 @@ const StockPage = () => {
                         >
                           <Trash2 size={14} />
                         </Button>
-                        <Switch
-                          checked={product.showOnMenuDigital === true}
-                          onCheckedChange={() => handleToggleMenuDigital(product.id, product.showOnMenuDigital === true)}
-                          title={product.showOnMenuDigital ? "Retirer du menu digital" : "Afficher sur le menu digital"}
-                        />
-                        <span className="text-xs text-muted-foreground hidden sm:inline">Menu du jour</span>
                       </div>
                       <p className="text-sm font-normal leading-normal text-[#8a7260]">
                         {product.category}

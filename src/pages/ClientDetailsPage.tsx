@@ -19,7 +19,6 @@ import {
   query, 
   orderBy, 
   getDocs,
-  collection,
   where
 } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
@@ -74,7 +73,6 @@ const ClientDetailsPage = () => {
     productsCount: 0,
     salesCount: 0,
     ordersCount: 0,
-    barOrdersCount: 0,
     eventsCount: 0,
     teamCount: 0,
     paymentsCount: 0,
@@ -126,16 +124,9 @@ const ClientDetailsPage = () => {
           return sum + (Number(data.total) || 0);
         }, 0);
 
-        // Commandes normales + QR (source de vérité : orders, source 'qr' = menu digital)
+        // Commandes
         const ordersSnap = await getDocs(query(ordersColRef(db, uid), orderBy("createdAt", "desc")));
-        const allOrders = ordersSnap.docs;
-        const qrOrders = allOrders.filter(d => (d.data() as { source?: string }).source === 'qr');
-        const ordersCount = allOrders.length - qrOrders.length;
-
-        // Commandes Bar Connectée / Menu Digital (orders source 'qr' + legacy barOrders)
-        const barOrdersRef = collection(db, `profiles/${uid}/barOrders`);
-        const barOrdersSnap = await getDocs(barOrdersRef);
-        const barOrdersCount = qrOrders.length + barOrdersSnap.size;
+        const ordersCount = ordersSnap.size;
 
         // Événements
         const eventsSnap = await getDocs(eventsColRef(db, uid));
@@ -157,7 +148,6 @@ const ClientDetailsPage = () => {
           productsCount,
           salesCount,
           ordersCount,
-          barOrdersCount,
           eventsCount,
           teamCount,
           paymentsCount,
@@ -409,9 +399,9 @@ const ClientDetailsPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats.ordersCount + stats.barOrdersCount}</div>
+              <div className="text-2xl font-bold">{stats.ordersCount}</div>
               <div className="text-xs text-muted-foreground mt-1">
-                {stats.ordersCount} normales + {stats.barOrdersCount} QR
+                commandes
               </div>
             </CardContent>
           </Card>

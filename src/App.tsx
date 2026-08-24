@@ -41,10 +41,10 @@ const CaisseInterface = lazyWithReload(() => import("./pages/CaisseInterface"));
 const CuisineInterface = lazyWithReload(() => import("./pages/CuisineInterface"));
 const AgentEvenementInterface = lazyWithReload(() => import("./pages/AgentEvenementInterface"));
 const EventPublicPage = lazyWithReload(() => import("./pages/EventPublicPage"));
-const PublicOrderingPage = lazyWithReload(() => import("./pages/PublicOrderingPage"));
 const PaymentSuccess = lazyWithReload(() => import("./pages/PaymentSuccess"));
 const PaymentError = lazyWithReload(() => import("./pages/PaymentError"));
 const TabletInboxPage = lazyWithReload(() => import("./pages/TabletInboxPage"));
+const MenuDigitalPage = lazyWithReload(() => import("@/components/pages/MenuDigitalPage"));
 
 const queryClient = new QueryClient();
 
@@ -151,7 +151,6 @@ const RootLayout = () => {
   useOfflineCacheWarmup();
   const location = useLocation();
   const isPublicPage = location.pathname.startsWith('/event/') ||
-    location.pathname.startsWith('/commande/') ||
     location.pathname.startsWith('/affiliate') ||
     location.pathname === '/admin-check' ||
     location.pathname === '/mon-uid' ||
@@ -187,6 +186,7 @@ const routes = [
       { path: "configure-tickets", element: <LazyBoundary><RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "dashboard", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><TabletAwareDashboard /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "tablet-inbox", element: <LazyBoundary><RequireAuth><RequireProfile><TabletInboxPage /></RequireProfile></RequireAuth></LazyBoundary> },
+      { path: "menu-digital", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="menu-digital"><MenuDigitalPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "team", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "customer/:customerId", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "admin-check", element: <AdminCheck /> },
@@ -199,7 +199,6 @@ const routes = [
       { path: "cuisine/:agentCode", element: <LazyBoundary><CuisineInterface /></LazyBoundary> },
       { path: "agent-evenement/:agentCode", element: <LazyBoundary><AgentEvenementInterface /></LazyBoundary> },
       { path: "event/:eventId", element: <LazyBoundary><EventPublicPage /></LazyBoundary> },
-      { path: "commande/:establishmentId", element: <LazyBoundary><PublicOrderingPage /></LazyBoundary> },
       { path: "payment/success", element: <LazyBoundary><PaymentSuccess /></LazyBoundary> },
       { path: "payment/error", element: <LazyBoundary><PaymentError /></LazyBoundary> },
       { path: "*", element: <NotFound /> },

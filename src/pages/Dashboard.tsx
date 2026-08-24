@@ -9,9 +9,9 @@ import {
   User2,
   ChevronLeft,
   Bell,
-  QrCode,
   Calendar,
   Heart,
+  LayoutGrid,
 } from "lucide-react";
 import { Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,15 +22,15 @@ import StockPage from "@/components/pages/StockPage";
 import ReportsPage from "@/components/pages/ReportsPage";
 import SettingsPage from "@/components/pages/SettingsPage";
 import OrderManagement from "@/components/OrderManagement";
-import BarConnecteePage from "@/components/pages/BarConnecteePage";
 import EventsPage from "@/components/pages/EventsPage";
 import CustomersPage from "@/components/pages/CustomersPage";
 import NotificationPanel from "@/components/NotificationPanel";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import TeamPage from "@/components/pages/TeamPage";
+import MenuDigitalPage from "@/components/pages/MenuDigitalPage";
 import { db } from "@/lib/firebase";
 import { productsColRef, salesColRef, teamColRef, ordersColRef } from "@/lib/collections";
-import { onSnapshot, orderBy, query, where, collection } from "firebase/firestore";
+import { onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -84,10 +84,10 @@ const MENU_CARD_META: Record<
   sales: { icon: ShoppingCart, accentBg: "", accentColor: "text-[#28A745]" },
   reports: { icon: BarChart3, accentBg: "", accentColor: "text-[#0D6EFD]" },
   team: { icon: Users, accentBg: "", accentColor: "text-[#0D6EFD]" },
-  "bar-connectee": { icon: QrCode, accentBg: "", accentColor: "text-[#FD7E14]" },
   events: { icon: Calendar, accentBg: "", accentColor: "text-[#E91E63]" },
   customers: { icon: Heart, accentBg: "", accentColor: "text-[#FF6B9D]" },
   profile: { icon: User2, accentBg: "", accentColor: "text-[#6C757D]" },
+  "menu-digital": { icon: LayoutGrid, accentBg: "", accentColor: "text-[#DC2626]" },
   logout: { icon: LogOut, accentBg: "", accentColor: "text-[#DC3545]" },
 };
 
@@ -116,7 +116,6 @@ const Dashboard = () => {
     productsCount: 0,
     teamCount: 0,
   });
-  const [barPendingCount, setBarPendingCount] = useState<number>(0);
   const [tablePendingCount, setTablePendingCount] = useState<number>(0);
 
   useEffect(() => {
@@ -157,15 +156,6 @@ const Dashboard = () => {
         setStatsValues((prev) => ({ ...prev, salesToday: total }));
       }
     ));
-
-    // Menu Digital pending orders count (source de vérité : orders source 'qr')
-    try {
-      const barOrdersRef = collection(db, `profiles/${user.uid}/orders`);
-      const pendingQ = query(barOrdersRef, where('status', '==', 'awaiting-validation'), where('source', '==', 'qr'));
-      unsubs.push(onSnapshot(pendingQ, (snap) => setBarPendingCount(snap.size)));
-    } catch {
-      setBarPendingCount(0);
-    }
 
     // Commandes table / serveur en attente
     try {
@@ -221,12 +211,6 @@ const Dashboard = () => {
             <SalesPage />
           </FeatureGate>
         );
-      case "bar-connectee":
-        return (
-          <FeatureGate feature="menuDigital">
-            <BarConnecteePage />
-          </FeatureGate>
-        );
       case "stock":
         return (
           <FeatureGate feature="stock">
@@ -249,6 +233,8 @@ const Dashboard = () => {
         return <CustomersPage />;
       case "profile":
         return <SettingsPage />;
+      case "menu-digital":
+        return <MenuDigitalPage />;
       default:
         return null;
     }
@@ -299,7 +285,7 @@ const Dashboard = () => {
           </h1>
         )}
         <div className="flex items-center gap-2 md:gap-3">
-          <NotificationPanel size="sm" onNavigateToOrders={() => handleCardClick("bar-connectee")} />
+          <NotificationPanel size="sm" />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -442,11 +428,6 @@ const Dashboard = () => {
                         <p className={`text-sm md:text-base font-normal leading-normal mt-1 ${accentColor}`}>{hint}</p>
                       )}
                     </div>
-                    {key === 'bar-connectee' && barPendingCount > 0 && (
-                      <span className="absolute -top-1 -right-1 md:-top-2 md:-right-2 min-w-[20px] h-5 md:h-6 px-1.5 md:px-2 rounded-full bg-red-600 text-white text-xs md:text-sm font-bold flex items-center justify-center shadow-lg">
-                        {barPendingCount}
-                      </span>
-                    )}
                     {key === 'sales' && tablePendingCount > 0 && (
                       <span className="absolute -top-1 -right-1 md:-top-2 md:-right-2 min-w-[20px] h-5 md:h-6 px-1.5 md:px-2 rounded-full bg-red-600 text-white text-xs md:text-sm font-bold flex items-center justify-center shadow-lg">
                         {tablePendingCount}

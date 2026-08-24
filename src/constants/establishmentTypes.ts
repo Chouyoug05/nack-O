@@ -81,6 +81,32 @@ export function isSimpleBusiness(value: string | undefined | null): boolean {
 }
 
 /**
+ * Label affiché pour la page menu digital / boutique en ligne.
+ * - Restauration → "Menu digital"
+ * - Boutique / Commerce → "Boutique en ligne"
+ * - Services / Autre → "Catalogue en ligne"
+ */
+export function getMenuLabel(value: string | undefined | null): string {
+  if (!value) return "Catalogue en ligne";
+  const main = getMainCategory(value);
+  switch (main?.id) {
+    case "restauration": return "Menu digital";
+    case "boutique":
+    case "commerce":      return "Boutique en ligne";
+    default:              return "Catalogue en ligne";
+  }
+}
+
+/**
+ * Vaut vrai si le type d'établissement sert sur place (bars, restaurants, etc.)
+ * et nécessite une gestion des tables.
+ */
+export function isTableType(value: string | undefined | null): boolean {
+  if (!value) return false;
+  return isFoodBusiness(value);
+}
+
+/**
  * Catégories de produits proposées selon le type d'établissement.
  * - Restauration & Bar : uniquement les catégories alimentaires/boissons.
  * - Boutique / Commerce : catégories marchandises (vêtements, accessoires...).

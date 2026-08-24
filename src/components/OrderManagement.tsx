@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
 import { ordersColRef, productsColRef, salesColRef } from "@/lib/collections";
-import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc, getDocs, where } from "firebase/firestore";
+import { onSnapshot, orderBy, query, updateDoc, doc as fsDoc, getDoc, runTransaction, addDoc, getDocs, where, increment } from "firebase/firestore";
 import type { SaleDoc, SaleItem, PaymentMethod } from "@/types/inventory";
 import type { UserProfile } from "@/types/profile";
 import { OrderCancelDialog } from "@/components/OrderCancelDialog";
@@ -433,6 +433,40 @@ const OrderManagement = ({
   const handleCloseOrder = async (order: Order) => {
     if (!uidToUse) return;
     try {
+      // Décrémenter le stock pour chaque article de la commande
+      if (order.items && order.items.length > 0) {
+        const productsSnapshot = await getDocs(productsColRef(db, uidToUse));
+        const productsMap = new Map<string, string>();
+        productsSnapshot.docs.forEach(d => {
+          const data = d.data();
+          if (data.name) productsMap.set(data.name, d.id);
+        });
+
+        const stockUpdates: Array<{ id: string; qty: number }> = [];
+        for (const item of order.items) {
+          const productId = item.id || productsMap.get(item.name);
+          if (productId) {
+            stockUpdates.push({ id: productId, qty: item.quantity });
+          }
+        }
+
+        if (stockUpdates.length > 0) {
+          try {
+            await runTransaction(db, async (transaction) => {
+              for (const update of stockUpdates) {
+                const productRef = fsDoc(productsColRef(db, uidToUse), update.id);
+                transaction.update(productRef, {
+                  quantity: increment(-update.qty),
+                  updatedAt: Date.now(),
+                });
+              }
+            });
+          } catch (stockErr) {
+            console.error('Erreur décrémentation stock:', stockErr);
+          }
+        }
+      }
+
       await updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), {
         status: 'closed',
         closedAt: Date.now(),
@@ -440,7 +474,7 @@ const OrderManagement = ({
       });
       setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'closed' } : o));
       updateOrderStatus(order.id, 'closed');
-      toast({ title: "Commande clôturée", description: `Commande #${order.orderNumber} clôturée` });
+      toast({ title: "Commande clôturée", description: `Commande #${order.orderNumber} clôturée — stock mis à jour` });
     } catch (e) {
       toast({ title: 'Erreur', description: 'Impossible de clôturer la commande.', variant: 'destructive' });
     }

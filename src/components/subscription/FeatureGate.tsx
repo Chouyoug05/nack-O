@@ -12,7 +12,7 @@ import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
 import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
 
 interface FeatureGateProps {
-  feature: 'products' | 'sales' | 'stock' | 'reports' | 'team' | 'barConnectee' | 'events' | 'menuDigital' | 'disbursementRequest';
+  feature: 'products' | 'sales' | 'stock' | 'reports' | 'team' | 'events' | 'disbursementRequest';
   children: ReactNode;
   fallback?: ReactNode;
 }
@@ -47,8 +47,6 @@ export const FeatureGate = ({ feature, children, fallback }: FeatureGateProps) =
     stock: 'Stock',
     reports: 'Rapports',
     team: 'Équipiers',
-    barConnectee: 'Bar Connectée',
-    menuDigital: 'Menu Digital',
     disbursementRequest: 'Demande de Disbursement ID',
     events: 'Événements',
   };
@@ -188,7 +186,7 @@ export const FeatureGate = ({ feature, children, fallback }: FeatureGateProps) =
               </Button>
             </div>
             <p className="text-[10px] sm:text-xs text-center text-muted-foreground">
-              Standard: Produits, Ventes, Stock, Rapports, Menu Digital • Premium: Tout + Équipiers + Bar Connectée + Événements illimités
+              Standard: Produits, Ventes, Stock, Rapports • Premium: Tout + Équipiers + Événements illimités
             </p>
           </div>
         </DialogContent>

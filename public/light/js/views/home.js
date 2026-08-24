@@ -7,7 +7,7 @@
     var profile = ctx.profile || {};
     var stats = ctx.stats || { salesToday: 0, productsCount: 0, teamCount: 0 };
     var owner = profile.ownerName || "";
-    var lbl = est && est.labels ? est.labels(profile) : { products: "Produits", stock: "Stock", sales: "Vente", menu: "Menu Digital", team: "Équipe", welcome: "Bonjour" };
+    var lbl = est && est.labels ? est.labels(profile) : { products: "Produits", stock: "Stock", sales: "Vente", team: "Équipe", welcome: "Bonjour" };
 
     var welcome = owner
       ? '<div class="lg-welcome-simple">' + ui.escapeHtml(lbl.welcome) + ', ' + ui.escapeHtml(owner) + '</div>'
@@ -27,7 +27,6 @@
         card("sales", lbl.sales, "cart", "sales") +
         card("reports", "Rapport", "chart", "reports") +
         card("team", lbl.team, "users", "team") +
-        card("menu", lbl.menu, "qrcode", "menu") +
         card("events", "Événements", "calendar", "events") +
         card("customers", "Clients", "heart", "customers") +
         card("notifications", "Notifications", "bell", "notifications") +
@@ -79,7 +78,7 @@
       '<div class="lg-section-title">Raccourcis boutique</div>' +
       '<div class="lg-grid">' +
         hubCard("stock", lbl.stock) + hubCard("sales", lbl.sales) + hubCard("customers", "Clients") +
-        hubCard("reports", "Statistiques") + hubCard("menu", lbl.menu) +
+        hubCard("reports", "Statistiques") +
       '</div>';
   }
 

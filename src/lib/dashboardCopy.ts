@@ -6,9 +6,9 @@ export type DashboardActionKey =
   | "reports"
   | "profile"
   | "team"
-  | "bar-connectee"
   | "events"
   | "customers"
+  | "menu-digital"
   | "logout";
 
 export type DashboardCopy = {
@@ -34,10 +34,10 @@ const restoCopy: DashboardCopy = {
     sales: { title: "Vente" },
     reports: { title: "Rapport" },
     team: { title: "Équipe", hint: "Gérer" },
-    "bar-connectee": { title: "Menu Digital", hint: "QR" },
     events: { title: "Événements" },
     customers: { title: "Clients", description: "Favoris & Fidélité" },
     profile: { title: "Mon Profil" },
+    "menu-digital": { title: "Menu Digital", hint: "Design & Tables" },
     logout: { title: "Déconnexion" },
   },
 };
@@ -53,10 +53,10 @@ const commerceCopy: DashboardCopy = {
     sales: { title: "Caisse" },
     reports: { title: "Rapport" },
     team: { title: "Équipe", hint: "Gérer" },
-    "bar-connectee": { title: "Catalogue QR", hint: "QR" },
     events: { title: "Événements" },
     customers: { title: "Clients", description: "Fidélité" },
     profile: { title: "Mon Profil" },
+    "menu-digital": { title: "Boutique en ligne", hint: "Design" },
     logout: { title: "Déconnexion" },
   },
 };
@@ -72,10 +72,10 @@ const boutiqueCopy: DashboardCopy = {
     sales: { title: "Vente" },
     reports: { title: "Rapport" },
     team: { title: "Équipe", hint: "Gérer" },
-    "bar-connectee": { title: "Catalogue QR", hint: "QR" },
     events: { title: "Événements" },
     customers: { title: "Clients", description: "Fidélité" },
     profile: { title: "Mon Profil" },
+    "menu-digital": { title: "Boutique en ligne", hint: "Design" },
     logout: { title: "Déconnexion" },
   },
 };
@@ -91,10 +91,10 @@ const servicesCopy: DashboardCopy = {
     sales: { title: "Vente" },
     reports: { title: "Rapport" },
     team: { title: "Équipe", hint: "Gérer" },
-    "bar-connectee": { title: "Catalogue QR", hint: "QR" },
     events: { title: "Événements" },
     customers: { title: "Clients" },
     profile: { title: "Mon Profil" },
+    "menu-digital": { title: "Catalogue en ligne", hint: "Design" },
     logout: { title: "Déconnexion" },
   },
 };
@@ -103,7 +103,6 @@ function applySubtypeHints(copy: DashboardCopy, establishmentType: string): Dash
   const tiles = { ...copy.tiles };
   if (establishmentType === "commerce-cosmetique") {
     tiles.stock = { title: "Stock", hint: "Beauté" };
-    tiles["bar-connectee"] = { title: "Catalogue QR", hint: "Beauté" };
   } else if (establishmentType === "commerce-alimentation") {
     tiles.stock = { title: "Stock", hint: "Alimentation" };
   } else if (establishmentType === "commerce-marche") {
@@ -147,18 +146,15 @@ export function getVisibleDashboardKeys(establishmentType?: string | null): Dash
   const service = isServiceBusiness(type);
 
   if (service && !boutiqueOrCommerce && !food) {
-    return ["stock", "sales", "reports", "team", "customers", "profile", "logout"];
+    return ["stock", "sales", "reports", "team", "customers", "profile", "menu-digital", "logout"];
   }
 
   const keys: DashboardActionKey[] = ["stock", "sales", "reports", "team"];
 
-  if (food || boutiqueOrCommerce) {
-    keys.push("bar-connectee");
-  }
   if (food) {
     keys.push("events");
   }
 
-  keys.push("customers", "profile", "logout");
+  keys.push("customers", "profile", "menu-digital", "logout");
   return keys;
 }

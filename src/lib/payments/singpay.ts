@@ -10,6 +10,17 @@ export interface CreatePaymentLinkParams {
   disbursement?: string;
 }
 
+export interface CreateOrderPaymentLinkParams {
+  amount: number;
+  reference: string;
+  redirectSuccess: string;
+  redirectError: string;
+  logoURL: string;
+  establishmentId: string;
+  deliveryEnabled?: boolean;
+  deliveryPrice?: number;
+}
+
 interface CreatePaymentLinkResponse {
   link: string;
   exp: string;
@@ -104,4 +115,23 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
     throw new Error("Paiement indisponible. Utilisez la version web de Nack.");
   }
   return requestPaymentLinkViaProxy(proxyUrl, params);
+}
+
+export async function createOrderPaymentLink(params: CreateOrderPaymentLinkParams): Promise<string> {
+  const proxyUrl = resolvePaymentProxyUrl();
+  if (!proxyUrl) {
+    throw new Error("Paiement indisponible. Utilisez la version web de Nack.");
+  }
+  
+  // Add order-specific metadata to the reference
+  const orderParams: CreatePaymentLinkParams = {
+    amount: params.amount,
+    reference: `order-${params.establishmentId}-${params.reference}`,
+    redirectSuccess: params.redirectSuccess,
+    redirectError: params.redirectError,
+    logoURL: params.logoURL,
+    isTransfer: false,
+  };
+  
+  return requestPaymentLinkViaProxy(proxyUrl, orderParams);
 }

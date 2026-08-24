@@ -10,6 +10,21 @@ exports.handler = async (event) => {
     const db = admin.firestore();
     const profilesSnap = await db.collection("profiles").get();
 
+    // Pré-charger les configs menu digital (collection menuConfigs)
+    let menuConfigsMap = {};
+    try {
+      const menuSnap = await db.collection("menuConfigs").get();
+      for (const doc of menuSnap.docs) {
+        const data = doc.data();
+        menuConfigsMap[doc.id] = {
+          menuConfigEnabled: data.enabled === true,
+          menuDesignId: data.selectedDesign || null,
+        };
+      }
+    } catch (e) {
+      console.warn("menuConfigs collection not found or empty, skipping:", e.message);
+    }
+
     let synced = 0;
     let errors = 0;
 
@@ -19,6 +34,8 @@ exports.handler = async (event) => {
 
       const paymentsEnabled =
         profile.disbursementStatus === "approved" && Boolean(String(profile.disbursementId || "").trim());
+
+      const menuFields = menuConfigsMap[uid] || {};
 
       try {
         await db.doc(`publicProfiles/${uid}`).set(
@@ -46,7 +63,7 @@ exports.handler = async (event) => {
             deliveryEnabled: profile.deliveryEnabled,
             deliveryPrice: profile.deliveryPrice,
             paymentsEnabled,
-            menuDesignId: profile.menuDesignId,
+            ...menuFields,
             updatedAt: Date.now(),
           },
           { merge: true }

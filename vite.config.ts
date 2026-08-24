@@ -26,6 +26,21 @@ const spa404Plugin = () => {
   } as const;
 };
 
+// En dev, /light/ et /light (sans index.html) doivent servir le light app statique
+// (public/light/index.html) et non le SPA React — sinon les liens publics tombent sur le login.
+const lightAppDevPlugin = () => ({
+  name: "light-app-dev-serve",
+  apply: "serve" as const,
+  configureServer(server: { middlewares: { use: (fn: (req: { url?: string }, res: unknown, next: () => void) => void) => void } }) {
+    server.middlewares.use((req, _res, next) => {
+      if (req.url && /^\/light\/?(?:[#?].*)?$/.test(req.url)) {
+        req.url = "/light/index.html";
+      }
+      next();
+    });
+  },
+});
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -48,6 +63,7 @@ export default defineConfig(({ mode }) => {
       }),
       mode === "development" && componentTagger(),
       spa404Plugin(),
+      lightAppDevPlugin(),
     ].filter(Boolean),
     resolve: {
       alias: {

@@ -29,14 +29,14 @@ export interface ProductDoc {
     price: number;
   };
   foodCost?: FoodCost; // Module Food Cost pour produits alimentaires
-  /** Si true, le produit apparaît sur le menu digital (menu du jour). Si aucun produit n'est coché, tous sont visibles. */
-  showOnMenuDigital?: boolean;
   // Champs boutique / commerce
   sku?: string;
   subCategory?: string;
   brand?: string;
   isPromotional?: boolean;
   isFeatured?: boolean;
+  /** Plat du jour / Article du jour — affiché en priorité sur le menu digital */
+  isDailySpecial?: boolean;
   createdAt: number;
   updatedAt: number;
 }

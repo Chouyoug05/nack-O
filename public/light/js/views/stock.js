@@ -197,13 +197,11 @@
       var item = filtered[j];
       var qn = Number(item.quantity) || 0;
       var badge = qn <= 0 ? "lg-badge-danger" : qn < 5 ? "lg-badge-warn" : "lg-badge-ok";
-      var menuOn = item.showOnMenuDigital !== false;
       html +=
         '<div class="lg-list-item">' +
           '<div class="lg-list-item-main">' +
             '<div class="lg-list-item-title">' + ui.escapeHtml(item.name || "Sans nom") + '</div>' +
             '<div class="lg-list-item-meta">' + ui.escapeHtml(item.category || "—") + " · " + ui.escapeHtml(ui.formatMoney(item.price)) +
-              (menuOn ? " · Menu ✓" : " · Menu ✗") + '</div>' +
           '</div>' +
           '<div style="text-align:right;min-width:110px">' +
             '<div class="lg-badge ' + badge + '" style="margin-bottom:6px">Stock ' + qn + '</div>' +
@@ -215,7 +213,6 @@
               '<button type="button" class="lg-btn lg-btn-outline lg-btn-sm" data-action="stock-edit" data-arg="' + ui.escapeHtml(item.id) + '">Modifier</button>' +
               '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="stock-dup" data-arg="' + ui.escapeHtml(item.id) + '">Dupliquer</button>' +
               '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="stock-del" data-arg="' + ui.escapeHtml(item.id) + '">Suppr.</button>' +
-              '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" data-action="stock-menu-toggle" data-arg="' + ui.escapeHtml(item.id) + '">Menu</button>' +
             '</div></div></div>';
     }
     list.innerHTML = html;
@@ -312,12 +309,12 @@
     }
     var payload = {
       name: d.name, category: d.category, price: d.price, quantity: d.quantity,
-      imageUrl: d.imageUrl || "", showOnMenuDigital: d.showOnMenuDigital !== false,
+      imageUrl: d.imageUrl || "",
       updatedAt: Date.now()
     };
     var chain;
     if (state.editingId) {
-      chain = api.patchDoc(colPath() + "/" + state.editingId, payload, ["name", "category", "price", "quantity", "imageUrl", "showOnMenuDigital", "updatedAt"]);
+      chain = api.patchDoc(colPath() + "/" + state.editingId, payload, ["name", "category", "price", "quantity", "imageUrl", "updatedAt"]);
     } else {
       payload.createdAt = Date.now();
       chain = api.createDoc(colPath(), payload);
@@ -349,23 +346,11 @@
       price: Number(p.price) || 0,
       quantity: 0,
       imageUrl: p.imageUrl || "",
-      showOnMenuDigital: p.showOnMenuDigital !== false,
       createdAt: Date.now(),
       updatedAt: Date.now()
     }).then(function () {
       ui.toast("Produit dupliqué", "ok");
       loadProducts();
-    }).catch(function (err) { ui.toast(err.message || "Erreur", "error"); });
-  }
-
-  function toggleMenuDigital(id) {
-    var p = findProduct(id);
-    if (!p) return;
-    var next = p.showOnMenuDigital === false;
-    api.patchDoc(colPath() + "/" + id, { showOnMenuDigital: next, updatedAt: Date.now() }, ["showOnMenuDigital", "updatedAt"]).then(function () {
-      p.showOnMenuDigital = next;
-      paintList();
-      ui.toast(next ? "Visible sur le menu" : "Masqué du menu", "ok");
     }).catch(function (err) { ui.toast(err.message || "Erreur", "error"); });
   }
 
@@ -512,7 +497,7 @@
     adjustStock: adjustStock, toggleZero: toggleZero,
     openAddModal: openAddModal, addNext: addNext, addPrev: addPrev, addSave: addSave,
     deleteProduct: deleteProduct, duplicateProduct: duplicateProduct,
-    toggleMenuDigital: toggleMenuDigital, exportCsv: exportCsv,
+    exportCsv: exportCsv,
     openEntryModal: openEntryModal, openExitModal: openExitModal,
     saveEntry: saveEntry, saveExit: saveExit, openPinModal: openPinModal, savePin: savePin
   };

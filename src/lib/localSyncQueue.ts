@@ -1,12 +1,12 @@
 import { addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { barOrdersColRef, notificationsColRef, ordersColRef } from "@/lib/collections";
+import { notificationsColRef, ordersColRef } from "@/lib/collections";
 
 const DB_NAME = "nack-local-sync-db";
 const DB_VERSION = 1;
 const STORE_NAME = "pending_orders";
 
-type QueueChannel = "orders" | "barOrders";
+type QueueChannel = "orders";
 
 type PlainObject = Record<string, unknown>;
 
@@ -99,11 +99,7 @@ export async function removePendingOrder(id: string): Promise<void> {
 }
 
 async function syncOne(record: PendingOrderRecord): Promise<void> {
-  if (record.channel === "orders") {
-    await addDoc(ordersColRef(db, record.ownerUid), record.payload);
-  } else {
-    await addDoc(barOrdersColRef(db, record.ownerUid), record.payload);
-  }
+  await addDoc(ordersColRef(db, record.ownerUid), record.payload);
 
   if (record.notificationPayload) {
     try {

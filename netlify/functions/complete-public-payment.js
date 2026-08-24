@@ -38,95 +38,6 @@ exports.handler = async (event) => {
 
     const subType = String(payment.subscriptionType || "");
 
-    // Menu digital : mettre à jour la commande existante ou la créer
-    if (subType === "menu-digital" && payment.orderData && establishmentId) {
-      const orderData = {
-        ...payment.orderData,
-        status: "confirmed",
-        paymentStatus: "paid",
-        paymentPending: false,
-        source: "qr",
-        paidAt: now,
-        paymentMethod: "airtel-money",
-        paymentTransactionId: transactionId,
-      };
-
-      // Supprimer orderId des données pour ne pas écraser l'ID du document
-      const existingOrderId = orderData.orderId;
-      delete orderData.orderId;
-
-      let orderRef;
-      if (existingOrderId) {
-        // Mettre à jour la commande existante (créée avant le paiement)
-        orderRef = db.doc(`profiles/${establishmentId}/orders/${existingOrderId}`);
-        await orderRef.update({
-          status: "confirmed",
-          paymentStatus: "paid",
-          paymentPending: false,
-          paidAt: now,
-          paymentMethod: "airtel-money",
-          paymentTransactionId: transactionId,
-          updatedAt: now,
-        });
-        console.log('[Payment] Updated existing order:', existingOrderId);
-      } else {
-        // Créer une nouvelle commande (fallback)
-        orderRef = await db.collection(`profiles/${establishmentId}/orders`).add(orderData);
-        console.log('[Payment] Created new order:', orderRef.id);
-      }
-
-      // Diminuer le stock automatiquement après paiement
-      try {
-        const items = payment.orderData.items || [];
-        const productsRef = db.collection(`profiles/${establishmentId}/products`);
-        
-        for (const item of items) {
-          // Trouver le produit par nom
-          const productsSnap = await productsRef.where('name', '==', item.name).limit(1).get();
-          if (!productsSnap.empty) {
-            const productDoc = productsSnap.docs[0];
-            const product = productDoc.data();
-            const currentStock = Number(product.quantity || product.stock || 0);
-            const itemQuantity = Number(item.quantity || 0);
-            const newStock = Math.max(0, currentStock - itemQuantity);
-            
-            await productDoc.ref.update({
-              quantity: newStock,
-              stock: newStock,
-              lastStockUpdate: now
-            });
-            console.log(`[Payment] Stock updated for ${item.name}: ${currentStock} -> ${newStock}`);
-          }
-        }
-      } catch (stockError) {
-        console.error('[Payment] Error updating stock:', stockError);
-        // Ne pas bloquer le paiement si le stock échoue
-      }
-
-      const profSnap = await db.doc(`profiles/${establishmentId}`).get();
-      const fcmToken = profSnap.exists ? String(profSnap.data().fcmToken || "").trim() : "";
-      if (fcmToken) {
-        try {
-          await admin.messaging().send({
-            notification: {
-              title: "Nouvelle commande payée",
-              body: `Commande #${orderData.orderNumber || ""} — ${Number(orderData.total || 0).toLocaleString("fr-FR")} XAF`,
-            },
-            token: fcmToken,
-          });
-        } catch (e) {
-          console.warn("FCM after payment:", e.message);
-        }
-      }
-
-      return json(200, {
-        success: true,
-        establishmentId,
-        orderId: existingOrderId || orderRef.id,
-        type: "menu-digital",
-      });
-    }
-
     // Billet événement
     if (subType === "event-ticket" && payment.ticketData && payment.eventId && establishmentId) {
       const td = payment.ticketData;
@@ -186,6 +97,63 @@ exports.handler = async (event) => {
       }
 
       return json(200, { success: true, establishmentId: userId, type: subType });
+    }
+
+    // Commande menu digital / boutique en ligne
+    if (subType === "order") {
+      const batch = db.batch();
+
+      // Mettre à jour la commande liée : awaiting-payment → paid
+      if (payment.orderId) {
+        const orderRef = db.doc(`profiles/${establishmentId}/orders/${payment.orderId}`);
+        batch.update(orderRef, {
+          status: "paid",
+          paymentStatus: "paid",
+          paymentMethod: String(payment.method || "mobile"),
+          paidAt: now,
+          updatedAt: now,
+        });
+      }
+
+      // Notification in-app pour l'établissement
+      const notifRef = db.collection(`profiles/${establishmentId}/notifications`).doc();
+      const items = Array.isArray(payment.items) ? payment.items : [];
+      const itemsLabel = items.length
+        ? items.map((it) => `${it.quantity || 1}x ${it.name || "Article"}`).join(", ").slice(0, 120)
+        : "Commande menu digital";
+      batch.set(notifRef, {
+        title: "Commande payée en ligne",
+        message: `Nouvelle commande payée (${Number(payment.amount || 0).toLocaleString("fr-FR")} XAF) : ${itemsLabel}`,
+        type: "order",
+        orderId: payment.orderId || null,
+        paymentMethod: String(payment.method || "mobile"),
+        amount: Number(payment.amount || 0),
+        read: false,
+        createdAt: now,
+      });
+
+      await batch.commit();
+
+      // Push FCM (best effort — ne bloque pas la confirmation)
+      try {
+        const profSnap = await db.doc(`profiles/${establishmentId}`).get();
+        const token = String(profSnap.data()?.fcmToken || "").trim();
+        if (token) {
+          await admin.messaging().send({
+            notification: {
+              title: "Commande payée en ligne",
+              body: `${itemsLabel} — ${Number(payment.amount || 0).toLocaleString("fr-FR")} XAF`,
+            },
+            data: { type: "order", orderId: String(payment.orderId || "") },
+            token,
+            android: { priority: "high", notification: { sound: "default" } },
+          });
+        }
+      } catch (pushErr) {
+        console.error("FCM push (order) failed:", pushErr);
+      }
+
+      return json(200, { success: true, establishmentId, type: "order", orderId: payment.orderId || null });
     }
 
     return json(200, { success: true, establishmentId, type: subType || "unknown" });

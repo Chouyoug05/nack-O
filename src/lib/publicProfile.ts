@@ -1,5 +1,6 @@
 import { doc, setDoc, type Firestore } from "firebase/firestore";
 import type { UserProfile } from "@/types/profile";
+import type { MenuDesignId } from "@/types/menuConfig";
 
 /** Données établissement exposables sans authentification (menu QR, carte). */
 export interface PublicProfile {
@@ -27,12 +28,22 @@ export interface PublicProfile {
   deliveryPrice?: number;
   /** true si disbursement approuvé — sans exposer l'ID */
   paymentsEnabled?: boolean;
-  /** ID du design de menu sélectionné */
-  menuDesignId?: string;
+  /** true si la feature menu digital / boutique en ligne est activée. */
+  menuConfigEnabled?: boolean;
+  /** ID du design sélectionné pour le menu public. */
+  menuDesignId?: MenuDesignId;
   updatedAt: number;
 }
 
-export function buildPublicProfile(profile: Partial<UserProfile> & { uid: string }): PublicProfile {
+export interface MenuConfigPublicFields {
+  menuConfigEnabled?: boolean;
+  menuDesignId?: MenuDesignId;
+}
+
+export function buildPublicProfile(
+  profile: Partial<UserProfile> & { uid: string },
+  menuFields?: MenuConfigPublicFields,
+): PublicProfile {
   const paymentsEnabled =
     profile.disbursementStatus === "approved" && Boolean(String(profile.disbursementId || "").trim());
 
@@ -60,16 +71,18 @@ export function buildPublicProfile(profile: Partial<UserProfile> & { uid: string
     deliveryEnabled: profile.deliveryEnabled,
     deliveryPrice: profile.deliveryPrice,
     paymentsEnabled,
-    menuDesignId: profile.menuDesignId,
+    menuConfigEnabled: menuFields?.menuConfigEnabled,
+    menuDesignId: menuFields?.menuDesignId,
     updatedAt: profile.updatedAt ?? Date.now(),
   };
 }
 
 export async function syncPublicProfile(
   db: Firestore,
-  profile: Partial<UserProfile> & { uid: string }
+  profile: Partial<UserProfile> & { uid: string },
+  menuFields?: MenuConfigPublicFields,
 ): Promise<void> {
-  const raw = buildPublicProfile(profile);
+  const raw = buildPublicProfile(profile, menuFields);
   const payload = Object.fromEntries(
     Object.entries(raw).filter(([, v]) => v !== undefined)
   );

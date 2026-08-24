@@ -25,10 +25,9 @@ const PaymentSuccess = () => {
         setTimeout(fn, ms);
       };
 
-      // Pour les paiements menu digital et événements, l'utilisateur n'est pas nécessairement authentifié
+      // Pour les paiements événements, l'utilisateur n'est pas nécessairement authentifié
       const reference = searchParams.get('reference') || '';
       const paymentType = searchParams.get('type') || '';
-      const isMenuDigitalPayment = reference.includes('menu-digital');
       const isEventTicketPayment = reference.includes('event-ticket') || paymentType === 'event-ticket';
 
       // Gérer les paiements de billets d'événement
@@ -56,44 +55,6 @@ const PaymentSuccess = () => {
         }
 
         scheduleNav(() => navigate('/', { replace: true }), 3000);
-        return;
-      }
-
-      if (isMenuDigitalPayment) {
-        const transactionId = searchParams.get('transactionId') || '';
-
-        if (transactionId) {
-          try {
-            const result = await completePaymentViaServer(transactionId);
-            const estId = result.establishmentId || searchParams.get('establishmentId') || '';
-            if (estId) {
-              const pubDoc = await getDoc(doc(db, 'publicProfiles', estId));
-              if (pubDoc.exists()) {
-                const d = pubDoc.data();
-                setEstablishmentInfo({
-                  name: d.establishmentName || 'Établissement',
-                  logoUrl: d.logoUrl,
-                });
-              }
-              scheduleNav(() => {
-                navigate(`/commande/${estId}`, { replace: true, state: { paymentSuccess: true } });
-              }, 3000);
-              return;
-            }
-          } catch (error) {
-            console.error('Erreur traitement paiement menu digital:', error);
-          }
-        }
-
-        const establishmentIdFromUrl = searchParams.get('establishmentId');
-        if (establishmentIdFromUrl) {
-          scheduleNav(() => navigate(`/commande/${establishmentIdFromUrl}`, {
-            replace: true,
-            state: { paymentSuccess: true }
-          }), 3000);
-        } else {
-          scheduleNav(() => navigate('/', { replace: true }), 3000);
-        }
         return;
       }
 
@@ -217,14 +178,10 @@ const PaymentSuccess = () => {
         }
 
         // Détecter le type de paiement depuis la référence ou l'URL
-        let subscriptionType: 'transition' | 'transition-pro-max' | 'menu-digital' = 'transition';
+        let subscriptionType: 'transition' | 'transition-pro-max' = 'transition';
         let amount = 2500;
-        let isMenuDigitalPayment = false;
 
-        if (reference.includes('menu-digital')) {
-          subscriptionType = 'menu-digital';
-          isMenuDigitalPayment = true;
-        } else if (reference.includes('transition-pro-max') || reference.includes('pro-max')) {
+        if (reference.includes('transition-pro-max') || reference.includes('pro-max')) {
           subscriptionType = 'transition-pro-max';
           amount = SUBSCRIPTION_PLANS['transition-pro-max'].price;
         } else {
@@ -245,24 +202,9 @@ const PaymentSuccess = () => {
               const paymentDoc = paymentsSnapshot.docs[0];
               paymentTransaction = { id: paymentDoc.id, ...paymentDoc.data() } as PaymentTransaction;
 
-              // Si c'est un paiement Menu Digital, récupérer le montant depuis la transaction
-              if (paymentTransaction.subscriptionType === 'menu-digital') {
-                isMenuDigitalPayment = true;
-                amount = paymentTransaction.amount;
-              }
-
               // VÉRIFICATION IMPORTANTE: Si la transaction est déjà complétée, ne pas la traiter à nouveau
               if (paymentTransaction.status === 'completed') {
                 console.warn(`PaymentSuccess: Transaction ${transactionId} déjà complétée. Ignorant le traitement dupliqué.`);
-
-                // Pour les paiements Menu Digital, rediriger vers la page de commande
-                if (isMenuDigitalPayment && orderId) {
-                  scheduleNav(() => navigate(`/commande/${paymentTransaction.establishmentId || user.uid}`, {
-                    replace: true,
-                    state: { paymentSuccess: true }
-                  }), 2000);
-                  return;
-                }
 
                 // Vérifier si un reçu existe déjà
                 const receiptsRef = receiptsColRef(db, user.uid);
@@ -319,26 +261,6 @@ const PaymentSuccess = () => {
           } catch (error) {
             console.error('Erreur vérification doublon par référence:', error);
           }
-        }
-
-        // Gérer les paiements Menu Digital (utilisateur authentifié)
-        if (isMenuDigitalPayment && paymentTransaction && transactionId) {
-          try {
-            await completePaymentViaServer(transactionId);
-          } catch (error) {
-            console.error('Erreur confirmation paiement menu digital:', error);
-          }
-          scheduleNav(() => {
-            if (paymentTransaction.establishmentId) {
-              navigate(`/commande/${paymentTransaction.establishmentId}`, {
-                replace: true,
-                state: { paymentSuccess: true }
-              });
-            } else {
-              navigate('/dashboard', { replace: true });
-            }
-          }, 2000);
-          return;
         }
 
         // Calculer la nouvelle date de fin d'abonnement
@@ -458,7 +380,6 @@ const PaymentSuccess = () => {
 
   const reference = searchParams.get('reference') || '';
   const paymentType = searchParams.get('type') || '';
-  const isMenuDigitalPayment = reference.includes('menu-digital');
   const isEventTicketPayment = reference.includes('event-ticket') || paymentType === 'event-ticket';
   const wantsDesktopReturn = searchParams.get("returnClient") === "electron";
 
@@ -482,18 +403,16 @@ const PaymentSuccess = () => {
           </div>
         </div>
         <h1 className="text-3xl font-bold text-gray-900">
-          {isMenuDigitalPayment || isEventTicketPayment ? 'Paiement confirmé !' : 'Paiement confirmé'}
+          {isEventTicketPayment ? 'Paiement confirmé !' : 'Paiement confirmé'}
         </h1>
         <p className="text-sm text-gray-600">
           {wantsDesktopReturn
-            ? isMenuDigitalPayment || isEventTicketPayment
+            ? isEventTicketPayment
               ? "Paiement enregistré. Utilisez le bouton ci-dessous pour revenir à l'application NACK."
               : "Votre abonnement est activé. Revenez à l'application NACK pour continuer (synchronisation automatique avec votre compte)."
-            : isMenuDigitalPayment
-              ? 'Votre commande a été payée avec succès. Vous allez être redirigé vers le menu...'
-              : isEventTicketPayment
-                ? 'Votre billet a été payé avec succès. Vous allez être redirigé...'
-                : 'Votre abonnement a été activé. Redirection…'}
+            : isEventTicketPayment
+              ? 'Votre billet a été payé avec succès. Vous allez être redirigé...'
+              : 'Votre abonnement a été activé. Redirection…'}
         </p>
         {wantsDesktopReturn && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 p-4 text-left space-y-3">

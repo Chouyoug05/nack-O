@@ -806,7 +806,7 @@ const ServeurInterface = () => {
     }
   };
 
-  // Le serveur prend en charge et valide une commande en attente (QR ou interne)
+  // Le serveur prend en charge et valide une commande en attente
   const handleValidateOrder = async (order: Order) => {
     if (!ownerUid) {
       toast({
