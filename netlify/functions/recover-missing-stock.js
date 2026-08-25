@@ -1,6 +1,10 @@
 const { admin } = require("./_firebaseAdmin");
 const { json, parseBody, checkInternalSecret } = require("./_security");
 
+function normalize(str) {
+  return (str || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '').trim();
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type, X-Nack-Internal-Secret, X-Admin-Secret", "Access-Control-Allow-Methods": "POST, OPTIONS" }, body: "" };
@@ -42,6 +46,19 @@ exports.handler = async (event) => {
       const profileId = profileDoc.id;
       const profileResult = { profileId, salesProcessed: 0, stockDecremented: 0, errors: [] };
 
+      // Charger tous les produits en memoire pour la recherche par nom
+      const productsSnap = await db.collection(`profiles/${profileId}/products`).get();
+      const productsById = new Map();
+      const productsByName = new Map();
+      for (const pDoc of productsSnap.docs) {
+        const pData = pDoc.data();
+        productsById.set(pDoc.id, { ref: pDoc.ref, data: pData });
+        const norm = normalize(pData.name);
+        if (norm && !productsByName.has(norm)) {
+          productsByName.set(norm, { id: pDoc.id, ref: pDoc.ref, data: pData });
+        }
+      }
+
       const salesSnapshot = await db.collection(`profiles/${profileId}/sales`).get();
 
       for (const saleDoc of salesSnapshot.docs) {
@@ -51,65 +68,47 @@ exports.handler = async (event) => {
         const items = saleData.items || [];
         if (items.length === 0) continue;
 
-        // Traiter chaque vente individuellement pour isoler les erreurs
         try {
           const batch = db.batch();
           let updatedCount = 0;
-          const missingProducts = [];
 
           for (const item of items) {
             let productId = item.id || item.productId;
             const quantity = Number(item.quantity || item.qty || 0);
             if (quantity <= 0) continue;
 
-            // Si pas d'ID, chercher par nom
-            if (!productId && item.name) {
-              const nameLower = item.name.toLowerCase().trim();
-              const productsSnap = await db.collection(`profiles/${profileId}/products`).where('name', '>=', nameLower).where('name', '<=', nameLower + '\uf8ff').limit(1).get();
-              if (!productsSnap.empty) {
-                productId = productsSnap.docs[0].id;
-              }
+            let productInfo = null;
+
+            // 1. Chercher par ID
+            if (productId) {
+              productInfo = productsById.get(productId);
             }
 
-            if (!productId) continue;
-
-            const productRef = db.doc(`profiles/${profileId}/products/${productId}`);
-            const productSnap = await productRef.get();
-
-            if (!productSnap.exists) {
-              missingProducts.push(productId);
-              continue;
+            // 2. Si pas trouve, chercher par nom normalise
+            if (!productInfo && item.name) {
+              productInfo = productsByName.get(normalize(item.name));
             }
 
-            batch.update(productRef, {
+            if (!productInfo) continue;
+
+            batch.update(productInfo.ref, {
               quantity: admin.firestore.FieldValue.increment(-quantity),
               updatedAt: admin.firestore.FieldValue.serverTimestamp()
             });
             updatedCount++;
           }
 
-          if (updatedCount > 0) {
+          if (updatedCount > 0 && !dryRun) {
             batch.update(saleDoc.ref, {
               stockRecovered: true,
               recoveredAt: admin.firestore.FieldValue.serverTimestamp()
             });
+            await batch.commit();
+          }
 
-            if (!dryRun) {
-              await batch.commit();
-            }
-
+          if (updatedCount > 0) {
             profileResult.salesProcessed++;
             profileResult.stockDecremented += updatedCount;
-          } else if (missingProducts.length > 0) {
-            // Tous les produits de cette vente n'existent pas
-            // Marquer quand même comme récupéré pour ne pas réessayer
-            if (!dryRun) {
-              await saleDoc.ref.update({
-                stockRecovered: true,
-                recoveredAt: admin.firestore.FieldValue.serverTimestamp(),
-                stockRecoveryNote: "All products missing from catalog"
-              });
-            }
           }
         } catch (saleError) {
           profileResult.errors.push(`Sale ${saleDoc.id}: ${saleError.message}`);
