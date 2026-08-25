@@ -5,7 +5,6 @@
   "description": "NACK — point de vente, stock, équipes et commandes pour établissements (interface web et application Windows).",
   "author": "NACK",
   "main": "electron/main.cjs",
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "dev:electron": "concurrently \"npm run dev\" \"wait-on tcp:8080 && electron .\"",
@@ -166,5 +165,6 @@
     "typescript-eslint": "^8.38.0",
     "vite": "^5.4.19",
     "wait-on": "^9.0.5"
-  }
+  },
+  "type": "module"
 }
