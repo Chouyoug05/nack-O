@@ -5,26 +5,30 @@ exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "Content-Type, X-Nack-Internal-Secret, X-Admin-Secret", "Access-Control-Allow-Methods": "POST, OPTIONS" }, body: "" };
   }
-  if (event.httpMethod !== "POST") {
-    return json(405, { error: "Method Not Allowed" });
-  }
+  if (event.httpMethod !== "POST") return json(405, { error: "Method Not Allowed" });
 
   const adminSecret = event.headers["x-admin-secret"] || event.headers["X-Admin-Secret"];
-  const internalSecret = event.headers["x-nack-internal-secret"] || event.headers["X-Nack-Internal-Secret"];
   const expectedAdmin = process.env.ADMIN_FUNCTION_SECRET;
   const expectedInternal = process.env.NACK_INTERNAL_SECRET;
-
-  if (expectedAdmin && adminSecret !== expectedAdmin && expectedInternal && internalSecret !== expectedInternal) {
+  if (expectedAdmin && adminSecret !== expectedAdmin && expectedInternal && (event.headers["x-nack-internal-secret"] || event.headers["X-Nack-Internal-Secret"]) !== expectedInternal) {
     return json(403, { error: "Secret requis" });
   }
 
   const input = parseBody(event);
   const dryRun = input && input.dryRun === true;
+  const targetProfileId = input && input.profileId;
 
   try {
     const db = admin.firestore();
 
-    const profilesSnapshot = await db.collection("profiles").get();
+    let profilesSnapshot;
+    if (targetProfileId) {
+      const doc = await db.doc(`profiles/${targetProfileId}`).get();
+      profilesSnapshot = doc.exists ? { docs: [doc], size: 1 } : { docs: [], size: 0 };
+    } else {
+      profilesSnapshot = await db.collection("profiles").get();
+    }
+
     const results = {
       totalProfiles: profilesSnapshot.size,
       profilesWithSales: 0,
@@ -38,21 +42,20 @@ exports.handler = async (event) => {
       const profileId = profileDoc.id;
       const profileResult = { profileId, salesProcessed: 0, stockDecremented: 0, errors: [] };
 
-      try {
-        const salesSnapshot = await db.collection(`profiles/${profileId}/sales`).get();
+      const salesSnapshot = await db.collection(`profiles/${profileId}/sales`).get();
 
-        for (const saleDoc of salesSnapshot.docs) {
-          const saleData = saleDoc.data();
+      for (const saleDoc of salesSnapshot.docs) {
+        const saleData = saleDoc.data();
+        if (saleData.stockRecovered || saleData.stockDecrementedAt) continue;
 
-          if (saleData.stockRecovered || saleData.stockDecrementedAt) {
-            continue;
-          }
+        const items = saleData.items || [];
+        if (items.length === 0) continue;
 
-          const items = saleData.items || [];
-          if (items.length === 0) continue;
-
+        // Traiter chaque vente individuellement pour isoler les erreurs
+        try {
           const batch = db.batch();
           let updatedCount = 0;
+          const missingProducts = [];
 
           for (const item of items) {
             const productId = item.id || item.productId;
@@ -62,6 +65,13 @@ exports.handler = async (event) => {
             if (quantity <= 0) continue;
 
             const productRef = db.doc(`profiles/${profileId}/products/${productId}`);
+            const productSnap = await productRef.get();
+
+            if (!productSnap.exists()) {
+              missingProducts.push(productId);
+              continue;
+            }
+
             batch.update(productRef, {
               quantity: admin.firestore.FieldValue.increment(-quantity),
               updatedAt: admin.firestore.FieldValue.serverTimestamp()
@@ -81,23 +91,29 @@ exports.handler = async (event) => {
 
             profileResult.salesProcessed++;
             profileResult.stockDecremented += updatedCount;
+          } else if (missingProducts.length > 0) {
+            // Tous les produits de cette vente n'existent pas
+            // Marquer quand même comme récupéré pour ne pas réessayer
+            if (!dryRun) {
+              await saleDoc.ref.update({
+                stockRecovered: true,
+                recoveredAt: admin.firestore.FieldValue.serverTimestamp(),
+                stockRecoveryNote: "All products missing from catalog"
+              });
+            }
           }
-        }
-
-        if (profileResult.salesProcessed > 0) {
-          results.profilesWithSales++;
-          results.totalSalesRecovered += profileResult.salesProcessed;
-          results.totalStockDecremented += profileResult.stockDecremented;
-          results.details.push(profileResult);
-        }
-      } catch (error) {
-        const errorMsg = `Profile ${profileId}: ${error.message}`;
-        results.errors.push(errorMsg);
-        profileResult.errors.push(errorMsg);
-        if (profileResult.salesProcessed > 0) {
-          results.details.push(profileResult);
+        } catch (saleError) {
+          profileResult.errors.push(`Sale ${saleDoc.id}: ${saleError.message}`);
         }
       }
+
+      if (profileResult.salesProcessed > 0 || profileResult.errors.length > 0) {
+        results.profilesWithSales++;
+        results.totalSalesRecovered += profileResult.salesProcessed;
+        results.totalStockDecremented += profileResult.stockDecremented;
+        results.details.push(profileResult);
+      }
+      results.errors.push(...profileResult.errors);
     }
 
     return json(200, {
