@@ -65,7 +65,7 @@ service cloud.firestore {
         (resource.data.status == 'awaiting-validation' && (request.resource.data.status == 'validated' || request.resource.data.status == 'cancelled')) ||
         (resource.data.status == 'validated' && (request.resource.data.status == 'in-preparation' || request.resource.data.status == 'ready' || request.resource.data.status == 'cancelled')) ||
         (resource.data.status == 'in-preparation' && (request.resource.data.status == 'ready' || request.resource.data.status == 'validated' || request.resource.data.status == 'cancelled')) ||
-        (resource.data.status == 'ready' && request.resource.data.status == 'delivered') ||
+        (resource.data.status == 'ready' && (request.resource.data.status == 'delivered' || request.resource.data.status == 'cancelled')) ||
         (resource.data.status == 'delivered' && request.resource.data.status == 'paid') ||
         (resource.data.status == 'paid' && request.resource.data.status == 'closed');
     }

@@ -321,6 +321,52 @@ const OrderManagement = ({
     }
   };
 
+  const handleMarkReady = async (order: Order) => {
+    if (processingIds.has(order.id)) return;
+    setProcessingIds(prev => new Set(prev).add(order.id));
+    if (!uidToUse) {
+      setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+      toast({ title: 'Erreur', description: 'Établissement non identifié.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const updateData: Record<string, unknown> = {
+        status: 'ready',
+        readyAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const orderRef = fsDoc(ordersColRef(db, uidToUse), order.id);
+      const orderSnap = await getDoc(orderRef);
+
+      if (!orderSnap.exists()) {
+        const q = query(ordersColRef(db, uidToUse), where('orderNumber', '==', order.orderNumber));
+        const querySnap = await getDocs(q);
+        if (querySnap.empty) {
+          toast({ title: 'Erreur', description: `Commande #${order.orderNumber} introuvable.`, variant: 'destructive' });
+          return;
+        }
+        const foundDoc = querySnap.docs[0];
+        await updateDoc(foundDoc.ref, updateData);
+        setFsOrders(prev => prev.map(o => o.id === foundDoc.id ? { ...o, status: 'ready' } : o));
+        updateOrderStatus(order.id, 'ready');
+        toast({ title: "Commande prête", description: `Commande #${order.orderNumber} marquée comme prête` });
+        return;
+      }
+
+      await updateDoc(orderRef, updateData);
+      setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'ready' } : o));
+      updateOrderStatus(order.id, 'ready');
+      toast({ title: "Commande prête", description: `Commande #${order.orderNumber} marquée comme prête` });
+    } catch (e) {
+      console.error('Erreur marquer prête:', e);
+      const errorMsg = e instanceof Error ? e.message : 'Erreur inconnue';
+      toast({ title: 'Erreur', description: `Impossible de marquer la commande: ${errorMsg}`, variant: 'destructive' });
+    } finally {
+      setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+    }
+  };
+
   // Encaissement d'une commande livrée : via la caisse (SalesPage) ou directement
   const handleCashInOrder = async (order: Order) => {
     if (processingIds.has(order.id)) return;
@@ -642,7 +688,7 @@ const OrderManagement = ({
   }, [orders]);
 
   const canCancelOrderStatus = (s: OrderStatus) =>
-    s === 'awaiting-validation' || s === 'validated' || s === 'in-preparation';
+    s === 'awaiting-validation' || s === 'validated' || s === 'in-preparation' || s === 'ready';
 
   // Grouper les commandes par section
   const ordersToCashIn = sortedOrders.filter(o => o.status === 'delivered' && o.paymentStatus !== 'paid');
@@ -740,6 +786,29 @@ const OrderManagement = ({
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Valider et envoyer en cuisine
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleCancelOrderClick(order)}
+                disabled={processingIds.has(order.id) || isCancelling}
+                type="button"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Annuler
+              </Button>
+            </>
+          )}
+
+          {(order.status === 'validated' || order.status === 'in-preparation') && (
+            <>
+              <Button
+                onClick={() => handleMarkReady(order)}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-button min-w-[140px]"
+                disabled={processingIds.has(order.id)}
+                type="button"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Marquer prête
               </Button>
               <Button
                 variant="destructive"
