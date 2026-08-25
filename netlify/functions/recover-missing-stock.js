@@ -67,7 +67,7 @@ exports.handler = async (event) => {
             const productRef = db.doc(`profiles/${profileId}/products/${productId}`);
             const productSnap = await productRef.get();
 
-            if (!productSnap.exists()) {
+            if (!productSnap.exists) {
               missingProducts.push(productId);
               continue;
             }
