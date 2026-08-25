@@ -436,8 +436,14 @@ const OrderManagement = ({
       let stockUpdated = false;
       let missingProducts: string[] = [];
 
-      // Décrémenter le stock pour chaque article de la commande
-      if (order.items && order.items.length > 0) {
+      // Vérifier si le stock a déjà été décrémenté (ex: lors de l'encaissement)
+      const orderRef = fsDoc(ordersColRef(db, uidToUse), order.id);
+      const orderSnap = await getDoc(orderRef);
+      const orderData = orderSnap.data() as { stockDecrementedAt?: number };
+      const stockAlreadyDecremented = !!orderData?.stockDecrementedAt;
+
+      // Décrémenter le stock pour chaque article de la commande (sauf si déjà fait)
+      if (!stockAlreadyDecremented && order.items && order.items.length > 0) {
         const productsSnapshot = await getDocs(productsColRef(db, uidToUse));
         const productsMap = new Map<string, string>();
         productsSnapshot.docs.forEach(d => {
@@ -467,6 +473,8 @@ const OrderManagement = ({
           });
           stockUpdated = true;
         }
+      } else if (stockAlreadyDecremented) {
+        stockUpdated = true;
       }
 
       await updateDoc(fsDoc(ordersColRef(db, uidToUse), order.id), {

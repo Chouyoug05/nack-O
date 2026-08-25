@@ -443,59 +443,56 @@ const SalesPage = () => {
     })();
 
     try {
-      // Pré-contrôle des stocks uniquement pour les nouvelles ventes (pas pour l'encaissement de commandes)
-      if (!isOrderCashIn) {
-        const adjusted: CartItem[] = [];
-        const changes: string[] = [];
-        for (const item of cart) {
-          let currentQty: number;
-          if (!isOnline) {
-            const p = products.find((x) => x.id === item.id);
-            if (!p) {
-              changes.push(`${item.name}: supprimé (produit introuvable en local)`);
-              continue;
-            }
-            currentQty = Number(p.stock ?? 0);
-          } else {
-            const ref = fsDoc(productsColRef(db, user.uid), item.id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) {
-              changes.push(`${item.name}: supprimé (produit introuvable)`);
-              continue;
-            }
-            const data = snap.data() as ProductDoc;
-            currentQty = Number((data as { quantity?: number }).quantity ?? 0);
-          }
-          if (currentQty <= 0) {
-            changes.push(`${item.name}: supprimé (stock épuisé)`);
+      // Pré-contrôle des stocks pour toutes les ventes
+      const adjusted: CartItem[] = [];
+      const changes: string[] = [];
+      for (const item of cart) {
+        let currentQty: number;
+        if (!isOnline) {
+          const p = products.find((x) => x.id === item.id);
+          if (!p) {
+            changes.push(`${item.name}: supprimé (produit introuvable en local)`);
             continue;
           }
-          const desired = Number(item.quantity || 0);
-          if (desired > currentQty) {
-            adjusted.push({ ...item, quantity: currentQty });
-            changes.push(`${item.name}: limité à ${currentQty}`);
-          } else {
-            adjusted.push(item);
+          currentQty = Number(p.stock ?? 0);
+        } else {
+          const ref = fsDoc(productsColRef(db, user.uid), item.id);
+          const snap = await getDoc(ref);
+          if (!snap.exists()) {
+            changes.push(`${item.name}: supprimé (produit introuvable)`);
+            continue;
           }
+          const data = snap.data() as ProductDoc;
+          currentQty = Number((data as { quantity?: number }).quantity ?? 0);
         }
-        if (changes.length > 0) {
-          setCart(adjusted);
-          setIsCheckoutOpen(true);
-          toast({ title: "Stock ajusté", description: changes.join(" • "), variant: "destructive" });
-          return;
+        if (currentQty <= 0) {
+          changes.push(`${item.name}: supprimé (stock épuisé)`);
+          continue;
         }
+        const desired = Number(item.quantity || 0);
+        if (desired > currentQty) {
+          adjusted.push({ ...item, quantity: currentQty });
+          changes.push(`${item.name}: limité à ${currentQty}`);
+        } else {
+          adjusted.push(item);
+        }
+      }
+      if (changes.length > 0) {
+        setCart(adjusted);
+        setIsCheckoutOpen(true);
+        toast({ title: "Stock ajusté", description: changes.join(" • "), variant: "destructive" });
+        return;
       }
 
       setIsSaving(true);
       const ownerUidForWrites = user.uid;
       
-      // Batch atomique: créer la vente et éventuellement décrémenter le stock
+      // Batch atomique: créer la vente et décrémenter le stock (toujours, que ce soit vente directe ou encaissement de commande)
       const batch = writeBatch(db);
       const skippedItems: string[] = [];
       
-      // Décrémenter le stock uniquement pour les nouvelles ventes (pas pour l'encaissement de commandes)
-      if (!isOrderCashIn) {
-        for (const item of cart) {
+      // Décrémenter le stock pour toutes les ventes
+      for (const item of cart) {
           const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
           let currentQty: number;
           if (!isOnline) {
@@ -522,7 +519,6 @@ const SalesPage = () => {
           }
           batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
         }
-      }
         const saleItems: SaleItem[] = cart.map((ci) =>
           omitUndefined({
             id: ci.id,
@@ -563,14 +559,15 @@ const SalesPage = () => {
             paidBy: 'manager',
             managerId: user?.uid,
             paidAt,
+            stockDecrementedAt: paidAt,
             updatedAt: paidAt,
           });
         }
         localStorage.removeItem('nack_prefill_order_meta');
       } catch { /* ignore */ }
 
-      // Afficher un avertissement si des articles ont été ignorés (uniquement pour les nouvelles ventes)
-      if (!isOrderCashIn && skippedItems.length > 0) {
+      // Afficher un avertissement si des articles ont été ignorés (stock insuffisant)
+      if (skippedItems.length > 0) {
         toast({
           title: "Stock non décrémenté",
           description: `Les articles suivants n'ont pas été trouvés ou ont un stock insuffisant : ${skippedItems.join(', ')}`,
