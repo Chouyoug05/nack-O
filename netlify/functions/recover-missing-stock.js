@@ -58,11 +58,20 @@ exports.handler = async (event) => {
           const missingProducts = [];
 
           for (const item of items) {
-            const productId = item.id || item.productId;
-            if (!productId) continue;
-
-            const quantity = Number(item.quantity || 0);
+            let productId = item.id || item.productId;
+            const quantity = Number(item.quantity || item.qty || 0);
             if (quantity <= 0) continue;
+
+            // Si pas d'ID, chercher par nom
+            if (!productId && item.name) {
+              const nameLower = item.name.toLowerCase().trim();
+              const productsSnap = await db.collection(`profiles/${profileId}/products`).where('name', '>=', nameLower).where('name', '<=', nameLower + '\uf8ff').limit(1).get();
+              if (!productsSnap.empty) {
+                productId = productsSnap.docs[0].id;
+              }
+            }
+
+            if (!productId) continue;
 
             const productRef = db.doc(`profiles/${profileId}/products/${productId}`);
             const productSnap = await productRef.get();
