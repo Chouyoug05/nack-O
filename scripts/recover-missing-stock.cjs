@@ -1,7 +1,7 @@
 const https = require('https');
 const fs = require('fs');
 
-const FUNCTION_URL = 'https://nack-o.netlify.app/.netlify/functions/recover-missing-stock';
+const FUNCTION_URL = 'https://nack.pro/.netlify/functions/recover-missing-stock';
 const ADMIN_SECRET = process.env.ADMIN_FUNCTION_SECRET || '';
 
 if (!ADMIN_SECRET) {
@@ -17,7 +17,7 @@ console.log(`\n🔍 Mode: ${dryRun ? 'DRY RUN (simulation)' : 'EXÉCUTION RÉELL
 const postData = JSON.stringify({ dryRun });
 
 const options = {
-  hostname: 'nack-o.netlify.app',
+  hostname: 'nack.pro',
   port: 443,
   path: '/.netlify/functions/recover-missing-stock',
   method: 'POST',
