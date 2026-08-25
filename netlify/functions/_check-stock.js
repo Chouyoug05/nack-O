@@ -32,6 +32,7 @@ exports.handler = async (event) => {
       profileId,
       products,
       salesCount: sales.length,
+      sales: sales.slice(0, 50),
       unrecoveredCount: unrecovered.length,
       unrecovered: unrecovered.slice(0, 20)
     });
