@@ -479,9 +479,11 @@ const SalesPage = () => {
       }
       if (changes.length > 0) {
         setCart(adjusted);
-        setIsCheckoutOpen(true);
-        toast({ title: "Stock ajusté", description: changes.join(" • "), variant: "destructive" });
-        return;
+        if (adjusted.length === 0) {
+          toast({ title: "Panier vide", description: "Aucun produit valide restant après ajustement", variant: "destructive" });
+          return;
+        }
+        toast({ title: "Stock ajusté", description: changes.join(" • "), variant: "default" });
       }
 
       setIsSaving(true);
