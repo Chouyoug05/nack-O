@@ -448,16 +448,28 @@ const SalesPage = () => {
       const changes: string[] = [];
       for (const item of cart) {
         let currentQty: number;
+        let resolvedId = item.id;
         if (!isOnline) {
-          const p = products.find((x) => x.id === item.id);
+          let p = products.find((x) => x.id === item.id);
+          if (!p) p = products.find((x) => x.name === item.name);
           if (!p) {
             changes.push(`${item.name}: supprimé (produit introuvable en local)`);
             continue;
           }
+          resolvedId = p.id;
           currentQty = Number(p.stock ?? 0);
         } else {
-          const ref = fsDoc(productsColRef(db, user.uid), item.id);
-          const snap = await getDoc(ref);
+          let ref = fsDoc(productsColRef(db, user.uid), item.id);
+          let snap = await getDoc(ref);
+          if (!snap.exists()) {
+            const fallback = products.find((x) => x.name === item.name);
+            if (fallback) {
+              resolvedId = fallback.id;
+              ref = fsDoc(productsColRef(db, user.uid), fallback.id);
+              snap = await getDoc(ref);
+              changes.push(`${item.name}: réassocié au nouveau produit`);
+            }
+          }
           if (!snap.exists()) {
             changes.push(`${item.name}: supprimé (produit introuvable)`);
             continue;
@@ -471,10 +483,10 @@ const SalesPage = () => {
         }
         const desired = Number(item.quantity || 0);
         if (desired > currentQty) {
-          adjusted.push({ ...item, quantity: currentQty });
+          adjusted.push({ ...item, id: resolvedId, quantity: currentQty });
           changes.push(`${item.name}: limité à ${currentQty}`);
         } else {
-          adjusted.push(item);
+          adjusted.push({ ...item, id: resolvedId });
         }
       }
       if (changes.length > 0) {
@@ -488,13 +500,15 @@ const SalesPage = () => {
 
       setIsSaving(true);
       const ownerUidForWrites = user.uid;
+      const itemsToProcess = adjusted.length > 0 ? adjusted : cart;
+      const saleTotal = itemsToProcess.reduce((t, i) => t + (i.price * i.quantity), 0);
       
       // Batch atomique: créer la vente et décrémenter le stock (toujours, que ce soit vente directe ou encaissement de commande)
       const batch = writeBatch(db);
       const skippedItems: string[] = [];
       
       // Décrémenter le stock pour toutes les ventes
-      for (const item of cart) {
+      for (const item of itemsToProcess) {
           const productRef = fsDoc(productsColRef(db, ownerUidForWrites), item.id);
           let currentQty: number;
           if (!isOnline) {
@@ -521,7 +535,7 @@ const SalesPage = () => {
           }
           batch.update(productRef, { quantity: currentQty - qtyToDecrement, updatedAt: Date.now() });
         }
-        const saleItems: SaleItem[] = cart.map((ci) =>
+        const saleItems: SaleItem[] = itemsToProcess.map((ci) =>
           omitUndefined({
             id: ci.id,
             name: ci.name,
@@ -535,7 +549,7 @@ const SalesPage = () => {
         const saleRef = fsDoc(saleCol);
       const saleDoc: SaleDoc = omitUndefined({
         items: saleItems,
-        total: cartTotal,
+        total: saleTotal,
         paymentMethod: selectedPayment,
         createdAt: Date.now(),
         tableZone: tableNumber.trim() || 'Caisse',
@@ -580,10 +594,10 @@ const SalesPage = () => {
       toast({
         title: isOrderCashIn ? "Encaissement enregistré" : "Vente enregistrée",
         description: isOrderCashIn
-          ? `Commande encaissée avec succès (${cartTotal.toLocaleString()} XAF)`
+          ? `Commande encaissée avec succès (${saleTotal.toLocaleString()} XAF)`
           : !isOnline
-            ? `Vente de ${cartTotal.toLocaleString()} XAF — enregistrée sur l'appareil ; synchro automatique au retour du réseau.`
-            : `Vente de ${cartTotal.toLocaleString()} XAF`,
+            ? `Vente de ${saleTotal.toLocaleString()} XAF — enregistrée sur l'appareil ; synchro automatique au retour du réseau.`
+            : `Vente de ${saleTotal.toLocaleString()} XAF`,
       });
       
       // Proposer d'imprimer le reçu pour le client
@@ -600,12 +614,12 @@ const SalesPage = () => {
             establishmentName: profileData?.establishmentName || 'Établissement',
             establishmentLogo: profileData?.logoUrl,
             tableZone: tableNumber.trim() || 'Caisse',
-            items: cart.map(item => ({
+            items: itemsToProcess.map(item => ({
               name: item.name,
               quantity: item.quantity,
               price: item.price
             })),
-            total: cartTotal,
+            total: saleTotal,
             createdAt: Date.now(),
             // Informations personnalisées du profil
             companyName: profileData?.companyName,
