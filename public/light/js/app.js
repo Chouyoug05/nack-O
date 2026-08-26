@@ -99,13 +99,39 @@
       interfaces.agentEvent.render(root, { token: parts[1] });
       return true;
     }
-    if ((name === "menu" || name === "commande") && parts[1] && pub.ordering) {
-      var tableParam = (route.query.match(/(?:^|&)table=([^&]*)/) || [])[1];
-      var themeParam = (route.query.match(/(?:^|&)theme=([^&]*)/) || [])[1];
+    if ((name === "menu" || name === "commande") && parts[1]) {
+      if (!pub.ordering) {
+        var tableParam = (route.query.match(/(?:^|&)table=([^&]*)/) || [])[1];
+        var themeParam = (route.query.match(/(?:^|&)theme=([^&]*)/) || [])[1];
+        var ctx = {
+          uid: parts[1],
+          table: tableParam ? decodeURIComponent(tableParam) : null,
+          theme: themeParam ? decodeURIComponent(themeParam) : null
+        };
+        var retryCount = 0;
+        function retryOrdering() {
+          if (pub.ordering) {
+            pub.ordering.render(root, ctx);
+            return;
+          }
+          retryCount++;
+          if (retryCount > 10) {
+            root.innerHTML = '<div class="lg-empty" style="padding:48px 24px;text-align:center">' +
+              '<p style="font-size:16px;font-weight:700;margin-bottom:8px">Menu indisponible</p>' +
+              '<p style="font-size:13px;color:#888">Veuillez réessayer ou actualiser la page.</p></div>';
+            return;
+          }
+          setTimeout(retryOrdering, 300);
+        }
+        retryOrdering();
+        return true;
+      }
+      var tableParam2 = (route.query.match(/(?:^|&)table=([^&]*)/) || [])[1];
+      var themeParam2 = (route.query.match(/(?:^|&)theme=([^&]*)/) || [])[1];
       pub.ordering.render(root, {
         uid: parts[1],
-        table: tableParam ? decodeURIComponent(tableParam) : null,
-        theme: themeParam ? decodeURIComponent(themeParam) : null
+        table: tableParam2 ? decodeURIComponent(tableParam2) : null,
+        theme: themeParam2 ? decodeURIComponent(themeParam2) : null
       });
       return true;
     }

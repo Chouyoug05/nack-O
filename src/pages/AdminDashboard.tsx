@@ -82,6 +82,9 @@ const AdminDashboard = () => {
   const [isFixingPastDates, setIsFixingPastDates] = useState(false);
   const [allPayments, setAllPayments] = useState<Array<PaymentTransaction & { userEmail?: string; userName?: string }>>([]);
   const [isLoadingPayments, setIsLoadingPayments] = useState(false);
+  const [allSingpayPayments, setAllSingpayPayments] = useState<Array<PaymentTransaction & { userEmail?: string; userName?: string; establishmentName?: string }>>([]);
+  const [isLoadingSingpayPayments, setIsLoadingSingpayPayments] = useState(false);
+  const [singpayFilter, setSingpayFilter] = useState<"all" | "pending" | "completed" | "failed">("all");
   const [globalStats, setGlobalStats] = useState({
     totalProducts: 0,
     totalOrders: 0,
@@ -172,10 +175,10 @@ const AdminDashboard = () => {
 
   // Initialiser activeView depuis l'URL ou par défaut "menu"
   const viewParam = searchParams.get('view');
-  const initialView = (viewParam && ['menu', 'users', 'tablets', 'settings', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam))
+  const initialView = (viewParam && ['menu', 'users', 'tablets', 'settings', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates', 'payments'].includes(viewParam))
     ? viewParam as typeof activeView
     : 'menu';
-  const [activeView, setActiveView] = useState<"menu" | "users" | "tablets" | "settings" | "support" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "customers" | "disbursements" | "affiliates">(initialView);
+  const [activeView, setActiveView] = useState<"menu" | "users" | "tablets" | "settings" | "support" | "products" | "events" | "orders" | "ratings" | "subscriptions" | "notifications" | "customers" | "disbursements" | "affiliates" | "payments">(initialView);
   const [isSendingNotifications, setIsSendingNotifications] = useState(false);
   const [subscriptionPlans, setSubscriptionPlans] = useState<{
     transition: { name: string; price: number; features: SubscriptionFeatures };
@@ -201,7 +204,7 @@ const AdminDashboard = () => {
   // Mettre à jour activeView quand l'URL change
   useEffect(() => {
     const viewParam = searchParams.get('view');
-    if (viewParam && ['menu', 'users', 'tablets', 'settings', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates'].includes(viewParam)) {
+    if (viewParam && ['menu', 'users', 'tablets', 'settings', 'support', 'products', 'events', 'orders', 'ratings', 'subscriptions', 'notifications', 'customers', 'disbursements', 'affiliates', 'payments'].includes(viewParam)) {
       setActiveView(viewParam as typeof activeView);
     }
   }, [searchParams]);
@@ -315,6 +318,43 @@ const AdminDashboard = () => {
       setIsLoadingPayments(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- on purpose: reload only when allProfiles change
+  }, [allProfiles, toast]);
+
+  const loadAllSingpayPayments = useCallback(async () => {
+    if (allProfiles.length === 0) {
+      setIsLoadingSingpayPayments(false);
+      return;
+    }
+    setIsLoadingSingpayPayments(true);
+    try {
+      const payments: Array<PaymentTransaction & { userEmail?: string; userName?: string; establishmentName?: string }> = [];
+      for (const profile of allProfiles) {
+        try {
+          const paymentsRef = paymentsColRef(db, profile.uid);
+          const paymentsSnapshot = await getDocs(paymentsRef);
+          paymentsSnapshot.docs.forEach(d => {
+            const data = d.data();
+            const paymentData = { id: d.id, ...data } as PaymentTransaction;
+            payments.push({
+              ...paymentData,
+              userEmail: profile.email,
+              userName: profile.ownerName || profile.establishmentName,
+              establishmentName: profile.establishmentName || "",
+            });
+          });
+        } catch (err) {
+          console.error(`Erreur chargement paiements SingPay pour ${profile.uid}:`, err);
+        }
+      }
+      payments.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      setAllSingpayPayments(payments);
+    } catch (err) {
+      console.error("Erreur chargement tous les paiements SingPay:", err);
+      toast({ title: "Erreur", description: "Impossible de charger les paiements", variant: "destructive" });
+    } finally {
+      setIsLoadingSingpayPayments(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allProfiles, toast]);
 
   const loadGlobalStats = useCallback(async () => {
@@ -1019,6 +1059,7 @@ const AdminDashboard = () => {
       setIsLoadingGlobalStats(false);
       setIsLoadingPayments(false);
     }
+    if (currentView !== 'payments') setIsLoadingSingpayPayments(false);
   }, [isAdmin, activeView]);
 
   // Charger les données quand on change de vue ou quand les profils deviennent disponibles
@@ -1042,6 +1083,7 @@ const AdminDashboard = () => {
         setIsLoadingGlobalStats(false);
         setIsLoadingPayments(false);
       }
+      if (activeView !== 'payments') setIsLoadingSingpayPayments(false);
     }
 
     // Si on n'a pas de profils, restaurer depuis le cache si disponible
@@ -1096,6 +1138,9 @@ const AdminDashboard = () => {
             setIsLoadingPayments(true);
           }
           break;
+        case 'payments':
+          setIsLoadingSingpayPayments(true);
+          break;
         case 'users':
           // Les utilisateurs sont déjà chargés via onSnapshot
           break;
@@ -1147,6 +1192,10 @@ const AdminDashboard = () => {
             loadAllRatings();
             loadedViewsRef.current.add('ratings');
             break;
+          case 'payments':
+            loadAllSingpayPayments();
+            loadedViewsRef.current.add('payments');
+            break;
           case 'users':
             // Les utilisateurs sont déjà chargés via onSnapshot
             loadedViewsRef.current.add('users');
@@ -1158,7 +1207,7 @@ const AdminDashboard = () => {
     prevProfilesLengthRef.current = allProfiles.length;
     prevViewsRef.current = activeView;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, activeView, allProfiles.length]);
+  }, [isAdmin, activeView, allProfiles.length, loadAllSingpayPayments]);
 
   const now = Date.now();
   const filtered = useMemo(() => {
@@ -2086,6 +2135,14 @@ const AdminDashboard = () => {
           <QrCode size={48} className="text-teal-600 transition-transform group-hover:scale-110" />
           <h2 className="text-lg font-semibold text-gray-900">Affiliation</h2>
           <p className="text-sm text-muted-foreground">{affiliates.length} affiliés</p>
+        </button>
+        <button
+          onClick={() => navigate('/admin?view=payments')}
+          className="relative flex aspect-square flex-col items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow-lg transition-all hover:scale-[1.02] active:scale-[0.98] group"
+        >
+          <CreditCard size={48} className="text-emerald-600 transition-transform group-hover:scale-110" />
+          <h2 className="text-lg font-semibold text-gray-900">Paiements</h2>
+          <p className="text-sm text-muted-foreground">SingPay en ligne</p>
         </button>
       </div>
 
@@ -3723,6 +3780,154 @@ const AdminDashboard = () => {
     </div>
   );
 
+  // Vue Paiements SingPay (tous statuts)
+  const renderPaymentsView = () => {
+    const filtered = singpayFilter === "all"
+      ? allSingpayPayments
+      : allSingpayPayments.filter(p => p.status === singpayFilter);
+
+    const statusColor = (s?: string) => {
+      if (s === "completed") return "bg-green-100 text-green-800";
+      if (s === "pending") return "bg-yellow-100 text-yellow-800";
+      if (s === "failed") return "bg-red-100 text-red-800";
+      return "bg-gray-100 text-gray-800";
+    };
+
+    return (
+      <div className="p-4 md:p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <CreditCard size={24} className="text-blue-600" /> Paiements SingPay
+            </h1>
+            <p className="text-muted-foreground">Tous les paiements en ligne ({allSingpayPayments.length} total)</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Select value={singpayFilter} onValueChange={(v) => setSingpayFilter(v as typeof singpayFilter)}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous ({allSingpayPayments.length})</SelectItem>
+                <SelectItem value="pending">En attente ({allSingpayPayments.filter(p => p.status === "pending").length})</SelectItem>
+                <SelectItem value="completed">Completés ({allSingpayPayments.filter(p => p.status === "completed").length})</SelectItem>
+                <SelectItem value="failed">Échoués ({allSingpayPayments.filter(p => p.status === "failed").length})</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={() => exportPaymentsCsv(filtered)}>
+              <Download size={16} className="mr-1" /> CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => exportPaymentsPdf(filtered)}>
+              <FileText size={16} className="mr-1" /> PDF
+            </Button>
+          </div>
+        </div>
+
+        {isLoadingSingpayPayments ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-muted-foreground">Chargement des paiements...</span>
+          </div>
+        ) : filtered.length === 0 ? (
+          <Card className="border-0 shadow-card">
+            <CardContent className="py-12 text-center text-muted-foreground">
+              Aucun paiement trouvé
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Vue desktop : tableau */}
+            <Card className="border-0 shadow-card hidden md:block">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Établissement</TableHead>
+                        <TableHead>Référence</TableHead>
+                        <TableHead>Méthode</TableHead>
+                        <TableHead className="text-right">Montant</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Détails</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filtered.map((p) => (
+                        <TableRow key={p.id}>
+                          <TableCell>
+                            <div className="font-medium text-sm">{p.establishmentName || p.userName || "—"}</div>
+                            <div className="text-xs text-muted-foreground">{p.userEmail || ""}</div>
+                          </TableCell>
+                          <TableCell>
+                            <code className="text-xs bg-muted px-1.5 py-0.5 rounded break-all">{p.reference || p.id}</code>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {p.method === "airtel-money" ? "Airtel Money" : p.method === "moov-money" ? "Moov Money" : p.method || "—"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-bold">{(p.amount || 0).toLocaleString()} XAF</TableCell>
+                          <TableCell>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(p.status)}`}>
+                              {p.status === "completed" ? "Complété" : p.status === "pending" ? "En attente" : p.status === "failed" ? "Échoué" : p.status || "—"}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {p.createdAt ? new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {p.subscriptionType && (
+                              <Badge variant="secondary" className="text-xs mr-1">{p.subscriptionType}</Badge>
+                            )}
+                            {p.paymentLink && (
+                              <a href={p.paymentLink} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">
+                                Lien ↗
+                              </a>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Vue mobile : cartes */}
+            <div className="md:hidden space-y-3">
+              {filtered.map((p) => (
+                <Card key={p.id} className="border-0 shadow-sm">
+                  <CardContent className="p-4 space-y-2">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="font-medium">{p.establishmentName || p.userName || "—"}</div>
+                        <div className="text-xs text-muted-foreground">{p.userEmail || ""}</div>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${statusColor(p.status)}`}>
+                        {p.status === "completed" ? "Complété" : p.status === "pending" ? "En attente" : p.status === "failed" ? "Échoué" : p.status || "—"}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="font-bold text-lg">{(p.amount || 0).toLocaleString()} XAF</div>
+                      <Badge variant="outline" className="text-xs">
+                        {p.method === "airtel-money" ? "Airtel" : p.method === "moov-money" ? "Moov" : p.method || "—"}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {p.createdAt ? new Date(p.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—"}
+                      {" · "}<code className="bg-muted px-1 rounded">{p.reference || p.id}</code>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
   // Rendu principal
   return (
     <div className="min-h-screen bg-gradient-secondary">
@@ -3750,6 +3955,7 @@ const AdminDashboard = () => {
       {activeView === "customers" && renderCustomersView()}
       {activeView === "disbursements" && renderDisbursementsView()}
       {activeView === "affiliates" && renderAffiliatesView()}
+      {activeView === "payments" && renderPaymentsView()}
       {activeView === "subscriptions" && renderSubscriptionsView()}
       {activeView === "notifications" && renderNotificationsView()}
 

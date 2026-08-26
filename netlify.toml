@@ -31,6 +31,19 @@
   to = "/404.html"
   status = 404
 
+# Le menu digital public (/light/) doit toujours servir light/index.html
+# et JAMAIS le fallback SPA React — sinon les clients voient la page de connexion.
+[[redirects]]
+  from = "/light"
+  to = "/light/index.html"
+  status = 200
+
+[[redirects]]
+  from = "/light/*"
+  to = "/light/index.html"
+  status = 200
+
+# SPA fallback pour les routes internes React uniquement
 [[redirects]]
   from = "/*"
   to = "/index.html"

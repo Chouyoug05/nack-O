@@ -120,6 +120,13 @@ export const handler: Handler = async (event) => {
     });
 
     const text = await res.text();
+    console.log("[create-payment-link] SingPay response", {
+      status: res.status,
+      body: text.slice(0, 1000),
+      payload: { ...payload, portefeuille: "***" },
+      hasDisbursement: !!payInfo,
+      disbursementId: payInfo?.disbursementId || "(none)",
+    });
     if (!res.ok) {
       // Ne pas renvoyer un 500 opaque : message exploitable côté app
       return json(502, {
