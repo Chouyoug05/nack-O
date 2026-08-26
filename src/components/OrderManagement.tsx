@@ -367,6 +367,53 @@ const OrderManagement = ({
     }
   };
 
+  // Marquer une commande comme livrée au client (ready → delivered)
+  const handleDeliverOrder = async (order: Order) => {
+    if (processingIds.has(order.id)) return;
+    setProcessingIds(prev => new Set(prev).add(order.id));
+    if (!uidToUse) {
+      setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+      toast({ title: 'Erreur', description: 'Établissement non identifié.', variant: 'destructive' });
+      return;
+    }
+    try {
+      const updateData: Record<string, unknown> = {
+        status: 'delivered',
+        deliveredAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      const orderRef = fsDoc(ordersColRef(db, uidToUse), order.id);
+      const orderSnap = await getDoc(orderRef);
+
+      if (!orderSnap.exists()) {
+        const q = query(ordersColRef(db, uidToUse), where('orderNumber', '==', order.orderNumber));
+        const querySnap = await getDocs(q);
+        if (querySnap.empty) {
+          toast({ title: 'Erreur', description: `Commande #${order.orderNumber} introuvable.`, variant: 'destructive' });
+          return;
+        }
+        const foundDoc = querySnap.docs[0];
+        await updateDoc(foundDoc.ref, updateData);
+        setFsOrders(prev => prev.map(o => o.id === foundDoc.id ? { ...o, status: 'delivered' } : o));
+        updateOrderStatus(order.id, 'delivered');
+        toast({ title: "Commande livrée", description: `Commande #${order.orderNumber} marquée comme livrée au client` });
+        return;
+      }
+
+      await updateDoc(orderRef, updateData);
+      setFsOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: 'delivered' } : o));
+      updateOrderStatus(order.id, 'delivered');
+      toast({ title: "Commande livrée", description: `Commande #${order.orderNumber} marquée comme livrée au client` });
+    } catch (e) {
+      console.error('Erreur marquer livrée:', e);
+      const errorMsg = e instanceof Error ? e.message : 'Erreur inconnue';
+      toast({ title: 'Erreur', description: `Impossible de marquer la commande comme livrée: ${errorMsg}`, variant: 'destructive' });
+    } finally {
+      setProcessingIds(prev => { const s = new Set(prev); s.delete(order.id); return s; });
+    }
+  };
+
   // Encaissement d'une commande livrée : via la caisse (SalesPage) ou directement
   const handleCashInOrder = async (order: Order) => {
     if (processingIds.has(order.id)) return;
@@ -809,6 +856,29 @@ const OrderManagement = ({
               >
                 <CheckCircle className="h-4 w-4 mr-2" />
                 Marquer prête
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => handleCancelOrderClick(order)}
+                disabled={processingIds.has(order.id) || isCancelling}
+                type="button"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Annuler
+              </Button>
+            </>
+          )}
+
+          {order.status === 'ready' && (
+            <>
+              <Button
+                onClick={() => handleDeliverOrder(order)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white shadow-button min-w-[140px]"
+                disabled={processingIds.has(order.id)}
+                type="button"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Marquer livrée
               </Button>
               <Button
                 variant="destructive"
