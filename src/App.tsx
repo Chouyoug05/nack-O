@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createBrowserRouter, createHashRouter, RouterProvider, Outlet, useLocation, Navigate, useRouteError, isRouteErrorResponse } from "react-router-dom";
+import { createHashRouter, createBrowserRouter, RouterProvider, Outlet, useLocation, Navigate, useRouteError, isRouteErrorResponse } from "react-router-dom";
 import { Suspense, useEffect, type ReactNode } from "react";
 import { OrderProvider } from "@/contexts/OrderContext";
 import { EventProvider } from "@/contexts/EventContext";
@@ -21,8 +21,7 @@ import AdminCheck from "./pages/AdminCheck";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useOfflineCacheWarmup } from "@/hooks/useOfflineCacheWarmup";
-import OfflineAuthBlock from "@/components/OfflineAuthBlock";
-import OfflineStatusBar from "@/components/OfflineStatusBar";
+import { getSelectedMode, isLightMode, isFullMode, reEvaluateMode } from "@/lib/modeSelection";
 import { isElectronRenderer } from "@/lib/platform";
 import { isProfileComplete } from "@/utils/profileComplete";
 import { lazyWithReload, isChunkLoadError, reloadOnceForStaleChunk } from "@/lib/lazyWithReload";
@@ -186,7 +185,7 @@ const routes = [
       { path: "configure-tickets", element: <LazyBoundary><RequireAuth><RequireProfile><ConfigureTickets /></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "dashboard", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><TabletAwareDashboard /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "tablet-inbox", element: <LazyBoundary><RequireAuth><RequireProfile><TabletInboxPage /></RequireProfile></RequireAuth></LazyBoundary> },
-      { path: "menu-digital", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="menu-digital"><MenuDigitalPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
+      { path: "menu-digital", element: <RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="menu-digital"><LazyBoundary><MenuDigitalPage /></LazyBoundary></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth> },
       { path: "team", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><FeatureGate feature="team"><TeamPage /></FeatureGate></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "customer/:customerId", element: <LazyBoundary><RequireAuth><RequireProfile><SubscriptionGate><CustomerDetailsPage /></SubscriptionGate></RequireProfile></RequireAuth></LazyBoundary> },
       { path: "admin-check", element: <AdminCheck /> },
@@ -213,20 +212,32 @@ const router = routerFactory(routes, {
   basename: routerBaseName,
 });
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <AuthProvider>
-        <EventProvider>
-          <OrderProvider>
-            <Toaster />
-            <Sonner />
-            <RouterProvider router={router} future={{ v7_startTransition: true }} />
-          </OrderProvider>
-        </EventProvider>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useEffect(() => {
+    // Initialisation automatique du mode appareil au premier chargement
+    const selection = getSelectedMode();
+    // Setup re-evaluation when user returns to the app
+    setupVisibilityReEvaluation();
+    // Le mode est maintenant stocké et sera utilisé par le reste de l'application
+    // Si le mode a changé (réévaluation), on pourraitNotifier ici
+    // Mais pour l'instant, on se contente de la détection initiale
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <AuthProvider>
+          <EventProvider>
+            <OrderProvider>
+              <Toaster />
+              <Sonner />
+              <RouterProvider router={router} future={{ v7_startTransition: true }} />
+            </OrderProvider>
+          </EventProvider>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;

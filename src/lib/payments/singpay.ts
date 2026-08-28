@@ -1,4 +1,5 @@
 import { isElectronRenderer } from "@/lib/platform";
+import { isLightMode, isFullMode } from "@/lib/modeSelection";
 
 export interface CreatePaymentLinkParams {
   amount: number;
@@ -110,6 +111,13 @@ async function requestPaymentLinkViaProxy(proxyUrl: string, params: CreatePaymen
 }
 
 export async function createSubscriptionPaymentLink(params: CreatePaymentLinkParams): Promise<string> {
+  // Vérifier le mode appareil - en mode light, rediriger vers la version web
+  if (typeof window !== "undefined" && isLightMode()) {
+    const qrCodeLink = `${window.location.origin}/light/#/payment?type=subscription`;
+    window.location.href = qrCodeLink;
+    throw new Error("Redirection vers mode léger - utilisez le lien de paiement web");
+  }
+
   const proxyUrl = resolvePaymentProxyUrl();
   if (!proxyUrl) {
     throw new Error("Paiement indisponible. Utilisez la version web de Nack.");
@@ -118,6 +126,13 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
 }
 
 export async function createOrderPaymentLink(params: CreateOrderPaymentLinkParams): Promise<string> {
+  // Vérifier le mode appareil - en mode light, rediriger vers la version web
+  if (typeof window !== "undefined" && isLightMode()) {
+    const qrCodeLink = `${window.location.origin}/light/#/payment?type=order`;
+    window.location.href = qrCodeLink;
+    throw new Error("Redirection vers mode léger - utilisez le lien de paiement web");
+  }
+
   const proxyUrl = resolvePaymentProxyUrl();
   if (!proxyUrl) {
     throw new Error("Paiement indisponible. Utilisez la version web de Nack.");
