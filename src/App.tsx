@@ -9,6 +9,8 @@ import { EventProvider } from "@/contexts/EventContext";
 import PWAInstallButton from "@/components/PWAInstallButton";
 import WhatsAppCommunityPopup from "@/components/WhatsAppCommunityPopup";
 import LocationRequestDialog from "@/components/LocationRequestDialog";
+import OfflineAuthBlock from "@/components/OfflineAuthBlock";
+import OfflineStatusBar from "@/components/OfflineStatusBar";
 import NackLogo from "@/components/NackLogo";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
