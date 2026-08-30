@@ -64,12 +64,20 @@
 
           var legacy = force;
 
+          // Aligné sur browserDetect.ts — vérifie les ES2015+ fondamentaux
           if (!legacy) {
-            if (typeof Promise === 'undefined' || typeof Promise.allSettled !== 'function') {
+            if (typeof Symbol === 'undefined' ||
+                typeof Promise === 'undefined' ||
+                typeof Array.prototype.find === 'undefined' ||
+                typeof Array.prototype.includes === 'undefined' ||
+                typeof Object.assign === 'undefined' ||
+                typeof fetch === 'undefined' ||
+                typeof indexedDB === 'undefined') {
               legacy = true;
             }
           }
 
+          // Fallback UA : très vieux iOS ou Safari qui passent les checks mais plantent
           if (!legacy && typeof navigator !== 'undefined') {
             var ua = navigator.userAgent || '';
             var iosMatch = ua.match(/OS (\d+)[_.\d]*/i);

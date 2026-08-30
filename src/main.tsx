@@ -5,7 +5,7 @@ import "./index.css";
 import "./lib/firebase";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { isElectronRenderer } from "@/lib/platform";
-import { getSelectedMode, isLightMode, isFullMode, reEvaluateMode } from "@/lib/modeSelection";
+import { getSelectedMode } from "@/lib/modeSelection";
 
 // Service worker (PWA + offline + notifications)
 // En production on enregistre le SW principal. En dev, on évite de garder un SW

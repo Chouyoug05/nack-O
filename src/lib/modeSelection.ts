@@ -1,12 +1,21 @@
 /**
- * Hook de persistance et de mémorisation du mode appareil.
- * Stocke le mode déterminé en localStorage et permet la réévaluation.
+ * Persistance et réévaluation du mode appareil.
+ *
+ * - Lit/écrit `localStorage['nack_selected_mode']`
+ * - Réévalue instantanément si la détection a changé (upgrade/downgrade)
+ * - Sinon toutes les 24h
+ * - Sur visibilitychange : réévaluation débouncée (500 ms), écriture uniquement si changement
  */
 
-import { detectDeviceCapability, DeviceCapabilityLevel, shouldReEvaluate, getLightModeMessage } from "./deviceCapability";
+import {
+  detectDeviceCapability,
+  type DeviceCapabilityLevel,
+  hasCapabilityChanged,
+  getLightModeMessage,
+} from "./deviceCapability";
 
 const STORAGE_KEY = "nack_selected_mode";
-const REEVALUATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24h
+const REEVALUATION_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 h
 
 export interface ModeSelection {
   mode: DeviceCapabilityLevel;
@@ -14,120 +23,166 @@ export interface ModeSelection {
   reason?: string;
 }
 
+// ── Lecture ──────────────────────────────────────────────────────────────────
+
+function isValidMode(v: unknown): v is DeviceCapabilityLevel {
+  return v === "light" || v === "full";
+}
+
 /**
- * Obtient le mode sélectionné (depuis le stockage ou détection automatique).
+ * Lit le mode depuis localStorage. Retourne null si absent ou corrompu.
+ */
+function readStoredMode(): ModeSelection | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      isValidMode(parsed.mode) &&
+      typeof parsed.detectedAt === "number" &&
+      parsed.detectedAt > 0
+    ) {
+      return parsed as ModeSelection;
+    }
+    // Corrompu → nettoyer
+    localStorage.removeItem(STORAGE_KEY);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Écrit le mode en localStorage sans jamais écrouter une valeur invalide.
+ */
+function storeMode(selection: ModeSelection): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(selection));
+  } catch {
+    /* quota ou storage private */
+  }
+}
+
+// ── API publique ─────────────────────────────────────────────────────────────
+
+/**
+ * Obtient le mode sélectionné.
+ * 1. Si la détection a changé → met à jour immédiatement.
+ * 2. Si âge > 24 h → réévalue.
+ * 3. Sinon retourne la valeur stockée.
+ * 4. Première visite → détecte et stocke.
  */
 export function getSelectedMode(): ModeSelection {
   if (typeof window === "undefined") {
-    return {
-      mode: "full",
+    return { mode: "full", detectedAt: Date.now(), reason: "SSR" };
+  }
+
+  const stored = readStoredMode();
+
+  // Aucun stockage → détection initiale
+  if (!stored) {
+    const mode = detectDeviceCapability();
+    const selection: ModeSelection = {
+      mode,
       detectedAt: Date.now(),
-      reason: "Server-side rendering, assumed full capabilities",
+      reason: mode === "light" ? getLightModeMessage() : undefined,
     };
+    storeMode(selection);
+    return selection;
   }
 
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      // Vérifier si on doit réévaluer (intervalle écoulé ou changement de capabilities)
-      const age = Date.now() - (parsed.detectedAt || 0);
-      if (age > REEVALUATION_INTERVAL_MS || shouldReEvaluate()) {
-        // Réévaluation nécessaire - détecter à nouveau
-        const newMode = detectDeviceCapability();
-        const selection: ModeSelection = {
-          mode: newMode,
-          detectedAt: Date.now(),
-          reason: newMode === "light" ? getLightModeMessage() : undefined,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(selection));
-        return selection;
-      }
-      return parsed as ModeSelection;
-    }
-  } catch (e) {
-    console.warn("[NACK] Impossible de lire le mode sélectionné depuis localStorage", e);
+  // Détection a changé → upgrade/downgrade instantané
+  if (hasCapabilityChanged(stored.mode)) {
+    const newMode = detectDeviceCapability();
+    const selection: ModeSelection = {
+      mode: newMode,
+      detectedAt: Date.now(),
+      reason: newMode === "light" ? getLightModeMessage() : undefined,
+    };
+    storeMode(selection);
+    return selection;
   }
 
-  // Détection automatique initiale
-  const mode = detectDeviceCapability();
-  const selection: ModeSelection = {
-    mode,
-    detectedAt: Date.now(),
-    reason: mode === "light" ? getLightModeMessage() : undefined,
-  };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(selection));
-  } catch {
-    /* ignore quota errors */
+  // Intervalle 24 h dépassé → réévaluer (même résultat probable, mais safety net)
+  const age = Date.now() - stored.detectedAt;
+  if (age > REEVALUATION_INTERVAL_MS) {
+    const newMode = detectDeviceCapability();
+    const selection: ModeSelection = {
+      mode: newMode,
+      detectedAt: Date.now(),
+      reason: newMode === "light" ? getLightModeMessage() : undefined,
+    };
+    storeMode(selection);
+    return selection;
   }
-  return selection;
+
+  return stored;
 }
 
 /**
- * Force une réévaluation du mode (ex: lorsque l'utilisateur change d'appareil ou que
- * les capabilities du navigateur ont changé).
+ * Force une réévaluation (appelé sur visibilitychange, manuel, etc.).
+ * Écrit uniquement si le mode a changé.
  */
 export function reEvaluateMode(): ModeSelection {
   const mode = detectDeviceCapability();
+  const stored = readStoredMode();
+
+  // Pas de changement → ne rien écrire
+  if (stored && stored.mode === mode) {
+    return stored;
+  }
+
   const selection: ModeSelection = {
     mode,
     detectedAt: Date.now(),
     reason: mode === "light" ? getLightModeMessage() : undefined,
   };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(selection));
-  } catch {
-    /* ignore quota errors */
-  }
+  storeMode(selection);
   return selection;
 }
 
 /**
- * Change manuellement le mode (pour les tests ou cas particuliers).
- * Note: ceci contourne la détection automatique - utiliser avec précaution.
- */
-export function setModeManually(mode: DeviceCapabilityLevel): void {
-  const selection: ModeSelection = {
-    mode,
-    detectedAt: Date.now(),
-    reason: mode === "light" ? getLightModeMessage() : undefined,
-  };
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(selection));
-  } catch {
-    /* ignore quota errors */
-  }
-}
-
-/**
- * Vérifie si le mode actuel est le mode léger.
+ * Mode léger : true si l'appareil ne peut pas exécuter React.
+ * Seul cas : unsupported par browserDetect → redirect /light/.
  */
 export function isLightMode(): boolean {
   return getSelectedMode().mode === "light";
 }
 
-/**
- * Vérifie si le mode actuel est le mode plein.
- */
 export function isFullMode(): boolean {
   return getSelectedMode().mode === "full";
 }
 
 /**
- * Définit un écouteur de visibilité pour réévaluer les capabilities
- * quand l'utilisateur revient dans l'application.
- * À appeler une fois au démarrage de l'application.
+ * Supprime le cache (utile pour debug / tests).
+ */
+export function clearModeCache(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch { /* ignore */ }
+}
+
+// ── Réévaluation sur visibility ──────────────────────────────────────────────
+
+let visibilityDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Réévalue le mode quand l'utilisateur revient dans l'app.
+ * Débouncé 500 ms, ne réécrit que si changement.
  */
 export function setupVisibilityReEvaluation(): void {
   if (typeof window === "undefined") return;
 
   const handleVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      setTimeout(() => {
-        reEvaluateMode();
-      }, 100);
-    }
+    if (document.visibilityState !== "visible") return;
+    if (visibilityDebounceTimer !== null) return;
+    visibilityDebounceTimer = setTimeout(() => {
+      visibilityDebounceTimer = null;
+      reEvaluateMode();
+    }, 500);
   };
 
   const existing = document.getAttribute("data-nack-visibility-listener");
