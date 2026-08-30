@@ -185,9 +185,9 @@ export function setupVisibilityReEvaluation(): void {
     }, 500);
   };
 
-  const existing = document.getAttribute("data-nack-visibility-listener");
-  if (!existing) {
+  const el = document.documentElement;
+  if (!el.hasAttribute("data-nack-visibility-listener")) {
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    document.setAttribute("data-nack-visibility-listener", "1");
+    el.setAttribute("data-nack-visibility-listener", "1");
   }
 }
