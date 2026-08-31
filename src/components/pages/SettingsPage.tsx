@@ -33,14 +33,14 @@ import {
   CheckCircle2,
   ArrowRight
 } from "lucide-react";
-import { ESTABLISHMENT_TYPES, getEstablishmentIcon, getEstablishmentLabel, MAIN_CATEGORIES } from "@/constants/establishmentTypes";
+import { ESTABLISHMENT_TYPES, getEstablishmentLabel } from "@/constants/establishmentTypes";
 import { useAuth } from "@/contexts/AuthContext";
 import { uploadLogo } from "@/lib/upload";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { deleteImageByToken } from "@/lib/cloudinary";
 import { uploadImageToCloudinaryDetailed } from "@/lib/cloudinary";
 import { createSubscriptionPaymentLink } from "@/lib/payments/singpay";
-import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
+import { openPaymentUrl } from "@/lib/paymentNavigation";
 import { generateSubscriptionReceiptPDF } from "@/utils/receipt";
 import { validateWhatsApp, getWhatsAppErrorMessage } from "@/utils/whatsapp";
 import { getCurrentPlan, SUBSCRIPTION_PLANS, getCurrentEventsCount } from "@/utils/subscription";
