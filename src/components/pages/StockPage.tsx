@@ -68,7 +68,7 @@ import { searchGoogleImages } from "@/utils/productImageSearch";
 import { sha256Hex } from "@/lib/sha256";
 import ManagerAuthDialog from "@/components/ManagerAuthDialog";
 import { useManagerAuth } from "@/hooks/useManagerAuth";
-import { getCategoriesForEstablishment } from "@/constants/establishmentTypes";
+import { getCategoriesForEstablishment, isFoodBusiness as _isFoodBusiness } from "@/constants/establishmentTypes";
 
 interface Product {
   id: string;
@@ -309,6 +309,7 @@ const StockPage = () => {
   };
 
   const categories = getCategoriesForEstablishment(profile?.establishmentType);
+  const isFoodBusiness = _isFoodBusiness(profile?.establishmentType);
 
   const subCategories: Record<string, string[]> = {
     "Vêtements": ["T-shirts", "Chemises", "Pantalons", "Robes", "Shorts", "Sweats", "Manteaux", "Sous-vêtements", "Sport", "Autre"],
