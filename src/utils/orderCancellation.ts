@@ -6,6 +6,13 @@ import type { OrderStatus } from "@/types/order";
 import type { SaleDoc } from "@/types/inventory";
 
 /**
+ * Supprime les champs undefined d'un objet (FireStore les rejette)
+ */
+function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined));
+}
+
+/**
  * Configuration pour l'annulation de commande
  */
 export const CANCELLATION_CONFIG = {
@@ -134,7 +141,7 @@ export async function cancelOrderWithLogging(
     refundRequired,
     ...(refundRequired ? { refundStatus: 'pending' as const } : {}),
     ...(paymentMethod ? { paymentMethod } : {}),
-    ...(metadata ? { metadata } : {}),
+    ...(metadata ? { metadata: stripUndefined(metadata) as OrderCancellationDoc['metadata'] } : {}),
   };
 
   // Enregistrer l'annulation
