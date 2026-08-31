@@ -37,6 +37,8 @@ export interface ProductDoc {
   isFeatured?: boolean;
   /** Plat du jour / Article du jour — affiché en priorité sur le menu digital */
   isDailySpecial?: boolean;
+  /** false = masqué du menu digital public (default true pour rétro-compatibilité) */
+  showInMenu?: boolean;
   createdAt: number;
   updatedAt: number;
 }

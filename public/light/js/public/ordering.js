@@ -266,7 +266,8 @@
       products = allProducts.filter(function (p) {
         var cat = (p.category || "").toLowerCase();
         var isPlat = cat === "plats" || cat.includes("plat");
-        return p.price > 0 && (p.quantity > 0 || p.quantity === undefined || isPlat);
+        var inMenu = p.showInMenu !== false;
+        return inMenu && p.price > 0 && (p.quantity > 0 || p.quantity === undefined || isPlat);
       });
 
       // Filtre jour : si dailySpecialMode est activé dans la config menu,

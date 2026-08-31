@@ -185,7 +185,7 @@ export default function MenuDigitalPage() {
   const [deliveryEnabled, setDeliveryEnabled] = useState(profile?.deliveryEnabled ?? false);
   const [deliveryPrice, setDeliveryPrice] = useState(profile?.deliveryPrice ?? 0);
   const [dailySpecialMode, setDailySpecialMode] = useState(config?.dailySpecialMode ?? false);
-  const [activatableProducts, setActivatableProducts] = useState<Array<{ id: string; name: string; category?: string; isFeatured?: boolean; isDailySpecial?: boolean; isPromotional?: boolean }>>([]);
+  const [activatableProducts, setActivatableProducts] = useState<Array<{ id: string; name: string; category?: string; isFeatured?: boolean; isDailySpecial?: boolean; isPromotional?: boolean; showInMenu?: boolean }>>([]);
 
   const uid = user?.uid;
 
@@ -245,6 +245,7 @@ export default function MenuDigitalPage() {
           isFeatured: Boolean(raw.isFeatured),
           isDailySpecial: Boolean(raw.isDailySpecial),
           isPromotional: Boolean(raw.isPromotional),
+          showInMenu: raw.showInMenu !== false,
         };
       });
       setActivatableProducts(list);
@@ -302,7 +303,7 @@ export default function MenuDigitalPage() {
     }
   };
 
-  const handleToggleProductFlag = async (productId: string, flag: "isFeatured" | "isDailySpecial", current: boolean) => {
+  const handleToggleProductFlag = async (productId: string, flag: "isFeatured" | "isDailySpecial" | "showInMenu", current: boolean) => {
     if (!uid) return;
     try {
       await updateDoc(doc(productsColRef(db, uid), productId), { [flag]: !current, updatedAt: Date.now() });
@@ -854,7 +855,16 @@ export default function MenuDigitalPage() {
               ) : (
                 <div className="space-y-2">
                   {activatableProducts.map((p) => (
-                    <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                    <div key={p.id} className={`flex items-center gap-3 p-3 rounded-lg border transition ${p.showInMenu !== false ? 'bg-gray-50' : 'bg-gray-100 opacity-60'}`}>
+                      <div className="flex items-center gap-1.5">
+                        <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                          <Eye className="h-3 w-3 inline" /> Menu
+                        </Label>
+                        <Switch
+                          checked={p.showInMenu !== false}
+                          onCheckedChange={() => handleToggleProductFlag(p.id, "showInMenu", p.showInMenu !== false)}
+                        />
+                      </div>
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 truncate">{p.name}</p>
                         {p.category && <p className="text-xs text-muted-foreground">{p.category}</p>}

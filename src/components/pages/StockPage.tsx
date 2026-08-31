@@ -94,6 +94,7 @@ interface Product {
   isPromotional?: boolean;
   isFeatured?: boolean;
   isDailySpecial?: boolean;
+  showInMenu?: boolean;
 }
 
 const StockPage = () => {
@@ -163,6 +164,7 @@ const StockPage = () => {
           isPromotional: raw.isPromotional === true,
           isFeatured: raw.isFeatured === true,
           isDailySpecial: raw.isDailySpecial === true,
+          showInMenu: raw.showInMenu !== false,
         } as Product;
       });
 
@@ -228,6 +230,7 @@ const StockPage = () => {
     isPromotional: false,
     isFeatured: false,
     isDailySpecial: false,
+    showInMenu: true,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [isSavingProduct, setIsSavingProduct] = useState(false);
@@ -512,6 +515,7 @@ const StockPage = () => {
         ...(newProduct.isPromotional ? { isPromotional: newProduct.isPromotional } : {}),
         ...(newProduct.isFeatured ? { isFeatured: newProduct.isFeatured } : {}),
         ...(newProduct.isDailySpecial ? { isDailySpecial: newProduct.isDailySpecial } : {}),
+        showInMenu: newProduct.showInMenu !== false,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -537,7 +541,9 @@ const StockPage = () => {
         isPromotional: false,
         isFeatured: false,
         isDailySpecial: false,
+        showInMenu: true,
       });
+
       setImageFile(null);
       setIsAddModalOpen(false);
       toast({ title: "Produit ajouté", description: `${payload.name} a été ajouté au stock avec succès` });
@@ -573,6 +579,7 @@ const StockPage = () => {
       isPromotional: product.isPromotional || false,
       isFeatured: product.isFeatured || false,
       isDailySpecial: product.isDailySpecial || false,
+      showInMenu: product.showInMenu !== false,
     });
     setIsAddModalOpen(true);
   };
@@ -800,6 +807,7 @@ const StockPage = () => {
         ...(newProduct.isPromotional !== undefined ? { isPromotional: newProduct.isPromotional } : {}),
         ...(newProduct.isFeatured !== undefined ? { isFeatured: newProduct.isFeatured } : {}),
         ...(newProduct.isDailySpecial !== undefined ? { isDailySpecial: newProduct.isDailySpecial } : {}),
+        showInMenu: newProduct.showInMenu !== false,
         updatedAt: Date.now(),
       };
       await updateDoc(productRef, payload);
@@ -826,6 +834,7 @@ const StockPage = () => {
         isPromotional: false,
         isFeatured: false,
         isDailySpecial: false,
+        showInMenu: true,
       });
       toast({ title: "Produit modifié", description: "Le produit a été mis à jour" });
     } catch (e: unknown) {
@@ -1968,6 +1977,21 @@ const StockPage = () => {
               </p>
 
               <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-l-4 border-green-500">
+                  <div className="flex items-center gap-3">
+                    <Eye className="h-6 w-6 text-green-600" />
+                    <div>
+                      <p className="font-medium text-gray-900">Afficher dans le menu</p>
+                      <p className="text-sm text-muted-foreground">Désactivez pour masquer ce produit du menu digital public</p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="showInMenu"
+                    checked={newProduct.showInMenu !== false}
+                    onCheckedChange={(checked) => setNewProduct({ ...newProduct, showInMenu: checked })}
+                  />
+                </div>
+
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <Star className="h-6 w-6 text-yellow-500" />
@@ -2164,6 +2188,18 @@ const StockPage = () => {
                         )}
                         <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 w-7 p-0" title="Modifier">
                           <Edit size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const ref = fsDoc(productsColRef(db, user!.uid), product.id);
+                            updateDoc(ref, { showInMenu: product.showInMenu === false, updatedAt: Date.now() });
+                          }}
+                          className={product.showInMenu !== false ? "text-green-600 hover:text-green-700 hover:bg-green-50 h-7 w-7 p-0" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50 h-7 w-7 p-0"}
+                          title={product.showInMenu !== false ? "Masquer du menu" : "Afficher dans le menu"}
+                        >
+                          {product.showInMenu !== false ? <Eye size={14} /> : <EyeOff size={14} />}
                         </Button>
                         <Button
                           variant="ghost"
