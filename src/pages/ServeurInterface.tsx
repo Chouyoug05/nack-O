@@ -238,6 +238,7 @@ const ServeurInterface = () => {
           stock: Number(data.quantity || 0),
           image: 'menu',
           imageUrl: data.imageUrl && data.imageUrl.trim() !== '' ? data.imageUrl : undefined,
+          showInMenu: (data as Record<string, unknown>).showInMenu !== false,
         } as Product;
       });
       setFsProducts(list);
@@ -369,12 +370,11 @@ const ServeurInterface = () => {
   }, [ownerUid]);
 
   const products = fsProducts ?? [];
-  // Filtrer les produits vendables : tous les produits avec prix > 0
-  // Les serveurs peuvent vendre tous les produits avec un prix, même si le stock est à 0
-  // (les plats peuvent être préparés à la demande, et les autres produits peuvent être réapprovisionnés)
+  // Filtrer les produits : prix > 0 + affichés dans le menu par le gérant
   const sellableProducts = products.filter(product => {
     const price = Number(product.price || 0) > 0;
-    return price; // Afficher tous les produits avec un prix > 0
+    const inMenu = product.showInMenu !== false;
+    return price && inMenu;
   });
   const availableCategories = [...new Set(sellableProducts.map(p => p.category).filter(Boolean))].sort();
 
