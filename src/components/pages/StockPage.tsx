@@ -513,9 +513,9 @@ const StockPage = () => {
         ...(newProduct.sku ? { sku: newProduct.sku } : {}),
         ...(newProduct.subCategory ? { subCategory: newProduct.subCategory } : {}),
         ...(newProduct.brand ? { brand: newProduct.brand } : {}),
-        ...(newProduct.isPromotional ? { isPromotional: newProduct.isPromotional } : {}),
-        ...(newProduct.isFeatured ? { isFeatured: newProduct.isFeatured } : {}),
-        ...(newProduct.isDailySpecial ? { isDailySpecial: newProduct.isDailySpecial } : {}),
+        isPromotional: newProduct.isPromotional || false,
+        isFeatured: newProduct.isFeatured || false,
+        isDailySpecial: newProduct.isDailySpecial || false,
         showInMenu: newProduct.showInMenu !== false,
         createdAt: Date.now(),
         updatedAt: Date.now(),
@@ -2189,6 +2189,42 @@ const StockPage = () => {
                         )}
                         <Button variant="ghost" size="sm" onClick={() => handleEditProduct(product)} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 h-7 w-7 p-0" title="Modifier">
                           <Edit size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const ref = fsDoc(productsColRef(db, user!.uid), product.id);
+                            updateDoc(ref, { isFeatured: !product.isFeatured, updatedAt: Date.now() });
+                          }}
+                          className={product.isFeatured ? "text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 h-7 w-7 p-0" : "text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 h-7 w-7 p-0"}
+                          title={product.isFeatured ? "Retirer vedette" : "Mettre en vedette"}
+                        >
+                          <Star size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const ref = fsDoc(productsColRef(db, user!.uid), product.id);
+                            updateDoc(ref, { isPromotional: !product.isPromotional, updatedAt: Date.now() });
+                          }}
+                          className={product.isPromotional ? "text-orange-600 hover:text-orange-700 hover:bg-orange-50 h-7 w-7 p-0" : "text-gray-400 hover:text-orange-600 hover:bg-orange-50 h-7 w-7 p-0"}
+                          title={product.isPromotional ? "Retirer promo" : "Mettre en promo"}
+                        >
+                          <Tag size={14} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const ref = fsDoc(productsColRef(db, user!.uid), product.id);
+                            updateDoc(ref, { isDailySpecial: !product.isDailySpecial, updatedAt: Date.now() });
+                          }}
+                          className={product.isDailySpecial ? "text-nack-red hover:text-red-700 hover:bg-red-50 h-7 w-7 p-0" : "text-gray-400 hover:text-nack-red hover:bg-red-50 h-7 w-7 p-0"}
+                          title={product.isDailySpecial ? "Retirer plat du jour" : "Mettre plat du jour"}
+                        >
+                          <Sun size={14} />
                         </Button>
                         <Button
                           variant="ghost"
