@@ -188,7 +188,7 @@ export default function MenuDigitalPage() {
   const [deliveryEnabled, setDeliveryEnabled] = useState(profile?.deliveryEnabled ?? false);
   const [deliveryPrice, setDeliveryPrice] = useState(profile?.deliveryPrice ?? 0);
   const [dailySpecialMode, setDailySpecialMode] = useState(config?.dailySpecialMode ?? false);
-  const [activatableProducts, setActivatableProducts] = useState<Array<{ id: string; name: string; category?: string; isFeatured?: boolean; isDailySpecial?: boolean; isPromotional?: boolean; showInMenu?: boolean }>>([]);
+  const [activatableProducts, setActivatableProducts] = useState<Array<{ id: string; name: string; category?: string; price?: number; quantity?: number; hasQuantity?: boolean; isFeatured?: boolean; isDailySpecial?: boolean; isPromotional?: boolean; showInMenu?: boolean }>>([]);
 
   const uid = user?.uid;
 
@@ -235,22 +235,31 @@ export default function MenuDigitalPage() {
     loadData();
   }, [loadData]);
 
-  // ─── Load activatable products (vedette/jour) ────────────────────────────
+  // ─── Load activatable products (vedette/jour) — only sellable ────────────
   useEffect(() => {
     if (!uid) return;
     const unsub = onSnapshot(productsColRef(db, uid), (snap) => {
-      const list = snap.docs.map((d) => {
-        const raw = d.data() as Record<string, unknown>;
-        return {
-          id: d.id,
-          name: String(raw.name || ""),
-          category: String(raw.category || ""),
-          isFeatured: Boolean(raw.isFeatured),
-          isDailySpecial: Boolean(raw.isDailySpecial),
-          isPromotional: Boolean(raw.isPromotional),
-          showInMenu: raw.showInMenu !== false,
-        };
-      });
+      const list = snap.docs
+        .map((d) => {
+          const raw = d.data() as Record<string, unknown>;
+          return {
+            id: d.id,
+            name: String(raw.name || ""),
+            category: String(raw.category || ""),
+            price: Number(raw.price || 0),
+            quantity: Number(raw.quantity || 0),
+            hasQuantity: raw.quantity !== undefined && raw.quantity !== null,
+            isFeatured: Boolean(raw.isFeatured),
+            isDailySpecial: Boolean(raw.isDailySpecial),
+            isPromotional: Boolean(raw.isPromotional),
+            showInMenu: raw.showInMenu !== false,
+          };
+        })
+        .filter((p) => {
+          const cat = p.category.toLowerCase();
+          const isPlat = cat === "plats" || cat.includes("plat");
+          return p.price > 0 && (p.quantity > 0 || !p.hasQuantity || isPlat);
+        });
       setActivatableProducts(list);
     });
     return () => unsub();
@@ -860,22 +869,22 @@ export default function MenuDigitalPage() {
                   {activatableProducts.map((p) => (
                     <label
                       key={p.id}
-                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${p.showInMenu !== false ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}
+                      className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 rounded-lg border cursor-pointer transition ${p.showInMenu !== false ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}
                     >
-                      <Checkbox
-                        checked={p.showInMenu !== false}
-                        onCheckedChange={() => handleToggleProductFlag(p.id, "showInMenu", p.showInMenu !== false)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <span className="font-medium text-gray-900 truncate block">{p.name}</span>
-                        {p.category && <span className="text-xs text-muted-foreground">{p.category}</span>}
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Checkbox
+                          checked={p.showInMenu !== false}
+                          onCheckedChange={() => handleToggleProductFlag(p.id, "showInMenu", p.showInMenu !== false)}
+                        />
+                        <span className="font-medium text-gray-900 truncate">{p.name}</span>
+                        {p.category && <span className="text-xs text-muted-foreground hidden sm:inline">· {p.category}</span>}
+                        <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
+                          {p.isDailySpecial && <Badge className="bg-red-50 text-red-700 border-red-200 text-xs">Plat du jour</Badge>}
+                          {p.isFeatured && <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">Vedette</Badge>}
+                          {p.isPromotional && <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Promo</Badge>}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {p.isDailySpecial && <Badge className="bg-red-50 text-red-700 border-red-200 text-xs">Plat du jour</Badge>}
-                        {p.isFeatured && <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">Vedette</Badge>}
-                        {p.isPromotional && <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Promo</Badge>}
-                      </div>
-                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-3 pl-7 sm:pl-0" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
                           <Label className="text-xs text-muted-foreground whitespace-nowrap">
                             <Flame className="h-3 w-3 inline" /> Jour

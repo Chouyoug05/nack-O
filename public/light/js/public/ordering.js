@@ -244,7 +244,7 @@
       api.getPublicDoc("publicProfiles/" + uid),
       api.getPublicDoc("menuConfigs/" + uid),
       api.publicListDocs("profiles/" + uid + "/products", 200),
-      api.publicListDocs("menuConfigs/" + uid + "/tables", 200)
+      tableToken ? api.publicListDocs("menuConfigs/" + uid + "/tables", 200) : Promise.resolve([])
     ]).then(function (results) {
       establishment = results[0];
       menuConfig = results[1];
