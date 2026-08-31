@@ -132,9 +132,9 @@ export async function cancelOrderWithLogging(
     previousStatus: orderStatus,
     orderTotal,
     refundRequired,
-    refundStatus: refundRequired ? 'pending' : undefined,
-    paymentMethod,
-    metadata
+    ...(refundRequired ? { refundStatus: 'pending' as const } : {}),
+    ...(paymentMethod ? { paymentMethod } : {}),
+    ...(metadata ? { metadata } : {}),
   };
 
   // Enregistrer l'annulation
