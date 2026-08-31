@@ -19,6 +19,7 @@ exports.handler = async (event) => {
         menuConfigsMap[doc.id] = {
           menuConfigEnabled: data.enabled === true,
           menuDesignId: data.selectedDesign || null,
+          dailySpecialMode: data.dailySpecialMode === true,
         };
       }
     } catch (e) {

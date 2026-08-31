@@ -32,12 +32,15 @@ export interface PublicProfile {
   menuConfigEnabled?: boolean;
   /** ID du design sélectionné pour le menu public. */
   menuDesignId?: MenuDesignId;
+  /** Quand true, le menu public n'affiche que daily + vedette si au moins un daily existe. */
+  dailySpecialMode?: boolean;
   updatedAt: number;
 }
 
 export interface MenuConfigPublicFields {
   menuConfigEnabled?: boolean;
   menuDesignId?: MenuDesignId;
+  dailySpecialMode?: boolean;
 }
 
 export function buildPublicProfile(
@@ -73,6 +76,7 @@ export function buildPublicProfile(
     paymentsEnabled,
     menuConfigEnabled: menuFields?.menuConfigEnabled,
     menuDesignId: menuFields?.menuDesignId,
+    dailySpecialMode: menuFields?.dailySpecialMode,
     updatedAt: profile.updatedAt ?? Date.now(),
   };
 }

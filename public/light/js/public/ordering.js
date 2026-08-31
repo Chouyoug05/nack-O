@@ -269,11 +269,12 @@
         return p.price > 0 && (p.quantity > 0 || p.quantity === undefined || isPlat);
       });
 
-      // Filtre jour : si le gérant a marqué des articles "Plat du jour",
-      // n'afficher que ceux-ci + les articles vedettes.
-      // Si aucun plat du jour n'est marqué, afficher tout (fallback).
+      // Filtre jour : si dailySpecialMode est activé dans la config menu,
+      // et qu'au moins un article "Plat du jour" existe, n'afficher que
+      // ceux-ci + les articles vedettes. Sinon afficher tout.
+      var dailyMode = (menuConfig && menuConfig.dailySpecialMode === true) || (establishment && establishment.dailySpecialMode === true);
       var hasDailySpecials = products.some(function (p) { return p.isDailySpecial === true; });
-      if (hasDailySpecials) {
+      if (dailyMode && hasDailySpecials) {
         products = products.filter(function (p) {
           return p.isDailySpecial === true || p.isFeatured === true;
         });

@@ -10,6 +10,8 @@ export interface MenuConfig {
   selectedDesign: MenuDesignId;
   /** La feature est-elle activée ? */
   enabled: boolean;
+  /** Quand true + au moins un produit isDailySpecial, le menu public n'affiche que daily + vedette. */
+  dailySpecialMode?: boolean;
   /** Tables de l'établissement (vide si type = boutique/commerce). */
   tables: MenuTable[];
   createdAt: number;

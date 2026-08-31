@@ -48,6 +48,7 @@ export async function createMenuConfig(
     ownerUid: uid,
     selectedDesign: data.selectedDesign ?? "modern",
     enabled: data.enabled ?? false,
+    dailySpecialMode: data.dailySpecialMode ?? false,
     tables: [],
     createdAt: now,
     updatedAt: now,
@@ -85,6 +86,17 @@ export async function setMenuDesign(
 ): Promise<void> {
   await updateDoc(menuConfigDocRef(db, uid), {
     selectedDesign: designId,
+    updatedAt: Date.now(),
+  });
+}
+
+export async function setDailySpecialMode(
+  db: Firestore,
+  uid: string,
+  enabled: boolean,
+): Promise<void> {
+  await updateDoc(menuConfigDocRef(db, uid), {
+    dailySpecialMode: enabled,
     updatedAt: Date.now(),
   });
 }

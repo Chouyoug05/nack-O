@@ -8,6 +8,7 @@ import {
   updateMenuConfig,
   setMenuEnabled,
   setMenuDesign,
+  setDailySpecialMode,
   addTable,
   updateTable,
   deleteTable,
@@ -16,6 +17,8 @@ import {
   getMenuTables,
 } from "@/lib/menuConfig";
 import { syncPublicProfile } from "@/lib/publicProfile";
+import { productsColRef } from "@/lib/collections";
+import { onSnapshot, doc, updateDoc } from "firebase/firestore";
 import type { MenuConfig, MenuTable, MenuDesignId } from "@/types/menuConfig";
 import { getMenuLabel, isTableType } from "@/constants/establishmentTypes";
 import { MENU_DESIGNS } from "@/types/menuConfig";
@@ -90,6 +93,8 @@ import {
   Loader2,
   Truck,
   CreditCard,
+  Star,
+  Flame,
 } from "lucide-react";
 
 const DESIGN_PREVIEW: Record<MenuDesignId, { bg: string; card: string; accent: string; text: string; border: string }> = {
@@ -179,6 +184,8 @@ export default function MenuDigitalPage() {
   const [activeTab, setActiveTab] = useState<"config" | "tables">("config");
   const [deliveryEnabled, setDeliveryEnabled] = useState(profile?.deliveryEnabled ?? false);
   const [deliveryPrice, setDeliveryPrice] = useState(profile?.deliveryPrice ?? 0);
+  const [dailySpecialMode, setDailySpecialMode] = useState(config?.dailySpecialMode ?? false);
+  const [activatableProducts, setActivatableProducts] = useState<Array<{ id: string; name: string; category?: string; isFeatured?: boolean; isDailySpecial?: boolean; isPromotional?: boolean }>>([]);
 
   const uid = user?.uid;
 
@@ -194,12 +201,14 @@ export default function MenuDigitalPage() {
       if (!cfg) {
         const created = await createMenuConfig(db, uid, {});
         setConfig(created);
+        setDailySpecialMode(created.dailySpecialMode ?? false);
         // Generate QR for new config
         const url = getPublicMenuUrl(created.uid);
         const qr = await QRCode.toDataURL(url, { width: 300, margin: 2 });
         setQrCodeDataUrl(qr);
       } else {
         setConfig(cfg);
+        setDailySpecialMode(cfg.dailySpecialMode ?? false);
         const url = getPublicMenuUrl(cfg.uid);
         const qr = await QRCode.toDataURL(url, { width: 300, margin: 2 });
         setQrCodeDataUrl(qr);
@@ -222,6 +231,26 @@ export default function MenuDigitalPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // ─── Load activatable products (vedette/jour) ────────────────────────────
+  useEffect(() => {
+    if (!uid) return;
+    const unsub = onSnapshot(productsColRef(db, uid), (snap) => {
+      const list = snap.docs.map((d) => {
+        const raw = d.data() as Record<string, unknown>;
+        return {
+          id: d.id,
+          name: String(raw.name || ""),
+          category: String(raw.category || ""),
+          isFeatured: Boolean(raw.isFeatured),
+          isDailySpecial: Boolean(raw.isDailySpecial),
+          isPromotional: Boolean(raw.isPromotional),
+        };
+      });
+      setActivatableProducts(list);
+    });
+    return () => unsub();
+  }, [uid]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────
   const handleToggleEnabled = async (enabled: boolean) => {
@@ -253,6 +282,33 @@ export default function MenuDigitalPage() {
       toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible de changer le design", variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleDailyMode = async (enabled: boolean) => {
+    if (!uid || !config || !profile) return;
+    setSaving(true);
+    try {
+      await setDailySpecialMode(db, uid, enabled);
+      setDailySpecialMode(enabled);
+      setConfig((c) => c ? { ...c, dailySpecialMode: enabled } : null);
+      await syncPublicProfile(db, profile, { menuConfigEnabled: config.enabled, menuDesignId: config.selectedDesign, dailySpecialMode: enabled });
+      toast({ title: enabled ? "Mode Plat du jour activé" : "Mode Plat du jour désactivé", description: enabled ? "Le menu public n'affichera que les plats du jour et vedettes" : "Tous les produits s'affichent dans le menu public" });
+    } catch (e) {
+      console.error('[MenuDigitalPage] dailySpecialMode error:', e);
+      toast({ title: "Erreur", description: e instanceof Error ? e.message : "Impossible de modifier le mode", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleProductFlag = async (productId: string, flag: "isFeatured" | "isDailySpecial", current: boolean) => {
+    if (!uid) return;
+    try {
+      await updateDoc(doc(productsColRef(db, uid), productId), { [flag]: !current, updatedAt: Date.now() });
+    } catch (e) {
+      console.error('[MenuDigitalPage] product flag error:', e);
+      toast({ title: "Erreur", description: "Impossible de modifier le produit", variant: "destructive" });
     }
   };
 
@@ -490,10 +546,14 @@ export default function MenuDigitalPage() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className={`grid w-full ${showTables ? "grid-cols-2" : "grid-cols-1"}`}>
+        <TabsList className={`grid w-full ${showTables ? "grid-cols-3" : "grid-cols-2"}`}>
           <TabsTrigger value="config">
             <Settings className="mr-2 h-4 w-4" />
             Configuration
+          </TabsTrigger>
+          <TabsTrigger value="produits">
+            <Star className="mr-2 h-4 w-4" />
+            Produits
           </TabsTrigger>
           {showTables && (
             <TabsTrigger value="tables">
@@ -555,6 +615,36 @@ export default function MenuDigitalPage() {
                     </TooltipProvider>
                   );
                 })}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Mode Plat du jour */}
+          <Card className="border-0 shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Flame className="h-5 w-5 text-nack-red" />
+                Mode Plat du jour
+              </CardTitle>
+              <CardDescription>
+                Quand activé et qu'au moins un produit est coché "Plat du jour", le menu public n'affiche que les plats du jour + vedettes.
+                Désactivé : tous les produits s'affichent, daily/vedette juste en haut.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="daily-special-mode">Filtrer par plat du jour</Label>
+                  <p className="text-xs text-muted-foreground">
+                    {dailySpecialMode ? "Activé — seuls plat du jour et vedettes sont visibles" : "Désactivé — tous les produits sont visibles"}
+                  </p>
+                </div>
+                <Switch
+                  id="daily-special-mode"
+                  checked={dailySpecialMode}
+                  onCheckedChange={handleToggleDailyMode}
+                  disabled={saving || loading}
+                />
               </div>
             </CardContent>
           </Card>
@@ -735,6 +825,67 @@ export default function MenuDigitalPage() {
                       </p>
                     </div>
                   </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Produits Tab */}
+        <TabsContent value="produits" className="space-y-6 mt-4">
+          <Card className="border-0 shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="h-5 w-5 text-nack-red" />
+                Produits vedettes & plats du jour
+              </CardTitle>
+              <CardDescription>
+                Activez les produits à mettre en avant dans le menu public.
+                {dailySpecialMode ? " Le mode Plat du jour est activé — seuls les produits Vedettes et Plat du jour seront visibles." : " Tous les produits sont visibles, ceux cochés ici apparaissent en haut du menu."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {activatableProducts.length === 0 ? (
+                <div className="text-center py-12">
+                  <Star className="h-12 w-12 mx-auto text-gray-300 mb-4" />
+                  <p className="text-gray-500">Aucun produit trouvé</p>
+                  <p className="text-sm text-muted-foreground mt-1">Créez des produits dans l'onglet Stock</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {activatableProducts.map((p) => (
+                    <div key={p.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 truncate">{p.name}</p>
+                        {p.category && <p className="text-xs text-muted-foreground">{p.category}</p>}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {p.isDailySpecial && <Badge className="bg-red-50 text-red-700 border-red-200 text-xs">Plat du jour</Badge>}
+                        {p.isFeatured && <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">Vedette</Badge>}
+                        {p.isPromotional && <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Promo</Badge>}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                            <Flame className="h-3 w-3 inline" /> Jour
+                          </Label>
+                          <Switch
+                            checked={p.isDailySpecial ?? false}
+                            onCheckedChange={() => handleToggleProductFlag(p.id, "isDailySpecial", p.isDailySpecial ?? false)}
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Label className="text-xs text-muted-foreground whitespace-nowrap">
+                            <Star className="h-3 w-3 inline" /> Vedette
+                          </Label>
+                          <Switch
+                            checked={p.isFeatured ?? false}
+                            onCheckedChange={() => handleToggleProductFlag(p.id, "isFeatured", p.isFeatured ?? false)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </CardContent>
