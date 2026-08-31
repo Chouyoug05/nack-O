@@ -54,6 +54,9 @@ import {
   Badge,
 } from "@/components/ui/badge";
 import {
+  Checkbox,
+} from "@/components/ui/checkbox";
+import {
   Separator,
 } from "@/components/ui/separator";
 import {
@@ -838,11 +841,11 @@ export default function MenuDigitalPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Star className="h-5 w-5 text-nack-red" />
-                Produits vedettes & plats du jour
+                Produits visibles dans le menu
               </CardTitle>
               <CardDescription>
-                Activez les produits à mettre en avant dans le menu public.
-                {dailySpecialMode ? " Le mode Plat du jour est activé — seuls les produits Vedettes et Plat du jour seront visibles." : " Tous les produits sont visibles, ceux cochés ici apparaissent en haut du menu."}
+                Cochez les produits à afficher dans le menu digital public. Les produits non cochés seront masqués.
+                {dailySpecialMode && " Le mode Plat du jour est activé — seuls les produits Vedettes et Plat du jour seront en haut du menu."}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -853,28 +856,26 @@ export default function MenuDigitalPage() {
                   <p className="text-sm text-muted-foreground mt-1">Créez des produits dans l'onglet Stock</p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {activatableProducts.map((p) => (
-                    <div key={p.id} className={`flex items-center gap-3 p-3 rounded-lg border transition ${p.showInMenu !== false ? 'bg-gray-50' : 'bg-gray-100 opacity-60'}`}>
-                      <div className="flex items-center gap-1.5">
-                        <Label className="text-xs text-muted-foreground whitespace-nowrap">
-                          <Eye className="h-3 w-3 inline" /> Menu
-                        </Label>
-                        <Switch
-                          checked={p.showInMenu !== false}
-                          onCheckedChange={() => handleToggleProductFlag(p.id, "showInMenu", p.showInMenu !== false)}
-                        />
-                      </div>
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition ${p.showInMenu !== false ? 'bg-white border-green-200' : 'bg-gray-50 border-gray-200 opacity-70'}`}
+                    >
+                      <Checkbox
+                        checked={p.showInMenu !== false}
+                        onCheckedChange={() => handleToggleProductFlag(p.id, "showInMenu", p.showInMenu !== false)}
+                      />
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 truncate">{p.name}</p>
-                        {p.category && <p className="text-xs text-muted-foreground">{p.category}</p>}
+                        <span className="font-medium text-gray-900 truncate block">{p.name}</span>
+                        {p.category && <span className="text-xs text-muted-foreground">{p.category}</span>}
                       </div>
                       <div className="flex items-center gap-2">
                         {p.isDailySpecial && <Badge className="bg-red-50 text-red-700 border-red-200 text-xs">Plat du jour</Badge>}
                         {p.isFeatured && <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 text-xs">Vedette</Badge>}
                         {p.isPromotional && <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs">Promo</Badge>}
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-1.5">
                           <Label className="text-xs text-muted-foreground whitespace-nowrap">
                             <Flame className="h-3 w-3 inline" /> Jour
@@ -894,7 +895,7 @@ export default function MenuDigitalPage() {
                           />
                         </div>
                       </div>
-                    </div>
+                    </label>
                   ))}
                 </div>
               )}
