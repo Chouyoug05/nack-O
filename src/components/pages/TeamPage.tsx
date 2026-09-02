@@ -160,7 +160,8 @@ const TeamPage = () => {
     if (role === 'serveur' || role === 'vendeur' || role === 'consultant') return `/serveur/${token}`;
     if (role === 'caissier') return `/caisse/${token}`;
     if (role === 'cuisinier' || role === 'barman') return `/cuisine/${token}`;
-    if (role === 'gestionnaire-stock' || role === 'magasinier' || role === 'assistant') return `/serveur/${token}`;
+    if (role === 'gestionnaire-stock') return `/stock/${token}`;
+    if (role === 'magasinier' || role === 'assistant') return `/serveur/${token}`;
     return `/agent-evenement/${token}`;
   };
 

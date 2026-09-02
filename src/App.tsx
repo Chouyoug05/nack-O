@@ -41,6 +41,7 @@ const AffiliateDashboard = lazyWithReload(() => import("./pages/AffiliateDashboa
 const ServeurInterface = lazyWithReload(() => import("./pages/ServeurInterface"));
 const CaisseInterface = lazyWithReload(() => import("./pages/CaisseInterface"));
 const CuisineInterface = lazyWithReload(() => import("./pages/CuisineInterface"));
+const StockInterface = lazyWithReload(() => import("./pages/StockInterface"));
 const AgentEvenementInterface = lazyWithReload(() => import("./pages/AgentEvenementInterface"));
 const EventPublicPage = lazyWithReload(() => import("./pages/EventPublicPage"));
 const PaymentSuccess = lazyWithReload(() => import("./pages/PaymentSuccess"));
@@ -199,6 +200,7 @@ const routes = [
       { path: "serveur/:agentCode", element: <LazyBoundary><ServeurInterface /></LazyBoundary> },
       { path: "caisse/:agentCode", element: <LazyBoundary><CaisseInterface /></LazyBoundary> },
       { path: "cuisine/:agentCode", element: <LazyBoundary><CuisineInterface /></LazyBoundary> },
+      { path: "stock/:agentCode", element: <LazyBoundary><StockInterface /></LazyBoundary> },
       { path: "agent-evenement/:agentCode", element: <LazyBoundary><AgentEvenementInterface /></LazyBoundary> },
       { path: "event/:eventId", element: <LazyBoundary><EventPublicPage /></LazyBoundary> },
       { path: "payment/success", element: <LazyBoundary><PaymentSuccess /></LazyBoundary> },

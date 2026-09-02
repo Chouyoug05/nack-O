@@ -171,6 +171,7 @@ export const ROLES_BY_CATEGORY: Record<string, RoleConfig[]> = {
     { value: 'caissier', label: 'Caissier', description: 'Enregistrer les paiements à la caisse', icon: Wallet },
     { value: 'cuisinier', label: 'Cuisinier', description: 'Préparer les plats et gérer la cuisine', icon: ChefHat },
     { value: 'barman', label: 'Barman', description: 'Préparer les boissons et gérer le bar', icon: GlassWater },
+    { value: 'gestionnaire-stock', label: 'Gestionnaire de stock', description: 'Gérer les inventaires et réapprovisionnements', icon: Package },
   ],
   boutique: [
     { value: 'vendeur', label: 'Vendeur', description: 'Accueillir les clients et gérer les ventes', icon: Users },
@@ -181,11 +182,13 @@ export const ROLES_BY_CATEGORY: Record<string, RoleConfig[]> = {
     { value: 'vendeur', label: 'Vendeur', description: 'Accueillir les clients et gérer les ventes', icon: Users },
     { value: 'caissier', label: 'Caissier', description: 'Enregistrer les paiements à la caisse', icon: Wallet },
     { value: 'magasinier', label: 'Magasinier', description: 'Gérer le stock et les livraisons', icon: Package },
+    { value: 'gestionnaire-stock', label: 'Gestionnaire de stock', description: 'Gérer les inventaires et réapprovisionnements', icon: Package },
   ],
   services: [
     { value: 'consultant', label: 'Consultant', description: 'Accompagner les clients dans leurs demandes', icon: ClipboardList },
     { value: 'caissier', label: 'Caissier', description: 'Enregistrer les paiements', icon: Wallet },
     { value: 'assistant', label: 'Assistant', description: 'Assister dans les tâches administratives', icon: UserCheck },
+    { value: 'gestionnaire-stock', label: 'Gestionnaire de stock', description: 'Gérer les inventaires et réapprovisionnements', icon: Package },
   ],
 };
 

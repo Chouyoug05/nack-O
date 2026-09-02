@@ -149,8 +149,10 @@ const Login = () => {
       }
 
       // Rediriger vers l'interface appropriée
-      if (teamFormData.role === 'serveur' || teamFormData.role === 'vendeur' || teamFormData.role === 'consultant' || teamFormData.role === 'gestionnaire-stock' || teamFormData.role === 'magasinier' || teamFormData.role === 'assistant') {
+      if (teamFormData.role === 'serveur' || teamFormData.role === 'vendeur' || teamFormData.role === 'consultant' || teamFormData.role === 'magasinier' || teamFormData.role === 'assistant') {
         navigate(`/serveur/${foundToken}`);
+      } else if (teamFormData.role === 'gestionnaire-stock') {
+        navigate(`/stock/${foundToken}`);
       } else if (teamFormData.role === 'caissier') {
         navigate(`/caisse/${foundToken}`);
       } else if (teamFormData.role === 'cuisinier' || teamFormData.role === 'barman') {

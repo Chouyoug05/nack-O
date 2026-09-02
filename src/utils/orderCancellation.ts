@@ -16,7 +16,6 @@ function stripUndefined(obj: Record<string, unknown>): Record<string, unknown> {
  * Configuration pour l'annulation de commande
  */
 export const CANCELLATION_CONFIG = {
-  MAX_DELAY_MINUTES: 30, // Délai maximum pour annuler une commande validée (en minutes)
   MIN_REASON_LENGTH: 5, // Longueur minimale de la raison
 };
 
@@ -27,7 +26,7 @@ export async function canCancelOrder(
   orderId: string,
   ownerUid: string,
   orderStatus: OrderStatus,
-  orderCreatedAt: number | Date
+  _orderCreatedAt: number | Date
 ): Promise<{ canCancel: boolean; reason?: string }> {
   // Ne pas permettre l'annulation si la commande est déjà livrée, payée ou clôturée
   if (orderStatus === 'ready' || orderStatus === 'delivered' || orderStatus === 'paid' || orderStatus === 'closed') {
@@ -35,24 +34,6 @@ export async function canCancelOrder(
       canCancel: false,
       reason: "Impossible d'annuler : la commande est déjà livrée ou clôturée."
     };
-  }
-
-  // Pour les commandes validées, vérifier le délai
-  if (orderStatus === 'validated' || orderStatus === 'in-preparation') {
-    const createdAt = orderCreatedAt instanceof Date 
-      ? orderCreatedAt.getTime() 
-      : (typeof orderCreatedAt === 'number' ? orderCreatedAt : Date.now());
-    
-    const now = Date.now();
-    const delayMs = now - createdAt;
-    const delayMinutes = delayMs / (1000 * 60);
-
-    if (delayMinutes > CANCELLATION_CONFIG.MAX_DELAY_MINUTES) {
-      return {
-        canCancel: false,
-        reason: `Impossible d'annuler : le délai d'annulation (${CANCELLATION_CONFIG.MAX_DELAY_MINUTES} minutes) est dépassé.`
-      };
-    }
   }
 
   return { canCancel: true };
