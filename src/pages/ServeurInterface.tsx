@@ -146,7 +146,6 @@ const ServeurInterface = () => {
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent';
             setAgentInfo({ name, code: agentCode });
-            // Récupérer le type d'établissement
             try {
               const profileDoc = await getDoc(doc(db, 'profiles', data.ownerUid));
               if (profileDoc.exists()) {
@@ -154,7 +153,6 @@ const ServeurInterface = () => {
                 setEstablishmentType(profileData.establishmentType || null);
               }
             } catch { /* ignore */ }
-            // Sauvegarder dans localStorage pour persistance
             try {
               localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
                 ownerUid: data.ownerUid,
@@ -165,7 +163,10 @@ const ServeurInterface = () => {
             return;
           }
         }
-      } catch { /* ignore */ }
+      } catch (e) {
+        console.error('[ServeurInterface] Échec résolution via agentTokens:', e);
+      }
+      // Fallback: collectionGroup search
       try {
         const cg = collectionGroup(db, 'team');
         let foundOwner: string | null = null;
