@@ -284,7 +284,7 @@ service cloud.firestore {
       allow read, write: if isOwner(userId) || isAdmin();
     }
     match /profiles/{userId}/losses/{lossId} {
-      allow read, write: if isOwner(userId) || isAdmin();
+      allow read, write: if isOwner(userId) || isAdmin() || agentFor(userId);
     }
     match /profiles/{userId}/receipts/{receiptId} {
       allow read, write: if isOwner(userId) || isAdmin();
