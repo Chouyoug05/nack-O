@@ -94,9 +94,9 @@ const StockInterface = () => {
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string; role?: string };
           if (data.ownerUid && data.role === "gestionnaire-stock") {
-            await ensureAgentSession(agentCode, data.ownerUid);
             setOwnerUid(data.ownerUid);
             setAgentInfo({ name: `${data.firstName || ""} ${data.lastName || ""}`.trim() || "Agent", code: agentCode });
+            ensureAgentSession(agentCode, data.ownerUid).catch(() => {});
             try {
               localStorage.setItem(getStockAuthKey(agentCode), JSON.stringify({
                 ownerUid: data.ownerUid,
@@ -119,9 +119,9 @@ const StockInterface = () => {
           if (data.role !== "gestionnaire-stock") return;
           const foundOwner = docSnap.ref.parent.parent?.id;
           if (foundOwner) {
-            await ensureAgentSession(agentCode, foundOwner);
             setOwnerUid(foundOwner);
             setAgentInfo({ name: `${data.firstName} ${data.lastName}`.trim() || "Agent", code: agentCode });
+            ensureAgentSession(agentCode, foundOwner).catch(() => {});
             try {
               localStorage.setItem(getStockAuthKey(agentCode), JSON.stringify({
                 ownerUid: foundOwner,
@@ -140,9 +140,9 @@ const StockInterface = () => {
           if (data.role !== "gestionnaire-stock") return;
           const foundOwner = docSnap.ref.parent.parent?.id;
           if (foundOwner) {
-            await ensureAgentSession(agentCode, foundOwner);
             setOwnerUid(foundOwner);
             setAgentInfo({ name: `${data.firstName} ${data.lastName}`.trim() || "Agent", code: agentCode });
+            ensureAgentSession(agentCode, foundOwner).catch(() => {});
             try {
               localStorage.setItem(getStockAuthKey(agentCode), JSON.stringify({
                 ownerUid: foundOwner,

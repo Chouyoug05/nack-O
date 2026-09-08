@@ -142,7 +142,6 @@ const ServeurInterface = () => {
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string };
           if (data.ownerUid) {
-            await ensureAgentSession(agentCode, data.ownerUid);
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent';
             setAgentInfo({ name, code: agentCode });
@@ -160,12 +159,11 @@ const ServeurInterface = () => {
                 timestamp: Date.now(),
               }));
             } catch { /* ignore */ }
+            ensureAgentSession(agentCode, data.ownerUid).catch(() => {});
             return;
           }
         }
-      } catch (e) {
-        console.error('[ServeurInterface] Échec résolution via agentTokens:', e);
-      }
+      } catch { /* ignore */ }
       // Fallback: collectionGroup search
       try {
         const cg = collectionGroup(db, 'team');
@@ -192,10 +190,8 @@ const ServeurInterface = () => {
           }
         }
         if (foundOwner) {
-          await ensureAgentSession(agentCode, foundOwner);
           setOwnerUid(foundOwner);
           setAgentInfo({ name: foundName || 'Agent', code: agentCode, memberId: foundMemberId });
-          // Récupérer le type d'établissement
           try {
             const profileDoc = await getDoc(doc(db, 'profiles', foundOwner));
             if (profileDoc.exists()) {
@@ -203,7 +199,6 @@ const ServeurInterface = () => {
               setEstablishmentType(profileData.establishmentType || null);
             }
           } catch { /* ignore */ }
-          // Sauvegarder dans localStorage pour persistance
           try {
             localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
               ownerUid: foundOwner,
@@ -212,6 +207,7 @@ const ServeurInterface = () => {
               timestamp: Date.now(),
             }));
           } catch { /* ignore */ }
+          ensureAgentSession(agentCode, foundOwner).catch(() => {});
         }
       } catch { /* ignore permissions */ }
     };

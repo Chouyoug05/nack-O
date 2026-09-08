@@ -50,11 +50,11 @@ const CaisseInterfaceContent = () => {
         if (tokenDoc.exists()) {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string; agentCode?: string };
           if (data.ownerUid) {
-            await ensureAgentSession(agentCode, data.ownerUid);
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent Caissier';
             setAgentInfo({ name, code: agentCode });
             if (data.agentCode) setExpectedAgentCode(data.agentCode);
+            ensureAgentSession(agentCode, data.ownerUid).catch(() => {});
             // Sauvegarder l'authentification dans localStorage
             try {
               localStorage.setItem(getAuthStorageKey(agentCode), JSON.stringify({
@@ -94,10 +94,10 @@ const CaisseInterfaceContent = () => {
         }
       }
       if (foundOwner) {
-        await ensureAgentSession(agentCode, foundOwner);
         setOwnerUid(foundOwner);
         setAgentInfo({ name: foundName || 'Agent Caissier', code: agentCode });
         if (foundAgentCode) setExpectedAgentCode(foundAgentCode);
+        ensureAgentSession(agentCode, foundOwner).catch(() => {});
         // Sauvegarder l'authentification dans localStorage
         try {
           localStorage.setItem(getAuthStorageKey(agentCode), JSON.stringify({
@@ -160,12 +160,11 @@ const CaisseInterfaceContent = () => {
         const snap = sTok.docs[0];
         const data = snap.data() as { ownerUid?: string; firstName?: string; lastName?: string; agentCode?: string };
         if (data.ownerUid) {
-          await ensureAgentSession(agentCode, data.ownerUid);
           setOwnerUid(data.ownerUid);
           const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Agent Caissier';
           setAgentInfo({ name, code: agentCode });
           if (data.agentCode) setExpectedAgentCode(data.agentCode);
-          // Sauvegarder l'authentification
+          ensureAgentSession(agentCode, data.ownerUid).catch(() => {});
           try {
             localStorage.setItem(getAuthStorageKey(agentCode), JSON.stringify({
               authenticated: true,

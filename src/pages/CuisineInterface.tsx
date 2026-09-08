@@ -120,12 +120,10 @@ const CuisineInterface = () => {
           const data = tokenDoc.data() as { ownerUid?: string; firstName?: string; lastName?: string; role?: string };
           console.log('[CuisineInterface] Token data:', { ownerUid: data.ownerUid, role: data.role });
           if (data.ownerUid && (data.role === 'cuisinier' || data.role === 'barman')) {
-            console.log('[CuisineInterface] Création session agent pour ownerUid:', data.ownerUid);
-            await ensureAgentSession(agentCode, data.ownerUid);
-            console.log('[CuisineInterface] Session agent créée avec succès');
             setOwnerUid(data.ownerUid);
             const name = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Cuisinier';
             setAgentInfo({ name, code: agentCode });
+            ensureAgentSession(agentCode, data.ownerUid).catch(() => {});
             try {
               localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
                 ownerUid: data.ownerUid,
@@ -153,11 +151,9 @@ const CuisineInterface = () => {
             const foundOwner = docSnap.ref.parent.parent ? docSnap.ref.parent.parent.id : null;
             const foundName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Cuisinier';
             if (foundOwner) {
-              console.log('[CuisineInterface] Création session agent (via team) pour ownerUid:', foundOwner);
-              await ensureAgentSession(agentCode, foundOwner);
-              console.log('[CuisineInterface] Session agent (via team) créée avec succès');
               setOwnerUid(foundOwner);
               setAgentInfo({ name: foundName, code: agentCode });
+              ensureAgentSession(agentCode, foundOwner).catch(() => {});
               try {
                 localStorage.setItem(getServeurAuthKey(agentCode), JSON.stringify({
                   ownerUid: foundOwner,
