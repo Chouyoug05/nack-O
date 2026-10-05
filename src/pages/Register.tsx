@@ -94,7 +94,7 @@ const Register = () => {
 
   const getCurrentLocation = async () => {
     if (!navigator.geolocation) {
-      setLocationError("La gÃ©olocalisation n'est pas supportÃ©e");
+      setLocationError("La géolocalisation n'est pas supportée");
       return;
     }
     setIsGettingLocation(true);
@@ -116,9 +116,9 @@ const Register = () => {
         setFormData(prev => ({ ...prev, address: fallback }));
         setAddressInput(fallback);
       }
-      toast({ title: "Position enregistrÃ©e" });
+      toast({ title: "Position enregistrée" });
     } catch {
-      setLocationError("Erreur de gÃ©olocalisation");
+      setLocationError("Erreur de géolocalisation");
     } finally {
       setIsGettingLocation(false);
     }
@@ -178,7 +178,7 @@ const Register = () => {
 
   const handleManagerSubmit = async () => {
     if (formData.password !== formData.confirmPassword) {
-      toast({ title: "Erreur", description: "Mots de passe diffÃ©rents", variant: "destructive" });
+      toast({ title: "Erreur", description: "Mots de passe différents", variant: "destructive" });
       return;
     }
     if (!termsAccepted) {
@@ -198,7 +198,7 @@ const Register = () => {
         }
       }
       await saveProfile({
-        establishmentName: formData.establishmentName,
+        establishmentName: formData.establishmentName || formData.ownerName,
         establishmentType: formData.establishmentType,
         ownerName: formData.ownerName,
         email: formData.email,
@@ -211,7 +211,7 @@ const Register = () => {
         locationAsked: true,
         referredBy: refCode,
       });
-      toast({ title: "Inscription rÃ©ussie !" });
+      toast({ title: "Inscription réussie !" });
       navigate("/configure-tickets");
     } catch (error) {
       toast({
@@ -230,7 +230,7 @@ const Register = () => {
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      toast({ title: "Mots de passe diffÃ©rents", variant: "destructive" });
+      toast({ title: "Mots de passe différents", variant: "destructive" });
       return;
     }
     if (!termsAccepted) {
@@ -258,7 +258,7 @@ const Register = () => {
       });
       setAffiliateCode(code);
       setAffiliateStep(2);
-      toast({ title: "Compte crÃ©Ã© !" });
+      toast({ title: "Compte créé !" });
     } catch (error) {
       toast({
         title: "Erreur",
@@ -278,12 +278,12 @@ const Register = () => {
             <Gift size={40} className="animate-bounce" />
           </div>
           <h3 className="text-3xl font-bold">Bienvenue, Partenaire !</h3>
-          <p className="text-muted-foreground">Votre compte a Ã©tÃ© crÃ©Ã©. Notez votre code :</p>
+          <p className="text-muted-foreground">Votre compte a été créé. Notez votre code :</p>
           <div className="bg-white border-2 border-dashed border-nack-red p-6 rounded-2xl shadow-sm inline-block my-4">
             <span className="text-4xl font-mono font-bold text-nack-red tracking-widest">{affiliateCode}</span>
           </div>
           <Button onClick={() => navigate(`/affiliate?code=${affiliateCode}`)} className="w-full h-16 text-xl font-bold bg-nack-red hover:bg-nack-red-dark text-white rounded-xl shadow-lg mt-6">
-            AccÃ©der Ã  mon tableau de bord
+            Accéder à mon tableau de bord
           </Button>
         </div>
       );
@@ -291,8 +291,8 @@ const Register = () => {
 
     return (
       <div className="space-y-6 py-4">
-        <h3 className="text-2xl font-bold text-center">Devenir AffiliÃ© Nack</h3>
-        <p className="text-center text-muted-foreground">Gagnez des revenus en parrainant des Ã©tablissements.</p>
+        <h3 className="text-2xl font-bold text-center">Devenir Affilié Nack</h3>
+        <p className="text-center text-muted-foreground">Gagnez des revenus en parrainant des établissements.</p>
         <div className="space-y-4">
           <Input name="ownerName" placeholder="Nom complet" value={formData.ownerName} onChange={handleInputChange} className="h-14" />
           <Input name="email" type="email" placeholder="Email" value={formData.email} onChange={handleInputChange} className="h-14" />
@@ -336,9 +336,9 @@ const Register = () => {
           {isLoading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              CrÃ©ation du compte...
+              Création du compte...
             </>
-          ) : "CrÃ©er mon compte partenaire"}
+          ) : "Créer mon compte partenaire"}
         </Button>
         <div className="text-center">
           <Button variant="ghost" onClick={() => navigate('/login')} className="text-muted-foreground">Annuler</Button>
@@ -352,15 +352,15 @@ const Register = () => {
       <div className="w-full max-w-2xl animate-scale-in">
         <div className="text-center mb-6">
           <NackLogo size="md" className="mb-2" />
-          <p className="text-muted-foreground text-sm">Rejoignez la communautÃ© NACK!</p>
+          <p className="text-muted-foreground text-sm">Rejoignez la communauté NACK!</p>
         </div>
 
         <Card className="shadow-card border-0">
           <CardHeader className="text-center pb-4">
             <CardTitle className="text-2xl">
-              {isAffiliateMode ? (affiliateStep === 2 ? "FÃ©licitations !" : "Devenir AffiliÃ©") : "CrÃ©er un compte"}
+              {isAffiliateMode ? (affiliateStep === 2 ? "Félicitations !" : "Devenir Affilié") : "Créer un compte"}
             </CardTitle>
-            {!isAffiliateMode && <CardDescription>Ã‰tape {formStep} sur 5</CardDescription>}
+            {!isAffiliateMode && <CardDescription>Étape {formStep} sur 5</CardDescription>}
             {!isAffiliateMode && (
               <div className="flex gap-2 mt-4">
                 {[1, 2, 3, 4, 5].map(s => (
@@ -378,7 +378,7 @@ const Register = () => {
                   <div className="space-y-6">
                     {!selectedMainCategory ? (
                       <div className="space-y-4">
-                        <Label className="text-lg">Quelle est l'activitÃ© principale de votre Ã©tablissement ? *</Label>
+                        <Label className="text-lg">Quelle est l'activité principale de votre établissement ? *</Label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           {MAIN_CATEGORIES.map((cat) => {
                             const Icon = cat.icon;
@@ -403,7 +403,7 @@ const Register = () => {
                             <ArrowLeft className="w-4 h-4 mr-1" /> Retour
                           </Button>
                         </div>
-                        <Label className="text-lg">PrÃ©cisez votre type d'Ã©tablissement *</Label>
+                        <Label className="text-lg">Précisez votre type d'établissement *</Label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           {ESTABLISHMENT_TYPES.filter(t => t.main === selectedMainCategory).map((t) => (
                             <button
@@ -424,11 +424,11 @@ const Register = () => {
                   <div className="space-y-4">
                     {!(selectedMainCategory === 'commerce' || selectedMainCategory === 'boutique') && (
                       <>
-                        <Label>Nom de l'Ã©tablissement *</Label>
-                        <Input name="establishmentName" placeholder="Mon Ã©tablissement" value={formData.establishmentName} onChange={handleInputChange} className="h-12" />
+                        <Label>Nom de l'établissement *</Label>
+                        <Input name="establishmentName" placeholder="Mon établissement" value={formData.establishmentName} onChange={handleInputChange} className="h-12" />
                       </>
                     )}
-                    <Label>Nom complet du gÃ©rant *</Label>
+                    <Label>Nom complet du gérant *</Label>
                     <Input name="ownerName" placeholder="Votre nom complet" value={formData.ownerName} onChange={handleInputChange} className="h-12" />
                   </div>
                 )}
@@ -459,7 +459,7 @@ const Register = () => {
                       </Button>
                       <Button onClick={handleGeocodeAddress} variant="outline" disabled={isSearchingAddress}>
                         {isSearchingAddress ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-                        GÃ©ocoder l'adresse
+                        Géocoder l'adresse
                       </Button>
                     </div>
                   </div>
@@ -484,16 +484,16 @@ const Register = () => {
                       {isLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          CrÃ©ation du compte...
+                          Création du compte...
                         </>
-                      ) : "CrÃ©er mon compte"}
+                      ) : "Créer mon compte"}
                     </Button>
                   </div>
                 )}
                 {/* Navigation Buttons */}
                 <div className="flex justify-between mt-6">
                   {formStep > 1 && (
-                    <Button variant="outline" onClick={() => setFormStep(formStep - 1)} disabled={isLoading}>PrÃ©cÃ©dent</Button>
+                    <Button variant="outline" onClick={() => setFormStep(formStep - 1)} disabled={isLoading}>Précédent</Button>
                   )}
                   {formStep < 5 && (
                     <Button onClick={handleNext} disabled={isLoading}>Suivant</Button>
@@ -501,7 +501,7 @@ const Register = () => {
                 </div>
                 <div className="mt-6 text-center">
                   <p className="text-sm text-muted-foreground">
-                    DÃ©jÃ  un compte ? <Link to="/login" className="text-nack-red font-medium">Se connecter</Link>
+                    Déjà un compte ? <Link to="/login" className="text-nack-red font-medium">Se connecter</Link>
                   </p>
                 </div>
               </div>

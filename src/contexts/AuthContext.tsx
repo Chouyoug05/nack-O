@@ -55,10 +55,10 @@ function removeUndefinedFields<T extends object>(obj: T): Partial<T> {
   return result;
 }
 
-/** CrÃ©e l'Ã©tablissement principal pour un nouvel utilisateur ou un utilisateur legacy */
+/** Crée l'établissement principal pour un nouvel utilisateur ou un utilisateur legacy */
 const ensureFirstEstablishment = async (profile: UserProfile, dbInstance: typeof db): Promise<{ eid: string; establishment: EstablishmentDoc }> => {
   const now = Date.now();
-  const eid = profile.uid; // Premier Ã©tablissement = uid de l'utilisateur
+  const eid = profile.uid; // Premier établissement = uid de l'utilisateur
   const estRef = establishmentDocRef(dbInstance, eid);
   const estSnap = await getDoc(estRef);
 
@@ -137,7 +137,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [activeEstablishment, setActiveEstablishment] = useState<EstablishmentDoc | null>(null);
   const [establishments, setEstablishments] = useState<EstablishmentRef[]>([]);
 
-  // RÃ©cupÃ©rer la liste des Ã©tablissements d'un utilisateur depuis la collection establishments
+  // Récupérer la liste des établissements d'un utilisateur depuis la collection establishments
   const fetchUserEstablishments = useCallback(async (uid: string): Promise<EstablishmentRef[]> => {
     try {
       const q = query(establishmentsColRef(db), where("ownerUid", "==", uid));
@@ -156,7 +156,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Charger un document Ã©tablissement + s'abonner aux changements
+  // Charger un document établissement + s'abonner aux changements
   const loadEstablishment = useCallback((eid: string | undefined) => {
     if (!eid) {
       setActiveEstablishment(null);
@@ -173,7 +173,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return unsub;
   }, []);
 
-  // Mettre Ã  jour le profil avec la liste des Ã©tablissements
+  // Mettre à jour le profil avec la liste des établissements
   const syncEstablishmentList = useCallback(async (uid: string, refs: EstablishmentRef[]) => {
     try {
       const profileRef = doc(db, "profiles", uid);
@@ -198,7 +198,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, []);
 
-  // Migration legacy : crÃ©er le premier Ã©tablissement si nÃ©cessaire
+  // Migration legacy : créer le premier établissement si nécessaire
   const migrateLegacyProfile = useCallback(async (profileData: UserProfile) => {
     const needsMigration = !profileData.activeEstablishmentId || !profileData.establishments?.length;
     if (!needsMigration) return profileData;
@@ -254,7 +254,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             profileData = await migrateLegacyProfile(profileData);
             setProfile(profileData);
 
-            // Charger la liste des Ã©tablissements
+            // Charger la liste des établissements
             const estRefs = profileData.establishments || [];
             if (estRefs.length === 0) {
               const refs = await fetchUserEstablishments(current.uid);
@@ -348,7 +348,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => unsub();
   }, [migrateLegacyProfile, fetchUserEstablishments, syncEstablishmentList]);
 
-  // Ã‰couter en temps rÃ©el le profil utilisateur
+  // Écouter en temps réel le profil utilisateur
   useEffect(() => {
     if (!user) return;
     const unsubProfile = onSnapshot(doc(db, "profiles", user.uid), (snap) => {
@@ -383,7 +383,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     touchTabletLastSeen(db, imei, user.uid).catch(() => undefined);
   }, [user, profile]);
 
-  // Ã‰couter l'Ã©tablissement actif en temps rÃ©el
+  // Écouter l'établissement actif en temps réel
   useEffect(() => {
     if (!profile?.activeEstablishmentId) {
       setActiveEstablishment(null);
@@ -393,7 +393,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return unsub;
   }, [profile?.activeEstablishmentId, loadEstablishment]);
 
-  // Notifications systÃ¨me
+  // Notifications système
   useEffect(() => {
     const pushSystemNotifications = async () => {
       if (!user || !profile) return;
@@ -409,8 +409,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             if (!localStorage.getItem(dayKey)) {
               try {
                 await addDoc(notificationsColRef(db, uid), {
-                  title: "Essai bientÃ´t terminÃ©",
-                  message: `Il vous reste ${daysLeft} jour${daysLeft > 1 ? 's' : ''} pour utiliser la plateforme. Passez Ã  l'abonnement.`,
+                  title: "Essai bientôt terminé",
+                  message: `Il vous reste ${daysLeft} jour${daysLeft > 1 ? 's' : ''} pour utiliser la plateforme. Passez à l'abonnement.`,
                   type: "warning",
                   createdAt: now,
                   read: false,
@@ -433,7 +433,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       await signInWithRedirect(auth, provider);
     } catch (e) {
       console.error('Google redirect error:', e);
-      throw new Error("Connexion Google indisponible pour le moment. RÃ©essayez.");
+      throw new Error("Connexion Google indisponible pour le moment. Réessayez.");
     }
   };
 
@@ -447,7 +447,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const now = Date.now();
       const sevenDays = 7 * 24 * 60 * 60 * 1000;
 
-      // CrÃ©er le premier Ã©tablissement
+      // Créer le premier établissement
       const eid = cred.user.uid;
       const est: EstablishmentDoc = {
         id: eid,
@@ -466,7 +466,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       };
       await setDoc(establishmentDocRef(db, eid), removeUndefinedFields(est));
 
-      // CrÃ©er le profil utilisateur
+      // Créer le profil utilisateur
       const profileData: UserProfile = {
         uid: cred.user.uid,
         establishmentName: "",
@@ -511,7 +511,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }, 5000);
       });
     }
-    if (!currentUser) throw new Error("Authentification en cours. Veuillez rÃ©essayer dans un instant.");
+    if (!currentUser) throw new Error("Authentification en cours. Veuillez réessayer dans un instant.");
     const ref = doc(db, "profiles", currentUser.uid);
     const now = Date.now();
     const sevenDays = 7 * 24 * 60 * 60 * 1000;
@@ -533,7 +533,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       console.error('[Auth] Failed to sync public profile:', syncError);
     }
 
-    // Sync avec l'Ã©tablissement actif
+    // Sync avec l'établissement actif
     const eid = payload.activeEstablishmentId || profile?.activeEstablishmentId;
     if (eid) {
       const estRef = establishmentDocRef(db, eid);
@@ -561,7 +561,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const createEstablishment = async (data: Partial<EstablishmentDoc>): Promise<string> => {
-    if (!user) throw new Error("Non authentifiÃ©");
+    if (!user) throw new Error("Non authentifié");
     const now = Date.now();
     const colRef = establishmentsColRef(db);
     const docRef = await addDoc(colRef, {
@@ -572,10 +572,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     const eid = docRef.id;
 
-    // Mettre Ã  jour la liste dans le profil
+    // Mettre à jour la liste dans le profil
     const newRef: EstablishmentRef = {
       id: eid,
-      name: data.name || "Nouvel Ã©tablissement",
+      name: data.name || "Nouvel établissement",
       type: data.type || "",
       logoUrl: data.logoUrl,
     };

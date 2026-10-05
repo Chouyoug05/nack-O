@@ -64,7 +64,7 @@ type DurationType = typeof DURATIONS[number]['value'];
 function formatCountdown(ms: number) {
   if (!ms || ms <= 0) return "0 jour";
   const d = Math.floor(ms / (24 * 60 * 60 * 1000));
-  // Afficher seulement les jours pour plus de clartÃ©
+  // Afficher seulement les jours pour plus de clarté
   if (d === 0) {
     const h = Math.floor((ms % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
     return h > 0 ? `${h} heure${h > 1 ? 's' : ''}` : "Moins d'une heure";
@@ -78,7 +78,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   const hasAssignedTablet = Boolean(getAssignedTabletImei(profile));
 
   const [establishmentInfo, setEstablishmentInfo] = useState({
-    name: profile?.establishmentName || "Mon Ã‰tablissement",
+    name: profile?.establishmentName || "Mon Établissement",
     address: "",
     phone: profile?.phone || "",
     email: profile?.email || "",
@@ -115,7 +115,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     teamUpdates: true
   });
 
-  // Multi-Ã©tablissement
+  // Multi-établissement
   const [isCreateEstDialogOpen, setIsCreateEstDialogOpen] = useState(false);
   const [newEstName, setNewEstName] = useState("");
   const [newEstType, setNewEstType] = useState("");
@@ -143,13 +143,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       });
       setIsCreateEstDialogOpen(false);
       toast({
-        title: "Ã‰tablissement crÃ©Ã©",
-        description: `"${newEstName}" a Ã©tÃ© crÃ©Ã© avec succÃ¨s. Vous pouvez maintenant le gÃ©rer.`,
+        title: "Établissement créé",
+        description: `"${newEstName}" a été créé avec succès. Vous pouvez maintenant le gérer.`,
       });
     } catch (e: unknown) {
       toast({
         title: "Erreur",
-        description: e instanceof Error ? e.message : "Impossible de crÃ©er l'Ã©tablissement",
+        description: e instanceof Error ? e.message : "Impossible de créer l'établissement",
         variant: "destructive",
       });
     } finally {
@@ -172,41 +172,41 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
   const handleSaveEstablishment = () => {
     toast({
-      title: "Informations sauvegardÃ©es",
-      description: "Les informations de l'Ã©tablissement ont Ã©tÃ© mises Ã  jour",
+      title: "Informations sauvegardées",
+      description: "Les informations de l'établissement ont été mises à jour",
     });
   };
 
   const handleExportData = () => {
     toast({
       title: "Export en cours",
-      description: "Vos donnÃ©es sont en cours d'export. Vous recevrez un email quand ce sera prÃªt.",
+      description: "Vos données sont en cours d'export. Vous recevrez un email quand ce sera prêt.",
     });
   };
 
   const handleBackup = () => {
     toast({
-      title: "Sauvegarde crÃ©Ã©e",
-      description: "Une sauvegarde complÃ¨te de vos donnÃ©es a Ã©tÃ© crÃ©Ã©e",
+      title: "Sauvegarde créée",
+      description: "Une sauvegarde complète de vos données a été créée",
     });
   };
 
   const handleResetData = async () => {
     if (!user) {
       toast({
-        title: "âŒ Erreur",
-        description: "Vous devez Ãªtre connectÃ© pour rÃ©initialiser les donnÃ©es",
+        title: "❌ Erreur",
+        description: "Vous devez être connecté pour réinitialiser les données",
         variant: "destructive",
       });
       return;
     }
 
-    const confirmMessage = "âš ï¸ ATTENTION : Cette action est irrÃ©versible !\n\nCela supprimera TOUTES vos donnÃ©es :\n- Tous les produits\n- Toutes les ventes\n- Toute l'Ã©quipe\n- Tous les Ã©vÃ©nements\n- Toutes les commandes\n- Toutes les notifications\n- Tous les paiements et reÃ§us\n\nSeuls vos paramÃ¨tres de base (nom, email, logo) seront conservÃ©s.\n\nÃŠtes-vous ABSOLUMENT sÃ»r de vouloir continuer ?";
+    const confirmMessage = "⚠️ ATTENTION : Cette action est irréversible !\n\nCela supprimera TOUTES vos données :\n- Tous les produits\n- Toutes les ventes\n- Toute l'équipe\n- Tous les événements\n- Toutes les commandes\n- Toutes les notifications\n- Tous les paiements et reçus\n\nSeuls vos paramètres de base (nom, email, logo) seront conservés.\n\nÊtes-vous ABSOLUMENT sûr de vouloir continuer ?";
 
     if (!window.confirm(confirmMessage)) return;
 
     // Double confirmation
-    if (!window.confirm("DerniÃ¨re confirmation : Voulez-vous vraiment supprimer TOUTES vos donnÃ©es ?")) return;
+    if (!window.confirm("Dernière confirmation : Voulez-vous vraiment supprimer TOUTES vos données ?")) return;
 
     try {
       setIsSaving(true);
@@ -257,19 +257,19 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       // Supprimer toutes les pertes
       await deleteCollection(lossesColRef(db, user.uid), "pertes");
 
-      // Supprimer tous les Ã©vÃ©nements (et leurs tickets)
+      // Supprimer tous les événements (et leurs tickets)
       const eventsSnapshot = await getDocs(eventsColRef(db, user.uid));
       for (const eventDoc of eventsSnapshot.docs) {
-        // Supprimer les tickets de l'Ã©vÃ©nement
+        // Supprimer les tickets de l'événement
         const ticketsRef = collection(db, "profiles", user.uid, "events", eventDoc.id, "tickets");
         await deleteCollection(ticketsRef, "tickets");
-        // Supprimer l'Ã©vÃ©nement
+        // Supprimer l'événement
         await deleteDoc(eventDoc.ref);
         totalDeleted++;
       }
 
-      // Supprimer toute l'Ã©quipe
-      await deleteCollection(teamColRef(db, user.uid), "Ã©quipe");
+      // Supprimer toute l'équipe
+      await deleteCollection(teamColRef(db, user.uid), "équipe");
 
       // Supprimer toutes les commandes
       await deleteCollection(ordersColRef(db, user.uid), "commandes");
@@ -280,18 +280,18 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       // Supprimer tous les paiements
       await deleteCollection(paymentsColRef(db, user.uid), "paiements");
 
-      // Supprimer tous les reÃ§us
-      await deleteCollection(receiptsColRef(db, user.uid), "reÃ§us");
+      // Supprimer tous les reçus
+      await deleteCollection(receiptsColRef(db, user.uid), "reçus");
 
       toast({
-        title: "âœ… DonnÃ©es rÃ©initialisÃ©es",
-        description: `${totalDeleted} Ã©lÃ©ment(s) supprimÃ©(s) avec succÃ¨s. Vos paramÃ¨tres de base ont Ã©tÃ© conservÃ©s.`,
+        title: "✅ Données réinitialisées",
+        description: `${totalDeleted} élément(s) supprimé(s) avec succès. Vos paramètres de base ont été conservés.`,
       });
     } catch (error) {
-      console.error("Erreur lors de la rÃ©initialisation:", error);
+      console.error("Erreur lors de la réinitialisation:", error);
       toast({
-        title: "âŒ Erreur",
-        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la rÃ©initialisation",
+        title: "❌ Erreur",
+        description: error instanceof Error ? error.message : "Une erreur est survenue lors de la réinitialisation",
         variant: "destructive",
       });
     } finally {
@@ -303,7 +303,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   const planLabel = currentPlan === 'trial' ? 'Essai (7 jours)'
     : currentPlan === 'transition' ? 'Transition'
       : currentPlan === 'transition-pro-max' ? 'Transition Pro Max'
-        : 'ExpirÃ©';
+        : 'Expiré';
   const now = Date.now();
   const remaining = profile?.plan === 'trial' && profile.trialEndsAt ? (profile.trialEndsAt - now) : (profile?.plan === 'active' && profile.subscriptionEndsAt ? (profile.subscriptionEndsAt - now) : 0);
   const eventsCount = getCurrentEventsCount(profile);
@@ -313,11 +313,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
     if (!user) return;
     try {
       setIsSaving(true);
-      // CrÃ©er un ID unique pour cette transaction
+      // Créer un ID unique pour cette transaction
       const transactionId = `TXN-${user.uid}-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const now = Date.now();
 
-      // Utiliser la mÃªme mÃ©thode que SubscriptionGate pour garantir la cohÃ©rence
+      // Utiliser la même méthode que SubscriptionGate pour garantir la cohérence
       const base = (
         (import.meta.env.VITE_PUBLIC_BASE_URL as string)
         || window.location.origin
@@ -347,27 +347,27 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
           status: 'pending' as const,
           paymentMethod: 'airtel-money' as const,
           reference,
-          paymentLink: '', // Sera rempli aprÃ¨s gÃ©nÃ©ration
+          paymentLink: '', // Sera rempli après génération
           redirectSuccess,
           redirectError,
           createdAt: now,
         });
       } catch (error) {
         console.error('Erreur enregistrement transaction pending:', error);
-        // Continuer mÃªme si l'enregistrement Ã©choue
+        // Continuer même si l'enregistrement échoue
       }
 
-      // GÃ©nÃ©rer le lien de paiement
+      // Générer le lien de paiement
       const link = await createSubscriptionPaymentLink({
         amount,
-        reference: `${reference}-${transactionId.substring(0, 8)}`, // Inclure un court ID dans la rÃ©fÃ©rence
+        reference: `${reference}-${transactionId.substring(0, 8)}`, // Inclure un court ID dans la référence
         redirectSuccess,
         redirectError,
         logoURL,
         isTransfer: false,
       });
 
-      // Mettre Ã  jour la transaction avec le lien gÃ©nÃ©rÃ©
+      // Mettre à jour la transaction avec le lien généré
       try {
         const { paymentsColRef } = await import('@/lib/collections');
         const { db } = await import('@/lib/firebase');
@@ -379,7 +379,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
           await updateDoc(doc(paymentsRef, snapshot.docs[0].id), { paymentLink: link });
         }
       } catch (error) {
-        console.error('Erreur mise Ã  jour lien paiement:', error);
+        console.error('Erreur mise à jour lien paiement:', error);
       }
 
       await openPaymentUrl(link);
@@ -397,7 +397,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   useEffect(() => {
     if (profile) {
       setEstablishmentInfo({
-        name: profile.establishmentName || "Mon Ã‰tablissement",
+        name: profile.establishmentName || "Mon Établissement",
         address: profile.address || "",
         phone: profile.phone || "",
         email: profile.email || "",
@@ -438,7 +438,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         } as { id: string; transactionId: string; amount: number; paidAt: number; reference: string; subscriptionType: string }));
         setReceipts(receiptsList);
       } catch (error) {
-        console.error('Erreur chargement reÃ§us:', error);
+        console.error('Erreur chargement reçus:', error);
       } finally {
         setIsLoadingReceipts(false);
       }
@@ -449,7 +449,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
   const downloadReceipt = async (receipt?: { transactionId: string; amount: number; paidAt: number; reference: string; subscriptionType: string }) => {
     if (!profile || !user) return;
 
-    // Si un reÃ§u spÃ©cifique est fourni, l'utiliser
+    // Si un reçu spécifique est fourni, l'utiliser
     if (receipt) {
       await generateSubscriptionReceiptPDF({
         establishmentName: profile.establishmentName,
@@ -475,7 +475,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
     // Sinon, utiliser le dernier paiement depuis le profil
     if (!profile.lastPaymentAt) {
-      toast({ title: "Aucun reÃ§u", description: "Aucun paiement trouvÃ©", variant: "destructive" });
+      toast({ title: "Aucun reçu", description: "Aucun paiement trouvé", variant: "destructive" });
       return;
     }
 
@@ -506,7 +506,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
           reference: lastPayment.reference || "abonnement",
         });
       } else {
-        // Fallback avec les donnÃ©es du profil
+        // Fallback avec les données du profil
         await generateSubscriptionReceiptPDF({
           establishmentName: profile.establishmentName,
           email: profile.email,
@@ -528,8 +528,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         });
       }
     } catch (error) {
-      console.error('Erreur gÃ©nÃ©ration reÃ§u:', error);
-      toast({ title: "Erreur", description: "Impossible de gÃ©nÃ©rer le reÃ§u", variant: "destructive" });
+      console.error('Erreur génération reçu:', error);
+      toast({ title: "Erreur", description: "Impossible de générer le reçu", variant: "destructive" });
     }
   };
 
@@ -539,10 +539,10 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings size={24} />
-            ParamÃ¨tres de l'application
+            Paramètres de l'application
           </CardTitle>
           <CardDescription>
-            Configurez votre Ã©tablissement et vos prÃ©fÃ©rences
+            Configurez votre établissement et vos préférences
           </CardDescription>
         </CardHeader>
       </Card>
@@ -550,13 +550,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
       <Tabs defaultValue="subscription" className="space-y-6">
         <TabsList className={`grid w-full grid-cols-2 sm:grid-cols-3 h-auto ${hasAssignedTablet ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
           <TabsTrigger value="subscription" className="text-xs sm:text-sm px-2 py-3 h-auto">Abonnement</TabsTrigger>
-          <TabsTrigger value="establishment" className="text-xs sm:text-sm px-2 py-3 h-auto">Ã‰tablissement</TabsTrigger>
+          <TabsTrigger value="establishment" className="text-xs sm:text-sm px-2 py-3 h-auto">Établissement</TabsTrigger>
           {hasAssignedTablet && (
             <TabsTrigger value="tablets" className="text-xs sm:text-sm px-2 py-3 h-auto">Tablettes</TabsTrigger>
           )}
           <TabsTrigger value="support" className="text-xs sm:text-sm px-2 py-3 h-auto">Support</TabsTrigger>
-          <TabsTrigger value="security" className="text-xs sm:text-sm px-2 py-3 h-auto">Ã€ propos</TabsTrigger>
-          <TabsTrigger value="data" className="text-xs sm:text-sm px-2 py-3 h-auto">DonnÃ©es</TabsTrigger>
+          <TabsTrigger value="security" className="text-xs sm:text-sm px-2 py-3 h-auto">À propos</TabsTrigger>
+          <TabsTrigger value="data" className="text-xs sm:text-sm px-2 py-3 h-auto">Données</TabsTrigger>
         </TabsList>
 
         {/* Subscription Tab */}
@@ -573,10 +573,10 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               <CardContent>
                 <div className="space-y-4">
                   <div className="mb-6 p-4 bg-muted/30 rounded-lg space-y-3 border border-muted-foreground/10">
-                    <Label className="text-sm font-medium">DurÃ©e de l'abonnement (appliquÃ© aux offres ci-dessous)</Label>
+                    <Label className="text-sm font-medium">Durée de l'abonnement (appliqué aux offres ci-dessous)</Label>
                     <Select value={selectedDuration} onValueChange={(v) => setSelectedDuration(v as DurationType)}>
                       <SelectTrigger className="w-full bg-white">
-                        <SelectValue placeholder="Choisir une durÃ©e" />
+                        <SelectValue placeholder="Choisir une durée" />
                       </SelectTrigger>
                       <SelectContent>
                         {DURATIONS.map((d) => (
@@ -601,11 +601,11 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       {currentPlan === 'trial' ? (
                         <p className="text-2xl font-bold text-nack-red">Gratuit (7 jours)</p>
                       ) : currentPlan === 'transition' ? (
-                        <p className="text-2xl font-bold text-nack-red">Ã  partir de {SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF</p>
+                        <p className="text-2xl font-bold text-nack-red">à partir de {SUBSCRIPTION_PLANS.transition.price.toLocaleString()} XAF</p>
                       ) : currentPlan === 'transition-pro-max' ? (
-                        <p className="text-2xl font-bold text-nack-red">Ã  partir de {SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF</p>
+                        <p className="text-2xl font-bold text-nack-red">à partir de {SUBSCRIPTION_PLANS['transition-pro-max'].price.toLocaleString()} XAF</p>
                       ) : (
-                        <p className="text-2xl font-bold text-red-600">ExpirÃ©</p>
+                        <p className="text-2xl font-bold text-red-600">Expiré</p>
                       )}
                     </div>
                     <Badge className={
@@ -627,12 +627,12 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
                   {currentPlan === 'transition-pro-max' && eventsLimit !== undefined && (
                     <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-blue-900 mb-1">Ã‰vÃ©nements crÃ©Ã©s</p>
+                      <p className="text-sm font-medium text-blue-900 mb-1">Événements créés</p>
                       <p className="text-sm text-blue-800">
-                        {eventsCount} / {eventsLimit} Ã©vÃ©nements inclus
+                        {eventsCount} / {eventsLimit} événements inclus
                         {eventsCount >= eventsLimit && (
                           <span className="block mt-1 text-xs">
-                            Chaque Ã©vÃ©nement supplÃ©mentaire: {SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsExtraPrice?.toLocaleString()} XAF
+                            Chaque événement supplémentaire: {SUBSCRIPTION_PLANS['transition-pro-max'].features.eventsExtraPrice?.toLocaleString()} XAF
                           </span>
                         )}
                       </p>
@@ -642,7 +642,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
                     <p className="text-sm text-yellow-800">
                       Avertissement: le paiement est disponible uniquement via <strong>Airtel Money</strong>.
-                      Moov Money est momentanÃ©ment indisponible.
+                      Moov Money est momentanément indisponible.
                     </p>
                   </div>
                 </div>
@@ -700,7 +700,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       Transition Pro Max
-                      <Badge className="bg-nack-red text-white">RecommandÃ©</Badge>
+                      <Badge className="bg-nack-red text-white">Recommandé</Badge>
                     </CardTitle>
                     <CardDescription>Plan complet</CardDescription>
                   </CardHeader>
@@ -720,19 +720,19 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       </div>
                       <div className="flex items-center gap-2">
                         <Check size={16} className="text-green-600" />
-                        <span className="text-sm">Ã‰quipiers</span>
+                        <span className="text-sm">Équipiers</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check size={16} className="text-green-600" />
-                        <span className="text-sm">Bar ConnectÃ©e</span>
+                        <span className="text-sm">Bar Connectée</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Check size={16} className="text-green-600" />
-                        <span className="text-sm">5 Ã‰vÃ©nements inclus</span>
+                        <span className="text-sm">5 Événements inclus</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Check size={14} className="text-gray-500" />
-                        <span>+1,500 XAF par Ã©vÃ©nement supplÃ©mentaire</span>
+                        <span>+1,500 XAF par événement supplémentaire</span>
                       </div>
                     </div>
                     <Button
@@ -746,7 +746,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               </div>
             )}
 
-            {/* Si dÃ©jÃ  abonnÃ©, afficher option de renouvellement */}
+            {/* Si déjà abonné, afficher option de renouvellement */}
             {(currentPlan === 'transition' || currentPlan === 'transition-pro-max') && (
               <Card className="shadow-card border-0">
                 <CardHeader>
@@ -778,19 +778,19 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               </Card>
             )}
 
-            {/* Section des reÃ§us */}
+            {/* Section des reçus */}
             {receipts.length > 0 && (
               <Card className="shadow-card border-0">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Download size={18} />
-                    Mes reÃ§us de paiement
+                    Mes reçus de paiement
                   </CardTitle>
-                  <CardDescription>TÃ©lÃ©chargez vos reÃ§us d'abonnement</CardDescription>
+                  <CardDescription>Téléchargez vos reçus d'abonnement</CardDescription>
                 </CardHeader>
                 <CardContent>
                   {isLoadingReceipts ? (
-                    <div className="text-center py-4 text-muted-foreground">Chargement des reÃ§us...</div>
+                    <div className="text-center py-4 text-muted-foreground">Chargement des reçus...</div>
                   ) : (
                     <div className="space-y-2">
                       {receipts.map((receipt) => (
@@ -822,7 +822,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                               onClick={() => downloadReceipt(receipt)}
                             >
                               <Download size={14} className="mr-1" />
-                              TÃ©lÃ©charger
+                              Télécharger
                             </Button>
                           </div>
                         </div>
@@ -837,16 +837,16 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
         {/* Establishment Tab */}
         <TabsContent value="establishment">
-          {/* Mes Ã©tablissements */}
+          {/* Mes établissements */}
           <div className="mb-6">
             <Card className="shadow-card border-0">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Store size={20} />
-                  Mes Ã©tablissements
+                  Mes établissements
                 </CardTitle>
                 <CardDescription>
-                  GÃ©rez vos Ã©tablissements. {establishments.length} sur {maxEstablishments} utilisÃ©{establishments.length > 1 ? 's' : ''}
+                  Gérez vos établissements. {establishments.length} sur {maxEstablishments} utilisé{establishments.length > 1 ? 's' : ''}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -867,7 +867,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         </div>
                         <div>
                           <p className="font-semibold">{est.name || "Sans nom"}</p>
-                          <p className="text-sm text-muted-foreground">{getEstablishmentLabel(est.type) || "Type non dÃ©fini"}</p>
+                          <p className="text-sm text-muted-foreground">{getEstablishmentLabel(est.type) || "Type non défini"}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -899,13 +899,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     onClick={() => { setIsCreateEstDialogOpen(true); setNewEstName(""); setNewEstType(""); }}
                   >
                     <Plus size={16} />
-                    Ajouter un Ã©tablissement
+                    Ajouter un établissement
                   </Button>
                 )}
 
                 {establishments.length >= maxEstablishments && profile?.plan === 'free' && (
                   <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 text-center">
-                    Passez Ã  un abonnement payant pour ajouter plus d'Ã©tablissements.
+                    Passez à un abonnement payant pour ajouter plus d'établissements.
                   </div>
                 )}
               </CardContent>
@@ -915,12 +915,12 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
             <Dialog open={isCreateEstDialogOpen} onOpenChange={setIsCreateEstDialogOpen}>
               <DialogContent className="sm:max-w-[480px]">
                 <DialogHeader>
-                  <DialogTitle>Nouvel Ã©tablissement</DialogTitle>
-                  <DialogDescription>CrÃ©ez un nouvel Ã©tablissement pour gÃ©rer son stock, ses ventes et son Ã©quipe.</DialogDescription>
+                  <DialogTitle>Nouvel établissement</DialogTitle>
+                  <DialogDescription>Créez un nouvel établissement pour gérer son stock, ses ventes et son équipe.</DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div>
-                    <Label htmlFor="est-name">Nom de l'Ã©tablissement *</Label>
+                    <Label htmlFor="est-name">Nom de l'établissement *</Label>
                     <Input
                       id="est-name"
                       value={newEstName}
@@ -930,10 +930,10 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     />
                   </div>
                   <div>
-                    <Label htmlFor="est-type">Type d'Ã©tablissement *</Label>
+                    <Label htmlFor="est-type">Type d'établissement *</Label>
                     <Select value={newEstType} onValueChange={setNewEstType}>
                       <SelectTrigger className="mt-1" id="est-type">
-                        <SelectValue placeholder="SÃ©lectionner un type" />
+                        <SelectValue placeholder="Sélectionner un type" />
                       </SelectTrigger>
                       <SelectContent>
                         {ESTABLISHMENT_TYPES.map((t) => (
@@ -946,7 +946,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                 <div className="flex justify-end gap-3 pt-4 border-t">
                   <Button variant="outline" onClick={() => setIsCreateEstDialogOpen(false)}>Annuler</Button>
                   <Button onClick={handleCreateEstablishment} disabled={!newEstName || !newEstType || isCreatingEst}>
-                    {isCreatingEst ? "CrÃ©ation..." : "CrÃ©er l'Ã©tablissement"}
+                    {isCreatingEst ? "Création..." : "Créer l'établissement"}
                   </Button>
                 </div>
               </DialogContent>
@@ -958,7 +958,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Building size={20} />
-                  Informations de l'Ã©tablissement
+                  Informations de l'établissement
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1014,9 +1014,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                                 latitude: establishmentInfo.latitude,
                                 longitude: establishmentInfo.longitude,
                               });
-                              toast({ title: "Logo mis Ã  jour", description: "Votre logo a Ã©tÃ© tÃ©lÃ©chargÃ©." });
+                              toast({ title: "Logo mis à jour", description: "Votre logo a été téléchargé." });
                             } catch {
-                              toast({ title: "Ã‰chec de l'upload", description: "Veuillez rÃ©essayer avec une image diffÃ©rente.", variant: "destructive" });
+                              toast({ title: "Échec de l'upload", description: "Veuillez réessayer avec une image différente.", variant: "destructive" });
                             } finally {
                               setIsSaving(false);
                             }
@@ -1028,7 +1028,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="establishment-name">Nom de l'Ã©tablissement</Label>
+                    <Label htmlFor="establishment-name">Nom de l'établissement</Label>
                     <Input
                       id="establishment-name"
                       value={establishmentInfo.name}
@@ -1036,13 +1036,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="establishment-type">Type d'Ã©tablissement</Label>
+                    <Label htmlFor="establishment-type">Type d'établissement</Label>
                     <Select
                       value={establishmentInfo.establishmentType}
                       onValueChange={(value) => setEstablishmentInfo({ ...establishmentInfo, establishmentType: value })}
                     >
                       <SelectTrigger id="establishment-type">
-                        <SelectValue placeholder="SÃ©lectionner un type" />
+                        <SelectValue placeholder="Sélectionner un type" />
                       </SelectTrigger>
                       <SelectContent>
                         {ESTABLISHMENT_TYPES.map((t) => (
@@ -1052,7 +1052,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="establishment-phone">TÃ©lÃ©phone</Label>
+                    <Label htmlFor="establishment-phone">Téléphone</Label>
                     <Input
                       id="establishment-phone"
                       value={establishmentInfo.phone}
@@ -1073,7 +1073,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       <p className="text-xs text-red-500">{getWhatsAppErrorMessage(establishmentInfo.whatsapp)}</p>
                     )}
                     {establishmentInfo.whatsapp && validateWhatsApp(establishmentInfo.whatsapp) && (
-                      <p className="text-xs text-green-600">âœ“ Format WhatsApp valide</p>
+                      <p className="text-xs text-green-600">✓ Format WhatsApp valide</p>
                     )}
                   </div>
                   <div className="space-y-2">
@@ -1086,14 +1086,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     />
                   </div>
                   <div className="space-y-2 border-t pt-4 mt-2">
-                    <Label className="font-semibold">Localisation de l'Ã©tablissement</Label>
+                    <Label className="font-semibold">Localisation de l'établissement</Label>
                     <div className="space-y-2">
                       <Label htmlFor="establishment-address">Adresse</Label>
                       <Input
                         id="establishment-address"
                         value={establishmentInfo.address}
                         onChange={(e) => setEstablishmentInfo({ ...establishmentInfo, address: e.target.value })}
-                        placeholder="Adresse de l'Ã©tablissement"
+                        placeholder="Adresse de l'établissement"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-3">
@@ -1157,7 +1157,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         cssPercentage: ticketCustomization.cssPercentage,
                         ticketFooterMessage: ticketCustomization.ticketFooterMessage || undefined,
                       });
-                      toast({ title: "Informations sauvegardÃ©es", description: "Profil mis Ã  jour" });
+                      toast({ title: "Informations sauvegardées", description: "Profil mis à jour" });
                     } catch {
                       toast({ title: "Erreur", description: "Impossible d'enregistrer pour le moment.", variant: "destructive" });
                     } finally {
@@ -1178,7 +1178,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   Personnalisation des tickets
                 </CardTitle>
                 <CardDescription>
-                  Personnalisez les informations affichÃ©es sur vos tickets de paiement
+                  Personnalisez les informations affichées sur vos tickets de paiement
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1194,7 +1194,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="rcs-number">NumÃ©ro RCS</Label>
+                      <Label htmlFor="rcs-number">Numéro RCS</Label>
                       <Input
                         id="rcs-number"
                         value={ticketCustomization.rcsNumber}
@@ -1203,7 +1203,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="nif-number">NumÃ©ro NIF</Label>
+                      <Label htmlFor="nif-number">Numéro NIF</Label>
                       <Input
                         id="nif-number"
                         value={ticketCustomization.nifNumber}
@@ -1213,7 +1213,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="business-phone">NumÃ©ro de tÃ©lÃ©phone professionnel</Label>
+                    <Label htmlFor="business-phone">Numéro de téléphone professionnel</Label>
                     <Input
                       id="business-phone"
                       type="tel"
@@ -1223,25 +1223,25 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="full-address">Adresse complÃ¨te</Label>
+                    <Label htmlFor="full-address">Adresse complète</Label>
                     <Input
                       id="full-address"
                       value={ticketCustomization.fullAddress}
                       onChange={(e) => setTicketCustomization({ ...ticketCustomization, fullAddress: e.target.value })}
-                      placeholder="Ex: Avenue LÃ©on Mba, Libreville, Gabon"
+                      placeholder="Ex: Avenue Léon Mba, Libreville, Gabon"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="custom-message">Message personnalisÃ©</Label>
+                    <Label htmlFor="custom-message">Message personnalisé</Label>
                     <Input
                       id="custom-message"
                       value={ticketCustomization.customMessage}
                       onChange={(e) => setTicketCustomization({ ...ticketCustomization, customMessage: e.target.value })}
-                      placeholder="Ex: Merci pour votre confiance â¤ï¸"
+                      placeholder="Ex: Merci pour votre confiance ❤️"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="legal-mentions">Mentions lÃ©gales</Label>
+                    <Label htmlFor="legal-mentions">Mentions légales</Label>
                     <Textarea
                       id="legal-mentions"
                       value={ticketCustomization.legalMentions}
@@ -1251,9 +1251,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     />
                   </div>
 
-                  {/* SÃ©parateur */}
+                  {/* Séparateur */}
                   <div className="border-t pt-4 mt-4">
-                    <h3 className="font-semibold mb-4">ParamÃ¨tres avancÃ©s du ticket</h3>
+                    <h3 className="font-semibold mb-4">Paramètres avancés du ticket</h3>
                   </div>
 
                   {/* Logo noir et blanc pour tickets */}
@@ -1280,16 +1280,16 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                               try {
                                 const uploadedUrl = await uploadImageToCloudinary(file, "ticket-logos");
                                 setTicketCustomization({ ...ticketCustomization, ticketLogoUrl: uploadedUrl });
-                                toast({ title: "Logo tÃ©lÃ©versÃ©", description: "Le logo a Ã©tÃ© converti en noir et blanc" });
+                                toast({ title: "Logo téléversé", description: "Le logo a été converti en noir et blanc" });
                               } catch (error) {
-                                toast({ title: "Erreur", description: "Impossible de tÃ©lÃ©verser le logo", variant: "destructive" });
+                                toast({ title: "Erreur", description: "Impossible de téléverser le logo", variant: "destructive" });
                               }
                             }
                           }}
                           className="cursor-pointer"
                         />
                         <p className="text-xs text-muted-foreground mt-1">
-                          Logo qui apparaÃ®tra en noir et blanc sur les tickets (recommandÃ©: logo simple, contrastÃ©)
+                          Logo qui apparaîtra en noir et blanc sur les tickets (recommandé: logo simple, contrasté)
                         </p>
                       </div>
                     </div>
@@ -1346,9 +1346,9 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     )}
                   </div>
 
-                  {/* Message personnalisÃ© en bas du ticket */}
+                  {/* Message personnalisé en bas du ticket */}
                   <div className="space-y-2">
-                    <Label htmlFor="ticket-footer-message">Message personnalisÃ© en bas du ticket</Label>
+                    <Label htmlFor="ticket-footer-message">Message personnalisé en bas du ticket</Label>
                     <Input
                       id="ticket-footer-message"
                       value={ticketCustomization.ticketFooterMessage}
@@ -1356,7 +1356,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       placeholder="Ex: Merci de votre visite !"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Message qui apparaÃ®tra en bas du ticket aprÃ¨s les mentions
+                      Message qui apparaîtra en bas du ticket après les mentions
                     </p>
                   </div>
 
@@ -1387,7 +1387,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         cssPercentage: ticketCustomization.cssPercentage,
                         ticketFooterMessage: ticketCustomization.ticketFooterMessage || undefined,
                       });
-                      toast({ title: "Personnalisation sauvegardÃ©e", description: "Les informations des tickets ont Ã©tÃ© mises Ã  jour" });
+                      toast({ title: "Personnalisation sauvegardée", description: "Les informations des tickets ont été mises à jour" });
                     } catch {
                       toast({ title: "Erreur", description: "Impossible d'enregistrer pour le moment.", variant: "destructive" });
                     } finally {
@@ -1412,7 +1412,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Alertes de stock faible</p>
-                      <p className="text-sm text-muted-foreground">ÃŠtre notifiÃ© quand les stocks sont faibles</p>
+                      <p className="text-sm text-muted-foreground">Être notifié quand les stocks sont faibles</p>
                     </div>
                     <Switch
                       checked={notificationSettings.lowStock}
@@ -1422,7 +1422,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">Rapport quotidien</p>
-                      <p className="text-sm text-muted-foreground">Recevoir un rÃ©sumÃ© des ventes quotidiennes</p>
+                      <p className="text-sm text-muted-foreground">Recevoir un résumé des ventes quotidiennes</p>
                     </div>
                     <Switch
                       checked={notificationSettings.dailyReport}
@@ -1441,8 +1441,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   </div>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-medium">Mises Ã  jour Ã©quipe</p>
-                      <p className="text-sm text-muted-foreground">Notifications des changements d'Ã©quipe</p>
+                      <p className="font-medium">Mises à jour équipe</p>
+                      <p className="text-sm text-muted-foreground">Notifications des changements d'équipe</p>
                     </div>
                     <Switch
                       checked={notificationSettings.teamUpdates}
@@ -1459,16 +1459,16 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users size={20} />
-                Gestion de l'Ã©quipe
+                Gestion de l'équipe
               </CardTitle>
               <CardDescription>
-                Fonction disponible en novembre. Les compteurs et statistiques seront affichÃ©s ici.
+                Fonction disponible en novembre. Les compteurs et statistiques seront affichés ici.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="p-4 bg-nack-beige-light rounded-lg">
                 <p className="text-sm text-muted-foreground">
-                  En attendant, vous pouvez prÃ©parer votre inventaire et vos ventes.
+                  En attendant, vous pouvez préparer votre inventaire et vos ventes.
                 </p>
               </div>
             </CardContent>
@@ -1492,7 +1492,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Info className="text-nack-red" size={20} />
-                  Ã€ propos de Nack!
+                  À propos de Nack!
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1500,13 +1500,13 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   <div className="bg-gradient-to-r from-nack-red/10 to-nack-beige-light p-4 rounded-lg">
                     <h3 className="font-semibold text-lg mb-2">Notre histoire</h3>
                     <p className="text-sm text-muted-foreground mb-3">
-                      Nack! est nÃ©e d'une demande suite aux lourdes commandes d'un bar.
-                      Face aux dÃ©fis de gestion des stocks, des ventes et de l'Ã©quipe,
-                      nous avons crÃ©Ã© une solution complÃ¨te et intuitive pour tous les
-                      Ã©tablissements du Gabon.
+                      Nack! est née d'une demande suite aux lourdes commandes d'un bar.
+                      Face aux défis de gestion des stocks, des ventes et de l'équipe,
+                      nous avons créé une solution complète et intuitive pour tous les
+                      établissements du Gabon.
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      Aujourd'hui, Nack! accompagne des dizaines d'Ã©tablissements dans
+                      Aujourd'hui, Nack! accompagne des dizaines d'établissements dans
                       leur gestion quotidienne, leur permettant de se concentrer sur
                       l'essentiel : servir leurs clients.
                     </p>
@@ -1518,7 +1518,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                         <Wrench className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="font-medium">DÃ©veloppÃ© par l'Ã©quipe Bwitix</p>
+                        <p className="font-medium">Développé par l'équipe Bwitix</p>
                         <p className="text-sm text-muted-foreground">Solutions technologiques innovantes</p>
                       </div>
                     </div>
@@ -1576,27 +1576,27 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       />
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      Consultez les conditions gÃ©nÃ©rales d'utilisation de NACK!, incluant les informations sur
-                      l'utilisation de vos donnÃ©es Ã  des fins d'Ã©tudes de marchÃ© et d'amÃ©lioration des services
-                      pour le bien-Ãªtre de la population gabonaise.
+                      Consultez les conditions générales d'utilisation de NACK!, incluant les informations sur
+                      l'utilisation de vos données à des fins d'études de marché et d'amélioration des services
+                      pour le bien-être de la population gabonaise.
                     </p>
                   </div>
 
                   <div className="space-y-3">
                     <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                       <div>
-                        <p className="font-medium">SÃ©curitÃ© des donnÃ©es</p>
+                        <p className="font-medium">Sécurité des données</p>
                         <p className="text-sm text-muted-foreground">Chiffrement end-to-end</p>
                       </div>
                       <Badge variant="secondary" className="bg-green-100 text-green-800">
-                        SÃ©curisÃ©
+                        Sécurisé
                       </Badge>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                       <div>
                         <p className="font-medium">Sauvegarde automatique</p>
-                        <p className="text-sm text-muted-foreground">DonnÃ©es protÃ©gÃ©es 24/7</p>
+                        <p className="text-sm text-muted-foreground">Données protégées 24/7</p>
                       </div>
                       <Badge variant="secondary" className="bg-blue-100 text-blue-800">
                         Actif
@@ -1637,7 +1637,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Database size={20} />
-                  Gestion des donnÃ©es
+                  Gestion des données
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1646,7 +1646,7 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                     <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                       <div>
                         <p className="font-medium">Sauvegarde automatique</p>
-                        <p className="text-sm text-muted-foreground">DerniÃ¨re sauvegarde: Aujourd'hui Ã  14:30</p>
+                        <p className="text-sm text-muted-foreground">Dernière sauvegarde: Aujourd'hui à 14:30</p>
                       </div>
                       <Button onClick={handleBackup} variant="outline" size="sm">
                         <Upload className="mr-2" size={16} />
@@ -1656,8 +1656,8 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
 
                     <div className="flex items-center justify-between p-3 bg-nack-beige-light rounded-lg">
                       <div>
-                        <p className="font-medium">Export des donnÃ©es</p>
-                        <p className="text-sm text-muted-foreground">TÃ©lÃ©charger toutes vos donnÃ©es</p>
+                        <p className="font-medium">Export des données</p>
+                        <p className="text-sm text-muted-foreground">Télécharger toutes vos données</p>
                       </div>
                       <Button onClick={handleExportData} variant="outline" size="sm">
                         <Download className="mr-2" size={16} />
@@ -1667,12 +1667,12 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                   </div>
 
                   <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
-                    <p className="text-sm font-medium text-yellow-800">Configuration systÃ¨me</p>
+                    <p className="text-sm font-medium text-yellow-800">Configuration système</p>
                     <div className="mt-2 space-y-1 text-sm text-yellow-700">
                       <p> Devise: XAF (Franc CFA)</p>
                       <p> Fuseau horaire: GMT+0 (Dakar)</p>
                       <p> Format de date: DD/MM/YYYY</p>
-                      <p> Langue: FranÃ§ais</p>
+                      <p> Langue: Français</p>
                     </div>
                   </div>
                 </div>
@@ -1682,14 +1682,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
             <Card className="shadow-card border-0">
               <CardHeader>
                 <CardTitle>Zone de danger</CardTitle>
-                <CardDescription>Actions irrÃ©versibles</CardDescription>
+                <CardDescription>Actions irréversibles</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   <div className="border border-red-200 p-4 rounded-lg">
-                    <h4 className="font-medium text-red-800 mb-2">RÃ©initialiser les donnÃ©es</h4>
+                    <h4 className="font-medium text-red-800 mb-2">Réinitialiser les données</h4>
                     <p className="text-sm text-red-600 mb-3">
-                      Supprime toutes les donnÃ©es (ventes, stock, Ã©quipe) sauf les paramÃ¨tres de base.
+                      Supprime toutes les données (ventes, stock, équipe) sauf les paramètres de base.
                     </p>
                     <Button
                       variant="outline"
@@ -1697,14 +1697,14 @@ const SettingsPage = ({ onTabChange }: { onTabChange?: (tab: string) => void }) 
                       onClick={handleResetData}
                       disabled={isSaving}
                     >
-                      {isSaving ? "Suppression en cours..." : "RÃ©initialiser les donnÃ©es"}
+                      {isSaving ? "Suppression en cours..." : "Réinitialiser les données"}
                     </Button>
                   </div>
 
                   <div className="border border-red-200 p-4 rounded-lg">
                     <h4 className="font-medium text-red-800 mb-2">Supprimer le compte</h4>
                     <p className="text-sm text-red-600 mb-3">
-                      Supprime dÃ©finitivement votre compte et toutes les donnÃ©es associÃ©es.
+                      Supprime définitivement votre compte et toutes les données associées.
                     </p>
                     <Button variant="outline" className="text-red-600 border-red-600 hover:bg-red-50">
                       Supprimer le compte

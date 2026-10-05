@@ -103,7 +103,7 @@ const CompleteProfile = () => {
 
   const getCurrentLocation = async () => {
     if (!navigator.geolocation) {
-      setLocationError("La gÃ©olocalisation n'est pas supportÃ©e");
+      setLocationError("La géolocalisation n'est pas supportée");
       return;
     }
     setIsGettingLocation(true);
@@ -125,9 +125,9 @@ const CompleteProfile = () => {
         setFormData(prev => ({ ...prev, address: fallback }));
         setAddressInput(fallback);
       }
-      toast({ title: "Position enregistrÃ©e" });
+      toast({ title: "Position enregistrée" });
     } catch {
-      setLocationError("Erreur de gÃ©olocalisation");
+      setLocationError("Erreur de géolocalisation");
     } finally {
       setIsGettingLocation(false);
     }
@@ -138,7 +138,7 @@ const CompleteProfile = () => {
 
     if (!termsAccepted) {
       toast({
-        title: "Conditions non acceptÃ©es",
+        title: "Conditions non acceptées",
         description: "Veuillez accepter les conditions d'utilisation.",
         variant: "destructive"
       });
@@ -148,8 +148,8 @@ const CompleteProfile = () => {
     // Validation WhatsApp
     if (!formData.whatsapp.trim()) {
       toast({
-        title: "NumÃ©ro WhatsApp requis",
-        description: "Le numÃ©ro WhatsApp est obligatoire pour le support.",
+        title: "Numéro WhatsApp requis",
+        description: "Le numéro WhatsApp est obligatoire pour le support.",
         variant: "destructive"
       });
       return;
@@ -169,14 +169,14 @@ const CompleteProfile = () => {
       let finalLogoUrl: string | undefined = formData.logoUrl || undefined;
       if (logoFile) {
         if (!isCloudinaryConfigured()) {
-          toast({ title: "Cloudinary non configurÃ©", description: "Ajoutez VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET", variant: "destructive" });
+          toast({ title: "Cloudinary non configuré", description: "Ajoutez VITE_CLOUDINARY_CLOUD_NAME et VITE_CLOUDINARY_UPLOAD_PRESET", variant: "destructive" });
           return;
         }
         try {
           finalLogoUrl = await uploadImageToCloudinary(logoFile, "logos");
         } catch (uploadErr: unknown) {
           const msg = uploadErr instanceof Error ? uploadErr.message : String(uploadErr);
-          toast({ title: "Ã‰chec de l'upload du logo", description: msg, variant: "destructive" });
+          toast({ title: "Échec de l'upload du logo", description: msg, variant: "destructive" });
           return;
         }
       }
@@ -193,10 +193,10 @@ const CompleteProfile = () => {
         address: formData.address || undefined,
         locationAsked: true,
       });
-      toast({ title: "Profil enregistrÃ©", description: "Bienvenue sur NACK!" });
+      toast({ title: "Profil enregistré", description: "Bienvenue sur NACK!" });
       navigate("/dashboard", { replace: true });
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "RÃ©essayez.";
+      const message = error instanceof Error ? error.message : "Réessayez.";
       toast({ title: "Erreur", description: message, variant: "destructive" });
     } finally {
       setIsSaving(false);
@@ -214,26 +214,26 @@ const CompleteProfile = () => {
       <div className="w-full max-w-md animate-scale-in">
         <div className="text-center mb-6">
           <NackLogo size="md" className="mb-2" />
-          <p className="text-muted-foreground text-sm">ComplÃ©tez votre profil pour continuer</p>
+          <p className="text-muted-foreground text-sm">Complétez votre profil pour continuer</p>
         </div>
 
         <Card className="shadow-card border-0">
           <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl">ComplÃ©ter le profil</CardTitle>
-            <CardDescription>Ces informations seront utilisÃ©es dans votre tableau de bord</CardDescription>
+            <CardTitle className="text-xl">Compléter le profil</CardTitle>
+            <CardDescription>Ces informations seront utilisées dans votre tableau de bord</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="establishmentName">Nom de l'Ã©tablissement</Label>
+                <Label htmlFor="establishmentName">Nom de l'établissement</Label>
                 <Input id="establishmentName" name="establishmentName" value={formData.establishmentName} onChange={handleInputChange} required />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="establishmentType">Type d'Ã©tablissement</Label>
+                <Label htmlFor="establishmentType">Type d'établissement</Label>
                 <Select value={formData.establishmentType} onValueChange={(value) => setFormData({ ...formData, establishmentType: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="SÃ©lectionnez le type" />
+                    <SelectValue placeholder="Sélectionnez le type" />
                   </SelectTrigger>
                   <SelectContent>
                     {ESTABLISHMENT_TYPES.map((type) => (
@@ -244,7 +244,7 @@ const CompleteProfile = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="ownerName">Nom du gÃ©rant</Label>
+                <Label htmlFor="ownerName">Nom du gérant</Label>
                 <Input id="ownerName" name="ownerName" value={formData.ownerName} onChange={handleInputChange} required />
               </div>
 
@@ -254,7 +254,7 @@ const CompleteProfile = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">TÃ©lÃ©phone</Label>
+                <Label htmlFor="phone">Téléphone</Label>
                 <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} required />
               </div>
 
@@ -274,9 +274,9 @@ const CompleteProfile = () => {
                   <p className="text-xs text-red-500">{getWhatsAppErrorMessage(formData.whatsapp)}</p>
                 )}
                 {formData.whatsapp && validateWhatsApp(formData.whatsapp) && (
-                  <p className="text-xs text-green-600">âœ“ Format WhatsApp valide</p>
+                  <p className="text-xs text-green-600">✓ Format WhatsApp valide</p>
                 )}
-                <p className="text-xs text-muted-foreground">NumÃ©ro WhatsApp obligatoire pour le support</p>
+                <p className="text-xs text-muted-foreground">Numéro WhatsApp obligatoire pour le support</p>
               </div>
 
               <div className="space-y-2">
@@ -286,7 +286,7 @@ const CompleteProfile = () => {
               </div>
 
               <div className="space-y-2 border-t pt-4 mt-4">
-                <Label className="font-semibold">Localisation de l'Ã©tablissement</Label>
+                <Label className="font-semibold">Localisation de l'établissement</Label>
                 <div className="relative">
                   <Input
                     placeholder="Chercher une adresse..."
@@ -309,7 +309,7 @@ const CompleteProfile = () => {
                   <Navigation className="w-4 h-4 mr-2" /> GPS
                 </Button>
                 {locationError && <p className="text-xs text-red-500 mt-1">{locationError}</p>}
-                {formData.latitude && <p className="text-xs text-green-600 mt-1 font-medium">âœ“ LocalisÃ© avec succÃ¨s</p>}
+                {formData.latitude && <p className="text-xs text-green-600 mt-1 font-medium">✓ Localisé avec succès</p>}
               </div>
 
               <div className="flex items-start space-x-2 pt-2">
@@ -338,7 +338,7 @@ const CompleteProfile = () => {
                     Enregistrement...
                   </>
                 ) : (
-                  formData.latitude ? "Finaliser mon inscription" : "Veuillez localiser l'Ã©tablissement"
+                  formData.latitude ? "Finaliser mon inscription" : "Veuillez localiser l'établissement"
                 )}
               </Button>
             </form>
