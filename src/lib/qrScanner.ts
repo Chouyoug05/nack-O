@@ -1,11 +1,9 @@
 /**
  * QR Code Scanner using html5-qrcode library.
- * Fonctionne en mode léger comme en mode plein.
- * Détecte automatiquement les capabilities et s'adapte.
+ * Compatible avec les navigateurs modernes (getUserMedia / caméra arrière).
  */
 
-import Html5Qrcode from "html5-qrcode";
-import { detectDeviceCapability, isFullMode, isLightMode } from "./deviceCapability";
+import { Html5Qrcode } from "html5-qrcode";
 
 export type QrScanResult = {
   success: true;
@@ -21,7 +19,7 @@ export interface QrScannerOptions {
   containerId: string;
   /** Traitement du code scanné (obligatoire) */
   onSuccess: (code: string) => void;
-  /** Gestion des erreurs */
+  /** Gestion des erreurs bloquantes (support/caméra) */
   onError?: (error: string) => void;
   /** Options html5-qrcode personnalisées */
   qrCodeSuccessCallback?: (decodedText: string, decodedResult: unknown) => void;
@@ -30,29 +28,11 @@ export interface QrScannerOptions {
 
 /**
  * Démarre le scanner QR Code.
- * Retourne une fonction d'arrêt pour arrêter le scanner.
- * Si l'appareil n'est pas capable de scanner (mode light sans caméra),
- * appelle le callback d'erreur et retourne une fonction vide.
+ * Retourne une fonction d'arrêt asynchrone à appeler au démontage.
  */
-export function startQrScanner(
-  options: QrScannerOptions,
-  onModeRestriction?: (message: string) => void
-): () => void {
+export function startQrScanner(options: QrScannerOptions): () => void {
   const { containerId, onSuccess, onError, qrCodeSuccessCallback, qrCodeFailureCallback } =
     options;
-
-  // Vérifier si le mode light restreint la caméra
-  const deviceCapability: DeviceCapabilityLevel = detectDeviceCapability();
-
-  // En mode light, on peut quand même scanner si la caméra est disponible
-  // Mais on avertit l'utilisateur si les capabilities sont limitées
-  if (!isFullMode() && onModeRestriction) {
-    const message =
-      deviceCapability === "light"
-        ? "Le mode léger ne dispose pas d'accès caméra complet. Certaines fonctionnalités de scan peuvent être limitées."
-        : undefined;
-    if (message) onModeRestriction(message);
-  }
 
   const scannerElement = document.getElementById(containerId);
   if (!scannerElement) {
@@ -60,81 +40,66 @@ export function startQrScanner(
     return () => {};
   }
 
-  // Configuration html5-qrcode
-  const config: any = {
-    qrCodeSuccessCallback: (decodedText: string, decodedResult: unknown) => {
-      // eslint-disable-line @typescript-eslint/no-explicit-any
-      if (typeof onSuccess === "function") {
-        onSuccess(decodedText);
-      }
-      if (typeof qrCodeSuccessCallback === "function") {
-        qrCodeSuccessCallback(decodedText, decodedResult);
-      }
-    },
-    qrCodeFailureCallback: (error: string) => {
-      if (typeof qrCodeFailureCallback === "function") {
-        qrCodeFailureCallback(error);
-      }
-      onError?.(`Erreur scanner: ${error}`);
-    },
-  };
-
+  let scanner: Html5Qrcode;
   try {
-    const scanner = new Html5Qrcode(containerId);
-    scanner.start(
-      // Success callback for getting camera permissions
-      {
-        facingMode: "environment", // Caméra arrière par défaut sur mobile
-        // Optional: facingMode: "user" for front camera
-      },
-      config,
-      // Error callback
-      (error: string | object) => {
-        // Gestion des erreurs d'appareil/camera
-        const errorMsg = `Erreur scanner QR: ${typeof error === "string" ? error : JSON.stringify(error)}`;
-        onError?.(errorMsg);
-      }
-    );
-    // Retourne la fonction d'arrêt
-    return () => {
-      try {
-        scanner.stop();
-      } catch (e) {
-        // Scanner déjà arrêté ou erreur
-      }
-    };
-  } catch (e) {
-    onError?.("Impossible de démarrer le scanner QR");
+    scanner = new Html5Qrcode(containerId);
+  } catch {
+    onError?.("Impossible d'initialiser le scanner QR");
     return () => {};
   }
+
+  // Configuration html5-qrcode.
+  // La signature correcte de start() est :
+  //   start(camera, configuration, qrCodeSuccessCallback, qrCodeErrorCallback)
+  const config = {
+    fps: 10,
+    qrbox: { width: 250, height: 250 },
+    aspectRatio: 1,
+  };
+
+  const onDecode = (decodedText: string, decodedResult: unknown): void => {
+    if (typeof onSuccess === "function") onSuccess(decodedText);
+    if (typeof qrCodeSuccessCallback === "function") {
+      qrCodeSuccessCallback(decodedText, decodedResult);
+    }
+  };
+
+  // Les erreurs de décodage (frame sans QR) sont fréquentes et ne doivent PAS
+  // être remontées comme erreur bloquante.
+  const onDecodeFailure = (error: string): void => {
+    if (typeof qrCodeFailureCallback === "function") qrCodeFailureCallback(error);
+  };
+
+  scanner
+    .start({ facingMode: "environment" }, config, onDecode, onDecodeFailure)
+    .catch((error: unknown) => {
+      const msg = typeof error === "string" ? error : (error instanceof Error ? error.message : "Erreur caméra");
+      onError?.(`Erreur scanner QR: ${msg}`);
+    });
+
+  return () => {
+    try {
+      scanner.stop().catch(() => { /* scanner déjà arrêté */ });
+    } catch {
+      /* scanner déjà arrêté ou erreur */
+    }
+  };
 }
 
 /**
  * Arrête un scanner QR démarré précédemment.
- * À appeler lors du déchargement du composant.
+ * Conservé pour compatibilité — l'arrêt est géré via la fonction retour de startQrScanner.
  */
 export function stopQrScanner(): void {
-  // Cette fonction est un placeholder - l'arrêt est géré via la fonction de retour de startQrScanner
-  // Mais on garde pour compatibilité
+  // no-op
 }
 
 /**
  * Vérifie si le scanner QR est supporté par cet appareil.
  */
 export function isQrScannerSupported(): boolean {
-  // html5-qrcode a besoin de getUserMedia et de la caméra
   if (typeof navigator === "undefined") return false;
   if (typeof navigator.mediaDevices === "undefined") return false;
   if (typeof navigator.mediaDevices.getUserMedia === "undefined") return false;
   return true;
-}
-
-/**
- * Obtient le message approprié selon le mode et les capabilities.
- */
-export function getQrScannerModeMessage(): string {
-  if (isFullMode()) {
-    return "Scanner QR Code activé - mode plein";
-  }
-  return "Scanner QR Code activé - mode léger";
 }

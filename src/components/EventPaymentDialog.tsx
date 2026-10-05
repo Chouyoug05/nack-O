@@ -16,6 +16,7 @@ import { addDoc, doc, getDoc, increment, orderBy, query, runTransaction, updateD
 import type { TicketDoc } from "@/types/event";
 import { createEventPaymentLink } from "@/lib/payments/eventPayment";
 import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNavigation";
+import { generateTicketQrToken } from "@/lib/qrToken";
 
 interface EventPaymentDialogProps {
   event: Event | null;
@@ -29,6 +30,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState<'form' | 'payment' | 'success'>('form');
+  const [lastQrCode, setLastQrCode] = useState<string>("");
   
   const [formData, setFormData] = useState({
     name: "",
@@ -129,6 +131,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
         eventTime: event.time,
         eventLocation: event.location,
         currency: event.currency,
+        qrCode: generateTicketQrToken(`NACK-${event.id}`),
       };
       
       // Enregistrer la transaction de paiement avec les données du billet
@@ -193,6 +196,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
     setIsProcessing(true);
     try {
       const ownerUid = event.ownerUid || user?.uid || "";
+      const qrCode = generateTicketQrToken(`NACK-${event.id}`);
       const ticket: TicketDoc = {
         customerName: formData.name,
         customerEmail: formData.email,
@@ -201,8 +205,10 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
         totalAmount: event.ticketPrice * formData.quantity,
         status: 'pending',
         purchaseDate: Date.now(),
+        qrCode,
       };
       await addDoc(eventTicketsColRef(db, ownerUid, event.id), ticket);
+      setLastQrCode(qrCode);
 
       // Générer le PDF immédiatement
       await generateEventTicket({
@@ -217,7 +223,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
         quantity: formData.quantity,
         totalAmount: event.ticketPrice * formData.quantity,
         currency: event.currency,
-        qrCode: `NACK-${event.id}-${formData.email}-${Date.now()}`
+        qrCode
       });
 
       toast({ title: "Réservation enregistrée", description: "Ticket généré avec succès" });
@@ -231,6 +237,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
 
   const downloadTicket = async () => {
     if (!event) return;
+    const qrCode = (currentStep === 'success' && lastQrCode) || generateTicketQrToken(`NACK-${event.id}`);
     const ticketData = {
       id: `TKT-${Date.now()}`,
       eventTitle: event.title,
@@ -243,7 +250,7 @@ const EventPaymentDialog = ({ event, isOpen, onClose, onPaymentSuccess }: EventP
       quantity: formData.quantity,
       totalAmount: event.ticketPrice * formData.quantity,
       currency: event.currency,
-      qrCode: `NACK-${event.id}-${formData.email}-${Date.now()}`
+      qrCode
     };
 
     try {

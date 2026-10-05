@@ -1,13 +1,12 @@
-import type { Handler } from "@netlify/functions";
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Content-Type': 'application/json',
+};
 
-export const handler: Handler = async (event) => {
-  // CORS headers
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Content-Type': 'application/json',
-  };
+exports.handler = async (event) => {
+  const headers = CORS_HEADERS;
 
   // Handle preflight
   if (event.httpMethod === 'OPTIONS') {
@@ -19,7 +18,7 @@ export const handler: Handler = async (event) => {
   }
 
   try {
-    const { query } = JSON.parse(event.body || '{}') as { query?: string };
+    const { query } = JSON.parse(event.body || '{}');
     
     if (!query || query.trim().length === 0) {
       return {
@@ -54,7 +53,7 @@ export const handler: Handler = async (event) => {
     }
 
     const html = await response.text();
-    const images: string[] = [];
+    const images = [];
     
     // Méthode 1: Extraire depuis les données JSON embarquées dans le HTML
     // Google Images stocke les URLs dans des scripts avec AF_initDataCallback
@@ -71,7 +70,7 @@ export const handler: Handler = async (event) => {
           const data = JSON.parse(cleaned);
           
           // Parcourir récursivement pour trouver les URLs d'images
-          const findImages = (obj: any): void => {
+          const findImages = (obj) => {
             if (typeof obj === 'string' && obj.match(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)/i)) {
               if (!obj.includes('googleusercontent.com/url') && 
                   !obj.includes('gstatic.com') && 

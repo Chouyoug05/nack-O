@@ -3,8 +3,10 @@ import { useParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import NackLogo from "@/components/NackLogo";
+import QRScanner from "@/components/QRScanner";
 import { 
   QrCode, 
   CheckCircle, 
@@ -13,7 +15,8 @@ import {
   Users,
   Ticket,
   BarChart3,
-  Calendar
+  Calendar,
+  ScanLine
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { db } from "@/lib/firebase";
@@ -34,6 +37,7 @@ const AgentEvenementInterface = () => {
   const [events, setEvents] = useState<Array<{ id: string; title: string }>>([]);
   const [tickets, setTickets] = useState<Array<{ id: string; data: TicketDoc }>>([]);
   const [loading, setLoading] = useState(true);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   useEffect(() => {
     const validate = async () => {
@@ -146,6 +150,25 @@ const AgentEvenementInterface = () => {
       }
   };
 
+  const handleScannedCode = async (code: string) => {
+    const clean = String(code || "").trim();
+    if (!clean) return;
+    const match = tickets.find(
+      (t) => t.data.qrCode === clean || t.id === clean,
+    );
+    if (!match) {
+      toast({ title: 'Billet introuvable', description: "Ce QR code ne correspond à aucun billet de cet événement.", variant: 'destructive' });
+      return;
+    }
+    if (match.data.validated) {
+      toast({ title: 'Déjà validé', description: `${match.data.customerName} — billet déjà scanné.` });
+      return;
+    }
+    await toggleValidate(match.id, true);
+    toast({ title: 'Entrée validée', description: `${match.data.customerName} — ${match.data.quantity} billet(s).` });
+    setIsScannerOpen(false);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f6f8f6] p-4 flex items-center justify-center">
@@ -200,8 +223,20 @@ const AgentEvenementInterface = () => {
           {/* Participants */}
           <Card className="border border-gray-200 bg-white shadow-sm">
           <CardHeader>
-            <CardTitle>Participants</CardTitle>
-            <CardDescription>Validez les billets à l'entrée</CardDescription>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle>Participants</CardTitle>
+                <CardDescription>Validez les billets à l'entrée</CardDescription>
+              </div>
+              <Button
+                onClick={() => setIsScannerOpen(true)}
+                disabled={!selectedEventId}
+                className="gap-2"
+              >
+                <ScanLine size={16} />
+                Scanner
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {tickets.length === 0 ? (
@@ -240,6 +275,23 @@ const AgentEvenementInterface = () => {
         </Card>
         </div>
       </main>
+
+      <Dialog open={isScannerOpen} onOpenChange={setIsScannerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Scanner un billet</DialogTitle>
+            <DialogDescription>
+              Présentez le QR code du billet devant la caméra.
+            </DialogDescription>
+          </DialogHeader>
+          {isScannerOpen && (
+            <QRScanner
+              onScan={handleScannedCode}
+              onError={(msg) => toast({ title: 'Caméra indisponible', description: msg, variant: 'destructive' })}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

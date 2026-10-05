@@ -1,0 +1,7 @@
+# Menu digital public (/light/) : toujours servir light/index.html,
+# jamais le fallback SPA React (sinon les clients voient la page de connexion).
+/light       /light/index.html   200
+/light/*     /light/index.html   200
+
+# SPA fallback pour les routes internes React
+/*           /index.html         200

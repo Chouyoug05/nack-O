@@ -2,7 +2,9 @@
 
 const https = require('https');
 
-const FUNCTION_URL = 'https://nack.pro/.netlify/functions/fix-stock-for-closed-orders';
+const FUNCTION_URL =
+  process.env.NACK_FUNCTION_URL ||
+  'https://<votre-site>.netlify.app/.netlify/functions/fix-stock-for-closed-orders';
 const INTERNAL_SECRET = process.env.NACK_INTERNAL_SECRET;
 
 if (!INTERNAL_SECRET) {

@@ -1,3 +1,5 @@
+import { auth } from "@/lib/firebase";
+
 export interface CompletePaymentResult {
   success: boolean;
   alreadyCompleted?: boolean;
@@ -9,10 +11,6 @@ export interface CompletePaymentResult {
 
 function resolveCompletePaymentUrl(): string {
   if (typeof window === "undefined") return "/.netlify/functions/complete-public-payment";
-  const host = window.location.hostname.toLowerCase();
-  if (host === "www.nack.pro" || host === "nack.pro") {
-    return "https://nack.pro/.netlify/functions/complete-public-payment";
-  }
   return "/.netlify/functions/complete-public-payment";
 }
 
@@ -31,10 +29,6 @@ export async function completePaymentViaServer(transactionId: string): Promise<C
 
 function resolveSendNotificationUrl(): string {
   if (typeof window === "undefined") return "/.netlify/functions/send-notification";
-  const host = window.location.hostname.toLowerCase();
-  if (host === "www.nack.pro" || host === "nack.pro") {
-    return "https://nack.pro/.netlify/functions/send-notification";
-  }
   return "/.netlify/functions/send-notification";
 }
 
@@ -44,9 +38,17 @@ export async function sendOrderNotificationViaServer(payload: {
   body: string;
   data?: Record<string, string>;
 }): Promise<void> {
+  let token = "";
+  try {
+    token = (await auth.currentUser?.getIdToken(false)) || "";
+  } catch {
+    token = "";
+  }
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
   await fetch(resolveSendNotificationUrl(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(payload),
   }).catch(() => undefined);
 }

@@ -63,16 +63,81 @@
       '</div>' +
       '<div class="lg-section-title">Sélectionner un événement</div>' +
       '<div class="lg-tabs" style="flex-wrap:wrap">' + (evBtns || '<span class="lg-card-desc">Aucun événement</span>') + '</div>' +
+      '<button type="button" class="lg-btn lg-btn-nack lg-btn-block" id="ae-scan" style="margin:12px 0" ' + (state.eventId ? '' : 'disabled') + '>Scanner un billet</button>' +
+      '<div id="ae-scan-slot"></div>' +
       '<div id="ae-tickets"></div>';
     var tabs = state.root.querySelectorAll("[data-ev]");
     for (var j = 0; j < tabs.length; j++) {
       tabs[j].onclick = function () {
+        stopScan();
         state.eventId = this.getAttribute("data-ev");
         paintShell();
         loadTickets();
       };
     }
+    var scanBtn = state.root.querySelector("#ae-scan");
+    if (scanBtn) scanBtn.onclick = startScan;
     paintTickets();
+  }
+
+  var scanStream = null, scanRaf = null;
+
+  function stopScan() {
+    if (scanRaf) { cancelAnimationFrame(scanRaf); scanRaf = null; }
+    if (scanStream) {
+      try { scanStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      scanStream = null;
+    }
+    var slot = state.root && state.root.querySelector("#ae-scan-slot");
+    if (slot) slot.innerHTML = "";
+  }
+
+  function startScan() {
+    var slot = state.root.querySelector("#ae-scan-slot");
+    if (!slot) return;
+    if (!("BarcodeDetector" in window) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      slot.innerHTML = '<div class="lg-card-desc" style="color:#b91c1c;margin-bottom:8px">Le scan caméra n\'est pas supporté sur cet appareil. Utilisez la validation manuelle ci-dessous.</div>';
+      return;
+    }
+    slot.innerHTML = '<div style="text-align:center">' +
+      '<video id="ae-video" autoplay muted playsinline style="width:100%;max-width:360px;border-radius:12px;background:#000"></video>' +
+      '<div class="lg-card-desc" style="margin-top:8px">Visez le QR code du billet…</div>' +
+      '<button type="button" class="lg-btn lg-btn-secondary lg-btn-sm" id="ae-scan-stop" style="margin-top:8px">Arrêter</button>' +
+    '</div>';
+    var stopBtn = slot.querySelector("#ae-scan-stop");
+    if (stopBtn) stopBtn.onclick = stopScan;
+
+    var detector;
+    try { detector = new window.BarcodeDetector({ formats: ["qr_code"] }); }
+    catch (e) { detector = new window.BarcodeDetector(); }
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function (stream) {
+      scanStream = stream;
+      var video = slot.querySelector("#ae-video");
+      if (!video) { stopScan(); return; }
+      video.srcObject = stream;
+      var detect = function () {
+        if (!scanStream) return;
+        detector.detect(video).then(function (codes) {
+          if (codes && codes.length) {
+            var value = codes[0].rawValue || "";
+            var match = null;
+            for (var i = 0; i < state.tickets.length; i++) {
+              if (state.tickets[i].qrCode === value || state.tickets[i].id === value) { match = state.tickets[i]; break; }
+            }
+            stopScan();
+            if (!match) { ui.toast("Billet introuvable pour cet événement", "error"); return; }
+            if (match.validated) { ui.toast("Billet déjà validé", "error"); return; }
+            toggleTicket(match.id, true);
+            return;
+          }
+          scanRaf = requestAnimationFrame(detect);
+        }).catch(function () { scanRaf = requestAnimationFrame(detect); });
+      };
+      detect();
+    }).catch(function (err) {
+      slot.innerHTML = '<div class="lg-card-desc" style="color:#b91c1c;margin-bottom:8px">Caméra indisponible : ' + ui.escapeHtml((err && err.message) || "accès refusé") + '</div>';
+    });
   }
 
   function paintTickets() {

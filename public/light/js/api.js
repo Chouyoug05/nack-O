@@ -575,13 +575,13 @@
     try {
       return window.location.protocol + "//" + window.location.host;
     } catch (e2) {
-      return "https://nack.pro";
+      return "";
     }
   }
 
   function publicBase() {
     try {
-      var origin = getPageOrigin().replace("://www.nack.pro", "://nack.pro");
+      var origin = getPageOrigin();
       var path = window.location.pathname || "";
       var idx = path.indexOf("/light");
       var basePath = idx >= 0 ? path.substring(0, idx) : "";
@@ -590,14 +590,14 @@
       }
       return origin + basePath;
     } catch (e) {
-      return "https://nack.pro";
+      return "";
     }
   }
 
   function resolvePaymentProxy() {
-    // URL absolue obligatoire sur tablettes anciennes :
-    // une URL relative depuis /light/ devient /light/.netlify/... (cassé → erreur).
-    return "https://nack.pro/.netlify/functions/create-payment-link";
+    // Fonction Netlify servie sur la même origine que l'app (domaine réellement déployé).
+    // Le domaine cible est déduit de window.location, jamais codé en dur.
+    return getPageOrigin() + "/.netlify/functions/create-payment-link";
   }
 
   function createPaymentLink(params) {
@@ -606,8 +606,7 @@
     if (!amount || amount < 100) {
       return Promise.reject(new Error("Montant de paiement invalide"));
     }
-    var base = publicBase() || "https://nack.pro";
-    base = String(base).replace("://www.nack.pro", "://nack.pro");
+    var base = publicBase();
     var payload = {
       reference: String(params.reference || ("nack-" + Date.now())),
       redirect_success: String(params.redirect_success || (base + "/payment/success")),
@@ -633,10 +632,9 @@
       if (res && res.link) return String(res.link);
       throw new Error("Lien de paiement introuvable");
     }).catch(function (err) {
-      // Second essai via chemin relatif racine (si DNS/apex bloqué sur le WebView)
-      var fallback = getPageOrigin().replace("://www.nack.pro", "://nack.pro") +
-        "/.netlify/functions/create-payment-link";
-      if (fallback.indexOf("nack.pro") !== -1 && fallback !== resolvePaymentProxy()) {
+      // Second essai via chemin relatif racine (si l'URL absolue échoue sur le WebView)
+      var fallback = "/.netlify/functions/create-payment-link";
+      if (fallback !== resolvePaymentProxy()) {
         return postOnce(fallback).then(function (res) {
           if (typeof res === "string") {
             try { res = JSON.parse(res); } catch (e) { throw err; }

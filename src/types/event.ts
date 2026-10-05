@@ -28,6 +28,8 @@ export interface TicketDoc {
   totalAmount: number;
   status: TicketStatus;
   purchaseDate: number; // epoch ms
+  /** Identifiant encodé dans le QR du billet — permet la validation au scan. */
+  qrCode?: string;
   validated?: boolean;
   validatedAt?: number;
 } 

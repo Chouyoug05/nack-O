@@ -1,66 +1,43 @@
-import { useEffect, useRef, useState } from "react";
-import { startQrScanner, stopQrScanner, isQrScannerSupported, getQrScannerModeMessage, QrScanResult } from "@/lib/qrScanner";
-import { isLightMode, isFullMode } from "@/lib/modeSelection";
+import { useEffect, useRef } from "react";
+import { startQrScanner, isQrScannerSupported } from "@/lib/qrScanner";
 
 const QRScanner = ({
   onScan,
   onError,
   containerId = "qr-reader",
-  modeRestrictionCallback,
 }: {
   onScan: (code: string) => void;
   onError?: (error: string) => void;
   containerId?: string;
-  modeRestrictionCallback?: (message: string) => void;
 }) => {
   const scannerRef = useRef<() => void>(() => {});
-  const [isSupported, setIsSupported] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
-    // Vérifier le support du scanner au montage
-    const supported = isQrScannerSupported();
-    setIsSupported(supported);
-
-    if (!supported) {
+    if (!isQrScannerSupported()) {
       onError?.("Scanner QR non supporté par cet navigateur/appareil");
       return;
     }
 
-    // Démarrer le scanner
-    scannerRef.current = startQrScanner(
-      {
-        containerId,
-        onSuccess: (code) => {
-          setIsScanning(false);
-          onScan(code);
-        },
-        onError: (error) => {
-          setIsScanning(false);
-          onError?.(error);
-        },
-        modeRestrictionCallback,
-      },
-      (message) => {
-        // Callback de restriction de mode
-        if (modeRestrictionCallback) {
-          modeRestrictionCallback(message);
-        }
-      }
-    );
+    scannerRef.current = startQrScanner({
+      containerId,
+      onSuccess: onScan,
+      onError,
+    });
 
     return () => {
-      // Arrêter le scanner au démontage
       scannerRef.current?.();
     };
-  }, [containerId, onScan, onError, modeRestrictionCallback]);
+  }, [containerId, onScan, onError]);
 
-  useEffect(() => {
-    // Vérifier le mode actuel et mettre à jour le statut
-    setIsScanning(!!scannerRef.current);
-  }, [isLightMode(), isFullMode()]);
-
-  return null;
+  return (
+    <div className="w-full">
+      <div
+        id={containerId}
+        className="mx-auto w-full max-w-sm overflow-hidden rounded-xl bg-black"
+        style={{ minHeight: 260 }}
+      />
+    </div>
+  );
 };
 
 export default QRScanner;

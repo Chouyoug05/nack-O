@@ -452,7 +452,7 @@ export default function MenuDigitalPage() {
   }
 
   const publicUrl = config ? getPublicMenuUrl(config.uid) : "";
-  // En dev local : lien/aperçu pointent vers le light app local (nack.pro n'a le code à jour qu'après déploiement)
+  // En dev local : lien/aperçu pointent vers le light app local (le domaine public n'a le code à jour qu'après déploiement)
   const isLocalDev = typeof window !== "undefined" && ["localhost", "127.0.0.1"].includes(window.location.hostname);
   const shareUrl = config
     ? (isLocalDev ? `${window.location.origin}/light/index.html#/menu/${config.uid}` : publicUrl)

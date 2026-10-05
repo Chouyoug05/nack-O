@@ -218,7 +218,8 @@
   }
 
   function netlifyFn(name) {
-    return "https://nack.pro/.netlify/functions/" + name;
+    // Fonction Netlify sur la même origine que l'app (pas de domaine codé en dur).
+    return window.location.origin + "/.netlify/functions/" + name;
   }
 
   function render(root, ctx) {
@@ -700,7 +701,7 @@
 
     var total = getCartTotal();
     var establishmentId = establishment.uid;
-    var logoUrl = establishment.logoUrl || 'https://nack.pro/logo.png';
+    var logoUrl = establishment.logoUrl || (window.location.origin + '/favicon.png');
     var orderData = buildOrderData('awaiting-payment', method);
 
     try {

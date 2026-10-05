@@ -1,5 +1,4 @@
 import { isElectronRenderer } from "@/lib/platform";
-import { isLightMode, isFullMode } from "@/lib/modeSelection";
 
 export interface CreatePaymentLinkParams {
   amount: number;
@@ -28,7 +27,6 @@ interface CreatePaymentLinkResponse {
 }
 
 const DEFAULT_NETLIFY_PROXY = "/.netlify/functions/create-payment-link";
-const APEX_PAYMENT_PROXY = "https://nack.pro/.netlify/functions/create-payment-link";
 
 function trimEnv(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined;
@@ -36,13 +34,9 @@ function trimEnv(value: unknown): string | undefined {
   return t.length ? t : undefined;
 }
 
-function canonicalizeProxyUrl(url: string): string {
-  return url.replace("://www.nack.pro", "://nack.pro");
-}
-
 function resolvePaymentProxyUrl(): string | undefined {
   const fromEnv = trimEnv(import.meta.env.VITE_PAYMENT_PROXY_URL);
-  if (fromEnv) return canonicalizeProxyUrl(fromEnv);
+  if (fromEnv) return fromEnv;
 
   if (typeof window === "undefined") return undefined;
   if (isElectronRenderer()) return undefined;
@@ -50,11 +44,7 @@ function resolvePaymentProxyUrl(): string | undefined {
   const proto = window.location.protocol;
   if (proto !== "http:" && proto !== "https:") return undefined;
 
-  const host = window.location.hostname.toLowerCase();
-  if (host === "www.nack.pro" || host === "nack.pro") {
-    return APEX_PAYMENT_PROXY;
-  }
-
+  // Fonction Netlify sur la même origine que l'app (domaine réellement déployé).
   return DEFAULT_NETLIFY_PROXY;
 }
 
@@ -111,13 +101,6 @@ async function requestPaymentLinkViaProxy(proxyUrl: string, params: CreatePaymen
 }
 
 export async function createSubscriptionPaymentLink(params: CreatePaymentLinkParams): Promise<string> {
-  // Vérifier le mode appareil - en mode light, rediriger vers la version web
-  if (typeof window !== "undefined" && isLightMode()) {
-    const qrCodeLink = `${window.location.origin}/light/#/payment?type=subscription`;
-    window.location.href = qrCodeLink;
-    throw new Error("Redirection vers mode léger - utilisez le lien de paiement web");
-  }
-
   const proxyUrl = resolvePaymentProxyUrl();
   if (!proxyUrl) {
     throw new Error("Paiement indisponible. Utilisez la version web de Nack.");
@@ -126,13 +109,6 @@ export async function createSubscriptionPaymentLink(params: CreatePaymentLinkPar
 }
 
 export async function createOrderPaymentLink(params: CreateOrderPaymentLinkParams): Promise<string> {
-  // Vérifier le mode appareil - en mode light, rediriger vers la version web
-  if (typeof window !== "undefined" && isLightMode()) {
-    const qrCodeLink = `${window.location.origin}/light/#/payment?type=order`;
-    window.location.href = qrCodeLink;
-    throw new Error("Redirection vers mode léger - utilisez le lien de paiement web");
-  }
-
   const proxyUrl = resolvePaymentProxyUrl();
   if (!proxyUrl) {
     throw new Error("Paiement indisponible. Utilisez la version web de Nack.");

@@ -23,8 +23,6 @@ import AdminCheck from "./pages/AdminCheck";
 import { FeatureGate } from "@/components/subscription/FeatureGate";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useOfflineCacheWarmup } from "@/hooks/useOfflineCacheWarmup";
-import { getSelectedMode, isLightMode, isFullMode, reEvaluateMode, setupVisibilityReEvaluation } from "@/lib/modeSelection";
-import { detectBrowserLevel } from "@/lib/browserDetect";
 import { isElectronRenderer } from "@/lib/platform";
 import { isProfileComplete } from "@/utils/profileComplete";
 import { lazyWithReload, isChunkLoadError, reloadOnceForStaleChunk } from "@/lib/lazyWithReload";
@@ -218,25 +216,6 @@ const router = routerFactory(routes, {
 });
 
 const App = () => {
-  useEffect(() => {
-    // Initialisation automatique du mode appareil au premier chargement
-    const selection = getSelectedMode();
-
-    // Si le mode est light ET que la détection indique unsupported → redirect /light/
-    // Filet de secours si index.html a échoué (ex: SPA navigation)
-    if (selection.mode === "light" && detectBrowserLevel() === "unsupported") {
-      const alreadyOnLight = window.location.pathname.indexOf("/light") !== -1;
-      if (!alreadyOnLight) {
-        const base = import.meta.env.BASE_URL || "/";
-        window.location.replace(base + "light/");
-        return; // Ne rien monter de plus
-      }
-    }
-
-    // Setup re-evaluation quand l'utilisateur revient dans l'app
-    setupVisibilityReEvaluation();
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

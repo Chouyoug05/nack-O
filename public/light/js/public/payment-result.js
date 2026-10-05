@@ -2,11 +2,8 @@
   var ui, api;
 
   function netlifyFn(name) {
-    var host = String(window.location.hostname || "").toLowerCase();
-    if (host === "nack.pro" || host === "www.nack.pro") {
-      return "/.netlify/functions/" + name;
-    }
-    return "https://nack.pro/.netlify/functions/" + name;
+    // Fonction Netlify sur la même origine que l'app (pas de domaine codé en dur).
+    return window.location.origin + "/.netlify/functions/" + name;
   }
 
   function formatMoney(n) {

@@ -324,11 +324,7 @@
           (icon ? icon("download", 16) : "") + ' Installer l\'application</button>';
     panel.innerHTML =
       '<div class="lg-card">' +
-        '<div class="lg-card-title">Notre histoire</div>' +
-        '<p class="lg-card-desc">NACK Pro est la plateforme gabonaise de gestion pour bars, restaurants et commerces.</p>' +
-      '</div>' +
-      '<div class="lg-card">' +
-        row("Version", "1.0.0 Light") +
+        row("Version", "1.0.0") +
         row("Support", "WhatsApp NACK") +
         '<div class="lg-card-title" style="margin-top:12px">Application</div>' +
         '<p class="lg-card-desc">Installez NACK sur votre tablette pour un accès plus rapide au quotidien.</p>' +
@@ -486,8 +482,7 @@
 
   function payNow(planType) {
     var uid = state.ctx.uid;
-    var base = api.publicBase() || "https://nack.pro";
-    base = String(base).replace("://www.nack.pro", "://nack.pro");
+    var base = api.publicBase();
     var txnId = "TXN-" + uid + "-" + Date.now();
     var amount = Math.round(Number(calcPrice(planType, state.duration)) || 0);
     var reference = "abonnement-" + planType;

@@ -39,6 +39,7 @@ import { appendElectronPaymentReturn, openPaymentUrl } from "@/lib/paymentNaviga
 import { clipboardCopy } from "@/lib/clipboard";
 import ManagerAuthDialog from "@/components/ManagerAuthDialog";
 import { useManagerAuth } from "@/hooks/useManagerAuth";
+import { generateTicketQrToken } from "@/lib/qrToken";
 type NewEventPayload = {
   title: string;
   description: string;
@@ -380,6 +381,7 @@ const EventsPage = () => {
       toast({ title: "Champs manquants", description: "Nom, email, WhatsApp et quantité requis", variant: "destructive" });
       return;
     }
+    const qrCode = generateTicketQrToken(`NACK-${reserveDialogEvent.id}`);
     const ticket: TicketDoc = {
       customerName: reserveForm.name,
       customerEmail: reserveForm.email,
@@ -388,6 +390,7 @@ const EventsPage = () => {
       totalAmount: reserveDialogEvent.ticketPrice * reserveForm.quantity,
       status: 'pending',
       purchaseDate: Date.now(),
+      qrCode,
     };
     await addDoc(eventTicketsColRef(db, user.uid, reserveDialogEvent.id), ticket);
     await generateEventTicket({
@@ -402,7 +405,7 @@ const EventsPage = () => {
       quantity: reserveForm.quantity,
       totalAmount: reserveDialogEvent.ticketPrice * reserveForm.quantity,
       currency: reserveDialogEvent.currency,
-      qrCode: `NACK-${reserveDialogEvent.id}-${reserveForm.email}-${Date.now()}`
+      qrCode
     });
     toast({ title: "Réservation enregistrée", description: "Ticket généré avec succès" });
     setReserveDialogEvent(null);

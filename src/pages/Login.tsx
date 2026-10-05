@@ -33,7 +33,7 @@ const Login = () => {
 
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { signInWithEmail, signInWithGoogle, user, profile, profileLoading, isAdmin, isAdminLoading } = useAuth();
+  const { signInWithEmail, user, profile, profileLoading, isAdmin, isAdminLoading } = useAuth();
 
   useEffect(() => {
     if (user && !profileLoading && !isAdminLoading) {
@@ -55,33 +55,6 @@ const Login = () => {
         description: getFriendlyErrorMessage(error),
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogle = async () => {
-    // Forcer le domaine canonique (www -> apex) avant de démarrer l’OAuth
-    try {
-      if (typeof window !== 'undefined') {
-        const host = window.location.hostname;
-        if (host.toLowerCase().startsWith('www.')) {
-          const target = window.location.href.replace(/^https?:\/\/www\./i, (m) => m.replace('www.', ''));
-          window.location.replace(target);
-          return;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    setIsLoading(true);
-    try {
-      await signInWithGoogle();
-      // Redirection lancée — le flux continuera au retour
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Réessayez.";
-      toast({ title: "Connexion Google échouée", description: message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }

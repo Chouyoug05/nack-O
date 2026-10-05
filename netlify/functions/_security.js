@@ -17,10 +17,11 @@ function parseBody(event) {
   }
 }
 
-/** Secret interne pour les appels serveur-à-serveur (optionnel si transactionId fourni). */
+/** Secret interne pour les appels serveur-à-serveur.
+ *  Fail-closed : si NACK_INTERNAL_SECRET n'est pas défini, toute requête est refusée. */
 function checkInternalSecret(event) {
   const expected = process.env.NACK_INTERNAL_SECRET;
-  if (!expected) return true;
+  if (!expected) return false;
   const provided =
     event.headers["x-nack-internal-secret"] ||
     event.headers["X-Nack-Internal-Secret"] ||

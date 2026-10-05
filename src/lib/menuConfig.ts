@@ -158,9 +158,18 @@ export async function regenerateTableQrToken(
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+/** Base publique du site (domaine réellement déployé), sans slash final. */
+function getPublicBaseUrl(): string {
+  const envBase = typeof import.meta !== "undefined"
+    ? (import.meta.env.VITE_PUBLIC_BASE_URL as string | undefined)
+    : undefined;
+  const fallback = typeof window !== "undefined" ? window.location.origin : "";
+  return (envBase && envBase.trim() ? envBase.trim() : fallback).replace(/\/+$/, "");
+}
+
 /** Génère l'URL publique du menu pour un établissement. */
 export function getPublicMenuUrl(uid: string, tableQrToken?: string): string {
-  const base = `https://nack.pro/light/#/menu/${uid}`;
+  const base = `${getPublicBaseUrl()}/light/#/menu/${uid}`;
   return tableQrToken ? `${base}?table=${tableQrToken}` : base;
 }
 

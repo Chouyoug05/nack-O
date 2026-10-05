@@ -14,8 +14,10 @@ console.log(`\nMode: ${dryRun ? 'DRY RUN (simulation)' : 'EXECUTION REELLE'}\n`)
 
 const postData = JSON.stringify({ dryRun });
 
+const FUNCTION_HOST = process.env.NACK_FUNCTION_HOST || 'votre-site.netlify.app';
+
 const options = {
-  hostname: 'nack.pro',
+  hostname: FUNCTION_HOST,
   port: 443,
   path: '/.netlify/functions/recover-missing-stock',
   method: 'POST',

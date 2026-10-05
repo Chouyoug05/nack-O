@@ -51,6 +51,7 @@ exports.handler = async (event) => {
         totalAmount: Number(td.totalAmount || 0),
         status: "paid",
         purchaseDate: now,
+        qrCode: String(td.qrCode || ""),
       });
       const evtRef = db.doc(`profiles/${establishmentId}/events/${payment.eventId}`);
       await evtRef.update({ ticketsSold: admin.firestore.FieldValue.increment(qty) });

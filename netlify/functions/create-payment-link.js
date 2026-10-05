@@ -1,9 +1,8 @@
-import type { Handler } from "@netlify/functions";
-import { admin } from "./_firebaseAdmin";
+const { admin } = require("./_firebaseAdmin");
 
 const SINGPAY_ENDPOINT = "https://gateway.singpay.ga/v1/ext";
 
-function env(...keys: string[]): string {
+function env(...keys) {
   for (const k of keys) {
     const v = process.env[k];
     if (typeof v === "string" && v.trim()) return v.trim();
@@ -22,13 +21,8 @@ const CORS_HEADERS = {
   "Content-Type": "application/json",
 };
 
-function json(statusCode: number, body: Record<string, unknown>) {
+function json(statusCode, body) {
   return { statusCode, headers: CORS_HEADERS, body: JSON.stringify(body) };
-}
-
-interface EstablishmentPayInfo {
-  disbursementId: string;
-  establishmentName: string;
 }
 
 /**
@@ -36,7 +30,7 @@ interface EstablishmentPayInfo {
  * Le client n'a JAMAIS le droit de choisir le bénéficiaire : on ignore
  * tout `disbursement`/`portefeuille` envoyé par le front.
  */
-async function resolveEstablishmentPayInfo(establishmentId: string): Promise<EstablishmentPayInfo | null> {
+async function resolveEstablishmentPayInfo(establishmentId) {
   if (!establishmentId) return null;
   try {
     const snap = await admin.firestore().doc(`profiles/${establishmentId}`).get();
@@ -51,7 +45,7 @@ async function resolveEstablishmentPayInfo(establishmentId: string): Promise<Est
   }
 }
 
-export const handler: Handler = async (event) => {
+exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: CORS_HEADERS, body: "" };
   }
@@ -73,9 +67,9 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    let input: Record<string, unknown> = {};
+    let input = {};
     try {
-      input = JSON.parse(event.body || "{}") as Record<string, unknown>;
+      input = JSON.parse(event.body || "{}");
     } catch {
       return json(400, { error: "Corps JSON invalide" });
     }
@@ -95,7 +89,7 @@ export const handler: Handler = async (event) => {
       });
     }
 
-    const payload: Record<string, unknown> = {
+    const payload = {
       reference: input.reference || `nack-${Date.now()}`,
       redirect_success: input.redirect_success || input.redirectSuccess || "",
       redirect_error: input.redirect_error || input.redirectError || "",
@@ -125,7 +119,7 @@ export const handler: Handler = async (event) => {
       body: text.slice(0, 1000),
       payload: { ...payload, portefeuille: "***" },
       hasDisbursement: !!payInfo,
-      disbursementId: payInfo?.disbursementId || "(none)",
+      disbursementId: payInfo ? payInfo.disbursementId : "(none)",
     });
     if (!res.ok) {
       // Ne pas renvoyer un 500 opaque : message exploitable côté app
@@ -138,7 +132,7 @@ export const handler: Handler = async (event) => {
 
     // Renvoyer le JSON SingPay tel quel (attendu: { link, exp })
     try {
-      const data = JSON.parse(text) as Record<string, unknown>;
+      const data = JSON.parse(text);
       return json(200, data);
     } catch {
       return {

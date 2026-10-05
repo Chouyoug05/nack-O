@@ -16,13 +16,6 @@
 
 # SPA fallback défini via public/_redirects (copié vers dist/_redirects au build) 
 
-# Redirections explicites (Netlify)
-[[redirects]]
-  from = "https://www.nack.pro/*"
-  to = "https://nack.pro/:splat"
-  status = 301
-  force = true
-
 # Les fichiers /assets/* existants sont servis en priorité.
 # Si un chunk hashé est absent (cache index.html obsolète), renvoyer 404
 # au lieu de index.html — sinon le navigateur charge du HTML en MIME "module".

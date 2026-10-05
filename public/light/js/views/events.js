@@ -202,7 +202,7 @@
   function payExtra() {
     var extra = 1000;
     if (sub.PLANS && sub.PLANS.transition) extra = sub.PLANS.transition.features.eventsExtraPrice || 1000;
-    var base = (api.publicBase() || "https://nack.pro").replace("://www.nack.pro", "://nack.pro");
+    var base = api.publicBase();
     var txnId = "EVT-EXTRA-" + Date.now();
     ui.toast("Préparation du paiement…", "ok");
     api.createPaymentLink({
